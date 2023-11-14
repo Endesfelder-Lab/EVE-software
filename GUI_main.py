@@ -28,7 +28,8 @@ class MyGUI(QMainWindow):
         # Create a dictionary to store the entries
         self.entries = {}
         
-        
+        #Dictionary that stores all data in the GUI
+        self.data = {}
         
         #Set some major settings on the UI
         super().__init__()
