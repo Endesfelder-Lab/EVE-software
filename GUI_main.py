@@ -1,6 +1,6 @@
 # from csbdeep.io import save_tiff_imagej_compatible
 # from stardist import _draw_polygons, export_imagej_rois
-import sys, os, logging, json
+import sys, os, logging, json, argparse
 # Add the folder 2 folders up to the system path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -22,8 +22,16 @@ from PyQt5.QtWidgets import QApplication, QLayout, QMainWindow, QLabel, QPushBut
 
 class MyGUI(QMainWindow):
     def __init__(self):
-        self.unique_id = 0
-        logging.basicConfig(level=logging.DEBUG)
+        #Create parser
+        parser = argparse.ArgumentParser(description='Glados-PycroManager-Napari: an interface for autonomous microscopy via PycroManager')
+        parser.add_argument('--debug', '-d', action='store_true', help='Enable debug')
+        args=parser.parse_args()
+        if args.debug:
+            log_format = "%(asctime)s [%(levelname)s] %(filename)s:%(lineno)d - %(message)s"
+            logging.basicConfig(format=log_format, level=logging.DEBUG)
+        else:
+            logging.basicConfig(level=logging.INFO)
+        # logging.basicConfig(level=logging.DEBUG)
 
         # Create a dictionary to store the entries
         self.entries = {}
@@ -31,6 +39,7 @@ class MyGUI(QMainWindow):
         #Dictionary that stores all data in the GUI
         self.data = {}
         
+        self.unique_id = 0
         #Set some major settings on the UI
         super().__init__()
         self.setWindowTitle("EBS fitting - Endesfelder lab - Nov 2023")
