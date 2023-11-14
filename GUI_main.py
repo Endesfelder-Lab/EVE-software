@@ -23,7 +23,7 @@ from PyQt5.QtWidgets import QApplication, QLayout, QMainWindow, QLabel, QPushBut
 class MyGUI(QMainWindow):
     def __init__(self):
         #Create parser
-        parser = argparse.ArgumentParser(description='Glados-PycroManager-Napari: an interface for autonomous microscopy via PycroManager')
+        parser = argparse.ArgumentParser(description='EBS fitting - Endesfelder lab - Nov 2023')
         parser.add_argument('--debug', '-d', action='store_true', help='Enable debug')
         args=parser.parse_args()
         if args.debug:
