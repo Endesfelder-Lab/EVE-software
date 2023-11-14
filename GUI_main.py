@@ -92,6 +92,9 @@ class MyGUI(QMainWindow):
         
         print(self.get_editable_fields())
         
+        #Loop through all combobox states briefly to initialise them (and hide them)
+        self.set_all_combobox_states()
+        
     def setup_tab(self, tab_name):
         tab_mapping = {
             'Processing': self.setup_processing,
@@ -112,14 +115,14 @@ class MyGUI(QMainWindow):
         #Add a group box on candiddate fitting
         self.groupboxFinding = QGroupBox("Candidate finding")
         self.groupboxFinding.setObjectName("groupboxFinding")
-        self.groupboxFinding.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
+        self.groupboxFinding.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.groupboxFinding.setLayout(QGridLayout())
         tab_layout.addWidget(self.groupboxFinding, 0, 0)
         
         
         self.groupboxFitting = QGroupBox("Candidate fitting")
         self.groupboxFitting.setObjectName("groupboxFitting")
-        self.groupboxFinding.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
+        self.groupboxFinding.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.groupboxFitting.setLayout(QGridLayout())
         tab_layout.addWidget(self.groupboxFitting, 1, 0)
 
@@ -419,10 +422,12 @@ class MyGUI(QMainWindow):
                     if isinstance(field_widget, QLineEdit):
                         if 'QLineEdit' in runParams:
                             field_widget.setText(self.entries[field_name])
+                            logging.debug('Set text of field_widget '+field_name+' to '+self.entries[field_name])
                     elif isinstance(field_widget, QComboBox):
                         if 'QComboBox' in runParams:
                             index = field_widget.findText(self.entries[field_name])
                             if index >= 0:
+                                logging.debug('Set text of field_widget '+field_name+' to '+self.entries[field_name])
                                 field_widget.setCurrentIndex(index)
                                 #Also change the lineedits and such:
                                 self.changeLayout_choice(self.groupboxFinding.layout(),field_widget.objectName())
@@ -445,6 +450,26 @@ class MyGUI(QMainWindow):
         find_editable_fields(self)
         return fields
 
+    def set_all_combobox_states(self):
+        original_states = {}
+
+        def set_combobox_states(widget):
+            if isinstance(widget, QComboBox):
+                original_states[widget] = widget.currentIndex()
+                for i in range(widget.count()):
+                    logging.debug('Set text of combobox '+widget.objectName()+' to '+widget.itemText(i))
+                    widget.setCurrentIndex(i)
+                    #Update all line edits and such
+                    self.changeLayout_choice(self.groupboxFinding.layout(),widget.objectName())
+            elif isinstance(widget, QWidget):
+                for child_widget in widget.children():
+                    set_combobox_states(child_widget)
+
+        set_combobox_states(self)
+        # Reset to orig states
+        for combobox, original_state in original_states.items():
+            combobox.setCurrentIndex(original_state)
+            self.changeLayout_choice(self.groupboxFinding.layout(),combobox.objectName())
 
 
 
