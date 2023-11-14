@@ -1,6 +1,6 @@
 # from csbdeep.io import save_tiff_imagej_compatible
 # from stardist import _draw_polygons, export_imagej_rois
-import sys, os, logging
+import sys, os, logging, json
 # Add the folder 2 folders up to the system path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -24,6 +24,9 @@ class MyGUI(QMainWindow):
     def __init__(self):
         self.unique_id = 0
         logging.basicConfig(level=logging.DEBUG)
+
+        # Create a dictionary to store the entries
+        self.entries = {}
         
         
         
@@ -75,7 +78,20 @@ class MyGUI(QMainWindow):
         self.setup_tab('Save/Load')
         self.setup_tab('LocalizationList')
         
+         # Create a button to trigger saving the entries
+        self.save_button = QPushButton("Save", self)
+        self.save_button.clicked.connect(self.save_entries_to_json)
+        self.layout.addWidget(self.save_button, 4, 0)
+         # Create a button to trigger loading the entries
+        self.load_button = QPushButton("Load", self)
+        self.load_button.clicked.connect(self.load_entries_from_json)
+        self.layout.addWidget(self.load_button, 5, 0)
 
+        # # Load the entries from the JSON file
+        # self.load_entries_from_json()
+        
+        print(self.get_editable_fields())
+        
     def setup_tab(self, tab_name):
         tab_mapping = {
             'Processing': self.setup_processing,
@@ -182,13 +198,15 @@ class MyGUI(QMainWindow):
             #Value is used for scoring, and takes the output of the method
             if reqKwargs[k] != 'methodValue':
                 label = QLabel(f"<b>{reqKwargs[k]}</b>")
-                curr_layout.addWidget(label,2+(k)+labelposoffset,0)
-                label.setToolTip(utils.infoFromMetadata(curr_dropdown.currentText(),specificKwarg=reqKwargs[k]))
+                label.setObjectName(f"Label_{self.unique_id}#{curr_dropdown.currentText()}#{reqKwargs[k]}")
+                if self.checkAndShowWidget(curr_layout,label.objectName()) == False:
+                    label.setToolTip(utils.infoFromMetadata(curr_dropdown.currentText(),specificKwarg=reqKwargs[k]))
+                    curr_layout.addWidget(label,2+(k)+labelposoffset,0)
                 line_edit = QLineEdit()
                 line_edit.setObjectName(f"LineEdit_{self.unique_id}#{curr_dropdown.currentText()}#{reqKwargs[k]}")
-                line_edit.setToolTip(utils.infoFromMetadata(curr_dropdown.currentText(),specificKwarg=reqKwargs[k]))
-                self.unique_id+=1
-                curr_layout.addWidget(line_edit,2+k+labelposoffset,1)
+                if self.checkAndShowWidget(curr_layout,line_edit.objectName()) == False:
+                    line_edit.setToolTip(utils.infoFromMetadata(curr_dropdown.currentText(),specificKwarg=reqKwargs[k]))
+                    curr_layout.addWidget(line_edit,2+k+labelposoffset,1)
             else:
                 labelposoffset -= 1
             
@@ -197,15 +215,31 @@ class MyGUI(QMainWindow):
         #Add a widget-pair for every kwarg
         for k in range(len(optKwargs)):
             label = QLabel(f"<i>{optKwargs[k]}</i>")
-            label.setToolTip(utils.infoFromMetadata(curr_dropdown.currentText(),specificKwarg=optKwargs[k]))
-            curr_layout.addWidget(label,2+(k)+len(reqKwargs)+labelposoffset,0)
+            label.setObjectName(f"Label_{self.unique_id}#{curr_dropdown.currentText()}#{optKwargs[k]}")
+            if self.checkAndShowWidget(curr_layout,label.objectName()) == False:
+                label.setToolTip(utils.infoFromMetadata(curr_dropdown.currentText(),specificKwarg=optKwargs[k]))
+                curr_layout.addWidget(label,2+(k)+len(reqKwargs)+labelposoffset,0)
             line_edit = QLineEdit()
             line_edit.setObjectName(f"LineEdit_{self.unique_id}#{curr_dropdown.currentText()}#{optKwargs[k]}")
-            line_edit.setToolTip(utils.infoFromMetadata(curr_dropdown.currentText(),specificKwarg=optKwargs[k]))
-            self.unique_id+=1
-            curr_layout.addWidget(line_edit,2+(k)+len(reqKwargs)+labelposoffset,1)
-        
-
+            if self.checkAndShowWidget(curr_layout,line_edit.objectName()) == False:
+                line_edit.setToolTip(utils.infoFromMetadata(curr_dropdown.currentText(),specificKwarg=optKwargs[k]))
+                curr_layout.addWidget(line_edit,2+(k)+len(reqKwargs)+labelposoffset,1)
+    
+    def checkAndShowWidget(self,layout, widgetName):
+        # Iterate over the layout's items
+        for index in range(layout.count()):
+            item = layout.itemAt(index)
+            # Check if the item is a widget
+            if item.widget() is not None:
+                widget = item.widget()
+                # Check if the widget has the desired name
+                if widget.objectName() == widgetName:
+                    # Widget already exists, unhide it
+                    widget.show()
+                    return
+        return False
+                
+    
     #Remove everythign in this layout except className_dropdown
     def resetLayout(self,curr_layout,className):
         for index in range(curr_layout.count()):
@@ -215,9 +249,8 @@ class MyGUI(QMainWindow):
                 widget = widget_item.widget()
                 #If it's the dropdown segment, label it as such
                 if not ("candidateFindingDropdown" in widget.objectName()) and not ("scoringDropdown" in widget.objectName()) and widget.objectName() != f"titleLabel_{className}" and not ("KEEP" in widget.objectName()):
-                    logging.debug(f"Deleting {widget.objectName()}")
-                    widget.deleteLater()
-    
+                    logging.debug(f"Hiding {widget.objectName()}")
+                    widget.hide()
     
     def getMethodDropdownInfo(self,curr_layout,className):
         curr_dropdown = []
@@ -278,7 +311,6 @@ class MyGUI(QMainWindow):
         # optKwargs = utils.optKwargsFromFunction(curr_dropdown.currentText())
         # #Get the values from the line edits
         
-
     def getEvalTextFromGUIFunction(self, methodName, methodKwargNames, methodKwargValues, partialStringStart=None, removeKwargs=None):
     #--------------------------------------------------------------------------------------------------------------------------------------------------------------------
     #methodName: the physical name of the method, i.e. StarDist.StarDistSegment
@@ -350,24 +382,72 @@ class MyGUI(QMainWindow):
             else:
                 print('SOMETHING VERY STUPID HAPPENED')
                 return None
-# testImageLoc = "./AutonomousMicroscopy/ExampleData/BF_test_avg.tiff"
 
-# # Open the TIFF file
-# with tifffile.TiffFile(testImageLoc) as tiff:
-#     # Read the image data
-#     ImageData = tiff.asarray()
+    def save_entries_to_json(self):
+        # Iterate over all editable fields and store their values in the entries dictionary
+        for field_name, field_widget in self.get_editable_fields().items():
+            if isinstance(field_widget, QLineEdit):
+                self.entries[field_name] = field_widget.text()
+            elif isinstance(field_widget, QComboBox):
+                self.entries[field_name] = field_widget.currentText()
 
-# #Non-preloaded stardistsegmentation
-# coords = eval(HelperFunctions.createFunctionWithKwargs("StarDist.StarDistSegment",image_data="ImageData",modelStorageLoc="\"./AutonomousMicroscopy/ExampleData/StarDistModel\"",prob_thresh="0.35",nms_thresh="0.2"))
+        # Specify the path and filename for the JSON file
+        json_file_path = "GUI/storage.json"
 
-# coordim = outlineCoordinatesToImage(coords)
+        # Write the entries dictionary to the JSON file
+        with open(json_file_path, "w") as json_file:
+            json.dump(self.entries, json_file)
+    
+    def load_entries_from_json(self):
+        #First set all comboboxes
+        self.load_entries_from_json_single(runParams=['QComboBox'])
+        #Then set all line edits
+        self.load_entries_from_json_single(runParams=['QLineEdit'])
+    
+    def load_entries_from_json_single(self,runParams=['QLineEdit','QComboBox']):
+        # Specify the path and filename for the JSON file
+        json_file_path = "GUI/storage.json"
 
-# #Three examples
-# cellCrowdedness = eval(HelperFunctions.createFunctionWithKwargs("SimpleCellOperants.nrneighbours_basedonCellWidth",outline_coords="coords",multiple_cellWidth_lookup="1"))
-# cellCrowdedness_gauss=eval(HelperFunctions.createFunctionWithKwargs("DefaultScoringMetrics.gaussScore",methodValue="cellCrowdedness",meanVal="3",sigmaVal="2"))
+        try:
+            # Load the entries from the JSON file
+            with open(json_file_path, "r") as json_file:
+                self.entries = json.load(json_file)
 
-# cellArea = eval(HelperFunctions.createFunctionWithKwargs("SimpleCellOperants.cellArea",outline_coords="coords"))
-# cellArea_bounds=eval(HelperFunctions.createFunctionWithKwargs("DefaultScoringMetrics.lowerUpperBound",methodValue="cellArea",lower_bound="300",upper_bound="500"))
+            # Set the values of the editable fields from the loaded entries
+            for field_name, field_widget in self.get_editable_fields().items():
+                if field_name in self.entries:
+                    if isinstance(field_widget, QLineEdit):
+                        if 'QLineEdit' in runParams:
+                            field_widget.setText(self.entries[field_name])
+                    elif isinstance(field_widget, QComboBox):
+                        if 'QComboBox' in runParams:
+                            index = field_widget.findText(self.entries[field_name])
+                            if index >= 0:
+                                field_widget.setCurrentIndex(index)
+                                #Also change the lineedits and such:
+                                self.changeLayout_choice(self.groupboxFinding.layout(),field_widget.objectName())
+        
 
-# cellAssym = eval(HelperFunctions.createFunctionWithKwargs("SimpleCellOperants.lengthWidthRatio",outline_coords="coords"))
-# cellAssym_relativeToMax = eval(HelperFunctions.createFunctionWithKwargs("DefaultScoringMetrics.relativeToMaxScore",methodValue="cellAssym"))
+        except FileNotFoundError:
+            # Handle the case when the JSON file doesn't exist yet
+            pass
+        
+    def get_editable_fields(self):
+        fields = {}
+
+        def find_editable_fields(widget):
+            if isinstance(widget, QLineEdit) or isinstance(widget, QComboBox):
+                fields[widget.objectName()] = widget
+            elif isinstance(widget, QWidget):
+                for child_widget in widget.children():
+                    find_editable_fields(child_widget)
+
+        find_editable_fields(self)
+        return fields
+
+
+
+
+
+
+
