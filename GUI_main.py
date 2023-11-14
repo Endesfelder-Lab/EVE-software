@@ -284,7 +284,7 @@ class MyGUI(QMainWindow):
             item = all_layouts.itemAt(index)
             widget = item.widget()
             
-            if ("LineEdit" in widget.objectName()):
+            if ("LineEdit" in widget.objectName()) and widget.isVisible():
                 # The objectName will be along the lines of foo#bar#str
                 #Check if the objectname is part of a method or part of a scoring
                 split_list = widget.objectName().split('#')

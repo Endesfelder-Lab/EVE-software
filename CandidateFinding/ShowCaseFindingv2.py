@@ -32,16 +32,16 @@ def __function_metadata__():
 def FunctionOneV2(**kwargs):
     #Check if we have the required kwargs
     [provided_optional_args, missing_optional_args] = utilsHelper.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
-    if "okwarg_1" in provided_optional_args:
-        okwarg1 = float(kwargs["okwarg_1"])
+    if "okw_1" in provided_optional_args:
+        okwarg1 = float(kwargs["okw_1"])
     else:
         #Default okwarg1 value
         okwarg1 = 1
     print('Function one ran!')
-    return (float(kwargs["rkwarg_1"])+float(kwargs["rkwarg_2"]))*okwarg1
+    return (float(kwargs["rkw_1"])+float(kwargs["rkw_2"]))*okwarg1
 
 def FunctionTwoV2(**kwargs):
     #Check if we have the required kwargs
     [provided_optional_args, missing_optional_args] = utilsHelper.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
     print('Function Two ran!')
-    return (kwargs["rkwarg_1"])
+    return (kwargs["rkw_1"])
