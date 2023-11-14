@@ -31,7 +31,6 @@ class MyGUI(QMainWindow):
             logging.basicConfig(format=log_format, level=logging.DEBUG)
         else:
             logging.basicConfig(level=logging.INFO)
-        # logging.basicConfig(level=logging.DEBUG)
 
         # Create a dictionary to store the entries
         self.entries = {}
