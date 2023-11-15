@@ -108,6 +108,7 @@ class MyGUI(QMainWindow):
         globalSettings['StoreConvertedRawData'] = True
         globalSettings['StoreFileMetadata'] = True
         globalSettings['StoreFinalOutput'] = True
+        globalSettings['StoreFindingOutput'] = True
         return globalSettings
     
     # Function to handle the button click event
@@ -422,6 +423,8 @@ class MyGUI(QMainWindow):
                 self.data['FindingResult'] = eval(str(FindingEvalText))
                 logging.info('Candidate finding done!')
                 logging.debug(self.data['FindingResult'])
+                if self.globalSettings['StoreFindingOutput']:
+                    self.storeFindingOutput()
                 #Run the finding function!
                 FittingEvalText = self.getFunctionEvalText('Fitting',"self.data['FindingResult'][0]","self.globalSettings")
                 if FittingEvalText is not None:
@@ -447,13 +450,15 @@ class MyGUI(QMainWindow):
         #Store the localization output
         self.data['FittingResult'][0].to_csv(self.currentFileInfo['CurrentFileLoc'][:-4]+'_FitResults_'+datetime.datetime.now().strftime("%Y%m%d_%H%M%S")+'.csv')
         logging.info('Fitting results output stored')
+        
+    def storeFindingOutput(self):
+        logging.debug('Attempting to store finding results output')
+        #Store the Finding results output
+        np.save(self.currentFileInfo['CurrentFileLoc'][:-4]+'_FindingResults_'+datetime.datetime.now().strftime("%Y%m%d_%H%M%S")+'.npy',self.data['FindingResult'][0])
+        logging.info('Finding results output stored')
     
     def createAndStoreFileMetadata(self):
         logging.debug('Attempting to create and store file metadata')
-        
-        #Get the current chosen finding function and its parameters:
-        
-        
         try:
             metadatastring = f"""Metadata information for file {self.currentFileInfo['CurrentFileLoc']}
 Analysis routine finished at {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
