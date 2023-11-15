@@ -1,6 +1,6 @@
 # from csbdeep.io import save_tiff_imagej_compatible
 # from stardist import _draw_polygons, export_imagej_rois
-import sys, os, logging, json, argparse, datetime
+import sys, os, logging, json, argparse, datetime, glob
 import numpy as np
 # Add the folder 2 folders up to the system path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -112,10 +112,16 @@ class MyGUI(QMainWindow):
     # Function to handle the button click event
     def datasetSearchButtonClicked(self):
         logging.debug('data lookup search button clicked')
-        file_path, _ = QFileDialog.getOpenFileName(self, "Select File")
+        file_path, _ = QFileDialog.getOpenFileName(self, "Select File",filter="EBS files (*.raw *.npy);;All Files (*)")
         if file_path:
             self.dataLocationInput.setText(file_path)
-        
+    
+    def datasetFolderButtonClicked(self):
+        logging.debug('data lookup Folder button clicked')
+        folder_path = QFileDialog.getExistingDirectory(self, "Select Folder")
+        if folder_path:
+            self.dataLocationInput.setText(folder_path)
+    
     def setup_tab(self, tab_name):
         tab_mapping = {
             'Processing': self.setup_processing,
@@ -139,15 +145,18 @@ class MyGUI(QMainWindow):
         
         # Add a label:
         self.datasetLocation_label = QLabel("Dataset location:")
-        self.datasetLocation_layout.addWidget(self.datasetLocation_label, 0, 0)
+        self.datasetLocation_layout.addWidget(self.datasetLocation_label, 0, 0,2,1)
         # Create the input field
         self.dataLocationInput = QLineEdit()
         self.dataLocationInput.setObjectName("processing_dataLocationInput")
-        self.datasetLocation_layout.layout().addWidget(self.dataLocationInput, 0, 1)
+        self.datasetLocation_layout.layout().addWidget(self.dataLocationInput, 0, 1,2,1)
         # Create the search button
-        self.datasetSearchButton = QPushButton("Search")
+        self.datasetSearchButton = QPushButton("File...")
         self.datasetSearchButton.clicked.connect(self.datasetSearchButtonClicked)
         self.datasetLocation_layout.layout().addWidget(self.datasetSearchButton, 0, 2)
+        self.datasetFolderButton = QPushButton("Folder...")
+        self.datasetFolderButton.clicked.connect(self.datasetFolderButtonClicked)
+        self.datasetLocation_layout.layout().addWidget(self.datasetFolderButton, 1, 2)
         #Add the global settings group box to the central widget
         # self.layout.addWidget(self.datasetsSettingsGroupBox, 1, 0)
 
@@ -338,6 +347,7 @@ class MyGUI(QMainWindow):
             events = np.load(filepath[:-4]+'.npy')
             logging.info('NPY file from RAW was already present, loading this instead of RAW!')
         else:
+            logging.info('Starting to convert NPY to RAW...')
             # Add /usr/lib/python3/dist-packages/ to PYTHONPATH to include Metavision libraries
             sys.path.append("C:\Program Files\Prophesee\lib\python3\site-packages") 
             from metavision_core.event_io.raw_reader import RawReader
@@ -366,21 +376,55 @@ class MyGUI(QMainWindow):
             logging.info('Raw data loaded')
         return events
             
+    def find_raw_npy_files(self,directory):
+        raw_files = glob.glob(os.path.join(directory, "*.raw"))
+        npy_files = glob.glob(os.path.join(directory, "*.npy"))
+        files = npy_files+raw_files
+
+        unique_files = []
+        file_names = set()
+
+        for file in files:
+            file_name = os.path.splitext(file)[0]
+            if file_name not in file_names:
+                unique_files.append(file)
+                file_names.add(file_name)
+
+        return unique_files
+    
     def run_processing(self):
-        #Load the data:
-        #Later to do: run this over a folder if a folder is selected
-        self.currentFileInfo['CurrentFileLoc'] = self.dataLocationInput.text()
-        npyData = self.loadRawData(self.dataLocationInput.text())
+        #Check if a folder or file is selected:
+        if os.path.isdir(self.dataLocationInput.text()):
+            #Find all .raw or .npy files that have unique names except for the extension (and prefer .npy):
+            allFiles = self.find_raw_npy_files(self.dataLocationInput.text())
+            logging.debug('Running folder analysis on files :')
+            logging.debug(allFiles)
+            for file in allFiles:
+                try:
+                    logging.info('Starting to process file '+file)
+                    self.processSingleFile(file)
+                    logging.info('Successfully processed file '+file)
+                except:
+                    logging.error('Error in processing file '+file)
+        elif os.path.isfile(self.dataLocationInput.text()):
+            self.processSingleFile(self.dataLocationInput.text())
+    
+    def processSingleFile(self,FileName):
+        #Run the analysis on a single file
+        self.currentFileInfo['CurrentFileLoc'] = FileName
+        npyData = self.loadRawData(FileName)
         if npyData is not None:
             #Run the finding function!
             FindingEvalText = self.getFunctionEvalText('Finding',"npyData","self.globalSettings")
             if FindingEvalText is not None:
+                self.data['FindingMethod'] = str(FindingEvalText)
                 self.data['FindingResult'] = eval(str(FindingEvalText))
                 logging.info('Candidate finding done!')
                 logging.debug(self.data['FindingResult'])
                 #Run the finding function!
                 FittingEvalText = self.getFunctionEvalText('Fitting',"self.data['FindingResult'][0]","self.globalSettings")
                 if FittingEvalText is not None:
+                    self.data['FittingMethod'] = str(FittingEvalText)
                     self.data['FittingResult'] = eval(str(FittingEvalText))
                     logging.info('Candidate fitting done!')
                     logging.debug(self.data['FittingResult'])
@@ -393,19 +437,29 @@ class MyGUI(QMainWindow):
                     logging.error('Candidate fitting NOT performed')
             else:
                 logging.error('Candidate finding NOT performed')
-        #To be done
-        pass
     
     def createAndStoreFileMetadata(self):
         logging.debug('Attempting to create and store file metadata')
+        
+        #Get the current chosen finding function and its parameters:
+        
+        
         try:
             metadatastring = f"""Metadata information for file {self.currentFileInfo['CurrentFileLoc']}
 Analysis routine finished at {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 
 ---- Finding metadata output: ----
+Methodology used:
+{self.data['FindingMethod']}
+
+Custom output from finding function:
 {self.data['FindingResult'][1]}
 
 ---- Fitting metadata output: ----
+Methodology used:
+{self.data['FittingMethod']}
+
+Custom output from fitting function:
 {self.data['FittingResult'][1]}
             """
             #Store this metadatastring:
