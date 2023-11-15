@@ -9,7 +9,7 @@ from Utils import utilsHelper
 
 #Import all scripts in the custom script folders
 from CandidateFinding import *
-# from CandidateFitting import *
+from CandidateFitting import *
 
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
 # -----------------------------------------------------------------------------------------------------------------------------------------------------

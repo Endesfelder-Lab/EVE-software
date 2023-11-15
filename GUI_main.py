@@ -6,7 +6,7 @@ import numpy as np
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 #Import all scripts in the custom script folders
-# from CandidateFitting import *
+from CandidateFitting import *
 from CandidateFinding import *
 #Obtain the helperfunctions
 from Utils import utils, utilsHelper
@@ -155,19 +155,7 @@ class MyGUI(QMainWindow):
         self.groupboxFinding.setLayout(QGridLayout())
         tab_layout.addWidget(self.groupboxFinding, 1, 0)
         
-        
-        self.groupboxFitting = QGroupBox("Candidate fitting")
-        self.groupboxFitting.setObjectName("groupboxFitting")
-        self.groupboxFinding.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.groupboxFitting.setLayout(QGridLayout())
-        tab_layout.addWidget(self.groupboxFitting, 2, 0)
-
-        # self.button = QPushButton("Click me")
-        # self.button.clicked.connect(self.on_button_click)
-        # self.groupboxFitting.layout().addWidget(self.button, 1, 0)
-        
-        
-        # Create a QComboBox and add options - this is the METHOD dropdown
+        # Create a QComboBox and add options - this is the FINDING dropdown
         self.candidateFindingDropdown = QComboBox(self)
         options = utils.functionNamesFromDir('CandidateFinding')
         self.candidateFindingDropdown.setObjectName("CandidateFinding_candidateFindingDropdown")
@@ -177,8 +165,29 @@ class MyGUI(QMainWindow):
         #Activation for candidateFindingDropdown.activated
         self.candidateFindingDropdown.activated.connect(lambda: self.changeLayout_choice(self.groupboxFinding.layout(),"CandidateFinding_candidateFindingDropdown"))
         
+        
         #On startup/initiatlisation: also do changeLayout_choice
         self.changeLayout_choice(self.groupboxFinding.layout(),"CandidateFinding_candidateFindingDropdown")
+        
+        
+        self.groupboxFitting = QGroupBox("Candidate fitting")
+        self.groupboxFitting.setObjectName("groupboxFitting")
+        self.groupboxFitting.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.groupboxFitting.setLayout(QGridLayout())
+        tab_layout.addWidget(self.groupboxFitting, 2, 0)
+        
+        # Create a QComboBox and add options - this is the FITTING dropdown
+        self.candidateFittingDropdown = QComboBox(self)
+        options = utils.functionNamesFromDir('CandidateFitting')
+        self.candidateFittingDropdown.setObjectName("CandidateFitting_candidateFittingDropdown")
+        self.candidateFittingDropdown.addItems(options)
+        #Add the candidateFindingDropdown to the layout
+        self.groupboxFitting.layout().addWidget(self.candidateFittingDropdown,1,0,1,2)
+        #Activation for candidateFindingDropdown.activated
+        self.candidateFittingDropdown.activated.connect(lambda: self.changeLayout_choice(self.groupboxFitting.layout(),"CandidateFitting_candidateFittingDropdown"))
+        
+        #On startup/initiatlisation: also do changeLayout_choice
+        self.changeLayout_choice(self.groupboxFitting.layout(),"CandidateFitting_candidateFittingDropdown")
         
         
         #Add a run button:
@@ -226,6 +235,7 @@ class MyGUI(QMainWindow):
         self.resetLayout(curr_layout,className)
         #Get the dropdown info
         curr_dropdown = self.getMethodDropdownInfo(curr_layout,className)
+        print(curr_dropdown.currentText())
         #Get the kw-arguments from the current dropdown.
         reqKwargs = utils.reqKwargsFromFunction(curr_dropdown.currentText())
         #Add a widget-pair for every kwarg
@@ -284,7 +294,7 @@ class MyGUI(QMainWindow):
             if widget_item.widget() is not None:
                 widget = widget_item.widget()
                 #If it's the dropdown segment, label it as such
-                if not ("candidateFindingDropdown" in widget.objectName()) and not ("scoringDropdown" in widget.objectName()) and widget.objectName() != f"titleLabel_{className}" and not ("KEEP" in widget.objectName()):
+                if not ("candidateFindingDropdown" in widget.objectName()) and not ("candidateFittingDropdown" in widget.objectName()) and widget.objectName() != f"titleLabel_{className}" and not ("KEEP" in widget.objectName()):
                     logging.debug(f"Hiding {widget.objectName()}")
                     widget.hide()
     
@@ -319,55 +329,50 @@ class MyGUI(QMainWindow):
             return None
     
     def run_processing(self):
-        #------------------------------------------------
-        # Candidate finding
-        # -----------------------------------------------
-        
         #Load the data:
         #Later to do: run this over a folder if a folder is selected
         #Later to do: go from .raw to .npy if needed
         npyData = self.loadRawData()
         if npyData is not None:
-            
-            
-            
-            #First runf for finding:
-            #Get the dropdown info
-            moduleMethodEvalTexts = []
-            methodName_finding = self.candidateFindingDropdown.currentText()
-            all_layouts = self.findChild(QWidget, "groupboxFinding").findChildren(QLayout)[0]
-            
-            methodKwargNames_method = []
-            methodKwargValues_method = []
-            methodName_method = ''
-            # Iterate over the items in the layout
-            for index in range(all_layouts.count()):
-                item = all_layouts.itemAt(index)
-                widget = item.widget()
-                
-                if ("LineEdit" in widget.objectName()) and widget.isVisible():
-                    # The objectName will be along the lines of foo#bar#str
-                    #Check if the objectname is part of a method or part of a scoring
-                    split_list = widget.objectName().split('#')
-                    methodName_method = split_list[1]
-                    methodKwargNames_method.append(split_list[2])
-                    methodKwargValues_method.append(widget.text())
-            
-            #Function call: get the to-be-evaluated text out, giving the methodName, method KwargNames, methodKwargValues, and 'function Type (i.e. cellSegmentScripts, etc)' - do the same with scoring as with method
-            if methodName_method != '':
-                EvalTextMethod = self.getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart='npyData,self.globalSettings')
-                #append this to moduleEvalTexts
-                moduleMethodEvalTexts.append(EvalTextMethod)
-            
-            #Run the function!
-            candidateFindingOutput = eval(str(moduleMethodEvalTexts[0]))
+            #Run the finding function!
+            candidateFindingOutput = eval(str(self.getFunctionEvalText('Finding',"npyData","self.globalSettings")))
+            print('Candidate finding done!')
             print(candidateFindingOutput)
-        #------------------------------------------------
-        # Candidate fitting
-        # -----------------------------------------------
+            #Run the finding function!
+            candidateFittingOutput = eval(str(self.getFunctionEvalText('Fitting',"candidateFindingOutput[0]","self.globalSettings")))
+            print('Candidate fitting done!')
+            print(candidateFittingOutput)
         #To be done
         pass
+    def getFunctionEvalText(self,className,p1,p2):
+        #Get the dropdown info
+        moduleMethodEvalTexts = []
+        all_layouts = self.findChild(QWidget, "groupbox"+className).findChildren(QLayout)[0]
         
+        methodKwargNames_method = []
+        methodKwargValues_method = []
+        methodName_method = ''
+        # Iterate over the items in the layout
+        for index in range(all_layouts.count()):
+            item = all_layouts.itemAt(index)
+            widget = item.widget()
+            
+            if ("LineEdit" in widget.objectName()) and widget.isVisible():
+                # The objectName will be along the lines of foo#bar#str
+                #Check if the objectname is part of a method or part of a scoring
+                split_list = widget.objectName().split('#')
+                methodName_method = split_list[1]
+                methodKwargNames_method.append(split_list[2])
+                methodKwargValues_method.append(widget.text())
+        
+        #Function call: get the to-be-evaluated text out, giving the methodName, method KwargNames, methodKwargValues, and 'function Type (i.e. cellSegmentScripts, etc)' - do the same with scoring as with method
+        if methodName_method != '':
+            EvalTextMethod = self.getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart=str(p1)+','+str(p2))
+            #append this to moduleEvalTexts
+            moduleMethodEvalTexts.append(EvalTextMethod)
+        
+        return moduleMethodEvalTexts[0]
+                
     def getEvalTextFromGUIFunction(self, methodName, methodKwargNames, methodKwargValues, partialStringStart=None, removeKwargs=None):
     #--------------------------------------------------------------------------------------------------------------------------------------------------------------------
     #methodName: the physical name of the method, i.e. StarDist.StarDistSegment
@@ -484,7 +489,10 @@ class MyGUI(QMainWindow):
                                 logging.debug('Set text of field_widget '+field_name+' to '+self.entries[field_name])
                                 field_widget.setCurrentIndex(index)
                                 #Also change the lineedits and such:
-                                self.changeLayout_choice(self.groupboxFinding.layout(),field_widget.objectName())
+                                if 'Finding' in field_widget.objectName():
+                                    self.changeLayout_choice(self.groupboxFinding.layout(),field_widget.objectName())
+                                elif 'Fitting' in field_widget.objectName():
+                                    self.changeLayout_choice(self.groupboxFitting.layout(),field_widget.objectName())
         
 
         except FileNotFoundError:
@@ -506,7 +514,7 @@ class MyGUI(QMainWindow):
 
     def set_all_combobox_states(self):
         original_states = {}
-
+        # try:
         def set_combobox_states(widget):
             if isinstance(widget, QComboBox):
                 original_states[widget] = widget.currentIndex()
@@ -514,7 +522,10 @@ class MyGUI(QMainWindow):
                     logging.debug('Set text of combobox '+widget.objectName()+' to '+widget.itemText(i))
                     widget.setCurrentIndex(i)
                     #Update all line edits and such
-                    self.changeLayout_choice(self.groupboxFinding.layout(),widget.objectName())
+                    if 'Finding' in widget.objectName():
+                        self.changeLayout_choice(self.groupboxFinding.layout(),widget.objectName())
+                    elif 'Fitting' in widget.objectName():
+                        self.changeLayout_choice(self.groupboxFitting.layout(),widget.objectName())
             elif isinstance(widget, QWidget):
                 for child_widget in widget.children():
                     set_combobox_states(child_widget)
@@ -523,7 +534,12 @@ class MyGUI(QMainWindow):
         # Reset to orig states
         for combobox, original_state in original_states.items():
             combobox.setCurrentIndex(original_state)
-            self.changeLayout_choice(self.groupboxFinding.layout(),combobox.objectName())
+            if 'Finding' in combobox.objectName():
+                self.changeLayout_choice(self.groupboxFinding.layout(),combobox.objectName())
+            elif 'Fitting' in combobox.objectName():
+                self.changeLayout_choice(self.groupboxFitting.layout(),combobox.objectName())
+        # except:
+        #     pass
 
 
 
