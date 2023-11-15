@@ -41,7 +41,6 @@ class MyGUI(QMainWindow):
         self.globalSettings['PixelSize_nm'] = 80
         self.globalSettings['StoreConvertedRawData'] = True
         
-        self.unique_id = 0
         #Set some major settings on the UI
         super().__init__()
         self.setWindowTitle("EBS fitting - Endesfelder lab - Nov 2023")
@@ -99,11 +98,6 @@ class MyGUI(QMainWindow):
         self.load_button.clicked.connect(self.load_entries_from_json)
         self.layout.addWidget(self.load_button, 5, 0)
 
-        # # Load the entries from the JSON file
-        # self.load_entries_from_json()
-        
-        print(self.get_editable_fields())
-        
         #Loop through all combobox states briefly to initialise them (and hide them)
         self.set_all_combobox_states()
     
@@ -140,6 +134,7 @@ class MyGUI(QMainWindow):
         self.datasetLocation_layout.addWidget(self.datasetLocation_label, 0, 0)
         # Create the input field
         self.dataLocationInput = QLineEdit()
+        self.dataLocationInput.setObjectName("processing_dataLocationInput")
         self.datasetLocation_layout.layout().addWidget(self.dataLocationInput, 0, 1)
         # Create the search button
         self.datasetSearchButton = QPushButton("Search")
@@ -243,12 +238,12 @@ class MyGUI(QMainWindow):
             #Value is used for scoring, and takes the output of the method
             if reqKwargs[k] != 'methodValue':
                 label = QLabel(f"<b>{reqKwargs[k]}</b>")
-                label.setObjectName(f"Label_{self.unique_id}#{curr_dropdown.currentText()}#{reqKwargs[k]}")
+                label.setObjectName(f"Label#{curr_dropdown.currentText()}#{reqKwargs[k]}")
                 if self.checkAndShowWidget(curr_layout,label.objectName()) == False:
                     label.setToolTip(utils.infoFromMetadata(curr_dropdown.currentText(),specificKwarg=reqKwargs[k]))
                     curr_layout.addWidget(label,2+(k)+labelposoffset,0)
                 line_edit = QLineEdit()
-                line_edit.setObjectName(f"LineEdit_{self.unique_id}#{curr_dropdown.currentText()}#{reqKwargs[k]}")
+                line_edit.setObjectName(f"LineEdit#{curr_dropdown.currentText()}#{reqKwargs[k]}")
                 if self.checkAndShowWidget(curr_layout,line_edit.objectName()) == False:
                     line_edit.setToolTip(utils.infoFromMetadata(curr_dropdown.currentText(),specificKwarg=reqKwargs[k]))
                     curr_layout.addWidget(line_edit,2+k+labelposoffset,1)
@@ -260,12 +255,12 @@ class MyGUI(QMainWindow):
         #Add a widget-pair for every kwarg
         for k in range(len(optKwargs)):
             label = QLabel(f"<i>{optKwargs[k]}</i>")
-            label.setObjectName(f"Label_{self.unique_id}#{curr_dropdown.currentText()}#{optKwargs[k]}")
+            label.setObjectName(f"Label#{curr_dropdown.currentText()}#{optKwargs[k]}")
             if self.checkAndShowWidget(curr_layout,label.objectName()) == False:
                 label.setToolTip(utils.infoFromMetadata(curr_dropdown.currentText(),specificKwarg=optKwargs[k]))
                 curr_layout.addWidget(label,2+(k)+len(reqKwargs)+labelposoffset,0)
             line_edit = QLineEdit()
-            line_edit.setObjectName(f"LineEdit_{self.unique_id}#{curr_dropdown.currentText()}#{optKwargs[k]}")
+            line_edit.setObjectName(f"LineEdit#{curr_dropdown.currentText()}#{optKwargs[k]}")
             if self.checkAndShowWidget(curr_layout,line_edit.objectName()) == False:
                 line_edit.setToolTip(utils.infoFromMetadata(curr_dropdown.currentText(),specificKwarg=optKwargs[k]))
                 curr_layout.addWidget(line_edit,2+(k)+len(reqKwargs)+labelposoffset,1)
@@ -487,6 +482,7 @@ class MyGUI(QMainWindow):
                 return None
 
     def save_entries_to_json(self):
+        self.entries = {}
         # Iterate over all editable fields and store their values in the entries dictionary
         for field_name, field_widget in self.get_editable_fields().items():
             if isinstance(field_widget, QLineEdit):
