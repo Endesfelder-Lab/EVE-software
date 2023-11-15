@@ -8,7 +8,7 @@ import time
 # Should have an entry for every function in this file
 def __function_metadata__():
     return {
-        "Test": {
+        "FunctionOne": {
             "required_kwargs": [
                 {"name": "rkwarg_1", "description": "Value(s) to be converted to score"},
                 {"name": "rkwarg_2", "description": "lower bound"}
@@ -38,7 +38,7 @@ def FunctionOne(npy_array,settings,**kwargs):
     # generate the candidates in from of a dictionary
     candidates = {}
     candidates[0] = {}
-    candidates[0]['events'] = pd.dataframe(npy_array)
+    candidates[0]['events'] = pd.DataFrame(npy_array)
     candidates[0]['cluster_size'] = [np.max(npy_array['y'])-np.min(npy_array['y']), np.max(npy_array['x'])-np.min(npy_array['x']), np.max(npy_array['t'])-np.min(npy_array['t'])]
     candidates[0]['N_events'] = len(npy_array)
     
