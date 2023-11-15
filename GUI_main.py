@@ -107,6 +107,7 @@ class MyGUI(QMainWindow):
         globalSettings['PixelSize_nm'] = 80
         globalSettings['StoreConvertedRawData'] = True
         globalSettings['StoreFileMetadata'] = True
+        globalSettings['StoreFinalOutput'] = True
         return globalSettings
     
     # Function to handle the button click event
@@ -433,10 +434,19 @@ class MyGUI(QMainWindow):
                     if self.globalSettings['StoreFileMetadata']:
                         self.createAndStoreFileMetadata()
                     
+                    if self.globalSettings['StoreFinalOutput']:
+                        self.storeLocalizationOutput()
+                    
                 else:
                     logging.error('Candidate fitting NOT performed')
             else:
                 logging.error('Candidate finding NOT performed')
+    
+    def storeLocalizationOutput(self):
+        logging.debug('Attempting to store fitting results output')
+        #Store the localization output
+        self.data['FittingResult'][0].to_csv(self.currentFileInfo['CurrentFileLoc'][:-4]+'_FitResults_'+datetime.datetime.now().strftime("%Y%m%d_%H%M%S")+'.csv')
+        logging.info('Fitting results output stored')
     
     def createAndStoreFileMetadata(self):
         logging.debug('Attempting to create and store file metadata')
