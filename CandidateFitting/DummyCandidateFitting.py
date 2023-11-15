@@ -16,7 +16,7 @@ def __function_metadata__():
             "optional_kwargs": [
                 {"name": "okwarg_1", "description": "Score the object will be given if it's outside the bounds, default 0"}
             ],
-            "help_string": "Returns a test dictionary and metadata string, to check if the program is working properly."
+            "help_string": "Returns a test localization dataframe and metadata string, to check if the program is working properly."
         }
     }
 
