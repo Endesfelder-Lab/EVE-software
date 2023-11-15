@@ -1,6 +1,7 @@
 # from csbdeep.io import save_tiff_imagej_compatible
 # from stardist import _draw_polygons, export_imagej_rois
 import sys, os, logging, json, argparse
+import numpy as np
 # Add the folder 2 folders up to the system path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -11,7 +12,7 @@ from CandidateFinding import *
 from Utils import utils, utilsHelper
 
 from PyQt5 import QtWidgets
-from PyQt5.QtWidgets import QApplication, QLayout, QMainWindow, QLabel, QPushButton, QSizePolicy, QGroupBox, QTabWidget, QGridLayout, QWidget, QComboBox, QLineEdit
+from PyQt5.QtWidgets import QApplication, QLayout, QMainWindow, QLabel, QPushButton, QSizePolicy, QGroupBox, QTabWidget, QGridLayout, QWidget, QComboBox, QLineEdit, QFileDialog
 
 
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
@@ -34,9 +35,10 @@ class MyGUI(QMainWindow):
 
         # Create a dictionary to store the entries
         self.entries = {}
+         
         
-        #Dictionary that stores all data in the GUI
-        self.data = {}
+        self.globalSettings = {}
+        self.globalSettings['PixelSize_nm'] = 80
         
         self.unique_id = 0
         #Set some major settings on the UI
@@ -65,7 +67,7 @@ class MyGUI(QMainWindow):
         #Create a new group box
         self.mainGroupBox = QGroupBox()
         self.mainGroupBox.setLayout(QGridLayout())
-        self.layout.addWidget(self.mainGroupBox, 1, 0)
+        self.layout.addWidget(self.mainGroupBox, 2, 0)
 
         #Create a tab widget and add this to the main group box
         self.mainTabWidget = QTabWidget()
@@ -88,11 +90,11 @@ class MyGUI(QMainWindow):
         self.setup_tab('LocalizationList')
         
          # Create a button to trigger saving the entries
-        self.save_button = QPushButton("Save", self)
+        self.save_button = QPushButton("Save GUI contents", self)
         self.save_button.clicked.connect(self.save_entries_to_json)
         self.layout.addWidget(self.save_button, 4, 0)
          # Create a button to trigger loading the entries
-        self.load_button = QPushButton("Load", self)
+        self.load_button = QPushButton("Load GUI contents", self)
         self.load_button.clicked.connect(self.load_entries_from_json)
         self.layout.addWidget(self.load_button, 5, 0)
 
@@ -103,6 +105,14 @@ class MyGUI(QMainWindow):
         
         #Loop through all combobox states briefly to initialise them (and hide them)
         self.set_all_combobox_states()
+    
+    
+# Function to handle the button click event
+    def datasetSearchButtonClicked(self):
+        print('data lookup search button clicked')
+        file_path, _ = QFileDialog.getOpenFileName(self, "Select File")
+        if file_path:
+            self.dataLocationInput.setText(file_path)
         
     def setup_tab(self, tab_name):
         tab_mapping = {
@@ -120,23 +130,37 @@ class MyGUI(QMainWindow):
         #Create a grid layout and set it
         tab_layout = QGridLayout()
         self.tab_processing.setLayout(tab_layout)
+        
+        #add a box with multiple horizontally oriented entires:
+        self.datasetLocation_layout = QGridLayout()
+        tab_layout.addLayout(self.datasetLocation_layout, 0, 0)
+        
+        # Add a label:
+        self.datasetLocation_label = QLabel("Dataset location:")
+        self.datasetLocation_layout.addWidget(self.datasetLocation_label, 0, 0)
+        # Create the input field
+        self.dataLocationInput = QLineEdit()
+        self.datasetLocation_layout.layout().addWidget(self.dataLocationInput, 0, 1)
+        # Create the search button
+        self.datasetSearchButton = QPushButton("Search")
+        self.datasetSearchButton.clicked.connect(self.datasetSearchButtonClicked)
+        self.datasetLocation_layout.layout().addWidget(self.datasetSearchButton, 0, 2)
+        #Add the global settings group box to the central widget
+        # self.layout.addWidget(self.datasetsSettingsGroupBox, 1, 0)
 
         #Add a group box on candiddate fitting
         self.groupboxFinding = QGroupBox("Candidate finding")
         self.groupboxFinding.setObjectName("groupboxFinding")
         self.groupboxFinding.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.groupboxFinding.setLayout(QGridLayout())
-        tab_layout.addWidget(self.groupboxFinding, 0, 0)
+        tab_layout.addWidget(self.groupboxFinding, 1, 0)
         
         
         self.groupboxFitting = QGroupBox("Candidate fitting")
         self.groupboxFitting.setObjectName("groupboxFitting")
         self.groupboxFinding.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.groupboxFitting.setLayout(QGridLayout())
-        tab_layout.addWidget(self.groupboxFitting, 1, 0)
-
-        self.label2 = QLabel("Hello from Tab 1!")
-        self.groupboxFinding.layout().addWidget(self.label2)
+        tab_layout.addWidget(self.groupboxFitting, 2, 0)
 
         # self.button = QPushButton("Click me")
         # self.button.clicked.connect(self.on_button_click)
@@ -278,50 +302,71 @@ class MyGUI(QMainWindow):
         #Return the dropdown
         return curr_dropdown
     
+    def loadRawData(self):
+        #Check if self.dataLocationInput.text() is not empty:
+        if self.dataLocationInput.text() == "":
+            logging.error('No data location specified')
+            return None
+        #Check if it ends with npy or raw:
+        if not self.dataLocationInput.text().endswith('.npy') and not self.dataLocationInput.text().endswith('.raw'):
+            logging.error('Data location must end with .npy or .raw')
+            return None
+        #Load the data: 
+        if self.dataLocationInput.text().endswith('.npy'):
+            return np.load(self.dataLocationInput.text())
+        elif self.dataLocationInput.text().endswith('.raw'):
+            logging.error('RAW loading to be implemented later!')
+            return None
+    
     def run_processing(self):
-        #First runf for finding:
-        #Get the dropdown info
-        moduleMethodEvalTexts = []
-        methodName_finding = self.candidateFindingDropdown.currentText()
-        all_layouts = self.findChild(QWidget, "groupboxFinding").findChildren(QLayout)[0]
+        #------------------------------------------------
+        # Candidate finding
+        # -----------------------------------------------
         
-        methodKwargNames_method = []
-        methodKwargValues_method = []
-        methodName_method = ''
-        # Iterate over the items in the layout
-        for index in range(all_layouts.count()):
-            item = all_layouts.itemAt(index)
-            widget = item.widget()
+        #Load the data:
+        #Later to do: run this over a folder if a folder is selected
+        #Later to do: go from .raw to .npy if needed
+        npyData = self.loadRawData()
+        if npyData is not None:
             
-            if ("LineEdit" in widget.objectName()) and widget.isVisible():
-                # The objectName will be along the lines of foo#bar#str
-                #Check if the objectname is part of a method or part of a scoring
-                split_list = widget.objectName().split('#')
-                methodName_method = split_list[1]
-                methodKwargNames_method.append(split_list[2])
-                methodKwargValues_method.append(widget.text())
-        
-        #Function call: get the to-be-evaluated text out, giving the methodName, method KwargNames, methodKwargValues, and 'function Type (i.e. cellSegmentScripts, etc)' - do the same with scoring as with method
-        if methodName_method != '':
-            EvalTextMethod = self.getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method)
-            #append this to moduleEvalTexts
-            moduleMethodEvalTexts.append(EvalTextMethod)
-            # item = all_layouts.itemAt(index)
-            # # Check if the item is a QWidget
-            # if isinstance(item, QtWidgets.QWidgetItem):
-            #     widget = item.widget()
-            #     # Check if the widget is a PyQt5 module
-            #     if isinstance(widget, QtWidgets.QWidget):
-            #         # Do something with the PyQt5 module
-            #         print(widget)
-        
-        print(eval(str(moduleMethodEvalTexts[0])))
+            
+            
+            #First runf for finding:
+            #Get the dropdown info
+            moduleMethodEvalTexts = []
+            methodName_finding = self.candidateFindingDropdown.currentText()
+            all_layouts = self.findChild(QWidget, "groupboxFinding").findChildren(QLayout)[0]
+            
+            methodKwargNames_method = []
+            methodKwargValues_method = []
+            methodName_method = ''
+            # Iterate over the items in the layout
+            for index in range(all_layouts.count()):
+                item = all_layouts.itemAt(index)
+                widget = item.widget()
+                
+                if ("LineEdit" in widget.objectName()) and widget.isVisible():
+                    # The objectName will be along the lines of foo#bar#str
+                    #Check if the objectname is part of a method or part of a scoring
+                    split_list = widget.objectName().split('#')
+                    methodName_method = split_list[1]
+                    methodKwargNames_method.append(split_list[2])
+                    methodKwargValues_method.append(widget.text())
+            
+            #Function call: get the to-be-evaluated text out, giving the methodName, method KwargNames, methodKwargValues, and 'function Type (i.e. cellSegmentScripts, etc)' - do the same with scoring as with method
+            if methodName_method != '':
+                EvalTextMethod = self.getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart='npyData,self.globalSettings')
+                #append this to moduleEvalTexts
+                moduleMethodEvalTexts.append(EvalTextMethod)
+            
+            #Run the function!
+            candidateFindingOutput = eval(str(moduleMethodEvalTexts[0]))
+            print(candidateFindingOutput)
+        #------------------------------------------------
+        # Candidate fitting
+        # -----------------------------------------------
+        #To be done
         pass
-        # #Get the kw-arguments from the current dropdown.
-        # reqKwargs = utils.reqKwargsFromFunction(curr_dropdown.currentText())
-        # #Get the optional kw-arguments from the current dropdown.
-        # optKwargs = utils.optKwargsFromFunction(curr_dropdown.currentText())
-        # #Get the values from the line edits
         
     def getEvalTextFromGUIFunction(self, methodName, methodKwargNames, methodKwargValues, partialStringStart=None, removeKwargs=None):
     #--------------------------------------------------------------------------------------------------------------------------------------------------------------------

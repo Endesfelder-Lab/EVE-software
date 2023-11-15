@@ -29,7 +29,7 @@ def __function_metadata__():
 #-------------------------------------------------------------------------------------------------------------------------------
 #Callable functions
 #-------------------------------------------------------------------------------------------------------------------------------
-def FunctionOne(**kwargs):
+def FunctionOne(npyData,globalSettings,**kwargs):
     #Check if we have the required kwargs
     [provided_optional_args, missing_optional_args] = utilsHelper.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
     if "okwarg_1" in provided_optional_args:
@@ -40,7 +40,7 @@ def FunctionOne(**kwargs):
     print('Function one ran!')
     return (float(kwargs["rkwarg_1"])+float(kwargs["rkwarg_2"]))*okwarg1
 
-def FunctionTwo(**kwargs):
+def FunctionTwo(npyData,globalSettings,**kwargs):
     #Check if we have the required kwargs
     [provided_optional_args, missing_optional_args] = utilsHelper.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
     print('Function Two ran!')
