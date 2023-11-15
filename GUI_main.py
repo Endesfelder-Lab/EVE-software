@@ -1,6 +1,6 @@
 # from csbdeep.io import save_tiff_imagej_compatible
 # from stardist import _draw_polygons, export_imagej_rois
-import sys, os, logging, json, argparse
+import sys, os, logging, json, argparse, datetime
 import numpy as np
 # Add the folder 2 folders up to the system path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -13,7 +13,6 @@ from Utils import utils, utilsHelper
 
 from PyQt5 import QtWidgets
 from PyQt5.QtWidgets import QApplication, QLayout, QMainWindow, QLabel, QPushButton, QSizePolicy, QGroupBox, QTabWidget, QGridLayout, QWidget, QComboBox, QLineEdit, QFileDialog
-
 
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
@@ -35,18 +34,20 @@ class MyGUI(QMainWindow):
 
         # Create a dictionary to store the entries
         self.entries = {}
-         
         
-        self.globalSettings = {}
-        self.globalSettings['PixelSize_nm'] = 80
-        self.globalSettings['StoreConvertedRawData'] = True
+        #Create a dictionary to store the global Settings
+        self.globalSettings = self.initGlobalSettings()
+        
+        #Create a dictionary that stores info about each file being run (i.e. for metadata)
+        self.currentFileInfo = {}
+        
+        #Create a dictionary that stores data and passes it between finding,fitting,saving, etc
+        self.data = {}
         
         #Set some major settings on the UI
         super().__init__()
         self.setWindowTitle("EBS fitting - Endesfelder lab - Nov 2023")
         self.setMinimumSize(400, 300)  # Set minimum size for the GUI window
-        
-        
         
         #Set the central widget that contains everything
         #This is a group box that contains a grid layout. We fill everything inside this grid layout
@@ -100,6 +101,13 @@ class MyGUI(QMainWindow):
 
         #Loop through all combobox states briefly to initialise them (and hide them)
         self.set_all_combobox_states()
+    
+    def initGlobalSettings(self):
+        globalSettings = {}
+        globalSettings['PixelSize_nm'] = 80
+        globalSettings['StoreConvertedRawData'] = True
+        globalSettings['StoreFileMetadata'] = True
+        return globalSettings
     
     # Function to handle the button click event
     def datasetSearchButtonClicked(self):
@@ -300,7 +308,7 @@ class MyGUI(QMainWindow):
         #Return the dropdown
         return curr_dropdown
     
-    def loadRawData(self):
+    def loadRawData(self,dataLocation):
         """
         Load the raw (NPY or RAW)data from the specified location.
 
@@ -311,18 +319,18 @@ class MyGUI(QMainWindow):
             - If the data location ends with ".raw", returns None.
         """
         #Check if self.dataLocationInput.text() is not empty:
-        if self.dataLocationInput.text() == "":
+        if dataLocation == "":
             logging.error('No data location specified')
             return None
         #Check if it ends with npy or raw:
-        if not self.dataLocationInput.text().endswith('.npy') and not self.dataLocationInput.text().endswith('.raw'):
+        if not dataLocation.endswith('.npy') and not dataLocation.endswith('.raw'):
             logging.error('Data location must end with .npy or .raw')
             return None
             #Load the data: 
-        if self.dataLocationInput.text().endswith('.npy'):
-            return np.load(self.dataLocationInput.text())
-        elif self.dataLocationInput.text().endswith('.raw'):
-            events = self.RawToNpy(self.dataLocationInput.text())
+        if dataLocation.endswith('.npy'):
+            return np.load(dataLocation)
+        elif dataLocation.endswith('.raw'):
+            events = self.RawToNpy(dataLocation)
             return events
     
     def RawToNpy(self,filepath,buffer_size = 1e8,time_batches = 50e3):        
@@ -361,27 +369,51 @@ class MyGUI(QMainWindow):
     def run_processing(self):
         #Load the data:
         #Later to do: run this over a folder if a folder is selected
-        #Later to do: go from .raw to .npy if needed
-        npyData = self.loadRawData()
+        self.currentFileInfo['CurrentFileLoc'] = self.dataLocationInput.text()
+        npyData = self.loadRawData(self.dataLocationInput.text())
         if npyData is not None:
             #Run the finding function!
             FindingEvalText = self.getFunctionEvalText('Finding',"npyData","self.globalSettings")
             if FindingEvalText is not None:
-                candidateFindingOutput = eval(str(FindingEvalText))
+                self.data['FindingResult'] = eval(str(FindingEvalText))
                 logging.info('Candidate finding done!')
-                logging.debug(candidateFindingOutput)
+                logging.debug(self.data['FindingResult'])
                 #Run the finding function!
-                FittingEvalText = self.getFunctionEvalText('Fitting',"candidateFindingOutput[0]","self.globalSettings")
+                FittingEvalText = self.getFunctionEvalText('Fitting',"self.data['FindingResult'][0]","self.globalSettings")
                 if FittingEvalText is not None:
-                    candidateFittingOutput = eval(str(FittingEvalText))
+                    self.data['FittingResult'] = eval(str(FittingEvalText))
                     logging.info('Candidate fitting done!')
-                    logging.debug(candidateFittingOutput)
+                    logging.debug(self.data['FittingResult'])
+                    
+                    #Create and store the metadata
+                    if self.globalSettings['StoreFileMetadata']:
+                        self.createAndStoreFileMetadata()
+                    
                 else:
                     logging.error('Candidate fitting NOT performed')
             else:
                 logging.error('Candidate finding NOT performed')
         #To be done
         pass
+    
+    def createAndStoreFileMetadata(self):
+        logging.debug('Attempting to create and store file metadata')
+        try:
+            metadatastring = f"""Metadata information for file {self.currentFileInfo['CurrentFileLoc']}
+Analysis routine finished at {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+
+---- Finding metadata output: ----
+{self.data['FindingResult'][1]}
+
+---- Fitting metadata output: ----
+{self.data['FittingResult'][1]}
+            """
+            #Store this metadatastring:
+            with open(self.currentFileInfo['CurrentFileLoc'][:-4]+'_RunInfo_'+datetime.datetime.now().strftime("%Y%m%d_%H%M%S")+'.txt', 'w') as f:
+                f.write(metadatastring)
+            logging.info('File metadata created and stored')
+        except:
+            logging.error('Error in creating file metadata, not stored')
     
     def getFunctionEvalText(self,className,p1,p2):
         #Get the dropdown info
