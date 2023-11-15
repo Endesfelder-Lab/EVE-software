@@ -103,7 +103,7 @@ class MyGUI(QMainWindow):
     
     # Function to handle the button click event
     def datasetSearchButtonClicked(self):
-        print('data lookup search button clicked')
+        logging.debug('data lookup search button clicked')
         file_path, _ = QFileDialog.getOpenFileName(self, "Select File")
         if file_path:
             self.dataLocationInput.setText(file_path)
@@ -217,10 +217,6 @@ class MyGUI(QMainWindow):
         self.label4 = QLabel("Hello from Tab 4!")
         tab4_layout.addWidget(self.label4, 0, 0)
 
-    def on_button_click(self):
-        self.label.setText("Button clicked!")
-        print(utils.reqKwargsFromFunction("ShowCaseFinding.lowerUpperBound"))
-
     #Main def that interacts with a new layout based on whatever entries we have!
     #We assume a X-by-4 (4 columns) size, where 1/2 are used for Operation, and 3/4 are used for Value-->Score conversion
     def changeLayout_choice(self,curr_layout,className):
@@ -229,7 +225,6 @@ class MyGUI(QMainWindow):
         self.resetLayout(curr_layout,className)
         #Get the dropdown info
         curr_dropdown = self.getMethodDropdownInfo(curr_layout,className)
-        print(curr_dropdown.currentText())
         #Get the kw-arguments from the current dropdown.
         reqKwargs = utils.reqKwargsFromFunction(curr_dropdown.currentText())
         #Add a widget-pair for every kwarg
@@ -370,13 +365,21 @@ class MyGUI(QMainWindow):
         npyData = self.loadRawData()
         if npyData is not None:
             #Run the finding function!
-            candidateFindingOutput = eval(str(self.getFunctionEvalText('Finding',"npyData","self.globalSettings")))
-            print('Candidate finding done!')
-            print(candidateFindingOutput)
-            #Run the finding function!
-            candidateFittingOutput = eval(str(self.getFunctionEvalText('Fitting',"candidateFindingOutput[0]","self.globalSettings")))
-            print('Candidate fitting done!')
-            print(candidateFittingOutput)
+            FindingEvalText = self.getFunctionEvalText('Finding',"npyData","self.globalSettings")
+            if FindingEvalText is not None:
+                candidateFindingOutput = eval(str(FindingEvalText))
+                logging.info('Candidate finding done!')
+                logging.debug(candidateFindingOutput)
+                #Run the finding function!
+                FittingEvalText = self.getFunctionEvalText('Fitting',"candidateFindingOutput[0]","self.globalSettings")
+                if FittingEvalText is not None:
+                    candidateFittingOutput = eval(str(FittingEvalText))
+                    logging.info('Candidate fitting done!')
+                    logging.debug(candidateFittingOutput)
+                else:
+                    logging.error('Candidate fitting NOT performed')
+            else:
+                logging.error('Candidate finding NOT performed')
         #To be done
         pass
     
@@ -406,8 +409,10 @@ class MyGUI(QMainWindow):
             EvalTextMethod = self.getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart=str(p1)+','+str(p2))
             #append this to moduleEvalTexts
             moduleMethodEvalTexts.append(EvalTextMethod)
-        
-        return moduleMethodEvalTexts[0]
+        if moduleMethodEvalTexts is not None:
+            return moduleMethodEvalTexts[0]
+        else:
+            return None
                 
     def getEvalTextFromGUIFunction(self, methodName, methodKwargNames, methodKwargValues, partialStringStart=None, removeKwargs=None):
     #--------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -442,7 +447,7 @@ class MyGUI(QMainWindow):
                     kwargvalue = methodKwargValues[GUIbasedIndex]
                     if kwargvalue == '':
                         allreqKwargsHaveValue = False
-                        print(f'EMPTY VALUE of {kwargvalue}, NOT CONTINUING')
+                        logging.error(f'Missing required keyword argument in {methodName}: {reqKwargs[id]}, NOT CONTINUING')
                 if allreqKwargsHaveValue:
                     #If we're at this point, all req kwargs have a value, so we can run!
                     #Get the string for the required kwargs
@@ -476,9 +481,10 @@ class MyGUI(QMainWindow):
                     segmentEval = methodName+"("+partialString+")"
                     return segmentEval
                 else:
-                    print('NOT ALL KWARGS PROVIDED!')
+                    logging.error('NOT ALL KWARGS PROVIDED!')
+                    return None
             else:
-                print('SOMETHING VERY STUPID HAPPENED')
+                logging.error('SOMETHING VERY STUPID HAPPENED')
                 return None
 
     def save_entries_to_json(self):
