@@ -39,6 +39,7 @@ class MyGUI(QMainWindow):
         
         self.globalSettings = {}
         self.globalSettings['PixelSize_nm'] = 80
+        self.globalSettings['StoreConvertedRawData'] = True
         
         self.unique_id = 0
         #Set some major settings on the UI
@@ -106,8 +107,7 @@ class MyGUI(QMainWindow):
         #Loop through all combobox states briefly to initialise them (and hide them)
         self.set_all_combobox_states()
     
-    
-# Function to handle the button click event
+    # Function to handle the button click event
     def datasetSearchButtonClicked(self):
         print('data lookup search button clicked')
         file_path, _ = QFileDialog.getOpenFileName(self, "Select File")
@@ -226,7 +226,6 @@ class MyGUI(QMainWindow):
         self.label.setText("Button clicked!")
         print(utils.reqKwargsFromFunction("ShowCaseFinding.lowerUpperBound"))
 
-
     #Main def that interacts with a new layout based on whatever entries we have!
     #We assume a X-by-4 (4 columns) size, where 1/2 are used for Operation, and 3/4 are used for Value-->Score conversion
     def changeLayout_choice(self,curr_layout,className):
@@ -285,7 +284,6 @@ class MyGUI(QMainWindow):
                     return
         return False
                 
-    
     #Remove everythign in this layout except className_dropdown
     def resetLayout(self,curr_layout,className):
         for index in range(curr_layout.count()):
@@ -313,6 +311,15 @@ class MyGUI(QMainWindow):
         return curr_dropdown
     
     def loadRawData(self):
+        """
+        Load the raw (NPY or RAW)data from the specified location.
+
+        Returns:
+            - If the data location is empty, returns None.
+            - If the data location does not end with ".npy" or ".raw", returns None.
+            - If the data location ends with ".npy", returns the loaded numpy array.
+            - If the data location ends with ".raw", returns None.
+        """
         #Check if self.dataLocationInput.text() is not empty:
         if self.dataLocationInput.text() == "":
             logging.error('No data location specified')
@@ -321,13 +328,46 @@ class MyGUI(QMainWindow):
         if not self.dataLocationInput.text().endswith('.npy') and not self.dataLocationInput.text().endswith('.raw'):
             logging.error('Data location must end with .npy or .raw')
             return None
-        #Load the data: 
+            #Load the data: 
         if self.dataLocationInput.text().endswith('.npy'):
             return np.load(self.dataLocationInput.text())
         elif self.dataLocationInput.text().endswith('.raw'):
-            logging.error('RAW loading to be implemented later!')
-            return None
+            events = self.RawToNpy(self.dataLocationInput.text())
+            return events
     
+    def RawToNpy(self,filepath,buffer_size = 1e8,time_batches = 50e3):        
+        if(os.path.exists(filepath[:-4]+'.npy')):
+            events = np.load(filepath[:-4]+'.npy')
+            logging.info('NPY file from RAW was already present, loading this instead of RAW!')
+        else:
+            # Add /usr/lib/python3/dist-packages/ to PYTHONPATH to include Metavision libraries
+            sys.path.append("C:\Program Files\Prophesee\lib\python3\site-packages") 
+            from metavision_core.event_io.raw_reader import RawReader
+            record_raw = RawReader(filepath)
+            sums = 0
+            time = 0
+            events=np.empty
+            while not record_raw.is_done() and record_raw.current_event_index() < buffer_size:
+                #Load a batch of events
+                events_temp = record_raw.load_delta_t(time_batches)
+                sums += events_temp.size
+                time += time_batches/1e6
+                #Add the events in this batch to the big array
+                if sums == events_temp.size:
+                    events = events_temp
+                else:
+                    events = np.concatenate((events,events_temp))
+            record_raw.reset()
+            # correct the coordinates and time stamps
+            events['x']-=np.min(events['x'])
+            events['y']-=np.min(events['y'])
+            events['t']-=np.min(events['t'])
+            if self.globalSettings['StoreConvertedRawData']:
+                np.save(filepath[:-4]+'.npy',events)
+                logging.debug('NPY file created')
+            logging.info('Raw data loaded')
+        return events
+            
     def run_processing(self):
         #Load the data:
         #Later to do: run this over a folder if a folder is selected
@@ -344,6 +384,7 @@ class MyGUI(QMainWindow):
             print(candidateFittingOutput)
         #To be done
         pass
+    
     def getFunctionEvalText(self,className,p1,p2):
         #Get the dropdown info
         moduleMethodEvalTexts = []
