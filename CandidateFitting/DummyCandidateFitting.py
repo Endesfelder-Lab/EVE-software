@@ -24,7 +24,7 @@ def __function_metadata__():
 #-------------------------------------------------------------------------------------------------------------------------------
 #Callable functions
 #-------------------------------------------------------------------------------------------------------------------------------
-def FunctionOne(npy_array,settings,**kwargs):
+def FunctionOne(candidate_dic,settings,**kwargs):
     #Check if we have the required kwargs
     [provided_optional_args, missing_optional_args] = utilsHelper.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
     if "okwarg_1" in provided_optional_args:
@@ -35,12 +35,12 @@ def FunctionOne(npy_array,settings,**kwargs):
     # Start the timer
     start_time = time.time()
 
-    # generate the candidates in from of a dictionary
-    candidates = {}
-    candidates[0] = {}
-    candidates[0]['events'] = pd.DataFrame(npy_array)
-    candidates[0]['cluster_size'] = [np.max(npy_array['y'])-np.min(npy_array['y']), np.max(npy_array['x'])-np.min(npy_array['x']), np.max(npy_array['t'])-np.min(npy_array['t'])]
-    candidates[0]['N_events'] = len(npy_array)
+    # generate the localizations from a candidate dictionary
+    localizations = pd.DataFrame()
+    for i in range(len(candidate_dic)):
+        localizations['x'] = candidate_dic[i]['events']['x']
+        localizations['y'] = candidate_dic[i]['events']['y']
+        localizations['t'] = candidate_dic[i]['events']['t']
     
     # Stop the timer
     end_time = time.time()
@@ -51,4 +51,4 @@ def FunctionOne(npy_array,settings,**kwargs):
     performance_metadata = f"Dummy function ran for {elapsed_time} seconds."
     print('Function one ran!')
 
-    return candidates, performance_metadata
+    return localizations, performance_metadata
