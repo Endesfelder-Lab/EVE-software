@@ -56,7 +56,7 @@ def functionNamesFromDir(dirname):
                     for singlefunctiondata in functionMetadata:
                         #Also check this against the actual sub-routines and raise an error (this should also be present in the __init__ of the folders)
                         subroutineName = f"{functionName}.{singlefunctiondata}"
-                        if subfunction_exists(f'{absolute_path}\{functionName}.py',singlefunctiondata): #type:ignore
+                        if subfunction_exists(f'{absolute_path}{os.sep}{functionName}.py',singlefunctiondata): #type:ignore
                             functionnamearr.append(subroutineName)
                         else:
                             warnings.warn(f"Warning: {subroutineName} is present in __function_metadata__ but not in the actual file!")
