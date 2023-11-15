@@ -449,7 +449,7 @@ class MyGUI(QMainWindow):
                 self.entries[field_name] = field_widget.currentText()
 
         # Specify the path and filename for the JSON file
-        json_file_path = "GUI/storage.json"
+        json_file_path = "GUI"+os.sep+"storage.json"
 
         # Write the entries dictionary to the JSON file
         with open(json_file_path, "w") as json_file:
@@ -463,7 +463,7 @@ class MyGUI(QMainWindow):
     
     def load_entries_from_json_single(self,runParams=['QLineEdit','QComboBox']):
         # Specify the path and filename for the JSON file
-        json_file_path = "GUI/storage.json"
+        json_file_path = "GUI"+os.sep+"storage.json"
 
         try:
             # Load the entries from the JSON file
