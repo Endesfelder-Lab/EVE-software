@@ -12,7 +12,7 @@ from CandidateFinding import *
 from Utils import utils, utilsHelper
 
 from PyQt5 import QtWidgets
-from PyQt5.QtWidgets import QApplication, QLayout, QMainWindow, QLabel, QPushButton, QSizePolicy, QGroupBox, QTabWidget, QGridLayout, QWidget, QComboBox, QLineEdit, QFileDialog
+from PyQt5.QtWidgets import QApplication, QTableWidget, QTableWidgetItem, QLayout, QMainWindow, QLabel, QPushButton, QSizePolicy, QGroupBox, QTabWidget, QGridLayout, QWidget, QComboBox, QLineEdit, QFileDialog
 
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
@@ -235,8 +235,10 @@ class MyGUI(QMainWindow):
         tab4_layout = QGridLayout()
         self.tab_locList.setLayout(tab4_layout)
         
-        self.label4 = QLabel("Hello from Tab 4!")
-        tab4_layout.addWidget(self.label4, 0, 0)
+        #Create an empty table and add this:
+        self.LocListTable = QTableWidget()
+        tab4_layout.addWidget(self.LocListTable, 0, 0)
+        
 
     #Main def that interacts with a new layout based on whatever entries we have!
     #We assume a X-by-4 (4 columns) size, where 1/2 are used for Operation, and 3/4 are used for Value-->Score conversion
@@ -428,7 +430,38 @@ class MyGUI(QMainWindow):
                 
                 #Reset the global setting:
                 self.globalSettings['StoreFindingOutput']=origStoreFindingSetting
-            
+         
+        self.updateGUIafterNewResults()       
+        return
+    
+    def updateGUIafterNewResults(self):
+        self.updateLocList()
+    
+    def updateLocList(self):
+        #data is stored in self.data['FittingResult'][0]
+        #fill the self.LocListTable QTableWidget with the data:
+        
+        #Get the shape of the data
+        nrRows = np.shape(self.data['FittingResult'][0])[0]
+        nrColumns = np.shape(self.data['FittingResult'][0])[1]
+        
+        #Give the loclisttable the correct row/column count:
+        self.LocListTable.setRowCount(nrRows)
+        self.LocListTable.setColumnCount(nrColumns)
+        
+        #Fill the loclisttable with the output:
+        for r in range(nrRows):
+            for c in range(nrColumns):
+                nrDigits = 2
+                item = QTableWidgetItem(f"{round(self.data['FittingResult'][0].iloc[r, c], nrDigits):.{nrDigits}f}")
+                self.LocListTable.setItem(r, c, item)
+        
+        
+        #Add headers
+        self.LocListTable.setHorizontalHeaderLabels(self.data['FittingResult'][0].columns.tolist())
+        
+        return
+     
     def processSingleFile(self,FileName,onlyFitting=False):
         if not onlyFitting:
             #Run the analysis on a single file
