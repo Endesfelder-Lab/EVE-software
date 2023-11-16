@@ -1,6 +1,10 @@
 # from csbdeep.io import save_tiff_imagej_compatible
 # from stardist import _draw_polygons, export_imagej_rois
 import sys, os, logging, json, argparse, datetime, glob, csv
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
+
 import numpy as np
 # Add the folder 2 folders up to the system path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -12,7 +16,7 @@ from CandidateFinding import *
 from Utils import utils, utilsHelper
 
 from PyQt5 import QtWidgets
-from PyQt5.QtWidgets import QApplication, QTableWidget, QTableWidgetItem, QLayout, QMainWindow, QLabel, QPushButton, QSizePolicy, QGroupBox, QTabWidget, QGridLayout, QWidget, QComboBox, QLineEdit, QFileDialog
+from PyQt5.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QTableWidget, QTableWidgetItem, QLayout, QMainWindow, QLabel, QPushButton, QSizePolicy, QGroupBox, QTabWidget, QGridLayout, QWidget, QComboBox, QLineEdit, QFileDialog, QToolBar
 
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
@@ -65,11 +69,6 @@ class MyGUI(QMainWindow):
         #Add the global settings group box to the central widget
         self.layout.addWidget(self.globalSettingsGroupBox, 0, 0)
 
-        #Create a new group box
-        # self.mainGroupBox = QGroupBox()
-        # self.mainGroupBox.setLayout(QGridLayout())
-        # self.layout.addWidget(self.mainGroupBox, 2, 0)
-
         #Create a tab widget and add this to the main group box
         self.mainTabWidget = QTabWidget()
         self.mainTabWidget.setTabPosition(QTabWidget.South)
@@ -79,16 +78,16 @@ class MyGUI(QMainWindow):
         self.mainTabWidget.addTab(self.tab_processing, "Processing")
         self.tab_postProcessing = QWidget()
         self.mainTabWidget.addTab(self.tab_postProcessing, "Post-processing")
-        self.tab_saveLoad = QWidget()
-        self.mainTabWidget.addTab(self.tab_saveLoad, "Save/Load")
         self.tab_locList = QWidget()
         self.mainTabWidget.addTab(self.tab_locList, "LocalizationList")
+        self.tab_visualisation = QWidget()
+        self.mainTabWidget.addTab(self.tab_visualisation, "Visualisation")
         
         #Set up the tabs
         self.setup_tab('Processing')
         self.setup_tab('Post-processing')
-        self.setup_tab('Save/Load')
         self.setup_tab('LocalizationList')
+        self.setup_tab('Visualisation')
         
          # Create a button to trigger saving the entries
         self.save_button = QPushButton("Save GUI contents", self)
@@ -128,17 +127,18 @@ class MyGUI(QMainWindow):
     
     def setup_tab(self, tab_name):
         tab_mapping = {
-            'Processing': self.setup_processing,
-            'Post-processing': self.setup_postProcessing,
-            'Save/Load': self.setup_saveload,
-            'LocalizationList': self.setup_loclist
+            'Processing': self.setup_processingTab,
+            'Post-processing': self.setup_postProcessingTab,
+            'Save/Load': self.setup_saveloadTab,
+            'Visualisation': self.setup_visualisationTab,
+            'LocalizationList': self.setup_loclistTab
         }
         #Run the setup of this tab
         setup_func = tab_mapping.get(tab_name)
         if setup_func:
             setup_func()
             
-    def setup_processing(self):
+    def setup_processingTab(self):
         #Create a grid layout and set it
         tab_layout = QGridLayout()
         self.tab_processing.setLayout(tab_layout)
@@ -217,21 +217,21 @@ class MyGUI(QMainWindow):
         # tab_layout.addWidget(empty_widget, 999,0)
         tab_layout.setRowStretch(tab_layout.rowCount(), 1)
 
-    def setup_postProcessing(self):
+    def setup_postProcessingTab(self):
         tab2_layout = QGridLayout()
         self.tab_postProcessing.setLayout(tab2_layout)
         
         self.label2 = QLabel("Hello from Tab 2!")
         tab2_layout.addWidget(self.label2, 0, 0)
 
-    def setup_saveload(self):
+    def setup_saveloadTab(self):
         tab3_layout = QGridLayout()
         self.tab_saveLoad.setLayout(tab3_layout)
         
         self.label3 = QLabel("Hello from Tab 3!")
         tab3_layout.addWidget(self.label3, 0, 0)
         
-    def setup_loclist(self):
+    def setup_loclistTab(self):
         tab4_layout = QGridLayout()
         self.tab_locList.setLayout(tab4_layout)
         
@@ -239,7 +239,58 @@ class MyGUI(QMainWindow):
         self.LocListTable = QTableWidget()
         tab4_layout.addWidget(self.LocListTable, 0, 0)
         
-
+    def setup_visualisationTab(self):
+        #Add a vertical layout, not a grid layout:
+        visualisationTab_vertical_container = QVBoxLayout()
+        self.tab_visualisation.setLayout(visualisationTab_vertical_container)
+        
+        #Add a horizontal layout to the first row of the vertical layout:
+        visualisationTab_horizontal_container = QHBoxLayout()
+        visualisationTab_vertical_container.addLayout(visualisationTab_horizontal_container)
+        
+        #Add a button that says scatter:
+        self.buttonScatter = QPushButton("Scatter Plot")
+        visualisationTab_horizontal_container.addWidget(self.buttonScatter)
+        #Give it a function on click:
+        self.buttonScatter.clicked.connect(lambda: self.plotScatter())
+        
+        self.data['figurePlot'], self.data['figureAx'] = plt.subplots()
+        self.data['figureCanvas'] = FigureCanvas(self.data['figurePlot'])
+        
+        self.data['figurePlot'].tight_layout()
+        
+        visualisationTab_vertical_container.addWidget(NavigationToolbar(self.data['figureCanvas'], self))
+        
+        visualisationTab_vertical_container.addWidget(self.data['figureCanvas'])
+    
+    def plotScatter(self):
+        #check if we have results stored:
+        if 'FittingMethod' in self.data:
+            logging.debug('Attempting to show scatter plot')
+            #Delete any existing cbar - needs to be done before anything else:
+            if hasattr(self, 'cbar'):
+                self.cbar.remove()
+            #Plot the contents of the loclist as scatter points, color-coded on time:
+            #Clear axis
+            self.data['figureAx'].clear()
+            #Plot the data as scatter plot
+            scatter = self.data['figureAx'].scatter(self.data['FittingResult'][0]['x'], self.data['FittingResult'][0]['y'], c=self.data['FittingResult'][0]['t'], cmap='viridis')
+            self.data['figureAx'].set_xlabel('x [nm]')
+            self.data['figureAx'].set_ylabel('y [nm]')
+            self.data['figureAx'].set_aspect('equal', adjustable='box')  
+            
+            #Draw a cbar
+            self.cbar = self.data['figurePlot'].colorbar(scatter)
+            self.cbar.set_label('Time (ms)')
+            
+            #Give it a nice layout
+            self.data['figurePlot'].tight_layout()
+            #Update drawing of the canvas
+            self.data['figureCanvas'].draw()
+            logging.info('Scatter plot drawn')
+        else:
+            logging.error('Tried to visualise but no data found!')
+        
     #Main def that interacts with a new layout based on whatever entries we have!
     #We assume a X-by-4 (4 columns) size, where 1/2 are used for Operation, and 3/4 are used for Value-->Score conversion
     def changeLayout_choice(self,curr_layout,className):
@@ -782,9 +833,4 @@ Custom output from fitting function:
                 self.changeLayout_choice(self.groupboxFitting.layout(),combobox.objectName())
         # except:
         #     pass
-
-
-
-
-
 
