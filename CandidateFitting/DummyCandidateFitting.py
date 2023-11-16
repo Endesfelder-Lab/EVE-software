@@ -27,17 +27,13 @@ def __function_metadata__():
 def FunctionOne(candidate_dic,settings,**kwargs):
     #Check if we have the required kwargs
     [provided_optional_args, missing_optional_args] = utilsHelper.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
-    if "okwarg_1" in provided_optional_args:
-        okwarg1 = float(kwargs["okwarg_1"])
-    else:
-        #Default okwarg1 value
-        okwarg1 = 1
+
     # Start the timer
     start_time = time.time()
 
     # generate the localizations from a candidate dictionary
     localizations = pd.DataFrame()
-    for i in range(len(candidate_dic)):
+    for i in np.unique(list(candidate_dic)):
         localizations['x'] = candidate_dic[i]['events']['x']
         localizations['y'] = candidate_dic[i]['events']['y']
         localizations['t'] = candidate_dic[i]['events']['t']

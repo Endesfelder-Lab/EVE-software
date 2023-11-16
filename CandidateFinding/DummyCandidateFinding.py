@@ -10,11 +10,8 @@ def __function_metadata__():
     return {
         "FunctionOne": {
             "required_kwargs": [
-                {"name": "rkwarg_1", "description": "Value(s) to be converted to score"},
-                {"name": "rkwarg_2", "description": "lower bound"}
             ],
             "optional_kwargs": [
-                {"name": "okwarg_1", "description": "Score the object will be given if it's outside the bounds, default 0"}
             ],
             "help_string": "Returns a test dictionary and metadata string, to check if the program is working properly."
         }
@@ -27,11 +24,7 @@ def __function_metadata__():
 def FunctionOne(npy_array,settings,**kwargs):
     #Check if we have the required kwargs
     [provided_optional_args, missing_optional_args] = utilsHelper.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
-    if "okwarg_1" in provided_optional_args:
-        okwarg1 = float(kwargs["okwarg_1"])
-    else:
-        #Default okwarg1 value
-        okwarg1 = 1
+
     # Start the timer
     start_time = time.time()
 

@@ -105,6 +105,7 @@ class MyGUI(QMainWindow):
     def initGlobalSettings(self):
         globalSettings = {}
         globalSettings['PixelSize_nm'] = 80
+        globalSettings['MetaVisionPath'] = "C:\Program Files\Prophesee\lib\python3\site-packages"
         globalSettings['StoreConvertedRawData'] = True
         globalSettings['StoreFileMetadata'] = True
         globalSettings['StoreFinalOutput'] = True
@@ -351,8 +352,7 @@ class MyGUI(QMainWindow):
             logging.info('NPY file from RAW was already present, loading this instead of RAW!')
         else:
             logging.info('Starting to convert NPY to RAW...')
-            # Add /usr/lib/python3/dist-packages/ to PYTHONPATH to include Metavision libraries
-            sys.path.append("C:\Program Files\Prophesee\lib\python3\site-packages") 
+            sys.path.append(self.globalSettings['MetaVisionPath']) 
             from metavision_core.event_io.raw_reader import RawReader
             record_raw = RawReader(filepath)
             sums = 0
@@ -426,7 +426,6 @@ class MyGUI(QMainWindow):
                 #Reset the global setting:
                 self.globalSettings['StoreFindingOutput']=origStoreFindingSetting
             
-    
     def processSingleFile(self,FileName,onlyFitting=False):
         if not onlyFitting:
             #Run the analysis on a single file
