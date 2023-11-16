@@ -1,14 +1,25 @@
 from GUI_main import MyGUI
-import sys,argparse
+import sys,argparse,colorsys
 from PyQt5.QtWidgets import QApplication
 
+def adjust_color_brightness(hex_color, percent):
+    # Convert hexadecimal color to RGB
+    rgb_color = tuple(int(hex_color[1+i:1+i+2], 16) for i in (0, 2, 4))
+    # Convert HSL color back to RGB
+    rgb_color = tuple(int(round(i + i * percent / 100)) for i in rgb_color)
+    # Bound each element between 0 and 255
+    rgb_color = tuple(max(0, min(255, i)) for i in rgb_color)
+    # Convert RGB color to hexadecimal
+    hex_color = '#{:02x}{:02x}{:02x}'.format(*rgb_color)
+    
+    return hex_color
 
 def get_stylesheet():
     # External variables for colors
     background_color = '#f8f8f8'
     tab_pane_background_color = '#585858'
-    accent_color = '#d5d5e5'  # A shade of gray
-    accent_color_darker = '#b0b0e5'
+    accent_color = '#d5d5e5'  
+    accent_color_darker = adjust_color_brightness(accent_color, -15)#'#b0b0e5'
     text_color = '#333333'
     border_radius = '0px'
     border_width = '1px'

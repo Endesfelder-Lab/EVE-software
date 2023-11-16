@@ -1,6 +1,6 @@
 # from csbdeep.io import save_tiff_imagej_compatible
 # from stardist import _draw_polygons, export_imagej_rois
-import sys, os, logging, json, argparse, datetime, glob, csv
+import sys, os, logging, json, argparse, datetime, glob, csv, ast
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
@@ -15,9 +15,10 @@ from CandidateFinding import *
 #Obtain the helperfunctions
 from Utils import utils, utilsHelper
 
-from PyQt5 import QtWidgets
-from PyQt5.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QTableWidget, QTableWidgetItem, QLayout, QMainWindow, QLabel, QPushButton, QSizePolicy, QGroupBox, QTabWidget, QGridLayout, QWidget, QComboBox, QLineEdit, QFileDialog, QToolBar
-
+from PyQt5 import QtWidgets, QtGui
+from PyQt5.QtGui import QCursor
+from PyQt5.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QTableWidget, QTableWidgetItem, QLayout, QMainWindow, QLabel, QPushButton, QSizePolicy, QGroupBox, QTabWidget, QGridLayout, QWidget, QComboBox, QLineEdit, QFileDialog, QToolBar, QCheckBox,QDesktopWidget 
+from PyQt5.QtCore import Qt
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
 # Main script
@@ -48,6 +49,7 @@ class MyGUI(QMainWindow):
         #Create a dictionary that stores data and passes it between finding,fitting,saving, etc
         self.data = {}
         
+        
         #Set some major settings on the UI
         super().__init__()
         self.setWindowTitle("EBS fitting - Endesfelder lab - Nov 2023")
@@ -63,9 +65,24 @@ class MyGUI(QMainWindow):
         #Create a global settings group box
         self.globalSettingsGroupBox = QGroupBox("Global settings")
         self.globalSettingsGroupBox.setLayout(QGridLayout())
-        #Create a dummy label and add this to the global settings group box
-        self.label = QLabel("Hello, GUI!")
-        self.globalSettingsGroupBox.layout().addWidget(self.label)
+        
+        #Create an advanced settings button that opens a new window
+        self.advancedSettingsButton = QPushButton("Advanced settings", self)
+        self.advancedSettingsButton.clicked.connect(self.open_advanced_settings)
+        self.globalSettingsGroupBox.layout().addWidget(self.advancedSettingsButton, 0, 0)
+        
+        #Initialise (but not show!) advanced window:
+        self.advancedSettingsWindow = AdvancedSettingsWindow(self)
+        
+        # Create a button to trigger saving the entries
+        self.save_button = QPushButton("Save GUI contents", self)
+        self.save_button.clicked.connect(self.save_entries_to_json)
+        self.globalSettingsGroupBox.layout().addWidget(self.save_button, 0, 1)
+        # Create a button to trigger loading the entries
+        self.load_button = QPushButton("Load GUI contents", self)
+        self.load_button.clicked.connect(self.load_entries_from_json)
+        self.globalSettingsGroupBox.layout().addWidget(self.load_button, 1, 1)
+        
         #Add the global settings group box to the central widget
         self.layout.addWidget(self.globalSettingsGroupBox, 0, 0)
 
@@ -88,28 +105,42 @@ class MyGUI(QMainWindow):
         self.setup_tab('Post-processing')
         self.setup_tab('LocalizationList')
         self.setup_tab('Visualisation')
-        
-         # Create a button to trigger saving the entries
-        self.save_button = QPushButton("Save GUI contents", self)
-        self.save_button.clicked.connect(self.save_entries_to_json)
-        self.layout.addWidget(self.save_button, 4, 0)
-         # Create a button to trigger loading the entries
-        self.load_button = QPushButton("Load GUI contents", self)
-        self.load_button.clicked.connect(self.load_entries_from_json)
-        self.layout.addWidget(self.load_button, 5, 0)
 
         #Loop through all combobox states briefly to initialise them (and hide them)
         self.set_all_combobox_states()
+        
+        #Load the GUI settings from last time:
+        self.load_entries_from_json()
+    
+    def open_advanced_settings(self):
+        self.advancedSettingsWindow.show()
     
     def initGlobalSettings(self):
         globalSettings = {}
-        globalSettings['PixelSize_nm'] = 80
-        globalSettings['MetaVisionPath'] = "C:\Program Files\Prophesee\lib\python3\site-packages"
-        globalSettings['StoreConvertedRawData'] = True
-        globalSettings['StoreFileMetadata'] = True
-        globalSettings['StoreFinalOutput'] = True
-        globalSettings['StoreFindingOutput'] = True
-        globalSettings['OutputDataFormat'] = 'thunderstorm' #'minimal' or 'thunderstorm' atm
+        globalSettings['PixelSize_nm'] = {}
+        globalSettings['PixelSize_nm']['value'] = 80
+        globalSettings['PixelSize_nm']['input'] = float
+        globalSettings['MetaVisionPath'] = {}
+        globalSettings['MetaVisionPath']['value'] = "C:\Program Files\Prophesee\lib\python3\site-packages"
+        globalSettings['MetaVisionPath']['input'] = str
+        globalSettings['StoreConvertedRawData'] = {}
+        globalSettings['StoreConvertedRawData']['value'] = True
+        globalSettings['StoreConvertedRawData']['input'] = bool
+        globalSettings['StoreFileMetadata'] = {}
+        globalSettings['StoreFileMetadata']['value'] = True
+        globalSettings['StoreFileMetadata']['input'] = bool
+        globalSettings['StoreFinalOutput'] = {}
+        globalSettings['StoreFinalOutput']['value'] = True
+        globalSettings['StoreFinalOutput']['input'] = bool
+        globalSettings['StoreFindingOutput'] = {}
+        globalSettings['StoreFindingOutput']['value'] = True
+        globalSettings['StoreFindingOutput']['input'] = bool
+        globalSettings['OutputDataFormat'] = {}
+        globalSettings['OutputDataFormat']['value'] = 'thunderstorm'
+        globalSettings['OutputDataFormat']['input'] = 'choice'
+        globalSettings['OutputDataFormat']['options'] = ('thunderstorm','minimal')
+        
+        globalSettings['IgnoreInOptions'] = ('IgnoreInOptions')
         return globalSettings
     
     # Function to handle the button click event
@@ -254,7 +285,7 @@ class MyGUI(QMainWindow):
         #Give it a function on click:
         self.buttonScatter.clicked.connect(lambda: self.plotScatter())
         
-        self.data['figurePlot'], self.data['figureAx'] = plt.subplots()
+        self.data['figurePlot'], self.data['figureAx'] = plt.subplots(figsize=(5, 5))
         self.data['figureCanvas'] = FigureCanvas(self.data['figurePlot'])
         
         self.data['figurePlot'].tight_layout()
@@ -291,8 +322,6 @@ class MyGUI(QMainWindow):
         else:
             logging.error('Tried to visualise but no data found!')
         
-    #Main def that interacts with a new layout based on whatever entries we have!
-    #We assume a X-by-4 (4 columns) size, where 1/2 are used for Operation, and 3/4 are used for Value-->Score conversion
     def changeLayout_choice(self,curr_layout,className):
         logging.debug('Changing layout'+curr_layout.parent().objectName())
         #This removes everything except the first entry (i.e. the drop-down menu)
@@ -408,7 +437,7 @@ class MyGUI(QMainWindow):
             logging.info('NPY file from RAW was already present, loading this instead of RAW!')
         else:
             logging.info('Starting to convert NPY to RAW...')
-            sys.path.append(self.globalSettings['MetaVisionPath']) 
+            sys.path.append(self.globalSettings['MetaVisionPath']['value']) 
             from metavision_core.event_io.raw_reader import RawReader
             record_raw = RawReader(filepath)
             sums = 0
@@ -429,7 +458,7 @@ class MyGUI(QMainWindow):
             events['x']-=np.min(events['x'])
             events['y']-=np.min(events['y'])
             events['t']-=np.min(events['t'])
-            if self.globalSettings['StoreConvertedRawData']:
+            if self.globalSettings['StoreConvertedRawData']['value']:
                 np.save(filepath[:-4]+'.npy',events)
                 logging.debug('NPY file created')
             logging.info('Raw data loaded')
@@ -474,13 +503,13 @@ class MyGUI(QMainWindow):
                 logging.info('Skipping finding processing, going to fitting')
                 
                 #Ensure that we don't store the finding result
-                origStoreFindingSetting=self.globalSettings['StoreFindingOutput']
-                self.globalSettings['StoreFindingOutput'] = False
+                origStoreFindingSetting=self.globalSettings['StoreFindingOutput']['value']
+                self.globalSettings['StoreFindingOutput']['value'] = False
                 
                 self.processSingleFile(self.dataLocationInput.text(),onlyFitting=True)
                 
                 #Reset the global setting:
-                self.globalSettings['StoreFindingOutput']=origStoreFindingSetting
+                self.globalSettings['StoreFindingOutput']['value']=origStoreFindingSetting
          
         self.updateGUIafterNewResults()       
         return
@@ -533,7 +562,7 @@ class MyGUI(QMainWindow):
             self.data['FindingResult'] = eval(str(FindingEvalText))
             logging.info('Candidate finding done!')
             logging.debug(self.data['FindingResult'])
-            if self.globalSettings['StoreFindingOutput']:
+            if self.globalSettings['StoreFindingOutput']['value']:
                 self.storeFindingOutput()
             #And run the fitting
             self.runFitting()
@@ -551,10 +580,10 @@ class MyGUI(QMainWindow):
                 logging.debug(self.data['FittingResult'])
                 
                 #Create and store the metadata
-                if self.globalSettings['StoreFileMetadata']:
+                if self.globalSettings['StoreFileMetadata']['value']:
                     self.createAndStoreFileMetadata()
                 
-                if self.globalSettings['StoreFinalOutput']:
+                if self.globalSettings['StoreFinalOutput']['value']:
                     self.storeLocalizationOutput()
             else:
                 logging.error('Candidate fitting NOT performed')
@@ -573,9 +602,9 @@ class MyGUI(QMainWindow):
         logging.debug('Attempting to store fitting results output')
         storeLocation = self.getStoreLocationPartial()+'_FitResults_'+datetime.datetime.now().strftime("%Y%m%d_%H%M%S")+'.csv'
         #Store the localization output
-        if self.globalSettings['OutputDataFormat'] == 'minimal':
+        if self.globalSettings['OutputDataFormat']['value'] == 'minimal':
             self.data['FittingResult'][0].to_csv(storeLocation)
-        elif self.globalSettings['OutputDataFormat'] == 'thunderstorm':
+        elif self.globalSettings['OutputDataFormat']['value'] == 'thunderstorm':
             #Create thunderstorm headers
             headers = list(self.data['FittingResult'][0].columns)
             headers = ['\"x [nm]\"' if header == 'x' else '\"y [nm]\"' if header == 'y' else '\"z [nm]\"' if header == 'z' else '\"t [ms]\"' if header == 't' else header for header in headers]
@@ -790,6 +819,8 @@ Custom output from fitting function:
 
         except FileNotFoundError:
             # Handle the case when the JSON file doesn't exist yet
+            self.save_entries_to_json()
+            logging.info('No GUI settings storage found, new one created.')
             pass
         
     def get_editable_fields(self):
@@ -834,3 +865,115 @@ Custom output from fitting function:
         # except:
         #     pass
 
+class AdvancedSettingsWindow(QMainWindow):
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.setWindowTitle("New Window")
+        self.resize(300, 200)
+        
+        self.parent = parent
+
+        cursor_pos = QCursor.pos()
+
+        #Load the global settings from last time:
+        self.load_global_settings()
+
+        # Set the position of the window
+        self.move(cursor_pos)
+
+        #Create a QGridlayout to populate:
+        layout = QGridLayout()
+        currentRow = 0
+        
+        # Iterate over the settings in self.parent.globalSettings
+        for setting, value in self.parent.globalSettings.items():
+            # Check if the setting is not in IgnoreInOptions
+            if setting not in self.parent.globalSettings.get('IgnoreInOptions', ''):
+                # Create a label with the setting title
+                label = QLabel(setting)
+                layout.addWidget(label,currentRow,0)
+                
+                # Check the type of the input
+                input_type = value['input']
+                
+                # Create a checkbox for boolean values
+                if input_type == bool:
+                    checkbox = QCheckBox()
+                    checkbox.setChecked(value['value'])
+                    checkbox.stateChanged.connect(lambda state, s=setting: self.update_global_settings(s, state))
+                    layout.addWidget(checkbox,currentRow,1)
+                
+                # Create an input field for string or integer values
+                elif input_type in (str, float):
+                    input_field = QLineEdit()
+                    input_field.setText(str(value['value']))
+                    input_field.textChanged.connect(lambda text, s=setting: self.update_global_settings(s, text))
+                    layout.addWidget(input_field,currentRow,1)
+                    
+                # Create a dropdown for choices
+                elif input_type == 'choice':
+                    options = value['options']
+                    dropdown = QComboBox()
+                    dropdown.addItems(options)
+                    current_index = options.index(value['value'])
+                    dropdown.setCurrentIndex(current_index)
+                    dropdown.currentIndexChanged.connect(lambda index, s=setting: self.update_global_settings(s, options[index]))
+                    layout.addWidget(dropdown,currentRow,1)
+
+                #Increment the row for the next one   
+                currentRow+=1
+        
+        # Create a save button
+        save_button = QPushButton("Save Global Settings")
+        save_button.clicked.connect(self.save_global_settings)
+        layout.addWidget(save_button,currentRow,0)
+        
+        # Create a load button
+        load_button = QPushButton("Load Global Settings")
+        load_button.clicked.connect(self.load_global_settings)
+        layout.addWidget(load_button,currentRow,1)        
+                
+        # Create a widget and set the layout
+        widget = QWidget()
+        widget.setLayout(layout)
+
+        # Set the central widget of the main window
+        self.setCentralWidget(widget)
+    
+    def update_global_settings(self, setting, value):
+        self.parent.globalSettings[setting]['value'] = value
+        
+    def save_global_settings(self):
+        # Specify the path and filename for the JSON file
+        json_file_path = "GUI" + os.sep + "GlobSettingStorage.json"
+
+        # Serialize the globalSettings dictionary, skipping over the 'input' value
+        serialized_settings = {}
+        for key, value in self.parent.globalSettings.items():
+            if key != 'IgnoreInOptions':
+                serialized_settings[key] = value.copy()
+                serialized_settings[key].pop('input', None)
+
+    
+        # Write the globalSettings dictionary to the JSON file
+        with open(json_file_path, "w") as json_file:
+            json.dump(serialized_settings, json_file)
+    
+    def load_global_settings(self):
+        # Specify the path and filename for the JSON file
+        json_file_path = "GUI" + os.sep + "GlobSettingStorage.json"
+        try:    # Load the globalSettings dictionary from the JSON file
+            with open(json_file_path, "r") as json_file:
+                loaded_settings = json.load(json_file)
+
+            # Update the 'input' value in self.parent.globalSettings, if it exists
+            for key, value in loaded_settings.items():
+                if key != 'IgnoreInOptions':
+                    if key in self.parent.globalSettings:
+                        value['input'] = self.parent.globalSettings[key].get('input', None)
+
+
+            self.parent.globalSettings = loaded_settings
+        except:
+            self.save_global_settings()
+            logging.info('No global settings storage found, new one created.')
