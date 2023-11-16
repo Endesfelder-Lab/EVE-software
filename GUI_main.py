@@ -548,7 +548,7 @@ Custom output from fitting function:
         for index in range(all_layouts.count()):
             item = all_layouts.itemAt(index)
             widget = item.widget()
-            
+                        
             if ("LineEdit" in widget.objectName()) and widget.isVisible():
                 # The objectName will be along the lines of foo#bar#str
                 #Check if the objectname is part of a method or part of a scoring
@@ -558,13 +558,21 @@ Custom output from fitting function:
                 
                 #Widget.text() could contain a file location. Thus, we need to swap out all \ for /:
                 methodKwargValues_method.append(widget.text().replace('\\','/'))
+
+        #If at this point there is no methodName_method, it means that the method has exactly 0 req or opt kwargs. Thus, we simply find the value of the QComboBox which should be the methodName:
+        if methodName_method == '':
+            for index in range(all_layouts.count()):
+                item = all_layouts.itemAt(index)
+                widget = item.widget()
+                if isinstance(widget,QComboBox) and widget.isVisible() and className in widget.objectName():
+                    methodName_method = widget.currentText()
         
         #Function call: get the to-be-evaluated text out, giving the methodName, method KwargNames, methodKwargValues, and 'function Type (i.e. cellSegmentScripts, etc)' - do the same with scoring as with method
         if methodName_method != '':
             EvalTextMethod = self.getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart=str(p1)+','+str(p2))
             #append this to moduleEvalTexts
             moduleMethodEvalTexts.append(EvalTextMethod)
-        if moduleMethodEvalTexts is not None:
+        if moduleMethodEvalTexts is not None and len(moduleMethodEvalTexts) > 0:
             return moduleMethodEvalTexts[0]
         else:
             return None

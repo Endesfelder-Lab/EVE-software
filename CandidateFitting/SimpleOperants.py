@@ -10,7 +10,6 @@ def __function_metadata__():
     return {
         "AverageXYTpos": {
             "required_kwargs": [
-                {"name": "rkwarg_1", "description": "Value(s) to be converted to score"},
             ],
             "optional_kwargs": [
             ],

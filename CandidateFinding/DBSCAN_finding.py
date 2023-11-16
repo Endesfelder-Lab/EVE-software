@@ -18,11 +18,8 @@ def __function_metadata__():
     return {
         "DBSCAN_finding": {
             "required_kwargs": [
-                {"name": "rkwarg_1", "description": "Value(s) to be converted to score"},
-                {"name": "rkwarg_2", "description": "lower bound"}
             ],
             "optional_kwargs": [
-                {"name": "okwarg_1", "description": "Score the object will be given if it's outside the bounds, default 0"}
             ],
             "help_string": "Finding via DBSCAN"
         }
