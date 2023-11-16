@@ -494,7 +494,7 @@ class MyGUI(QMainWindow):
         elif self.globalSettings['OutputDataFormat'] == 'thunderstorm':
             #Create thunderstorm headers
             headers = list(self.data['FittingResult'][0].columns)
-            headers = ['\"x [nm]\"' if header == 'x' else '\"y [nm]\"' if header == 'y' else '\"z [nm]\"' if header == 'z' else '\"t [us]\"' if header == 't' else header for header in headers]
+            headers = ['\"x [nm]\"' if header == 'x' else '\"y [nm]\"' if header == 'y' else '\"z [nm]\"' if header == 'z' else '\"t [ms]\"' if header == 't' else header for header in headers]
             self.data['FittingResult'][0].rename_axis('\"id\"').to_csv(storeLocation, header=headers, quoting=csv.QUOTE_NONE)
         else:
             #default to minimal

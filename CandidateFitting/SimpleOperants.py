@@ -26,29 +26,11 @@ def AverageXYTpos(candidate_dic,settings,**kwargs):
     localizations = {}
     for i in np.unique(list(candidate_dic)):
         localizations[i]={}
-        localizations[i]['x'] = np.mean(candidate_dic[i]['events']['x'])
-        localizations[i]['y'] = np.mean(candidate_dic[i]['events']['y'])
-        localizations[i]['t'] = np.mean(candidate_dic[i]['events']['t'])
+        localizations[i]['x'] = np.mean(candidate_dic[i]['events']['x'])*settings['PixelSize_nm'] #X position in nm
+        localizations[i]['y'] = np.mean(candidate_dic[i]['events']['y'])*settings['PixelSize_nm'] #Y position in nm
+        localizations[i]['t'] = np.mean(candidate_dic[i]['events']['t'])/1000 #time in ms ?
     
-    #Make a pd dataframe out of it
+    #Make a pd dataframe out of it - needs to be transposed
     localizations = pd.DataFrame(localizations).T
-    # print('\nStarting localization list...')
-    # tic = time.time()
-    # localization_list = np.zeros((len(np.unique(b['DBSCAN'])),9))
-    # for cl in np.unique(b['DBSCAN']):
-    #     templocs = b[b['DBSCAN']==cl]
-    #     mean_x = np.mean(templocs['x']) #just mean x,y
-    #     mean_y = np.mean(templocs['y'])
-    #     FWHM_x = np.percentile(templocs['x'],75)-np.percentile(templocs['x'],25) #FWHM at x,y
-    #     FWHM_y = np.percentile(templocs['y'],75)-np.percentile(templocs['y'],25)
-    #     time_start_prc = np.percentile(templocs['t'],5) #5% percentile for start-time
-    #     time_end_prc = np.percentile(templocs['t'],95) #5% percentile for end-time of on-event
-    #     nr_events_loc = len(templocs)
-    #     #Put all in localization_list
-    #     localization_list[cl-1,:] = [cl,time_start_prc,mean_x,mean_y,nr_events_loc,1,FWHM_x,FWHM_y,time_end_prc]
-    #     #print('Localization '+str(cl)+' at: x: '+str(mean_x)+', y: '+str(mean_y)+', t: '+str(time_start_prc))
-    # localizations = cl
-    # print(str(cl)+' localizations found!\n')
-    # print('Time to find localizations: ', time.time()-tic)
     
     return localizations, ''
