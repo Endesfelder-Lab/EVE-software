@@ -66,14 +66,14 @@ class MyGUI(QMainWindow):
         self.layout.addWidget(self.globalSettingsGroupBox, 0, 0)
 
         #Create a new group box
-        self.mainGroupBox = QGroupBox()
-        self.mainGroupBox.setLayout(QGridLayout())
-        self.layout.addWidget(self.mainGroupBox, 2, 0)
+        # self.mainGroupBox = QGroupBox()
+        # self.mainGroupBox.setLayout(QGridLayout())
+        # self.layout.addWidget(self.mainGroupBox, 2, 0)
 
         #Create a tab widget and add this to the main group box
         self.mainTabWidget = QTabWidget()
         self.mainTabWidget.setTabPosition(QTabWidget.South)
-        self.mainGroupBox.layout().addWidget(self.mainTabWidget, 0, 0)
+        self.layout.addWidget(self.mainTabWidget, 2, 0)
         
         self.tab_processing = QWidget()
         self.mainTabWidget.addTab(self.tab_processing, "Processing")
@@ -409,62 +409,105 @@ class MyGUI(QMainWindow):
                     logging.info('Successfully processed file '+file)
                 except:
                     logging.error('Error in processing file '+file)
+        #If it's a file...
         elif os.path.isfile(self.dataLocationInput.text()):
             self.processSingleFile(self.dataLocationInput.text())
+        #If it's nothing - only continue if we actually load a finding result:
+        else:
+            if 'ExistingFinding' in self.candidateFindingDropdown.currentText():
+                logging.info('Skipping finding processing, going to fitting')
+                
+                #Ensure that we don't store the finding result
+                origStoreFindingSetting=self.globalSettings['StoreFindingOutput']
+                self.globalSettings['StoreFindingOutput'] = False
+                
+                self.processSingleFile(self.dataLocationInput.text(),onlyFitting=True)
+                
+                #Reset the global setting:
+                self.globalSettings['StoreFindingOutput']=origStoreFindingSetting
+            
     
-    def processSingleFile(self,FileName):
-        #Run the analysis on a single file
-        self.currentFileInfo['CurrentFileLoc'] = FileName
-        npyData = self.loadRawData(FileName)
-        if npyData is not None:
+    def processSingleFile(self,FileName,onlyFitting=False):
+        if not onlyFitting:
+            #Run the analysis on a single file
+            self.currentFileInfo['CurrentFileLoc'] = FileName
+            npyData = self.loadRawData(FileName)
+            if npyData is None:
+                return
+        #If we only fit, we still run more or less the same info, butwe don't care about the npyData in the CurrentFileLoc.
+        elif onlyFitting:
+            self.currentFileInfo['CurrentFileLoc'] = FileName
+            logging.info('Candidate finding NOT performed')
+            npyData = None
+            
+        #Run the finding function!
+        FindingEvalText = self.getFunctionEvalText('Finding',"npyData","self.globalSettings")
+        if FindingEvalText is not None:
+            self.data['FindingMethod'] = str(FindingEvalText)
+            self.data['FindingResult'] = eval(str(FindingEvalText))
+            logging.info('Candidate finding done!')
+            logging.debug(self.data['FindingResult'])
+            if self.globalSettings['StoreFindingOutput']:
+                self.storeFindingOutput()
+            #And run the fitting
+            self.runFitting()
+        else:
+            logging.error('Candidate finding NOT performed')
+                
+    def runFitting(self):
+        if self.data['FindingResult'][0] is not None:
             #Run the finding function!
-            FindingEvalText = self.getFunctionEvalText('Finding',"npyData","self.globalSettings")
-            if FindingEvalText is not None:
-                self.data['FindingMethod'] = str(FindingEvalText)
-                self.data['FindingResult'] = eval(str(FindingEvalText))
-                logging.info('Candidate finding done!')
-                logging.debug(self.data['FindingResult'])
-                if self.globalSettings['StoreFindingOutput']:
-                    self.storeFindingOutput()
-                #Run the finding function!
-                FittingEvalText = self.getFunctionEvalText('Fitting',"self.data['FindingResult'][0]","self.globalSettings")
-                if FittingEvalText is not None:
-                    self.data['FittingMethod'] = str(FittingEvalText)
-                    self.data['FittingResult'] = eval(str(FittingEvalText))
-                    logging.info('Candidate fitting done!')
-                    logging.debug(self.data['FittingResult'])
-                    
-                    #Create and store the metadata
-                    if self.globalSettings['StoreFileMetadata']:
-                        self.createAndStoreFileMetadata()
-                    
-                    if self.globalSettings['StoreFinalOutput']:
-                        self.storeLocalizationOutput()
-                    
-                else:
-                    logging.error('Candidate fitting NOT performed')
+            FittingEvalText = self.getFunctionEvalText('Fitting',"self.data['FindingResult'][0]","self.globalSettings")
+            if FittingEvalText is not None:
+                self.data['FittingMethod'] = str(FittingEvalText)
+                self.data['FittingResult'] = eval(str(FittingEvalText))
+                logging.info('Candidate fitting done!')
+                logging.debug(self.data['FittingResult'])
+                
+                #Create and store the metadata
+                if self.globalSettings['StoreFileMetadata']:
+                    self.createAndStoreFileMetadata()
+                
+                if self.globalSettings['StoreFinalOutput']:
+                    self.storeLocalizationOutput()
             else:
-                logging.error('Candidate finding NOT performed')
-    
+                logging.error('Candidate fitting NOT performed')
+        else:
+            logging.error('No Finding Result obtained! Fitting is not run succesfully!')
+                      
+    def getStoreLocationPartial(self):   
+        if 'ExistingFinding' in self.data['FindingMethod']:
+            FindingResultFileName = self.data['FindingMethod'][self.data['FindingMethod'].index('File_Location="')+len('File_Location="'):self.data['FindingMethod'].index('")')]
+            storeLocationPartial = FindingResultFileName[:-7]
+        else:
+            storeLocationPartial = self.currentFileInfo['CurrentFileLoc'][:-4]
+        return storeLocationPartial     
+      
     def storeLocalizationOutput(self):
         logging.debug('Attempting to store fitting results output')
+        storeLocation = self.getStoreLocationPartial()+'_FitResults_'+datetime.datetime.now().strftime("%Y%m%d_%H%M%S")+'.csv'
         #Store the localization output
         if self.globalSettings['OutputDataFormat'] == 'minimal':
-            self.data['FittingResult'][0].to_csv(self.currentFileInfo['CurrentFileLoc'][:-4]+'_FitResults_'+datetime.datetime.now().strftime("%Y%m%d_%H%M%S")+'.csv')
+            self.data['FittingResult'][0].to_csv(storeLocation)
         elif self.globalSettings['OutputDataFormat'] == 'thunderstorm':
             #Create thunderstorm headers
             headers = list(self.data['FittingResult'][0].columns)
             headers = ['\"x [nm]\"' if header == 'x' else '\"y [nm]\"' if header == 'y' else '\"z [nm]\"' if header == 'z' else '\"t [us]\"' if header == 't' else header for header in headers]
-            self.data['FittingResult'][0].rename_axis('\"id\"').to_csv(self.currentFileInfo['CurrentFileLoc'][:-4]+'_FitResults_'+datetime.datetime.now().strftime("%Y%m%d_%H%M%S")+'.csv', header=headers, quoting=csv.QUOTE_NONE)
+            self.data['FittingResult'][0].rename_axis('\"id\"').to_csv(storeLocation, header=headers, quoting=csv.QUOTE_NONE)
         else:
             #default to minimal
-            self.data['FittingResult'][0].to_csv(self.currentFileInfo['CurrentFileLoc'][:-4]+'_FitResults_'+datetime.datetime.now().strftime("%Y%m%d_%H%M%S")+'.csv')
+            self.data['FittingResult'][0].to_csv(storeLocation)
         logging.info('Fitting results output stored')
         
     def storeFindingOutput(self):
         logging.debug('Attempting to store finding results output')
         #Store the Finding results output
-        np.save(self.currentFileInfo['CurrentFileLoc'][:-4]+'_FindingResults_'+datetime.datetime.now().strftime("%Y%m%d_%H%M%S")+'.npy',self.data['FindingResult'][0])
+        # np.save(self.currentFileInfo['CurrentFileLoc'][:-4]+'_FindingResults_'+datetime.datetime.now().strftime("%Y%m%d_%H%M%S")+'.npy',self.data['FindingResult'][0])
+        import pickle
+        file_path = self.currentFileInfo['CurrentFileLoc'][:-4]+'_FindingResults_'+datetime.datetime.now().strftime("%Y%m%d_%H%M%S")+'.pickle'
+        with open(file_path, 'wb') as file:
+            pickle.dump(self.data['FindingResult'][0], file)
+        
         logging.info('Finding results output stored')
     
     def createAndStoreFileMetadata(self):
@@ -488,7 +531,7 @@ Custom output from fitting function:
 {self.data['FittingResult'][1]}
             """
             #Store this metadatastring:
-            with open(self.currentFileInfo['CurrentFileLoc'][:-4]+'_RunInfo_'+datetime.datetime.now().strftime("%Y%m%d_%H%M%S")+'.txt', 'w') as f:
+            with open(self.getStoreLocationPartial()+'_RunInfo_'+datetime.datetime.now().strftime("%Y%m%d_%H%M%S")+'.txt', 'w') as f:
                 f.write(metadatastring)
             logging.info('File metadata created and stored')
         except:
@@ -513,7 +556,9 @@ Custom output from fitting function:
                 split_list = widget.objectName().split('#')
                 methodName_method = split_list[1]
                 methodKwargNames_method.append(split_list[2])
-                methodKwargValues_method.append(widget.text())
+                
+                #Widget.text() could contain a file location. Thus, we need to swap out all \ for /:
+                methodKwargValues_method.append(widget.text().replace('\\','/'))
         
         #Function call: get the to-be-evaluated text out, giving the methodName, method KwargNames, methodKwargValues, and 'function Type (i.e. cellSegmentScripts, etc)' - do the same with scoring as with method
         if methodName_method != '':
