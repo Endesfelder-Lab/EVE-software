@@ -1,6 +1,6 @@
 # from csbdeep.io import save_tiff_imagej_compatible
 # from stardist import _draw_polygons, export_imagej_rois
-import sys, os, logging, json, argparse, datetime, glob
+import sys, os, logging, json, argparse, datetime, glob, csv
 import numpy as np
 # Add the folder 2 folders up to the system path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -109,6 +109,7 @@ class MyGUI(QMainWindow):
         globalSettings['StoreFileMetadata'] = True
         globalSettings['StoreFinalOutput'] = True
         globalSettings['StoreFindingOutput'] = True
+        globalSettings['OutputDataFormat'] = 'thunderstorm' #'minimal' or 'thunderstorm' atm
         return globalSettings
     
     # Function to handle the button click event
@@ -448,7 +449,16 @@ class MyGUI(QMainWindow):
     def storeLocalizationOutput(self):
         logging.debug('Attempting to store fitting results output')
         #Store the localization output
-        self.data['FittingResult'][0].to_csv(self.currentFileInfo['CurrentFileLoc'][:-4]+'_FitResults_'+datetime.datetime.now().strftime("%Y%m%d_%H%M%S")+'.csv')
+        if self.globalSettings['OutputDataFormat'] == 'minimal':
+            self.data['FittingResult'][0].to_csv(self.currentFileInfo['CurrentFileLoc'][:-4]+'_FitResults_'+datetime.datetime.now().strftime("%Y%m%d_%H%M%S")+'.csv')
+        elif self.globalSettings['OutputDataFormat'] == 'thunderstorm':
+            #Create thunderstorm headers
+            headers = list(self.data['FittingResult'][0].columns)
+            headers = ['\"x [nm]\"' if header == 'x' else '\"y [nm]\"' if header == 'y' else '\"z [nm]\"' if header == 'z' else '\"t [us]\"' if header == 't' else header for header in headers]
+            self.data['FittingResult'][0].rename_axis('\"id\"').to_csv(self.currentFileInfo['CurrentFileLoc'][:-4]+'_FitResults_'+datetime.datetime.now().strftime("%Y%m%d_%H%M%S")+'.csv', header=headers, quoting=csv.QUOTE_NONE)
+        else:
+            #default to minimal
+            self.data['FittingResult'][0].to_csv(self.currentFileInfo['CurrentFileLoc'][:-4]+'_FitResults_'+datetime.datetime.now().strftime("%Y%m%d_%H%M%S")+'.csv')
         logging.info('Fitting results output stored')
         
     def storeFindingOutput(self):
