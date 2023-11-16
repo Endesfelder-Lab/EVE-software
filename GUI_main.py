@@ -260,8 +260,11 @@ class MyGUI(QMainWindow):
                     curr_layout.addWidget(label,2+(k)+labelposoffset,0)
                 line_edit = QLineEdit()
                 line_edit.setObjectName(f"LineEdit#{curr_dropdown.currentText()}#{reqKwargs[k]}")
+                defaultValue = utils.defaultValueFromKwarg(curr_dropdown.currentText(),reqKwargs[k])
                 if self.checkAndShowWidget(curr_layout,line_edit.objectName()) == False:
                     line_edit.setToolTip(utils.infoFromMetadata(curr_dropdown.currentText(),specificKwarg=reqKwargs[k]))
+                    if defaultValue is not None:
+                        line_edit.setText(str(defaultValue))
                     curr_layout.addWidget(line_edit,2+k+labelposoffset,1)
             else:
                 labelposoffset -= 1

@@ -279,3 +279,24 @@ def createFunctionWithKwargs(functionname,**kwargs):
     fullstring = fullstring+")"
     #run the function
     return fullstring
+
+def defaultValueFromKwarg(functionname,kwargname):
+    #Check if the function has a 'default' entry for the specific kwarg. If not, return None. Otherwise, return the default value.
+    
+    defaultEntry=None
+    functionparent = functionname.split('.')[0]
+    #Get the full function metadata
+    functionMetadata = eval(f'{str(functionparent)}.__function_metadata__()')
+    for k in range(0,len(functionMetadata[functionname.split('.')[1]]["optional_kwargs"])):
+        if functionMetadata[functionname.split('.')[1]]["optional_kwargs"][k]['name'] == kwargname:
+            #check if this has a default value:
+            if 'default' in functionMetadata[functionname.split('.')[1]]["optional_kwargs"][k]:
+                defaultEntry = functionMetadata[functionname.split('.')[1]]["optional_kwargs"][k]['default']
+    #look over required kwargs
+    for k in range(0,len(functionMetadata[functionname.split('.')[1]]["required_kwargs"])):
+        if functionMetadata[functionname.split('.')[1]]["required_kwargs"][k]['name'] == kwargname:
+            #check if this has a default value:
+            if 'default' in functionMetadata[functionname.split('.')[1]]["required_kwargs"][k]:
+                defaultEntry = functionMetadata[functionname.split('.')[1]]["required_kwargs"][k]['default']
+    
+    return defaultEntry

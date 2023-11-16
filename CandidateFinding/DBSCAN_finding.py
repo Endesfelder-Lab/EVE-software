@@ -18,6 +18,9 @@ def __function_metadata__():
     return {
         "DBSCAN_finding": {
             "required_kwargs": [
+                {"name": "spatial_radius_outer", "description": "Outer radius (in px) to count the neighbours in.","default":7},
+                {"name": "spatial_radius_inner", "description": "Inner radius (in px) to count the neighbours in.","default":1},
+                {"name": "ratio_ms_to_px", "description": "Ratio of milliseconds to pixels.","default":35},
             ],
             "optional_kwargs": [
             ],
@@ -32,16 +35,17 @@ def __function_metadata__():
 #-------------------------------------------------------------------------------------------------------------------------------
 def DBSCAN_finding(npy_array,settings,**kwargs):
     #Check if we have the required kwargs
-    print('Hi!')
     [provided_optional_args, missing_optional_args] = utilsHelper.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
+    
+    #Load the required kwargs
+    spatial_radius_outer = float(kwargs['spatial_radius_outer']) #in pixels, 7 seems to work
+    spatial_radius_inner = float(kwargs['spatial_radius_inner']) #in pixels, 1 seems to work 
+    ratio_ms_to_pixel = float(kwargs['ratio_ms_to_px'])
     
     nr_batches = 1   #!!!
     consec_weight_max = 30
-    spatial_radius_outer = 7 #in pixels, 7 seems to work
-    spatial_radius_inner = 1 #in pixels, 1 seems to work
     temporal_duration = 50e3 #in microseconds?, 50e3 seems to work
     posneg = 1 #only pos
-    ratio_ms_to_pixel = 35
     
     
     print('Loading events...')
