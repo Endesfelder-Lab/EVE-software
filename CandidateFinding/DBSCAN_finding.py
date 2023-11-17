@@ -24,7 +24,8 @@ def __function_metadata__():
             ],
             "optional_kwargs": [
             ],
-            "help_string": "Finding via DBSCAN"
+            "help_string": "Finding via DBSCAN",
+            "display_name": "Finding via DBSCAN"
         }
     }
 

@@ -300,3 +300,28 @@ def defaultValueFromKwarg(functionname,kwargname):
                 defaultEntry = functionMetadata[functionname.split('.')[1]]["required_kwargs"][k]['default']
     
     return defaultEntry
+
+
+def displayNamesFromFunctionNames(functionName):
+    displaynames = []
+    functionName_to_displayName_map = []
+    for function in functionName:
+        #Extract the mother function name - before the period:
+        subroutineName = function.split('.')[0]
+        singlefunctiondata = function.split('.')[1]
+        #Check if the subroutine has a display name - if so, use that, otherwise use the subroutineName
+        functionMetadata = eval(f'{str(subroutineName)}.__function_metadata__()')
+        if 'display_name' in functionMetadata[singlefunctiondata]:
+            displayName = functionMetadata[singlefunctiondata]['display_name']
+        else:
+            displayName = subroutineName+': '+singlefunctiondata
+        displaynames.append(displayName)
+        functionName_to_displayName_map.append((displayName,function))
+    return displaynames, functionName_to_displayName_map
+
+def functionNameFromDisplayName(displayname,map):
+    for pair in map:
+        if pair[0] == displayname:
+            print(pair[1])
+            return pair[1]
+    print('error!')

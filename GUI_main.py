@@ -216,7 +216,7 @@ class MyGUI(QMainWindow):
         #Add the global settings group box to the central widget
         # self.layout.addWidget(self.datasetsSettingsGroupBox, 1, 0)
 
-        #Add a group box on candiddate fitting
+        #Add a group box on candiddate finding
         self.groupboxFinding = QGroupBox("Candidate finding")
         self.groupboxFinding.setObjectName("groupboxFinding")
         self.groupboxFinding.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
@@ -226,16 +226,17 @@ class MyGUI(QMainWindow):
         # Create a QComboBox and add options - this is the FINDING dropdown
         self.candidateFindingDropdown = QComboBox(self)
         options = utils.functionNamesFromDir('CandidateFinding')
+        displaynames, self.Finding_functionNameToDisplayNameMapping = utils.displayNamesFromFunctionNames(options)
         self.candidateFindingDropdown.setObjectName("CandidateFinding_candidateFindingDropdown")
-        self.candidateFindingDropdown.addItems(options)
+        self.candidateFindingDropdown.addItems(displaynames)
         #Add the candidateFindingDropdown to the layout
         self.groupboxFinding.layout().addWidget(self.candidateFindingDropdown,1,0,1,2)
         #Activation for candidateFindingDropdown.activated
-        self.candidateFindingDropdown.activated.connect(lambda: self.changeLayout_choice(self.groupboxFinding.layout(),"CandidateFinding_candidateFindingDropdown"))
+        self.candidateFindingDropdown.activated.connect(lambda: self.changeLayout_choice(self.groupboxFinding.layout(),"CandidateFinding_candidateFindingDropdown",self.Finding_functionNameToDisplayNameMapping))
         
         
         #On startup/initiatlisation: also do changeLayout_choice
-        self.changeLayout_choice(self.groupboxFinding.layout(),"CandidateFinding_candidateFindingDropdown")
+        self.changeLayout_choice(self.groupboxFinding.layout(),"CandidateFinding_candidateFindingDropdown",self.Finding_functionNameToDisplayNameMapping)
         
         
         self.groupboxFitting = QGroupBox("Candidate fitting")
@@ -248,14 +249,15 @@ class MyGUI(QMainWindow):
         self.candidateFittingDropdown = QComboBox(self)
         options = utils.functionNamesFromDir('CandidateFitting')
         self.candidateFittingDropdown.setObjectName("CandidateFitting_candidateFittingDropdown")
-        self.candidateFittingDropdown.addItems(options)
+        displaynames, self.Fitting_functionNameToDisplayNameMapping = utils.displayNamesFromFunctionNames(options)
+        self.candidateFittingDropdown.addItems(displaynames)
         #Add the candidateFindingDropdown to the layout
         self.groupboxFitting.layout().addWidget(self.candidateFittingDropdown,1,0,1,2)
         #Activation for candidateFindingDropdown.activated
-        self.candidateFittingDropdown.activated.connect(lambda: self.changeLayout_choice(self.groupboxFitting.layout(),"CandidateFitting_candidateFittingDropdown"))
+        self.candidateFittingDropdown.activated.connect(lambda: self.changeLayout_choice(self.groupboxFitting.layout(),"CandidateFitting_candidateFittingDropdown",self.Fitting_functionNameToDisplayNameMapping))
         
         #On startup/initiatlisation: also do changeLayout_choice
-        self.changeLayout_choice(self.groupboxFitting.layout(),"CandidateFitting_candidateFittingDropdown")
+        self.changeLayout_choice(self.groupboxFitting.layout(),"CandidateFitting_candidateFittingDropdown",self.Fitting_functionNameToDisplayNameMapping)
         
         
         #Add a run button:
@@ -343,29 +345,30 @@ class MyGUI(QMainWindow):
         else:
             logging.error('Tried to visualise but no data found!')
         
-    def changeLayout_choice(self,curr_layout,className):
+    def changeLayout_choice(self,curr_layout,className,displayNameToFunctionNameMap):
         logging.debug('Changing layout'+curr_layout.parent().objectName())
         #This removes everything except the first entry (i.e. the drop-down menu)
         self.resetLayout(curr_layout,className)
         #Get the dropdown info
         curr_dropdown = self.getMethodDropdownInfo(curr_layout,className)
         #Get the kw-arguments from the current dropdown.
-        reqKwargs = utils.reqKwargsFromFunction(curr_dropdown.currentText())
-        #Add a widget-pair for every kwarg
+        current_selected_function = utils.functionNameFromDisplayName(curr_dropdown.currentText(),displayNameToFunctionNameMap)
+        reqKwargs = utils.reqKwargsFromFunction(current_selected_function)
+        #Add a widget-pair for every kw-arg
         labelposoffset = 0
         for k in range(len(reqKwargs)):
             #Value is used for scoring, and takes the output of the method
             if reqKwargs[k] != 'methodValue':
                 label = QLabel(f"<b>{reqKwargs[k]}</b>")
-                label.setObjectName(f"Label#{curr_dropdown.currentText()}#{reqKwargs[k]}")
+                label.setObjectName(f"Label#{current_selected_function}#{reqKwargs[k]}")
                 if self.checkAndShowWidget(curr_layout,label.objectName()) == False:
-                    label.setToolTip(utils.infoFromMetadata(curr_dropdown.currentText(),specificKwarg=reqKwargs[k]))
+                    label.setToolTip(utils.infoFromMetadata(current_selected_function,specificKwarg=reqKwargs[k]))
                     curr_layout.addWidget(label,2+(k)+labelposoffset,0)
                 line_edit = QLineEdit()
-                line_edit.setObjectName(f"LineEdit#{curr_dropdown.currentText()}#{reqKwargs[k]}")
-                defaultValue = utils.defaultValueFromKwarg(curr_dropdown.currentText(),reqKwargs[k])
+                line_edit.setObjectName(f"LineEdit#{current_selected_function}#{reqKwargs[k]}")
+                defaultValue = utils.defaultValueFromKwarg(current_selected_function,reqKwargs[k])
                 if self.checkAndShowWidget(curr_layout,line_edit.objectName()) == False:
-                    line_edit.setToolTip(utils.infoFromMetadata(curr_dropdown.currentText(),specificKwarg=reqKwargs[k]))
+                    line_edit.setToolTip(utils.infoFromMetadata(current_selected_function,specificKwarg=reqKwargs[k]))
                     if defaultValue is not None:
                         line_edit.setText(str(defaultValue))
                     curr_layout.addWidget(line_edit,2+k+labelposoffset,1)
@@ -373,18 +376,18 @@ class MyGUI(QMainWindow):
                 labelposoffset -= 1
             
         #Get the optional kw-arguments from the current dropdown.
-        optKwargs = utils.optKwargsFromFunction(curr_dropdown.currentText())
+        optKwargs = utils.optKwargsFromFunction(current_selected_function)
         #Add a widget-pair for every kwarg
         for k in range(len(optKwargs)):
             label = QLabel(f"<i>{optKwargs[k]}</i>")
-            label.setObjectName(f"Label#{curr_dropdown.currentText()}#{optKwargs[k]}")
+            label.setObjectName(f"Label#{current_selected_function}#{optKwargs[k]}")
             if self.checkAndShowWidget(curr_layout,label.objectName()) == False:
-                label.setToolTip(utils.infoFromMetadata(curr_dropdown.currentText(),specificKwarg=optKwargs[k]))
+                label.setToolTip(utils.infoFromMetadata(current_selected_function,specificKwarg=optKwargs[k]))
                 curr_layout.addWidget(label,2+(k)+len(reqKwargs)+labelposoffset,0)
             line_edit = QLineEdit()
-            line_edit.setObjectName(f"LineEdit#{curr_dropdown.currentText()}#{optKwargs[k]}")
+            line_edit.setObjectName(f"LineEdit#{current_selected_function}#{optKwargs[k]}")
             if self.checkAndShowWidget(curr_layout,line_edit.objectName()) == False:
-                line_edit.setToolTip(utils.infoFromMetadata(curr_dropdown.currentText(),specificKwarg=optKwargs[k]))
+                line_edit.setToolTip(utils.infoFromMetadata(current_selected_function,specificKwarg=optKwargs[k]))
                 curr_layout.addWidget(line_edit,2+(k)+len(reqKwargs)+labelposoffset,1)
     
     def checkAndShowWidget(self,layout, widgetName):
@@ -702,7 +705,10 @@ Custom output from fitting function:
                 item = all_layouts.itemAt(index)
                 widget = item.widget()
                 if isinstance(widget,QComboBox) and widget.isVisible() and className in widget.objectName():
-                    methodName_method = widget.currentText()
+                    if className == 'Finding':
+                        methodName_method = utils.functionNameFromDisplayName(widget.currentText(),self.Finding_functionNameToDisplayNameMapping)
+                    elif className == 'Fitting':
+                        methodName_method = utils.functionNameFromDisplayName(widget.currentText(),self.Fitting_functionNameToDisplayNameMapping)
         
         #Function call: get the to-be-evaluated text out, giving the methodName, method KwargNames, methodKwargValues, and 'function Type (i.e. cellSegmentScripts, etc)' - do the same with scoring as with method
         if methodName_method != '':
@@ -833,9 +839,9 @@ Custom output from fitting function:
                                 field_widget.setCurrentIndex(index)
                                 #Also change the lineedits and such:
                                 if 'Finding' in field_widget.objectName():
-                                    self.changeLayout_choice(self.groupboxFinding.layout(),field_widget.objectName())
+                                    self.changeLayout_choice(self.groupboxFinding.layout(),field_widget.objectName(),self.Finding_functionNameToDisplayNameMapping)
                                 elif 'Fitting' in field_widget.objectName():
-                                    self.changeLayout_choice(self.groupboxFitting.layout(),field_widget.objectName())
+                                    self.changeLayout_choice(self.groupboxFitting.layout(),field_widget.objectName(),self.Fitting_functionNameToDisplayNameMapping)
         
 
         except FileNotFoundError:
@@ -868,9 +874,9 @@ Custom output from fitting function:
                     widget.setCurrentIndex(i)
                     #Update all line edits and such
                     if 'Finding' in widget.objectName():
-                        self.changeLayout_choice(self.groupboxFinding.layout(),widget.objectName())
+                        self.changeLayout_choice(self.groupboxFinding.layout(),widget.objectName(),self.Finding_functionNameToDisplayNameMapping)
                     elif 'Fitting' in widget.objectName():
-                        self.changeLayout_choice(self.groupboxFitting.layout(),widget.objectName())
+                        self.changeLayout_choice(self.groupboxFitting.layout(),widget.objectName(),self.Fitting_functionNameToDisplayNameMapping)
             elif isinstance(widget, QWidget):
                 for child_widget in widget.children():
                     set_combobox_states(child_widget)
@@ -880,9 +886,9 @@ Custom output from fitting function:
         for combobox, original_state in original_states.items():
             combobox.setCurrentIndex(original_state)
             if 'Finding' in combobox.objectName():
-                self.changeLayout_choice(self.groupboxFinding.layout(),combobox.objectName())
+                self.changeLayout_choice(self.groupboxFinding.layout(),combobox.objectName(),self.Finding_functionNameToDisplayNameMapping)
             elif 'Fitting' in combobox.objectName():
-                self.changeLayout_choice(self.groupboxFitting.layout(),combobox.objectName())
+                self.changeLayout_choice(self.groupboxFitting.layout(),combobox.objectName(),self.Fitting_functionNameToDisplayNameMapping)
         # except:
         #     pass
 
