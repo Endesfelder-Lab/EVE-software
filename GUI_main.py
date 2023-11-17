@@ -40,8 +40,6 @@ class MyGUI(QMainWindow):
             
         if os.path.exists(log_file_path):
             open(log_file_path, 'w').close()
-        
-        logging.info('WAARGH')
 
         # Create a dictionary to store the entries
         self.entries = {}
