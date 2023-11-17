@@ -1,6 +1,6 @@
 # from csbdeep.io import save_tiff_imagej_compatible
 # from stardist import _draw_polygons, export_imagej_rois
-import sys, os, logging, json, argparse, datetime, glob, csv, ast, platform
+import sys, os, logging, json, argparse, datetime, glob, csv, ast, platform, threading
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
@@ -548,6 +548,10 @@ class MyGUI(QMainWindow):
         return unique_files
     
     def run_processing(self):
+        thread = threading.Thread(target=self.run_processing_i)
+        thread.start()
+    
+    def run_processing_i(self):
         #Check if a folder or file is selected:
         if os.path.isdir(self.dataLocationInput.text()):
             #Find all .raw or .npy files that have unique names except for the extension (and prefer .npy):
@@ -580,6 +584,7 @@ class MyGUI(QMainWindow):
          
         self.updateGUIafterNewResults()       
         return
+        
     
     def updateGUIafterNewResults(self):
         self.updateLocList()
