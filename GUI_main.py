@@ -16,9 +16,9 @@ from CandidateFinding import *
 from Utils import utils, utilsHelper
 
 from PyQt5 import QtWidgets, QtGui
-from PyQt5.QtGui import QCursor
-from PyQt5.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QTableWidget, QTableWidgetItem, QLayout, QMainWindow, QLabel, QPushButton, QSizePolicy, QGroupBox, QTabWidget, QGridLayout, QWidget, QComboBox, QLineEdit, QFileDialog, QToolBar, QCheckBox,QDesktopWidget, QMessageBox
-from PyQt5.QtCore import Qt, QPoint, QProcess, QCoreApplication
+from PyQt5.QtGui import QCursor, QTextCursor
+from PyQt5.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QTableWidget, QTableWidgetItem, QLayout, QMainWindow, QLabel, QPushButton, QSizePolicy, QGroupBox, QTabWidget, QGridLayout, QWidget, QComboBox, QLineEdit, QFileDialog, QToolBar, QCheckBox,QDesktopWidget, QMessageBox, QTextEdit
+from PyQt5.QtCore import Qt, QPoint, QProcess, QCoreApplication, QTimer, QFileSystemWatcher, QFile
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
 # Main script
@@ -31,11 +31,17 @@ class MyGUI(QMainWindow):
         parser = argparse.ArgumentParser(description='EBS fitting - Endesfelder lab - Nov 2023')
         parser.add_argument('--debug', '-d', action='store_true', help='Enable debug')
         args=parser.parse_args()
+        log_file_path = 'GUI/logfile.log'
         if args.debug:
             log_format = "%(asctime)s [%(levelname)s] %(filename)s:%(lineno)d - %(message)s"
-            logging.basicConfig(format=log_format, level=logging.DEBUG)
+            logging.basicConfig(format=log_format, level=logging.DEBUG, filename=log_file_path)
         else:
-            logging.basicConfig(level=logging.INFO)
+            logging.basicConfig(level=logging.INFO, filename=log_file_path)
+            
+        if os.path.exists(log_file_path):
+            open(log_file_path, 'w').close()
+        
+        logging.info('WAARGH')
 
         # Create a dictionary to store the entries
         self.entries = {}
@@ -48,7 +54,6 @@ class MyGUI(QMainWindow):
         
         #Create a dictionary that stores data and passes it between finding,fitting,saving, etc
         self.data = {}
-        
         
         #Set some major settings on the UI
         super().__init__()
@@ -99,12 +104,15 @@ class MyGUI(QMainWindow):
         self.mainTabWidget.addTab(self.tab_locList, "LocalizationList")
         self.tab_visualisation = QWidget()
         self.mainTabWidget.addTab(self.tab_visualisation, "Visualisation")
+        self.tab_logfileInfo = QWidget()
+        self.mainTabWidget.addTab(self.tab_logfileInfo, "Run info")
         
         #Set up the tabs
         self.setup_tab('Processing')
         self.setup_tab('Post-processing')
         self.setup_tab('LocalizationList')
         self.setup_tab('Visualisation')
+        self.setup_tab('Run info')
 
         #Loop through all combobox states briefly to initialise them (and hide them)
         self.set_all_combobox_states()
@@ -183,7 +191,8 @@ class MyGUI(QMainWindow):
             'Post-processing': self.setup_postProcessingTab,
             'Save/Load': self.setup_saveloadTab,
             'Visualisation': self.setup_visualisationTab,
-            'LocalizationList': self.setup_loclistTab
+            'LocalizationList': self.setup_loclistTab,
+            'Run info': self.setup_logFileTab
         }
         #Run the setup of this tab
         setup_func = tab_mapping.get(tab_name)
@@ -278,6 +287,39 @@ class MyGUI(QMainWindow):
         self.label2 = QLabel("Hello from Tab 2!")
         tab2_layout.addWidget(self.label2, 0, 0)
 
+    def setup_logFileTab(self):
+        tab_layout = QGridLayout()
+        self.tab_logfileInfo.setLayout(tab_layout)
+        self.text_edit = QTextEdit()
+        tab_layout.addWidget(self.text_edit, 0, 0)
+
+        self.log_file_path = 'GUI/logfile.log'
+        # self.file_watcher = QFileSystemWatcher()
+        # self.file_watcher.addPath('GUI/logfile.log')
+        # self.file_watcher.fileChanged.connect(self.update_log)
+        
+        self.last_modified = os.path.getmtime(self.log_file_path)
+
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.check_logfile_modification)
+        self.timer.start(1000)  # Check every second
+        
+        self.update_log()
+
+    def check_logfile_modification(self):
+        current_modified = os.path.getmtime(self.log_file_path)
+        if current_modified != self.last_modified:
+            self.update_log()
+            self.last_modified = current_modified
+            
+    def update_log(self):
+        if QFile.exists(self.log_file_path):
+            with open(self.log_file_path, 'r') as file:
+                log_contents = file.read()
+                self.text_edit.setPlainText(log_contents)
+                self.text_edit.moveCursor(QTextCursor.End)
+                self.text_edit.ensureCursorVisible()
+                
     def setup_saveloadTab(self):
         tab3_layout = QGridLayout()
         self.tab_saveLoad.setLayout(tab3_layout)
