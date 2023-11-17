@@ -1,6 +1,6 @@
 # from csbdeep.io import save_tiff_imagej_compatible
 # from stardist import _draw_polygons, export_imagej_rois
-import sys, os, logging, json, argparse, datetime, glob, csv, ast
+import sys, os, logging, json, argparse, datetime, glob, csv, ast, platform
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
@@ -17,8 +17,8 @@ from Utils import utils, utilsHelper
 
 from PyQt5 import QtWidgets, QtGui
 from PyQt5.QtGui import QCursor
-from PyQt5.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QTableWidget, QTableWidgetItem, QLayout, QMainWindow, QLabel, QPushButton, QSizePolicy, QGroupBox, QTabWidget, QGridLayout, QWidget, QComboBox, QLineEdit, QFileDialog, QToolBar, QCheckBox,QDesktopWidget
-from PyQt5.QtCore import Qt, QPoint
+from PyQt5.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QTableWidget, QTableWidgetItem, QLayout, QMainWindow, QLabel, QPushButton, QSizePolicy, QGroupBox, QTabWidget, QGridLayout, QWidget, QComboBox, QLineEdit, QFileDialog, QToolBar, QCheckBox,QDesktopWidget, QMessageBox
+from PyQt5.QtCore import Qt, QPoint, QProcess, QCoreApplication
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
 # Main script
@@ -122,7 +122,14 @@ class MyGUI(QMainWindow):
         globalSettings['PixelSize_nm']['input'] = float
         globalSettings['PixelSize_nm']['displayName'] = 'Pixel size (nm)'
         globalSettings['MetaVisionPath'] = {}
-        globalSettings['MetaVisionPath']['value'] = "C:\Program Files\Prophesee\lib\python3\site-packages"
+        if platform.system() == 'Windows':
+            globalSettings['MetaVisionPath']['value'] = "C:\Program Files\Prophesee\lib\python3\site-packages"
+        elif platform.system() == 'Linux':
+            globalSettings['MetaVisionPath']['value'] = "/usr/lib/python3/dist-packages"
+        elif platform.system() == 'Darwin':
+            globalSettings['MetaVisionPath']['value'] = "Enter Path to Metavision SDK!"
+        else:
+            globalSettings['MetaVisionPath']['value'] = "Enter Path to Metavision SDK!"
         globalSettings['MetaVisionPath']['input'] = str
         globalSettings['MetaVisionPath']['displayName'] = 'MetaVision SDK Path'
         globalSettings['StoreConvertedRawData'] = {}
@@ -147,7 +154,14 @@ class MyGUI(QMainWindow):
         globalSettings['OutputDataFormat']['options'] = ('thunderstorm','minimal')
         globalSettings['OutputDataFormat']['displayName'] = 'Output data format'
         
-        globalSettings['IgnoreInOptions'] = ('IgnoreInOptions','StoreFinalOutput') #Add options here that should NOT show up in the global settings window
+        globalSettings['JSONGUIstorePath'] = {}
+        globalSettings['JSONGUIstorePath']['value'] = "GUI"+os.sep+"storage.json"
+        globalSettings['JSONGUIstorePath']['input'] = str
+        globalSettings['GlobalOptionsStorePath'] = {}
+        globalSettings['GlobalOptionsStorePath']['value'] = "GUI" + os.sep + "GlobSettingStorage.json"
+        globalSettings['GlobalOptionsStorePath']['input'] = str
+        
+        globalSettings['IgnoreInOptions'] = ('IgnoreInOptions','StoreFinalOutput', 'JSONGUIstorePath','GlobalOptionsStorePath') #Add options here that should NOT show up in the global settings window
         return globalSettings
     
     # Function to handle the button click event
@@ -783,7 +797,7 @@ Custom output from fitting function:
                 self.entries[field_name] = field_widget.currentText()
 
         # Specify the path and filename for the JSON file
-        json_file_path = "GUI"+os.sep+"storage.json"
+        json_file_path = self.globalSettings['JSONGUIstorePath']['value']
 
         # Write the entries dictionary to the JSON file
         with open(json_file_path, "w") as json_file:
@@ -797,7 +811,7 @@ Custom output from fitting function:
     
     def load_entries_from_json_single(self,runParams=['QLineEdit','QComboBox']):
         # Specify the path and filename for the JSON file
-        json_file_path = "GUI"+os.sep+"storage.json"
+        json_file_path = self.globalSettings['JSONGUIstorePath']['value']
 
         try:
             # Load the entries from the JSON file
@@ -882,12 +896,15 @@ class AdvancedSettingsWindow(QMainWindow):
         # Set the window icon to the parent's icon
         self.setWindowIcon(self.parent.windowIcon())
 
-        #Load the global settings from last time:
-        self.load_global_settings()
-
         #Create a QGridlayout to populate:
         layout = QGridLayout()
         currentRow = 0
+        
+        self.labelGlobSettings={}
+        self.checkboxGlobSettings = {}
+        self.input_fieldGlobSettings = {}
+        self.dropdownGlobSettings = {}
+        self.dropdownGlobSettingsOptions={}
         
         # Iterate over the settings in self.parent.globalSettings
         for setting, value in self.parent.globalSettings.items():
@@ -895,52 +912,60 @@ class AdvancedSettingsWindow(QMainWindow):
             if setting not in self.parent.globalSettings.get('IgnoreInOptions'):
                 # Create a label with the setting title
                 if 'displayName' in value:
-                    label = QLabel(value['displayName'])
+                    self.labelGlobSettings[setting] = QLabel(value['displayName'])
                 else:
-                    label = QLabel(setting)
+                    self.labelGlobSettings[setting] = QLabel(setting)
                 #Align correctly
-                label.setAlignment(Qt.AlignVCenter | Qt.AlignRight)
-                layout.addWidget(label,currentRow,0)
+                self.labelGlobSettings[setting].setAlignment(Qt.AlignVCenter | Qt.AlignRight)
+                layout.addWidget(self.labelGlobSettings[setting],currentRow,0)
                 
                 # Check the type of the input
                 input_type = value['input']
                 
                 # Create a checkbox for boolean values
                 if input_type == bool:
-                    checkbox = QCheckBox()
-                    checkbox.setChecked(value['value'])
-                    checkbox.stateChanged.connect(lambda state, s=setting: self.update_global_settings(s, state))
-                    layout.addWidget(checkbox,currentRow,1)
+                    self.checkboxGlobSettings[setting] = QCheckBox()
+                    self.checkboxGlobSettings[setting].setChecked(value['value'])
+                    self.checkboxGlobSettings[setting].stateChanged.connect(lambda state, s=setting: self.update_global_settings(s, state))
+                    layout.addWidget(self.checkboxGlobSettings[setting],currentRow,1)
                 
                 # Create an input field for string or integer values
                 elif input_type in (str, float):
-                    input_field = QLineEdit()
-                    input_field.setText(str(value['value']))
-                    input_field.textChanged.connect(lambda text, s=setting: self.update_global_settings(s, text))
-                    layout.addWidget(input_field,currentRow,1)
+                    self.input_fieldGlobSettings[setting] = QLineEdit()
+                    self.input_fieldGlobSettings[setting].setText(str(value['value']))
+                    self.input_fieldGlobSettings[setting].textChanged.connect(lambda text, s=setting: self.update_global_settings(s, text))
+                    layout.addWidget(self.input_fieldGlobSettings[setting],currentRow,1)
                     
                 # Create a dropdown for choices
                 elif input_type == 'choice':
-                    options = value['options']
-                    dropdown = QComboBox()
-                    dropdown.addItems(options)
-                    current_index = options.index(value['value'])
-                    dropdown.setCurrentIndex(current_index)
-                    dropdown.currentIndexChanged.connect(lambda index, s=setting: self.update_global_settings(s, options[index]))
-                    layout.addWidget(dropdown,currentRow,1)
+                    self.dropdownGlobSettings[setting] = QComboBox()
+                    self.dropdownGlobSettingsOptions[setting] = value['options']
+                    self.dropdownGlobSettings[setting].addItems(self.dropdownGlobSettingsOptions[setting])
+                    current_index = self.dropdownGlobSettingsOptions[setting].index(value['value'])
+                    self.dropdownGlobSettings[setting].setCurrentIndex(current_index)
+                    self.dropdownGlobSettings[setting].currentIndexChanged.connect(lambda index, s=setting: self.update_global_settings(s, self.dropdownGlobSettingsOptions[s][index]))
+                    layout.addWidget(self.dropdownGlobSettings[setting],currentRow,1)
 
                 #Increment the row for the next one   
                 currentRow+=1
         
+        #Load the global settings from last time:
+        self.load_global_settings()
+        
         # Create a save button
         save_button = QPushButton("Save Global Settings")
         save_button.clicked.connect(self.save_global_settings)
-        layout.addWidget(save_button,currentRow,0)
+        layout.addWidget(save_button,currentRow,0,1,2)
         
         # Create a load button
         load_button = QPushButton("Load Global Settings")
         load_button.clicked.connect(self.load_global_settings)
-        layout.addWidget(load_button,currentRow,1)        
+        layout.addWidget(load_button,currentRow+1,0,1,2)    
+        
+        #Add a full-reset button:
+        full_reset_button = QPushButton("Fully reset GUI and global settings")  
+        full_reset_button.clicked.connect(self.confirm_full_reset_GUI_GlobSettings)
+        layout.addWidget(full_reset_button,currentRow+2,0,1,2)      
                 
         # Create a widget and set the layout
         widget = QWidget()
@@ -955,13 +980,53 @@ class AdvancedSettingsWindow(QMainWindow):
         # Set the position of the window
         self.move(QPoint(cursor_pos.x()-self.width()/2,cursor_pos.y()))
 
+    def updateGlobSettingsGUIValues(self):
+        # Iterate over the settings in self.parent.globalSettings
+        for setting, value in self.parent.globalSettings.items():
+            # Check if the setting is not in IgnoreInOptions
+            if setting not in self.parent.globalSettings.get('IgnoreInOptions'):
+                # Create a label with the setting title
+                if 'displayName' in value:
+                    self.labelGlobSettings[setting] = QLabel(value['displayName'])
+                else:
+                    self.labelGlobSettings[setting] = QLabel(setting)
+                
+                # Check the type of the input
+                input_type = value['input']
+                
+                # Create a checkbox for boolean values
+                if input_type == bool:
+                    self.checkboxGlobSettings[setting].setChecked(value['value'])
+                
+                # Create an input field for string or integer values
+                elif input_type in (str, float):
+                    self.input_fieldGlobSettings[setting].setText(str(value['value']))
+                    
+                # Create a dropdown for choices
+                elif input_type == 'choice':
+                    options = value['options']
+                    self.dropdownGlobSettings[setting].addItems(options)
+                    current_index = options.index(value['value'])
+                    self.dropdownGlobSettings[setting].setCurrentIndex(current_index)
+                
+    def confirm_full_reset_GUI_GlobSettings(self):
+        reply = QMessageBox.question(self, 'Confirmation', "Are you sure you want to fully reset the GUI and global settings? This will close the GUI and you have to re-open.", QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if reply == QMessageBox.Yes:
+            self.full_reset_GUI_GlobSettings()
+
+    def full_reset_GUI_GlobSettings(self):
+        #Remove the JSON files:
+        os.remove(self.parent.globalSettings['JSONGUIstorePath']['value'])
+        os.remove(self.parent.globalSettings['GlobalOptionsStorePath']['value'])
+        #Restart the GUI:
+        QCoreApplication.quit()
     
     def update_global_settings(self, setting, value):
         self.parent.globalSettings[setting]['value'] = value
         
     def save_global_settings(self):
         # Specify the path and filename for the JSON file
-        json_file_path = "GUI" + os.sep + "GlobSettingStorage.json"
+        json_file_path = self.parent.globalSettings['GlobalOptionsStorePath']['value']
 
         # Serialize the globalSettings dictionary, skipping over the 'input' value
         serialized_settings = {}
@@ -969,15 +1034,18 @@ class AdvancedSettingsWindow(QMainWindow):
             if key != 'IgnoreInOptions':
                 serialized_settings[key] = value.copy()
                 serialized_settings[key].pop('input', None)
-
     
         # Write the globalSettings dictionary to the JSON file
         with open(json_file_path, "w") as json_file:
             json.dump(serialized_settings, json_file)
+            
+        #Close after saving
+        logging.info('Global settings saved!')
+        self.close()
     
     def load_global_settings(self):
         # Specify the path and filename for the JSON file
-        json_file_path = "GUI" + os.sep + "GlobSettingStorage.json"
+        json_file_path = self.parent.globalSettings['GlobalOptionsStorePath']['value']
         try:    # Load the globalSettings dictionary from the JSON file
             with open(json_file_path, "r") as json_file:
                 loaded_settings = json.load(json_file)
@@ -988,8 +1056,9 @@ class AdvancedSettingsWindow(QMainWindow):
                     if key in self.parent.globalSettings:
                         value['input'] = self.parent.globalSettings[key].get('input', None)
 
-
             self.parent.globalSettings.update(loaded_settings)
+            #Update the values of the globalSettings GUI
+            self.updateGlobSettingsGUIValues()
         except:
             self.save_global_settings()
             logging.info('No global settings storage found, new one created.')
