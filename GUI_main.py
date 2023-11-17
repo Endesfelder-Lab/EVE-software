@@ -32,11 +32,21 @@ class MyGUI(QMainWindow):
         parser.add_argument('--debug', '-d', action='store_true', help='Enable debug')
         args=parser.parse_args()
         log_file_path = 'GUI/logfile.log'
-        if args.debug:
-            log_format = "%(asctime)s [%(levelname)s] %(filename)s:%(lineno)d - %(message)s"
-            logging.basicConfig(format=log_format, level=logging.DEBUG, filename=log_file_path)
-        else:
-            logging.basicConfig(level=logging.INFO, filename=log_file_path)
+        # Create a logger with the desired log level
+        self.logger = logging.getLogger()
+        self.logger.setLevel(logging.DEBUG if args.debug else logging.INFO)
+
+        # Create the file handler to log to the file
+        file_handler = logging.FileHandler(log_file_path)
+        file_handler.setLevel(logging.INFO)
+
+        # Create the stream handler to log to the debug terminal
+        stream_handler = logging.StreamHandler(sys.stdout)
+        stream_handler.setLevel(logging.DEBUG if args.debug else logging.INFO)
+
+        # Add the handlers to the logger
+        logging.basicConfig(handlers=[file_handler, stream_handler], level=logging.DEBUG if args.debug else logging.INFO,format="%(asctime)s [%(levelname)s] %(filename)s:%(lineno)d - %(message)s")
+
             
         if os.path.exists(log_file_path):
             open(log_file_path, 'w').close()
@@ -348,6 +358,12 @@ class MyGUI(QMainWindow):
         #Give it a function on click:
         self.buttonScatter.clicked.connect(lambda: self.plotScatter())
         
+        #Add a button that says 2d interp histogram:
+        self.buttonInterpHist = QPushButton("Interp histogram")
+        visualisationTab_horizontal_container.addWidget(self.buttonInterpHist)
+        #Give it a function on click:
+        self.buttonInterpHist.clicked.connect(lambda: self.plotLinearInterpHist())
+        
         self.data['figurePlot'], self.data['figureAx'] = plt.subplots(figsize=(5, 5))
         self.data['figureCanvas'] = FigureCanvas(self.data['figurePlot'])
         
@@ -362,8 +378,11 @@ class MyGUI(QMainWindow):
         if 'FittingMethod' in self.data:
             logging.debug('Attempting to show scatter plot')
             #Delete any existing cbar - needs to be done before anything else:
-            if hasattr(self, 'cbar'):
-                self.cbar.remove()
+            try:
+                if hasattr(self, 'cbar'):
+                    self.cbar.remove()
+            except:
+                pass
             #Plot the contents of the loclist as scatter points, color-coded on time:
             #Clear axis
             self.data['figureAx'].clear()
@@ -384,7 +403,102 @@ class MyGUI(QMainWindow):
             logging.info('Scatter plot drawn')
         else:
             logging.error('Tried to visualise but no data found!')
-        
+    
+    def plotLinearInterpHist(self,pixel_recon_dim=100):
+        #check if we have results stored:
+        if 'FittingMethod' in self.data:
+            #Code inspired by Frontiers Martens et al
+            logging.debug('Attempting to show 2d hist plot')
+            #Delete any existing cbar - needs to be done before anything else:
+            try:
+                if hasattr(self, 'cbar'):
+                    self.cbar.remove()
+            except:
+                pass
+            # First, an empty two-dimensional array is allocated. It will be populated with 
+            # datapoints and finally will be used for the image reconstruction. 
+            # Its dimensions are adjusted to the maximum X and Y coordinate values in 
+            # the dataset divided by the pixel dimensions
+            max_x = max(self.data['FittingResult'][0]['x'])
+            max_y = max(self.data['FittingResult'][0]['y'])
+            hist_2d = np.zeros((int(max_x/pixel_recon_dim)+3, int(max_y/pixel_recon_dim)+3))
+            # We prepare the method which will compute the amount of intensity which will 
+            # be received by the pixel based on the subpixel localization of the processed event
+            def interpolation_value(x, pixel_dim=10):
+                y = (-np.abs(x)/pixel_dim + 1)
+                return y
+
+            # In this for loop each datapoint is assigned to four pixels (and in very 
+            # exceptional cases to a single pixel if it is positioned at the center of 
+            # the reconstruction iamge pixel) in the image reconstruction.
+            for index, d in self.data['FittingResult'][0].iterrows():
+                if 'int' in d:
+                    intensity = d['int']
+                else:
+                    intensity = 1
+                # Based on X and Y coordinates we determine the pixel position by dividing the 
+                # coordinates with the floor division (//) operation...
+                coord_x = int(d['x'] // pixel_recon_dim) + 1
+                coord_y = int(d['y'] // pixel_recon_dim) + 1
+                # ... and also we determine the subpixel pisition of the event. We subtract 
+                # the halved pixel dimension value from X and Y subpixel position in order 
+                # to determine how the event is oriented with respect to the pixel center. 
+                # This value will be used  for the intensity distribution and finding 
+                # neighboring pixels which will receive a fraction of this intensity as well
+                position_x = d['x'] % pixel_recon_dim - pixel_recon_dim/2
+                position_y = d['y'] % pixel_recon_dim - pixel_recon_dim/2
+
+                # we calculate the 'pixel-intensity' which is used for the linear interpolation
+                x_int = interpolation_value(position_x,pixel_dim=pixel_recon_dim)
+                y_int = interpolation_value(position_y,pixel_dim=pixel_recon_dim)
+
+                # Finally we distribute even itnensities to pixels. 
+                # The original pixel is at coord_x and coord_y values
+                hist_2d[coord_x, coord_y] += x_int*y_int * intensity
+
+                # The horizontal neighbor pixel is on the right (or left) side of the 
+                # original pixel, assuming the datapoint is on the right (or left) 
+                # half of the original pixel.
+                if position_x > 0:
+                    hist_2d[coord_x+1, coord_y] += (1-x_int)*y_int * intensity
+                else:
+                    hist_2d[coord_x-1, coord_y] += (1-x_int)*y_int * intensity
+
+                # Similarly we find a vertical neighbor in up & down dimension.
+                if position_y > 0:
+                    hist_2d[coord_x, coord_y+1] += x_int*(1-y_int) * intensity
+                else:
+                    hist_2d[coord_x, coord_y-1] += x_int*(1-y_int) * intensity
+
+                # Finally we find the diagonal neighbors by combining the code used in the 
+                # horizontal and vertical neighbours
+                if position_x > 0:
+                    if position_y > 0:
+                        hist_2d[coord_x+1, coord_y+1] += (1-x_int)*(1-y_int) * intensity
+                    else:
+                        hist_2d[coord_x+1, coord_y-1] += (1-x_int)*(1-y_int) * intensity
+                else:
+                    if position_y > 0:
+                        hist_2d[coord_x-1, coord_y+1] += (1-x_int)*(1-y_int) * intensity
+                    else:
+                        hist_2d[coord_x-1, coord_y-1] += (1-x_int)*(1-y_int) * intensity
+
+            #Plot hist_2d:
+            #Clear axis
+            self.data['figureAx'].clear()
+            #Plot the data as scatter plot
+            self.data['figureAx'].imshow(hist_2d)
+            self.data['figureAx'].set_xlabel('x [nm]')
+            self.data['figureAx'].set_ylabel('y [nm]')
+            self.data['figureAx'].set_aspect('equal', adjustable='box')  
+            #Give it a nice layout
+            self.data['figurePlot'].tight_layout()
+            #Update drawing of the canvas
+            self.data['figureCanvas'].draw()
+            logging.info('2d interp hist drawn')
+        else:
+            logging.error('Tried to visualise but no data found!')
+    
     def changeLayout_choice(self,curr_layout,className,displayNameToFunctionNameMap):
         logging.debug('Changing layout'+curr_layout.parent().objectName())
         #This removes everything except the first entry (i.e. the drop-down menu)
