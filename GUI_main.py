@@ -428,8 +428,11 @@ class MyGUI(QMainWindow):
                 curr_layout.addWidget(label,2+(k)+len(reqKwargs)+labelposoffset,0)
             line_edit = QLineEdit()
             line_edit.setObjectName(f"LineEdit#{current_selected_function}#{optKwargs[k]}")
+            defaultValue = utils.defaultValueFromKwarg(current_selected_function,optKwargs[k])
             if self.checkAndShowWidget(curr_layout,line_edit.objectName()) == False:
                 line_edit.setToolTip(utils.infoFromMetadata(current_selected_function,specificKwarg=optKwargs[k]))
+                if defaultValue is not None:
+                    line_edit.setText(str(defaultValue))
                 curr_layout.addWidget(line_edit,2+(k)+len(reqKwargs)+labelposoffset,1)
     
     def checkAndShowWidget(self,layout, widgetName):
