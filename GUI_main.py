@@ -55,7 +55,7 @@ class MyGUI(QMainWindow):
         
         #Set some major settings on the UI
         super().__init__()
-        self.setWindowTitle("EBS fitting - Endesfelder lab - Nov 2023")
+        self.setWindowTitle("Eve - alphaVersion")
         self.setMinimumSize(400, 300)  # Set minimum size for the GUI window
         
         #Set the central widget that contains everything
