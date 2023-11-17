@@ -1005,7 +1005,6 @@ class AdvancedSettingsWindow(QMainWindow):
                 # Create a dropdown for choices
                 elif input_type == 'choice':
                     options = value['options']
-                    self.dropdownGlobSettings[setting].addItems(options)
                     current_index = options.index(value['value'])
                     self.dropdownGlobSettings[setting].setCurrentIndex(current_index)
                 
