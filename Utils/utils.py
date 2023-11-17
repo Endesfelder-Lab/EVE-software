@@ -3,8 +3,9 @@ import warnings
 import inspect
 import importlib
 import re
-import warnings 
-
+import warnings, logging
+import numpy as np
+import itertools
 from Utils import utilsHelper
 
 #Import all scripts in the custom script folders
@@ -317,6 +318,11 @@ def displayNamesFromFunctionNames(functionName):
             displayName = subroutineName+': '+singlefunctiondata
         displaynames.append(displayName)
         functionName_to_displayName_map.append((displayName,function))
+    #Check for ambiguity in both columns:
+    
+    if not len(np.unique(list(set(functionName_to_displayName_map)))) == len(list(itertools.chain.from_iterable(functionName_to_displayName_map))):
+        raise Exception('Ambiguous display names in functions!! Please check all function names and display names for uniqueness!')
+        
     return displaynames, functionName_to_displayName_map
 
 def functionNameFromDisplayName(displayname,map):
@@ -324,4 +330,3 @@ def functionNameFromDisplayName(displayname,map):
         if pair[0] == displayname:
             print(pair[1])
             return pair[1]
-    print('error!')
