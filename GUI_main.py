@@ -17,8 +17,8 @@ from Utils import utils, utilsHelper
 
 from PyQt5 import QtWidgets, QtGui
 from PyQt5.QtGui import QCursor
-from PyQt5.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QTableWidget, QTableWidgetItem, QLayout, QMainWindow, QLabel, QPushButton, QSizePolicy, QGroupBox, QTabWidget, QGridLayout, QWidget, QComboBox, QLineEdit, QFileDialog, QToolBar, QCheckBox,QDesktopWidget 
-from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QTableWidget, QTableWidgetItem, QLayout, QMainWindow, QLabel, QPushButton, QSizePolicy, QGroupBox, QTabWidget, QGridLayout, QWidget, QComboBox, QLineEdit, QFileDialog, QToolBar, QCheckBox,QDesktopWidget
+from PyQt5.QtCore import Qt, QPoint
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
 # Main script
@@ -69,7 +69,7 @@ class MyGUI(QMainWindow):
         #Create an advanced settings button that opens a new window
         self.advancedSettingsButton = QPushButton("Advanced settings", self)
         self.advancedSettingsButton.clicked.connect(self.open_advanced_settings)
-        self.globalSettingsGroupBox.layout().addWidget(self.advancedSettingsButton, 0, 0)
+        self.globalSettingsGroupBox.layout().addWidget(self.advancedSettingsButton, 0, 0,1,2)
         
         #Initialise (but not show!) advanced window:
         self.advancedSettingsWindow = AdvancedSettingsWindow(self)
@@ -77,11 +77,11 @@ class MyGUI(QMainWindow):
         # Create a button to trigger saving the entries
         self.save_button = QPushButton("Save GUI contents", self)
         self.save_button.clicked.connect(self.save_entries_to_json)
-        self.globalSettingsGroupBox.layout().addWidget(self.save_button, 0, 1)
+        self.globalSettingsGroupBox.layout().addWidget(self.save_button, 0, 3)
         # Create a button to trigger loading the entries
         self.load_button = QPushButton("Load GUI contents", self)
         self.load_button.clicked.connect(self.load_entries_from_json)
-        self.globalSettingsGroupBox.layout().addWidget(self.load_button, 1, 1)
+        self.globalSettingsGroupBox.layout().addWidget(self.load_button, 0,4)
         
         #Add the global settings group box to the central widget
         self.layout.addWidget(self.globalSettingsGroupBox, 0, 0)
@@ -120,27 +120,34 @@ class MyGUI(QMainWindow):
         globalSettings['PixelSize_nm'] = {}
         globalSettings['PixelSize_nm']['value'] = 80
         globalSettings['PixelSize_nm']['input'] = float
+        globalSettings['PixelSize_nm']['displayName'] = 'Pixel size (nm)'
         globalSettings['MetaVisionPath'] = {}
         globalSettings['MetaVisionPath']['value'] = "C:\Program Files\Prophesee\lib\python3\site-packages"
         globalSettings['MetaVisionPath']['input'] = str
+        globalSettings['MetaVisionPath']['displayName'] = 'MetaVision SDK Path'
         globalSettings['StoreConvertedRawData'] = {}
         globalSettings['StoreConvertedRawData']['value'] = True
         globalSettings['StoreConvertedRawData']['input'] = bool
+        globalSettings['StoreConvertedRawData']['displayName'] = 'Store converted raw data'
         globalSettings['StoreFileMetadata'] = {}
         globalSettings['StoreFileMetadata']['value'] = True
         globalSettings['StoreFileMetadata']['input'] = bool
+        globalSettings['StoreFileMetadata']['displayName'] = 'Store metadata after running'
         globalSettings['StoreFinalOutput'] = {}
         globalSettings['StoreFinalOutput']['value'] = True
         globalSettings['StoreFinalOutput']['input'] = bool
+        globalSettings['StoreFinalOutput']['displayName'] = 'Store the final output'
         globalSettings['StoreFindingOutput'] = {}
         globalSettings['StoreFindingOutput']['value'] = True
         globalSettings['StoreFindingOutput']['input'] = bool
+        globalSettings['StoreFindingOutput']['displayName'] = 'Store intermediate output (after finding)'
         globalSettings['OutputDataFormat'] = {}
         globalSettings['OutputDataFormat']['value'] = 'thunderstorm'
         globalSettings['OutputDataFormat']['input'] = 'choice'
         globalSettings['OutputDataFormat']['options'] = ('thunderstorm','minimal')
+        globalSettings['OutputDataFormat']['displayName'] = 'Output data format'
         
-        globalSettings['IgnoreInOptions'] = ('IgnoreInOptions')
+        globalSettings['IgnoreInOptions'] = ('IgnoreInOptions','StoreFinalOutput') #Add options here that should NOT show up in the global settings window
         return globalSettings
     
     # Function to handle the button click event
@@ -868,18 +875,15 @@ Custom output from fitting function:
 class AdvancedSettingsWindow(QMainWindow):
     def __init__(self, parent):
         super().__init__(parent)
-        self.setWindowTitle("New Window")
+        self.setWindowTitle("Advanced settings")
         self.resize(300, 200)
         
         self.parent = parent
-
-        cursor_pos = QCursor.pos()
+        # Set the window icon to the parent's icon
+        self.setWindowIcon(self.parent.windowIcon())
 
         #Load the global settings from last time:
         self.load_global_settings()
-
-        # Set the position of the window
-        self.move(cursor_pos)
 
         #Create a QGridlayout to populate:
         layout = QGridLayout()
@@ -888,9 +892,14 @@ class AdvancedSettingsWindow(QMainWindow):
         # Iterate over the settings in self.parent.globalSettings
         for setting, value in self.parent.globalSettings.items():
             # Check if the setting is not in IgnoreInOptions
-            if setting not in self.parent.globalSettings.get('IgnoreInOptions', ''):
+            if setting not in self.parent.globalSettings.get('IgnoreInOptions'):
                 # Create a label with the setting title
-                label = QLabel(setting)
+                if 'displayName' in value:
+                    label = QLabel(value['displayName'])
+                else:
+                    label = QLabel(setting)
+                #Align correctly
+                label.setAlignment(Qt.AlignVCenter | Qt.AlignRight)
                 layout.addWidget(label,currentRow,0)
                 
                 # Check the type of the input
@@ -940,6 +949,13 @@ class AdvancedSettingsWindow(QMainWindow):
         # Set the central widget of the main window
         self.setCentralWidget(widget)
     
+    def show(self):
+        super().show()
+        cursor_pos = QCursor.pos()
+        # Set the position of the window
+        self.move(QPoint(cursor_pos.x()-self.width()/2,cursor_pos.y()))
+
+    
     def update_global_settings(self, setting, value):
         self.parent.globalSettings[setting]['value'] = value
         
@@ -973,7 +989,7 @@ class AdvancedSettingsWindow(QMainWindow):
                         value['input'] = self.parent.globalSettings[key].get('input', None)
 
 
-            self.parent.globalSettings = loaded_settings
+            self.parent.globalSettings.update(loaded_settings)
         except:
             self.save_global_settings()
             logging.info('No global settings storage found, new one created.')
