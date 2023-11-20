@@ -4,8 +4,10 @@ import sys, os, logging, json, argparse, datetime, glob, csv, ast, platform, thr
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
+import matplotlib.patches as patches
 import pandas as pd
 import numpy as np
+import copy
 # Add the folder 2 folders up to the system path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -17,7 +19,7 @@ from Utils import utils, utilsHelper
 
 from PyQt5 import QtWidgets, QtGui
 from PyQt5.QtGui import QCursor, QTextCursor
-from PyQt5.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QTableWidget, QTableWidgetItem, QLayout, QMainWindow, QLabel, QPushButton, QSizePolicy, QGroupBox, QTabWidget, QGridLayout, QWidget, QComboBox, QLineEdit, QFileDialog, QToolBar, QCheckBox,QDesktopWidget, QMessageBox, QTextEdit
+from PyQt5.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QTableWidget, QTableWidgetItem, QLayout, QMainWindow, QLabel, QPushButton, QSizePolicy, QGroupBox, QTabWidget, QGridLayout, QWidget, QComboBox, QLineEdit, QFileDialog, QToolBar, QCheckBox,QDesktopWidget, QMessageBox, QTextEdit, QSlider
 from PyQt5.QtCore import Qt, QPoint, QProcess, QCoreApplication, QTimer, QFileSystemWatcher, QFile
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
@@ -46,8 +48,7 @@ class MyGUI(QMainWindow):
 
         # Add the handlers to the logger
         logging.basicConfig(handlers=[file_handler, stream_handler], level=logging.DEBUG if args.debug else logging.INFO,format="%(asctime)s [%(levelname)s] %(filename)s:%(lineno)d - %(message)s")
-
-            
+ 
         if os.path.exists(log_file_path):
             open(log_file_path, 'w').close()
 
@@ -114,6 +115,8 @@ class MyGUI(QMainWindow):
         self.mainTabWidget.addTab(self.tab_visualisation, "Visualisation")
         self.tab_logfileInfo = QWidget()
         self.mainTabWidget.addTab(self.tab_logfileInfo, "Run info")
+        self.tab_previewVis = QWidget()
+        self.mainTabWidget.addTab(self.tab_previewVis, "Preview run")
         
         #Set up the tabs
         self.setup_tab('Processing')
@@ -121,6 +124,7 @@ class MyGUI(QMainWindow):
         self.setup_tab('LocalizationList')
         self.setup_tab('Visualisation')
         self.setup_tab('Run info')
+        self.setup_tab('Preview visualisation')
 
         #Loop through all combobox states briefly to initialise them (and hide them)
         self.set_all_combobox_states()
@@ -200,7 +204,8 @@ class MyGUI(QMainWindow):
             'Save/Load': self.setup_saveloadTab,
             'Visualisation': self.setup_visualisationTab,
             'LocalizationList': self.setup_loclistTab,
-            'Run info': self.setup_logFileTab
+            'Run info': self.setup_logFileTab,
+            'Preview visualisation': self.setup_previewTab
         }
         #Run the setup of this tab
         setup_func = tab_mapping.get(tab_name)
@@ -282,11 +287,108 @@ class MyGUI(QMainWindow):
         self.buttonProcessingRun.clicked.connect(lambda: self.run_processing())
         tab_layout.layout().addWidget(self.buttonProcessingRun,3,0)
 
-        #Add spacing
-        # Add an empty QWidget with stretch factor of 1
-        # empty_widget = QWidget()
-        # tab_layout.addWidget(empty_widget, 999,0)
-        tab_layout.setRowStretch(tab_layout.rowCount(), 1)
+        #Add spacing so that the previewLayout is pushed to the bottom:
+        tab_layout.setRowStretch(4, 1)
+        
+        
+        #Add a preview box:
+        self.previewLayout = QGroupBox("Preview")
+        self.previewLayout.setObjectName("groupboxPreview")
+        self.previewLayout.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.previewLayout.setLayout(QGridLayout())
+        tab_layout.addWidget(self.previewLayout, 5, 0)
+        
+        #Add a preview layout:
+        #Populate with a start time and end time inputs:
+        self.previewLayout.layout().addWidget(QLabel("Start time (ms):"), 0, 0)
+        self.previewLayout.layout().addWidget(QLabel("Duration (ms):"), 0, 1)
+        #Also the QLineEdits that have useful names:
+        self.preview_startTLineEdit = QLineEdit()
+        self.previewLayout.layout().addWidget(self.preview_startTLineEdit, 1, 0)
+        #Give this a default value:
+        self.preview_startTLineEdit.setText("0")
+        #Same for end time:
+        self.preview_durationTLineEdit = QLineEdit()
+        self.previewLayout.layout().addWidget(self.preview_durationTLineEdit, 1, 1)
+        self.preview_durationTLineEdit.setText("1000")
+        #Add a preview button:
+        self.buttonPreview = QPushButton("Preview")
+        #Add a button press event:
+        self.buttonPreview.clicked.connect(lambda: self.previewRun((self.preview_startTLineEdit.text(),self.preview_durationTLineEdit.text())))
+        #Add the button to the layout:
+        self.previewLayout.layout().addWidget(self.buttonPreview, 2, 0)
+
+        # #Add spacing
+        # # Add an empty QWidget with stretch factor of 1
+        # tab_layout.setRowStretch(tab_layout.rowCount(), 1)
+
+    def previewRun(self,timeStretch=(0,1000)):
+        #We error out if a folder is chosen rather than a file:
+        if not os.path.isfile(self.dataLocationInput.text()):
+            logging.error("Please choose a file rather than a folder for previews.")
+            return
+        
+        #Specifically for preview runs, we don't need to load the whole data, only between preview_startT and preview_endT.
+        #Thus, we check if it's raw or npy:
+        if self.dataLocationInput.text().endswith('.raw'):
+            sys.path.append(self.globalSettings['MetaVisionPath']['value']) 
+            from metavision_core.event_io.raw_reader import RawReader
+            record_raw = RawReader(self.dataLocationInput.text())
+            if int(timeStretch[0]) > 0:
+                record_raw.seek_time(int(timeStretch[0])*1000)
+                
+            events=np.empty
+            #Load all events
+            events = record_raw.load_delta_t(int(timeStretch[1])*1000)
+            #Check if we have at least 1 event:
+            if len(events) > 0:
+                # correct the coordinates and time stamps
+                events['x']-=np.min(events['x'])
+                events['y']-=np.min(events['y'])
+                events['t']-=np.min(events['t'])
+                #Log the nr of events found:
+                logging.info(f"Preview - Found {len(events)} events in the chosen time frame.")
+            else:
+                logging.error("Preview - No events found in the chosen time frame.")
+                return
+        elif self.dataLocationInput.text().endswith('.npy'):
+            #For npy, load the events in memory
+            data = np.load(self.dataLocationInput.text(), mmap_mode='r')
+            indices = np.where((data['t'] >= int(timeStretch[0])*1000) & (data['t'] <= int(timeStretch[0])*1000+int(timeStretch[1])*1000))
+            # Access the partial data using the indices
+            events = data[indices]
+            #Check if we have at least 1 event:
+            if len(events) > 0:
+                # correct the coordinates and time stamps
+                events['x']-=np.min(events['x'])
+                events['y']-=np.min(events['y'])
+                events['t']-=np.min(events['t'])
+                #Log the nr of events found:
+                logging.info(f"Preview - Found {len(events)} events in the chosen time frame.")
+            else:
+                logging.error("Preview - No events found in the chosen time frame.")
+                return
+        else:
+            logging.error("Please choose a .raw or .npy file for previews.")
+            return
+        
+        self.previewEvents = events
+        
+        #Change global values so nothing is stored:
+        globalSettingsOrig = copy.deepcopy(self.globalSettings)
+        self.globalSettings['StoreConvertedRawData']['value'] = False
+        self.globalSettings['StoreFileMetadata']['value'] = False
+        self.globalSettings['StoreFinalOutput']['value'] = False
+        self.globalSettings['StoreFindingOutput']['value'] = False
+        
+        #Run the current finding and fitting routine only on these events:
+        self.runFindingAndFitting(events)
+        
+        #Reset global settings
+        self.globalSettings = globalSettingsOrig
+        
+        #Show the preview panel:
+        self.updateShowPreview()
 
     def setup_postProcessingTab(self):
         tab2_layout = QGridLayout()
@@ -499,6 +601,91 @@ class MyGUI(QMainWindow):
         else:
             logging.error('Tried to visualise but no data found!')
     
+    def setup_previewTab(self):
+        tab_layout = QGridLayout()
+        self.tab_previewVis.setLayout(tab_layout)
+        
+        self.PreviewMinCbarVal = 0
+        self.PreviewMaxCbarVal = 0
+        
+        self.previewImage_slider = ImageSlider([],self)
+        tab_layout.addWidget(self.previewImage_slider)
+            
+        
+    def updateShowPreview(self):
+        #Idea: create some preview image and highlight found clusters and localizations.
+        self.allPreviewFigures = []
+        #For now: create 5 plots:
+        self.PreviewFig = {}
+        self.PreviewFrameTime = 100*1000 #in us - maybe user-definable later?
+        
+        #Obtain the numbers of frames that are displayed
+        nrFramesDisplay = int(np.ceil((max(self.previewEvents['t']))/self.PreviewFrameTime))
+        
+        #Initialise minimum, maximum colorbar values:
+        self.PreviewMinCbarVal = 99
+        self.PreviewMaxCbarVal = -99
+        
+        #Loop over the frames:
+        for i in range(0,nrFramesDisplay):
+            self.PreviewFig[i] = plt.figure()
+            #Create an empty array with the sizes of self.previewEvents:
+            frameBasedEvent2dArray = np.zeros((max(self.previewEvents['y'])+1,max(self.previewEvents['x'])+1))
+            #Get the events belonging to this frame:
+            eventsInThisFrame = self.previewEvents[self.previewEvents['t'] >= i*self.PreviewFrameTime]
+            eventsInThisFrame = eventsInThisFrame[eventsInThisFrame['t'] < (i+1)*self.PreviewFrameTime]
+            
+            #Loop over the events and fill the corresponding pixel in frameBasedEvent2dArray:
+            for j in range(0,len(eventsInThisFrame)):
+                if eventsInThisFrame[j]['p'] == 0:
+                    frameBasedEvent2dArray[eventsInThisFrame[j]['y'],eventsInThisFrame[j]['x']] -= 1
+                else:
+                    frameBasedEvent2dArray[eventsInThisFrame[j]['y'],eventsInThisFrame[j]['x']] += 1
+            
+            #Show this in plt as an imshow:
+            fig = self.PreviewFig[i].add_subplot(111)
+            fig.imshow(frameBasedEvent2dArray)
+            
+            #Find the 'finding' results in this time-frame
+            findingResultsThisTimeFrame = []
+            indices = [i + 1 for i in range(len(self.data['FindingResult'][0]))]
+            for indexv in indices:
+                row = self.data['FindingResult'][0][indexv]
+                if min(row['events']['t']) >= i*self.PreviewFrameTime and min(row['events']['t']) < (i+1)*self.PreviewFrameTime:
+                    findingResultsThisTimeFrame.append(row)
+                    # Create a Rectangle object
+                    self.createRectangle(fig,row['events'],'r')
+                    
+                    #Also add the corresponding fitting result
+                    try:
+                        localization = self.data['FittingResult'][0].iloc[indexv-1]
+                        fig.plot(localization['x']/self.globalSettings['PixelSize_nm']['value'],localization['y']/self.globalSettings['PixelSize_nm']['value'],'rx', alpha=0.5)
+                    except:
+                        breakpoint
+                    
+                #Else if on the next frame:
+                elif min(row['events']['t']) > (i+1)*self.PreviewFrameTime and min(row['events']['t']) < (i+2)*self.PreviewFrameTime:
+                    self.createRectangle(fig,row['events'],'m')
+            
+            self.allPreviewFigures.append(self.PreviewFig[i])
+            plt.close()
+            
+            #Check cbar values:
+            #Check the 1st percentile:
+            if np.percentile(frameBasedEvent2dArray,5) < self.PreviewMinCbarVal:
+                self.PreviewMinCbarVal = np.min(frameBasedEvent2dArray)
+            if np.percentile(frameBasedEvent2dArray,95) > self.PreviewMaxCbarVal:
+                self.PreviewMaxCbarVal = np.max(frameBasedEvent2dArray)
+
+        self.previewImage_slider.update_figures(self.allPreviewFigures)
+        
+        logging.info('UpdateShowPreview ran!')
+ 
+    def createRectangle(self,fig,data,col):
+        rect = patches.Rectangle((min(data['x']), min(data['y'])), max(data['x'])-min(data['x']), max(data['y'])-min(data['y']), edgecolor=col, facecolor='none')
+        # Add the rectangle to the axes
+        fig.add_patch(rect)
+            
     def changeLayout_choice(self,curr_layout,className,displayNameToFunctionNameMap):
         logging.debug('Changing layout'+curr_layout.parent().objectName())
         #This removes everything except the first entry (i.e. the drop-down menu)
@@ -699,7 +886,6 @@ class MyGUI(QMainWindow):
         self.updateGUIafterNewResults()       
         return
         
-    
     def updateGUIafterNewResults(self):
         self.updateLocList()
     
@@ -728,33 +914,43 @@ class MyGUI(QMainWindow):
         
         return
     
+    def checkPolarity(self,npyData):
+        #Ensure that polarity is 0/1, not -1/1. If it is -1/1, convert to 0/1. Otherwise, give error
+        if sum(np.unique(npyData['p']) == (0,1)) != 2:
+            if sum(np.unique(npyData['p']) == (-1,1)) == 2:
+                df = pd.DataFrame(npyData, columns=['x', 'y', 'p' ,'t'])
+                df.loc[df['p'] == -1, 'p'] = 0
+                # npyData = df.to_numpy(dtype=npyData.dtype)
+                npyData = df.to_records(index=False)
+            else:
+                logging.critical('RAW/NPY data does not have 0/1 or -1/1 polarity! Please fix this and try again.')
+        
+        return npyData
+    
     def processSingleFile(self,FileName,onlyFitting=False):
         if not onlyFitting:
             #Run the analysis on a single file
             self.currentFileInfo['CurrentFileLoc'] = FileName
             npyData = self.loadRawData(FileName)
-            #Ensure that polarity is 0/1, not -1/1. If it is -1/1, convert to 0/1. Otherwise, give error
-            if sum(np.unique(npyData['p']) == (0,1)) != 2:
-                if sum(np.unique(npyData['p']) == (-1,1)) == 2:
-                    df = pd.DataFrame(npyData, columns=['x', 'y', 'p' ,'t'])
-                    df.loc[df['p'] == -1, 'p'] = 0
-                    # npyData = df.to_numpy(dtype=npyData.dtype)
-                    npyData = df.to_records(index=False)
-                else:
-                    logging.critical('RAW/NPY data does not have 0/1 or -1/1 polarity! Please fix this and try again.')
+            if npyData is None:
+                return
+            
+            #Check polarity
+            self.checkPolarity(npyData)
             
             #Sort event list on time
             npyData = npyData[np.argsort(npyData,order='t')]
             
-            if npyData is None:
-                return
             
         #If we only fit, we still run more or less the same info, butwe don't care about the npyData in the CurrentFileLoc.
         elif onlyFitting:
             self.currentFileInfo['CurrentFileLoc'] = FileName
             logging.info('Candidate finding NOT performed')
             npyData = None
-            
+        
+        self.runFindingAndFitting(npyData)
+    
+    def runFindingAndFitting(self,npyData):
         #Run the finding function!
         FindingEvalText = self.getFunctionEvalText('Finding',"npyData","self.globalSettings")
         if FindingEvalText is not None:
@@ -768,7 +964,7 @@ class MyGUI(QMainWindow):
             self.runFitting()
         else:
             logging.error('Candidate finding NOT performed')
-                
+            
     def runFitting(self):
         if self.data['FindingResult'][0] is not None:
             #Run the finding function!
@@ -1068,6 +1264,7 @@ Custom output from fitting function:
         # except:
         #     pass
 
+
 class AdvancedSettingsWindow(QMainWindow):
     def __init__(self, parent):
         super().__init__(parent)
@@ -1243,3 +1440,70 @@ class AdvancedSettingsWindow(QMainWindow):
         except:
             self.save_global_settings()
             logging.info('No global settings storage found, new one created.')
+
+
+
+class ImageSlider(QWidget):
+    def __init__(self, figures=None, parent=None):
+        super().__init__()
+        
+        self.parent = parent
+
+        if figures is None:
+            figures = []
+
+        self.figures = figures
+        self.current_figure_idx = 0
+        self.canvas = FigureCanvas(self.figures[0]) if len(self.figures) > 0 else FigureCanvas()
+        
+        # self.toolbar = NavigationToolbar(self.canvas, self)
+
+        self.slider = QSlider(Qt.Horizontal)
+        self.slider.setRange(0, len(figures) - 1)
+        self.slider.valueChanged.connect(self.update_figure)
+
+        self.prev_button = QPushButton("Previous")
+        self.prev_button.clicked.connect(self.previous_figure)
+
+        self.next_button = QPushButton("Next")
+        self.next_button.clicked.connect(self.next_figure)
+
+        layout = QVBoxLayout()
+        # layout.addWidget(self.toolbar)
+        layout.addWidget(self.canvas)
+        layout.addWidget(self.slider)
+        layout.addWidget(self.prev_button)
+        layout.addWidget(self.next_button)
+
+        self.setLayout(layout) 
+
+    def update_figure(self, index):        
+        self.current_figure_idx = index
+        self.canvas.figure = self.figures[index]
+        
+        if self.parent is not None:
+            try:
+                # Calculate colorbar limits
+                cmin = self.parent.PreviewMinCbarVal
+                cmax = self.parent.PreviewMaxCbarVal
+                self.canvas.figure.axes[0].images[0].set_clim(cmin, cmax)
+                # Set colorbar to gray
+                self.canvas.figure.axes[0].images[0].set_cmap('gray')
+            except:
+                logging.error('Error in setting cbar limits preview')
+                pass
+                    
+        self.canvas.draw()
+
+    def previous_figure(self):
+        self.update_figure(max(self.current_figure_idx - 1, 0))
+        self.slider.setValue(self.current_figure_idx)
+
+    def next_figure(self):
+        self.update_figure(min(self.current_figure_idx + 1, len(self.figures) - 1))
+        self.slider.setValue(self.current_figure_idx)
+
+    def update_figures(self, new_figures):
+        self.figures = new_figures
+        self.slider.setRange(0, len(new_figures) - 1)
+        self.update_figure(0)
