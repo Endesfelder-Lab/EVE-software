@@ -4,7 +4,7 @@ import sys, os, logging, json, argparse, datetime, glob, csv, ast, platform, thr
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
-
+import pandas as pd
 import numpy as np
 # Add the folder 2 folders up to the system path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -727,14 +727,28 @@ class MyGUI(QMainWindow):
         self.LocListTable.setHorizontalHeaderLabels(self.data['FittingResult'][0].columns.tolist())
         
         return
-     
+    
     def processSingleFile(self,FileName,onlyFitting=False):
         if not onlyFitting:
             #Run the analysis on a single file
             self.currentFileInfo['CurrentFileLoc'] = FileName
             npyData = self.loadRawData(FileName)
+            #Ensure that polarity is 0/1, not -1/1. If it is -1/1, convert to 0/1. Otherwise, give error
+            if sum(np.unique(npyData['p']) == (0,1)) != 2:
+                if sum(np.unique(npyData['p']) == (-1,1)) == 2:
+                    df = pd.DataFrame(npyData, columns=['x', 'y', 'p' ,'t'])
+                    df.loc[df['p'] == -1, 'p'] = 0
+                    # npyData = df.to_numpy(dtype=npyData.dtype)
+                    npyData = df.to_records(index=False)
+                else:
+                    logging.critical('RAW/NPY data does not have 0/1 or -1/1 polarity! Please fix this and try again.')
+            
+            #Sort event list on time
+            npyData = npyData[np.argsort(npyData,order='t')]
+            
             if npyData is None:
                 return
+            
         #If we only fit, we still run more or less the same info, butwe don't care about the npyData in the CurrentFileLoc.
         elif onlyFitting:
             self.currentFileInfo['CurrentFileLoc'] = FileName
