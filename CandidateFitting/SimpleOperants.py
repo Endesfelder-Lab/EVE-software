@@ -13,7 +13,8 @@ def __function_metadata__():
             ],
             "optional_kwargs": [
             ],
-            "help_string": "Gives the average xyt position of each found localization."
+            "help_string": "Gives the average xyt position of each found localization.",
+            "display_name": "Mean X,Y,T, position"
         }
     }
 

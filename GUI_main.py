@@ -1,6 +1,6 @@
 # from csbdeep.io import save_tiff_imagej_compatible
 # from stardist import _draw_polygons, export_imagej_rois
-import sys, os, logging, json, argparse, datetime, glob, csv, ast
+import sys, os, logging, json, argparse, datetime, glob, csv, ast, platform, threading
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
@@ -16,9 +16,9 @@ from CandidateFinding import *
 from Utils import utils, utilsHelper
 
 from PyQt5 import QtWidgets, QtGui
-from PyQt5.QtGui import QCursor
-from PyQt5.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QTableWidget, QTableWidgetItem, QLayout, QMainWindow, QLabel, QPushButton, QSizePolicy, QGroupBox, QTabWidget, QGridLayout, QWidget, QComboBox, QLineEdit, QFileDialog, QToolBar, QCheckBox,QDesktopWidget
-from PyQt5.QtCore import Qt, QPoint
+from PyQt5.QtGui import QCursor, QTextCursor
+from PyQt5.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QTableWidget, QTableWidgetItem, QLayout, QMainWindow, QLabel, QPushButton, QSizePolicy, QGroupBox, QTabWidget, QGridLayout, QWidget, QComboBox, QLineEdit, QFileDialog, QToolBar, QCheckBox,QDesktopWidget, QMessageBox, QTextEdit
+from PyQt5.QtCore import Qt, QPoint, QProcess, QCoreApplication, QTimer, QFileSystemWatcher, QFile
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
 # Main script
@@ -31,11 +31,25 @@ class MyGUI(QMainWindow):
         parser = argparse.ArgumentParser(description='EBS fitting - Endesfelder lab - Nov 2023')
         parser.add_argument('--debug', '-d', action='store_true', help='Enable debug')
         args=parser.parse_args()
-        if args.debug:
-            log_format = "%(asctime)s [%(levelname)s] %(filename)s:%(lineno)d - %(message)s"
-            logging.basicConfig(format=log_format, level=logging.DEBUG)
-        else:
-            logging.basicConfig(level=logging.INFO)
+        log_file_path = 'GUI/logfile.log'
+        # Create a logger with the desired log level
+        self.logger = logging.getLogger()
+        self.logger.setLevel(logging.DEBUG if args.debug else logging.INFO)
+
+        # Create the file handler to log to the file
+        file_handler = logging.FileHandler(log_file_path)
+        file_handler.setLevel(logging.INFO)
+
+        # Create the stream handler to log to the debug terminal
+        stream_handler = logging.StreamHandler(sys.stdout)
+        stream_handler.setLevel(logging.DEBUG if args.debug else logging.INFO)
+
+        # Add the handlers to the logger
+        logging.basicConfig(handlers=[file_handler, stream_handler], level=logging.DEBUG if args.debug else logging.INFO,format="%(asctime)s [%(levelname)s] %(filename)s:%(lineno)d - %(message)s")
+
+            
+        if os.path.exists(log_file_path):
+            open(log_file_path, 'w').close()
 
         # Create a dictionary to store the entries
         self.entries = {}
@@ -49,10 +63,9 @@ class MyGUI(QMainWindow):
         #Create a dictionary that stores data and passes it between finding,fitting,saving, etc
         self.data = {}
         
-        
         #Set some major settings on the UI
         super().__init__()
-        self.setWindowTitle("EBS fitting - Endesfelder lab - Nov 2023")
+        self.setWindowTitle("Eve - alphaVersion")
         self.setMinimumSize(400, 300)  # Set minimum size for the GUI window
         
         #Set the central widget that contains everything
@@ -99,12 +112,15 @@ class MyGUI(QMainWindow):
         self.mainTabWidget.addTab(self.tab_locList, "LocalizationList")
         self.tab_visualisation = QWidget()
         self.mainTabWidget.addTab(self.tab_visualisation, "Visualisation")
+        self.tab_logfileInfo = QWidget()
+        self.mainTabWidget.addTab(self.tab_logfileInfo, "Run info")
         
         #Set up the tabs
         self.setup_tab('Processing')
         self.setup_tab('Post-processing')
         self.setup_tab('LocalizationList')
         self.setup_tab('Visualisation')
+        self.setup_tab('Run info')
 
         #Loop through all combobox states briefly to initialise them (and hide them)
         self.set_all_combobox_states()
@@ -122,7 +138,14 @@ class MyGUI(QMainWindow):
         globalSettings['PixelSize_nm']['input'] = float
         globalSettings['PixelSize_nm']['displayName'] = 'Pixel size (nm)'
         globalSettings['MetaVisionPath'] = {}
-        globalSettings['MetaVisionPath']['value'] = "C:\Program Files\Prophesee\lib\python3\site-packages"
+        if platform.system() == 'Windows':
+            globalSettings['MetaVisionPath']['value'] = "C:\Program Files\Prophesee\lib\python3\site-packages"
+        elif platform.system() == 'Linux':
+            globalSettings['MetaVisionPath']['value'] = "/usr/lib/python3/dist-packages"
+        elif platform.system() == 'Darwin':
+            globalSettings['MetaVisionPath']['value'] = "Enter Path to Metavision SDK!"
+        else:
+            globalSettings['MetaVisionPath']['value'] = "Enter Path to Metavision SDK!"
         globalSettings['MetaVisionPath']['input'] = str
         globalSettings['MetaVisionPath']['displayName'] = 'MetaVision SDK Path'
         globalSettings['StoreConvertedRawData'] = {}
@@ -147,7 +170,14 @@ class MyGUI(QMainWindow):
         globalSettings['OutputDataFormat']['options'] = ('thunderstorm','minimal')
         globalSettings['OutputDataFormat']['displayName'] = 'Output data format'
         
-        globalSettings['IgnoreInOptions'] = ('IgnoreInOptions','StoreFinalOutput') #Add options here that should NOT show up in the global settings window
+        globalSettings['JSONGUIstorePath'] = {}
+        globalSettings['JSONGUIstorePath']['value'] = "GUI"+os.sep+"storage.json"
+        globalSettings['JSONGUIstorePath']['input'] = str
+        globalSettings['GlobalOptionsStorePath'] = {}
+        globalSettings['GlobalOptionsStorePath']['value'] = "GUI" + os.sep + "GlobSettingStorage.json"
+        globalSettings['GlobalOptionsStorePath']['input'] = str
+        
+        globalSettings['IgnoreInOptions'] = ('IgnoreInOptions','StoreFinalOutput', 'JSONGUIstorePath','GlobalOptionsStorePath') #Add options here that should NOT show up in the global settings window
         return globalSettings
     
     # Function to handle the button click event
@@ -169,7 +199,8 @@ class MyGUI(QMainWindow):
             'Post-processing': self.setup_postProcessingTab,
             'Save/Load': self.setup_saveloadTab,
             'Visualisation': self.setup_visualisationTab,
-            'LocalizationList': self.setup_loclistTab
+            'LocalizationList': self.setup_loclistTab,
+            'Run info': self.setup_logFileTab
         }
         #Run the setup of this tab
         setup_func = tab_mapping.get(tab_name)
@@ -202,7 +233,7 @@ class MyGUI(QMainWindow):
         #Add the global settings group box to the central widget
         # self.layout.addWidget(self.datasetsSettingsGroupBox, 1, 0)
 
-        #Add a group box on candiddate fitting
+        #Add a group box on candiddate finding
         self.groupboxFinding = QGroupBox("Candidate finding")
         self.groupboxFinding.setObjectName("groupboxFinding")
         self.groupboxFinding.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
@@ -212,16 +243,17 @@ class MyGUI(QMainWindow):
         # Create a QComboBox and add options - this is the FINDING dropdown
         self.candidateFindingDropdown = QComboBox(self)
         options = utils.functionNamesFromDir('CandidateFinding')
+        displaynames, self.Finding_functionNameToDisplayNameMapping = utils.displayNamesFromFunctionNames(options)
         self.candidateFindingDropdown.setObjectName("CandidateFinding_candidateFindingDropdown")
-        self.candidateFindingDropdown.addItems(options)
+        self.candidateFindingDropdown.addItems(displaynames)
         #Add the candidateFindingDropdown to the layout
         self.groupboxFinding.layout().addWidget(self.candidateFindingDropdown,1,0,1,2)
         #Activation for candidateFindingDropdown.activated
-        self.candidateFindingDropdown.activated.connect(lambda: self.changeLayout_choice(self.groupboxFinding.layout(),"CandidateFinding_candidateFindingDropdown"))
+        self.candidateFindingDropdown.activated.connect(lambda: self.changeLayout_choice(self.groupboxFinding.layout(),"CandidateFinding_candidateFindingDropdown",self.Finding_functionNameToDisplayNameMapping))
         
         
         #On startup/initiatlisation: also do changeLayout_choice
-        self.changeLayout_choice(self.groupboxFinding.layout(),"CandidateFinding_candidateFindingDropdown")
+        self.changeLayout_choice(self.groupboxFinding.layout(),"CandidateFinding_candidateFindingDropdown",self.Finding_functionNameToDisplayNameMapping)
         
         
         self.groupboxFitting = QGroupBox("Candidate fitting")
@@ -234,14 +266,15 @@ class MyGUI(QMainWindow):
         self.candidateFittingDropdown = QComboBox(self)
         options = utils.functionNamesFromDir('CandidateFitting')
         self.candidateFittingDropdown.setObjectName("CandidateFitting_candidateFittingDropdown")
-        self.candidateFittingDropdown.addItems(options)
+        displaynames, self.Fitting_functionNameToDisplayNameMapping = utils.displayNamesFromFunctionNames(options)
+        self.candidateFittingDropdown.addItems(displaynames)
         #Add the candidateFindingDropdown to the layout
         self.groupboxFitting.layout().addWidget(self.candidateFittingDropdown,1,0,1,2)
         #Activation for candidateFindingDropdown.activated
-        self.candidateFittingDropdown.activated.connect(lambda: self.changeLayout_choice(self.groupboxFitting.layout(),"CandidateFitting_candidateFittingDropdown"))
+        self.candidateFittingDropdown.activated.connect(lambda: self.changeLayout_choice(self.groupboxFitting.layout(),"CandidateFitting_candidateFittingDropdown",self.Fitting_functionNameToDisplayNameMapping))
         
         #On startup/initiatlisation: also do changeLayout_choice
-        self.changeLayout_choice(self.groupboxFitting.layout(),"CandidateFitting_candidateFittingDropdown")
+        self.changeLayout_choice(self.groupboxFitting.layout(),"CandidateFitting_candidateFittingDropdown",self.Fitting_functionNameToDisplayNameMapping)
         
         
         #Add a run button:
@@ -262,6 +295,39 @@ class MyGUI(QMainWindow):
         self.label2 = QLabel("Hello from Tab 2!")
         tab2_layout.addWidget(self.label2, 0, 0)
 
+    def setup_logFileTab(self):
+        tab_layout = QGridLayout()
+        self.tab_logfileInfo.setLayout(tab_layout)
+        self.text_edit = QTextEdit()
+        tab_layout.addWidget(self.text_edit, 0, 0)
+
+        self.log_file_path = 'GUI/logfile.log'
+        # self.file_watcher = QFileSystemWatcher()
+        # self.file_watcher.addPath('GUI/logfile.log')
+        # self.file_watcher.fileChanged.connect(self.update_log)
+        
+        self.last_modified = os.path.getmtime(self.log_file_path)
+
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.check_logfile_modification)
+        self.timer.start(1000)  # Check every second
+        
+        self.update_log()
+
+    def check_logfile_modification(self):
+        current_modified = os.path.getmtime(self.log_file_path)
+        if current_modified != self.last_modified:
+            self.update_log()
+            self.last_modified = current_modified
+            
+    def update_log(self):
+        if QFile.exists(self.log_file_path):
+            with open(self.log_file_path, 'r') as file:
+                log_contents = file.read()
+                self.text_edit.setPlainText(log_contents)
+                self.text_edit.moveCursor(QTextCursor.End)
+                self.text_edit.ensureCursorVisible()
+                
     def setup_saveloadTab(self):
         tab3_layout = QGridLayout()
         self.tab_saveLoad.setLayout(tab3_layout)
@@ -292,6 +358,12 @@ class MyGUI(QMainWindow):
         #Give it a function on click:
         self.buttonScatter.clicked.connect(lambda: self.plotScatter())
         
+        #Add a button that says 2d interp histogram:
+        self.buttonInterpHist = QPushButton("Interp histogram")
+        visualisationTab_horizontal_container.addWidget(self.buttonInterpHist)
+        #Give it a function on click:
+        self.buttonInterpHist.clicked.connect(lambda: self.plotLinearInterpHist())
+        
         self.data['figurePlot'], self.data['figureAx'] = plt.subplots(figsize=(5, 5))
         self.data['figureCanvas'] = FigureCanvas(self.data['figurePlot'])
         
@@ -306,8 +378,11 @@ class MyGUI(QMainWindow):
         if 'FittingMethod' in self.data:
             logging.debug('Attempting to show scatter plot')
             #Delete any existing cbar - needs to be done before anything else:
-            if hasattr(self, 'cbar'):
-                self.cbar.remove()
+            try:
+                if hasattr(self, 'cbar'):
+                    self.cbar.remove()
+            except:
+                pass
             #Plot the contents of the loclist as scatter points, color-coded on time:
             #Clear axis
             self.data['figureAx'].clear()
@@ -328,30 +403,126 @@ class MyGUI(QMainWindow):
             logging.info('Scatter plot drawn')
         else:
             logging.error('Tried to visualise but no data found!')
-        
-    def changeLayout_choice(self,curr_layout,className):
+    
+    def plotLinearInterpHist(self,pixel_recon_dim=100):
+        #check if we have results stored:
+        if 'FittingMethod' in self.data:
+            #Code inspired by Frontiers Martens et al
+            logging.debug('Attempting to show 2d hist plot')
+            #Delete any existing cbar - needs to be done before anything else:
+            try:
+                if hasattr(self, 'cbar'):
+                    self.cbar.remove()
+            except:
+                pass
+            # First, an empty two-dimensional array is allocated. It will be populated with 
+            # datapoints and finally will be used for the image reconstruction. 
+            # Its dimensions are adjusted to the maximum X and Y coordinate values in 
+            # the dataset divided by the pixel dimensions
+            max_x = max(self.data['FittingResult'][0]['x'])
+            max_y = max(self.data['FittingResult'][0]['y'])
+            hist_2d = np.zeros((int(max_x/pixel_recon_dim)+3, int(max_y/pixel_recon_dim)+3))
+            # We prepare the method which will compute the amount of intensity which will 
+            # be received by the pixel based on the subpixel localization of the processed event
+            def interpolation_value(x, pixel_dim=10):
+                y = (-np.abs(x)/pixel_dim + 1)
+                return y
+
+            # In this for loop each datapoint is assigned to four pixels (and in very 
+            # exceptional cases to a single pixel if it is positioned at the center of 
+            # the reconstruction iamge pixel) in the image reconstruction.
+            for index, d in self.data['FittingResult'][0].iterrows():
+                if 'int' in d:
+                    intensity = d['int']
+                else:
+                    intensity = 1
+                # Based on X and Y coordinates we determine the pixel position by dividing the 
+                # coordinates with the floor division (//) operation...
+                coord_x = int(d['x'] // pixel_recon_dim) + 1
+                coord_y = int(d['y'] // pixel_recon_dim) + 1
+                # ... and also we determine the subpixel pisition of the event. We subtract 
+                # the halved pixel dimension value from X and Y subpixel position in order 
+                # to determine how the event is oriented with respect to the pixel center. 
+                # This value will be used  for the intensity distribution and finding 
+                # neighboring pixels which will receive a fraction of this intensity as well
+                position_x = d['x'] % pixel_recon_dim - pixel_recon_dim/2
+                position_y = d['y'] % pixel_recon_dim - pixel_recon_dim/2
+
+                # we calculate the 'pixel-intensity' which is used for the linear interpolation
+                x_int = interpolation_value(position_x,pixel_dim=pixel_recon_dim)
+                y_int = interpolation_value(position_y,pixel_dim=pixel_recon_dim)
+
+                # Finally we distribute even itnensities to pixels. 
+                # The original pixel is at coord_x and coord_y values
+                hist_2d[coord_x, coord_y] += x_int*y_int * intensity
+
+                # The horizontal neighbor pixel is on the right (or left) side of the 
+                # original pixel, assuming the datapoint is on the right (or left) 
+                # half of the original pixel.
+                if position_x > 0:
+                    hist_2d[coord_x+1, coord_y] += (1-x_int)*y_int * intensity
+                else:
+                    hist_2d[coord_x-1, coord_y] += (1-x_int)*y_int * intensity
+
+                # Similarly we find a vertical neighbor in up & down dimension.
+                if position_y > 0:
+                    hist_2d[coord_x, coord_y+1] += x_int*(1-y_int) * intensity
+                else:
+                    hist_2d[coord_x, coord_y-1] += x_int*(1-y_int) * intensity
+
+                # Finally we find the diagonal neighbors by combining the code used in the 
+                # horizontal and vertical neighbours
+                if position_x > 0:
+                    if position_y > 0:
+                        hist_2d[coord_x+1, coord_y+1] += (1-x_int)*(1-y_int) * intensity
+                    else:
+                        hist_2d[coord_x+1, coord_y-1] += (1-x_int)*(1-y_int) * intensity
+                else:
+                    if position_y > 0:
+                        hist_2d[coord_x-1, coord_y+1] += (1-x_int)*(1-y_int) * intensity
+                    else:
+                        hist_2d[coord_x-1, coord_y-1] += (1-x_int)*(1-y_int) * intensity
+
+            #Plot hist_2d:
+            #Clear axis
+            self.data['figureAx'].clear()
+            #Plot the data as scatter plot
+            self.data['figureAx'].imshow(hist_2d)
+            self.data['figureAx'].set_xlabel('x [nm]')
+            self.data['figureAx'].set_ylabel('y [nm]')
+            self.data['figureAx'].set_aspect('equal', adjustable='box')  
+            #Give it a nice layout
+            self.data['figurePlot'].tight_layout()
+            #Update drawing of the canvas
+            self.data['figureCanvas'].draw()
+            logging.info('2d interp hist drawn')
+        else:
+            logging.error('Tried to visualise but no data found!')
+    
+    def changeLayout_choice(self,curr_layout,className,displayNameToFunctionNameMap):
         logging.debug('Changing layout'+curr_layout.parent().objectName())
         #This removes everything except the first entry (i.e. the drop-down menu)
         self.resetLayout(curr_layout,className)
         #Get the dropdown info
         curr_dropdown = self.getMethodDropdownInfo(curr_layout,className)
         #Get the kw-arguments from the current dropdown.
-        reqKwargs = utils.reqKwargsFromFunction(curr_dropdown.currentText())
-        #Add a widget-pair for every kwarg
+        current_selected_function = utils.functionNameFromDisplayName(curr_dropdown.currentText(),displayNameToFunctionNameMap)
+        reqKwargs = utils.reqKwargsFromFunction(current_selected_function)
+        #Add a widget-pair for every kw-arg
         labelposoffset = 0
         for k in range(len(reqKwargs)):
             #Value is used for scoring, and takes the output of the method
             if reqKwargs[k] != 'methodValue':
                 label = QLabel(f"<b>{reqKwargs[k]}</b>")
-                label.setObjectName(f"Label#{curr_dropdown.currentText()}#{reqKwargs[k]}")
+                label.setObjectName(f"Label#{current_selected_function}#{reqKwargs[k]}")
                 if self.checkAndShowWidget(curr_layout,label.objectName()) == False:
-                    label.setToolTip(utils.infoFromMetadata(curr_dropdown.currentText(),specificKwarg=reqKwargs[k]))
+                    label.setToolTip(utils.infoFromMetadata(current_selected_function,specificKwarg=reqKwargs[k]))
                     curr_layout.addWidget(label,2+(k)+labelposoffset,0)
                 line_edit = QLineEdit()
-                line_edit.setObjectName(f"LineEdit#{curr_dropdown.currentText()}#{reqKwargs[k]}")
-                defaultValue = utils.defaultValueFromKwarg(curr_dropdown.currentText(),reqKwargs[k])
+                line_edit.setObjectName(f"LineEdit#{current_selected_function}#{reqKwargs[k]}")
+                defaultValue = utils.defaultValueFromKwarg(current_selected_function,reqKwargs[k])
                 if self.checkAndShowWidget(curr_layout,line_edit.objectName()) == False:
-                    line_edit.setToolTip(utils.infoFromMetadata(curr_dropdown.currentText(),specificKwarg=reqKwargs[k]))
+                    line_edit.setToolTip(utils.infoFromMetadata(current_selected_function,specificKwarg=reqKwargs[k]))
                     if defaultValue is not None:
                         line_edit.setText(str(defaultValue))
                     curr_layout.addWidget(line_edit,2+k+labelposoffset,1)
@@ -359,18 +530,21 @@ class MyGUI(QMainWindow):
                 labelposoffset -= 1
             
         #Get the optional kw-arguments from the current dropdown.
-        optKwargs = utils.optKwargsFromFunction(curr_dropdown.currentText())
+        optKwargs = utils.optKwargsFromFunction(current_selected_function)
         #Add a widget-pair for every kwarg
         for k in range(len(optKwargs)):
             label = QLabel(f"<i>{optKwargs[k]}</i>")
-            label.setObjectName(f"Label#{curr_dropdown.currentText()}#{optKwargs[k]}")
+            label.setObjectName(f"Label#{current_selected_function}#{optKwargs[k]}")
             if self.checkAndShowWidget(curr_layout,label.objectName()) == False:
-                label.setToolTip(utils.infoFromMetadata(curr_dropdown.currentText(),specificKwarg=optKwargs[k]))
+                label.setToolTip(utils.infoFromMetadata(current_selected_function,specificKwarg=optKwargs[k]))
                 curr_layout.addWidget(label,2+(k)+len(reqKwargs)+labelposoffset,0)
             line_edit = QLineEdit()
-            line_edit.setObjectName(f"LineEdit#{curr_dropdown.currentText()}#{optKwargs[k]}")
+            line_edit.setObjectName(f"LineEdit#{current_selected_function}#{optKwargs[k]}")
+            defaultValue = utils.defaultValueFromKwarg(current_selected_function,optKwargs[k])
             if self.checkAndShowWidget(curr_layout,line_edit.objectName()) == False:
-                line_edit.setToolTip(utils.infoFromMetadata(curr_dropdown.currentText(),specificKwarg=optKwargs[k]))
+                line_edit.setToolTip(utils.infoFromMetadata(current_selected_function,specificKwarg=optKwargs[k]))
+                if defaultValue is not None:
+                    line_edit.setText(str(defaultValue))
                 curr_layout.addWidget(line_edit,2+(k)+len(reqKwargs)+labelposoffset,1)
     
     def checkAndShowWidget(self,layout, widgetName):
@@ -488,6 +662,10 @@ class MyGUI(QMainWindow):
         return unique_files
     
     def run_processing(self):
+        thread = threading.Thread(target=self.run_processing_i)
+        thread.start()
+    
+    def run_processing_i(self):
         #Check if a folder or file is selected:
         if os.path.isdir(self.dataLocationInput.text()):
             #Find all .raw or .npy files that have unique names except for the extension (and prefer .npy):
@@ -520,6 +698,7 @@ class MyGUI(QMainWindow):
          
         self.updateGUIafterNewResults()       
         return
+        
     
     def updateGUIafterNewResults(self):
         self.updateLocList()
@@ -688,7 +867,10 @@ Custom output from fitting function:
                 item = all_layouts.itemAt(index)
                 widget = item.widget()
                 if isinstance(widget,QComboBox) and widget.isVisible() and className in widget.objectName():
-                    methodName_method = widget.currentText()
+                    if className == 'Finding':
+                        methodName_method = utils.functionNameFromDisplayName(widget.currentText(),self.Finding_functionNameToDisplayNameMapping)
+                    elif className == 'Fitting':
+                        methodName_method = utils.functionNameFromDisplayName(widget.currentText(),self.Fitting_functionNameToDisplayNameMapping)
         
         #Function call: get the to-be-evaluated text out, giving the methodName, method KwargNames, methodKwargValues, and 'function Type (i.e. cellSegmentScripts, etc)' - do the same with scoring as with method
         if methodName_method != '':
@@ -783,7 +965,7 @@ Custom output from fitting function:
                 self.entries[field_name] = field_widget.currentText()
 
         # Specify the path and filename for the JSON file
-        json_file_path = "GUI"+os.sep+"storage.json"
+        json_file_path = self.globalSettings['JSONGUIstorePath']['value']
 
         # Write the entries dictionary to the JSON file
         with open(json_file_path, "w") as json_file:
@@ -797,7 +979,7 @@ Custom output from fitting function:
     
     def load_entries_from_json_single(self,runParams=['QLineEdit','QComboBox']):
         # Specify the path and filename for the JSON file
-        json_file_path = "GUI"+os.sep+"storage.json"
+        json_file_path = self.globalSettings['JSONGUIstorePath']['value']
 
         try:
             # Load the entries from the JSON file
@@ -819,9 +1001,9 @@ Custom output from fitting function:
                                 field_widget.setCurrentIndex(index)
                                 #Also change the lineedits and such:
                                 if 'Finding' in field_widget.objectName():
-                                    self.changeLayout_choice(self.groupboxFinding.layout(),field_widget.objectName())
+                                    self.changeLayout_choice(self.groupboxFinding.layout(),field_widget.objectName(),self.Finding_functionNameToDisplayNameMapping)
                                 elif 'Fitting' in field_widget.objectName():
-                                    self.changeLayout_choice(self.groupboxFitting.layout(),field_widget.objectName())
+                                    self.changeLayout_choice(self.groupboxFitting.layout(),field_widget.objectName(),self.Fitting_functionNameToDisplayNameMapping)
         
 
         except FileNotFoundError:
@@ -854,9 +1036,9 @@ Custom output from fitting function:
                     widget.setCurrentIndex(i)
                     #Update all line edits and such
                     if 'Finding' in widget.objectName():
-                        self.changeLayout_choice(self.groupboxFinding.layout(),widget.objectName())
+                        self.changeLayout_choice(self.groupboxFinding.layout(),widget.objectName(),self.Finding_functionNameToDisplayNameMapping)
                     elif 'Fitting' in widget.objectName():
-                        self.changeLayout_choice(self.groupboxFitting.layout(),widget.objectName())
+                        self.changeLayout_choice(self.groupboxFitting.layout(),widget.objectName(),self.Fitting_functionNameToDisplayNameMapping)
             elif isinstance(widget, QWidget):
                 for child_widget in widget.children():
                     set_combobox_states(child_widget)
@@ -866,9 +1048,9 @@ Custom output from fitting function:
         for combobox, original_state in original_states.items():
             combobox.setCurrentIndex(original_state)
             if 'Finding' in combobox.objectName():
-                self.changeLayout_choice(self.groupboxFinding.layout(),combobox.objectName())
+                self.changeLayout_choice(self.groupboxFinding.layout(),combobox.objectName(),self.Finding_functionNameToDisplayNameMapping)
             elif 'Fitting' in combobox.objectName():
-                self.changeLayout_choice(self.groupboxFitting.layout(),combobox.objectName())
+                self.changeLayout_choice(self.groupboxFitting.layout(),combobox.objectName(),self.Fitting_functionNameToDisplayNameMapping)
         # except:
         #     pass
 
@@ -882,12 +1064,15 @@ class AdvancedSettingsWindow(QMainWindow):
         # Set the window icon to the parent's icon
         self.setWindowIcon(self.parent.windowIcon())
 
-        #Load the global settings from last time:
-        self.load_global_settings()
-
         #Create a QGridlayout to populate:
         layout = QGridLayout()
         currentRow = 0
+        
+        self.labelGlobSettings={}
+        self.checkboxGlobSettings = {}
+        self.input_fieldGlobSettings = {}
+        self.dropdownGlobSettings = {}
+        self.dropdownGlobSettingsOptions={}
         
         # Iterate over the settings in self.parent.globalSettings
         for setting, value in self.parent.globalSettings.items():
@@ -895,52 +1080,60 @@ class AdvancedSettingsWindow(QMainWindow):
             if setting not in self.parent.globalSettings.get('IgnoreInOptions'):
                 # Create a label with the setting title
                 if 'displayName' in value:
-                    label = QLabel(value['displayName'])
+                    self.labelGlobSettings[setting] = QLabel(value['displayName'])
                 else:
-                    label = QLabel(setting)
+                    self.labelGlobSettings[setting] = QLabel(setting)
                 #Align correctly
-                label.setAlignment(Qt.AlignVCenter | Qt.AlignRight)
-                layout.addWidget(label,currentRow,0)
+                self.labelGlobSettings[setting].setAlignment(Qt.AlignVCenter | Qt.AlignRight)
+                layout.addWidget(self.labelGlobSettings[setting],currentRow,0)
                 
                 # Check the type of the input
                 input_type = value['input']
                 
                 # Create a checkbox for boolean values
                 if input_type == bool:
-                    checkbox = QCheckBox()
-                    checkbox.setChecked(value['value'])
-                    checkbox.stateChanged.connect(lambda state, s=setting: self.update_global_settings(s, state))
-                    layout.addWidget(checkbox,currentRow,1)
+                    self.checkboxGlobSettings[setting] = QCheckBox()
+                    self.checkboxGlobSettings[setting].setChecked(value['value'])
+                    self.checkboxGlobSettings[setting].stateChanged.connect(lambda state, s=setting: self.update_global_settings(s, state))
+                    layout.addWidget(self.checkboxGlobSettings[setting],currentRow,1)
                 
                 # Create an input field for string or integer values
                 elif input_type in (str, float):
-                    input_field = QLineEdit()
-                    input_field.setText(str(value['value']))
-                    input_field.textChanged.connect(lambda text, s=setting: self.update_global_settings(s, text))
-                    layout.addWidget(input_field,currentRow,1)
+                    self.input_fieldGlobSettings[setting] = QLineEdit()
+                    self.input_fieldGlobSettings[setting].setText(str(value['value']))
+                    self.input_fieldGlobSettings[setting].textChanged.connect(lambda text, s=setting: self.update_global_settings(s, text))
+                    layout.addWidget(self.input_fieldGlobSettings[setting],currentRow,1)
                     
                 # Create a dropdown for choices
                 elif input_type == 'choice':
-                    options = value['options']
-                    dropdown = QComboBox()
-                    dropdown.addItems(options)
-                    current_index = options.index(value['value'])
-                    dropdown.setCurrentIndex(current_index)
-                    dropdown.currentIndexChanged.connect(lambda index, s=setting: self.update_global_settings(s, options[index]))
-                    layout.addWidget(dropdown,currentRow,1)
+                    self.dropdownGlobSettings[setting] = QComboBox()
+                    self.dropdownGlobSettingsOptions[setting] = value['options']
+                    self.dropdownGlobSettings[setting].addItems(self.dropdownGlobSettingsOptions[setting])
+                    current_index = self.dropdownGlobSettingsOptions[setting].index(value['value'])
+                    self.dropdownGlobSettings[setting].setCurrentIndex(current_index)
+                    self.dropdownGlobSettings[setting].currentIndexChanged.connect(lambda index, s=setting: self.update_global_settings(s, self.dropdownGlobSettingsOptions[s][index]))
+                    layout.addWidget(self.dropdownGlobSettings[setting],currentRow,1)
 
                 #Increment the row for the next one   
                 currentRow+=1
         
+        #Load the global settings from last time:
+        self.load_global_settings()
+        
         # Create a save button
         save_button = QPushButton("Save Global Settings")
         save_button.clicked.connect(self.save_global_settings)
-        layout.addWidget(save_button,currentRow,0)
+        layout.addWidget(save_button,currentRow,0,1,2)
         
         # Create a load button
         load_button = QPushButton("Load Global Settings")
         load_button.clicked.connect(self.load_global_settings)
-        layout.addWidget(load_button,currentRow,1)        
+        layout.addWidget(load_button,currentRow+1,0,1,2)    
+        
+        #Add a full-reset button:
+        full_reset_button = QPushButton("Fully reset GUI and global settings")  
+        full_reset_button.clicked.connect(self.confirm_full_reset_GUI_GlobSettings)
+        layout.addWidget(full_reset_button,currentRow+2,0,1,2)      
                 
         # Create a widget and set the layout
         widget = QWidget()
@@ -955,13 +1148,52 @@ class AdvancedSettingsWindow(QMainWindow):
         # Set the position of the window
         self.move(QPoint(cursor_pos.x()-self.width()/2,cursor_pos.y()))
 
+    def updateGlobSettingsGUIValues(self):
+        # Iterate over the settings in self.parent.globalSettings
+        for setting, value in self.parent.globalSettings.items():
+            # Check if the setting is not in IgnoreInOptions
+            if setting not in self.parent.globalSettings.get('IgnoreInOptions'):
+                # Create a label with the setting title
+                if 'displayName' in value:
+                    self.labelGlobSettings[setting] = QLabel(value['displayName'])
+                else:
+                    self.labelGlobSettings[setting] = QLabel(setting)
+                
+                # Check the type of the input
+                input_type = value['input']
+                
+                # Create a checkbox for boolean values
+                if input_type == bool:
+                    self.checkboxGlobSettings[setting].setChecked(value['value'])
+                
+                # Create an input field for string or integer values
+                elif input_type in (str, float):
+                    self.input_fieldGlobSettings[setting].setText(str(value['value']))
+                    
+                # Create a dropdown for choices
+                elif input_type == 'choice':
+                    options = value['options']
+                    current_index = options.index(value['value'])
+                    self.dropdownGlobSettings[setting].setCurrentIndex(current_index)
+                
+    def confirm_full_reset_GUI_GlobSettings(self):
+        reply = QMessageBox.question(self, 'Confirmation', "Are you sure you want to fully reset the GUI and global settings? This will close the GUI and you have to re-open.", QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if reply == QMessageBox.Yes:
+            self.full_reset_GUI_GlobSettings()
+
+    def full_reset_GUI_GlobSettings(self):
+        #Remove the JSON files:
+        os.remove(self.parent.globalSettings['JSONGUIstorePath']['value'])
+        os.remove(self.parent.globalSettings['GlobalOptionsStorePath']['value'])
+        #Restart the GUI:
+        QCoreApplication.quit()
     
     def update_global_settings(self, setting, value):
         self.parent.globalSettings[setting]['value'] = value
         
     def save_global_settings(self):
         # Specify the path and filename for the JSON file
-        json_file_path = "GUI" + os.sep + "GlobSettingStorage.json"
+        json_file_path = self.parent.globalSettings['GlobalOptionsStorePath']['value']
 
         # Serialize the globalSettings dictionary, skipping over the 'input' value
         serialized_settings = {}
@@ -969,15 +1201,18 @@ class AdvancedSettingsWindow(QMainWindow):
             if key != 'IgnoreInOptions':
                 serialized_settings[key] = value.copy()
                 serialized_settings[key].pop('input', None)
-
     
         # Write the globalSettings dictionary to the JSON file
         with open(json_file_path, "w") as json_file:
             json.dump(serialized_settings, json_file)
+            
+        #Close after saving
+        logging.info('Global settings saved!')
+        self.close()
     
     def load_global_settings(self):
         # Specify the path and filename for the JSON file
-        json_file_path = "GUI" + os.sep + "GlobSettingStorage.json"
+        json_file_path = self.parent.globalSettings['GlobalOptionsStorePath']['value']
         try:    # Load the globalSettings dictionary from the JSON file
             with open(json_file_path, "r") as json_file:
                 loaded_settings = json.load(json_file)
@@ -988,8 +1223,9 @@ class AdvancedSettingsWindow(QMainWindow):
                     if key in self.parent.globalSettings:
                         value['input'] = self.parent.globalSettings[key].get('input', None)
 
-
             self.parent.globalSettings.update(loaded_settings)
+            #Update the values of the globalSettings GUI
+            self.updateGlobSettingsGUIValues()
         except:
             self.save_global_settings()
             logging.info('No global settings storage found, new one created.')
