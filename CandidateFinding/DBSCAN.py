@@ -154,7 +154,7 @@ def clustering(events, DBSCAN_settings):
     return candidates
 
 def perfect_ROI(clusters, settings):
-    # This function returns a candidates dictionary with the perfect ROI
+    # This function returns a candidates dictionary with the perfect ROIs
     candidates = {}
     candidates[0] = {}
     candidates[0]['events'] = pd.DataFrame(clusters)
