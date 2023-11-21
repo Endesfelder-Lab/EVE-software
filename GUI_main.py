@@ -648,25 +648,28 @@ class MyGUI(QMainWindow):
             
             #Find the 'finding' results in this time-frame
             findingResultsThisTimeFrame = []
-            indices = [i + 1 for i in range(len(self.data['FindingResult'][0]))]
+            indices = [i for i in range(len(self.data['FindingResult'][0]))]
             for indexv in indices:
-                row = self.data['FindingResult'][0][indexv]
-                if min(row['events']['t']) >= i*self.PreviewFrameTime and min(row['events']['t']) < (i+1)*self.PreviewFrameTime:
-                    findingResultsThisTimeFrame.append(row)
-                    # Create a Rectangle object
-                    self.createRectangle(fig,row['events'],'r')
-                    
-                    #Also add the corresponding fitting result
-                    try:
-                        localization = self.data['FittingResult'][0].iloc[indexv-1]
-                        fig.plot(localization['x']/self.globalSettings['PixelSize_nm']['value'],localization['y']/self.globalSettings['PixelSize_nm']['value'],'rx', alpha=0.5)
-                    except:
-                        breakpoint
-                    
-                #Else if on the next frame:
-                elif min(row['events']['t']) > (i+1)*self.PreviewFrameTime and min(row['events']['t']) < (i+2)*self.PreviewFrameTime:
-                    self.createRectangle(fig,row['events'],'m')
-            
+                try:
+                    row = self.data['FindingResult'][0][indexv]
+                    if min(row['events']['t']) >= i*self.PreviewFrameTime and min(row['events']['t']) < (i+1)*self.PreviewFrameTime:
+                        findingResultsThisTimeFrame.append(row)
+                        # Create a Rectangle object
+                        self.createRectangle(fig,row['events'],'r')
+                        
+                        #Also add the corresponding fitting result
+                        try:
+                            localization = self.data['FittingResult'][0].iloc[indexv-1]
+                            fig.plot(localization['x']/self.globalSettings['PixelSize_nm']['value'],localization['y']/self.globalSettings['PixelSize_nm']['value'],'rx', alpha=0.5)
+                        except:
+                            breakpoint
+                        
+                    #Else if on the next frame:
+                    elif min(row['events']['t']) > (i+1)*self.PreviewFrameTime and min(row['events']['t']) < (i+2)*self.PreviewFrameTime:
+                        self.createRectangle(fig,row['events'],'m')
+                except:
+                    pass
+                           
             self.allPreviewFigures.append(self.PreviewFig[i])
             plt.close()
             
@@ -682,7 +685,7 @@ class MyGUI(QMainWindow):
         logging.info('UpdateShowPreview ran!')
  
     def createRectangle(self,fig,data,col):
-        rect = patches.Rectangle((min(data['x']), min(data['y'])), max(data['x'])-min(data['x']), max(data['y'])-min(data['y']), edgecolor=col, facecolor='none')
+        rect = patches.Rectangle((min(data['x']), min(data['y'])), max(data['x'])-min(data['x']), max(data['y'])-min(data['y']), edgecolor=col, facecolor='none',alpha=0.2)
         # Add the rectangle to the axes
         fig.add_patch(rect)
             

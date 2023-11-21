@@ -254,7 +254,7 @@ def FrameBased_finding(npy_array,settings,**kwargs):
         RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(compute_thread)(events_split[i], time_bin_frames, batch_size_CandidateFinding, time_limit_min, time_limit_max, candidate_radius, min_diameter, max_diameter, exclusion_radius, kernel1, kernel2, kernel, threshold_detection, frame_size) for i in range(len(events_split)))
         for i in range(len(RES)):
             for candidate in RES[i].items():
-                candidates[index] = candidate
+                candidates[index] = candidate[1]
                 index+=1
         candidates_info += f'Number of candidates found: {len(candidates)}'
 
@@ -266,7 +266,7 @@ def FrameBased_finding(npy_array,settings,**kwargs):
         RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(compute_thread)(events_split[i], time_bin_frames, batch_size_CandidateFinding, time_limit_min, time_limit_max, candidate_radius, min_diameter, max_diameter, exclusion_radius, kernel1, kernel2, kernel, threshold_detection, frame_size) for i in range(len(events_split)))
         for i in range(len(RES)):
             for candidate in RES[i].items():
-                candidates[index] = candidate
+                candidates[index] = candidate[1]
                 index+=1
         Nb_neg_candidates = len(candidates)
         candidates_info = f'Number of negative candidates found: {Nb_neg_candidates}\n'
@@ -278,7 +278,7 @@ def FrameBased_finding(npy_array,settings,**kwargs):
         RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(compute_thread)(events_split[i], time_bin_frames, batch_size_CandidateFinding, time_limit_min, time_limit_max, candidate_radius, min_diameter, max_diameter, exclusion_radius, kernel1, kernel2, kernel, threshold_detection, frame_size) for i in range(len(events_split)))
         for i in range(len(RES)):
             for candidate in RES[i].items():
-                candidates[index] = candidate
+                candidates[index] = candidate[1]
                 index+=1
         Nb_pos_candidates = len(candidates)-Nb_neg_candidates
         candidates_info += f'Number of positive candidates found: {Nb_pos_candidates}'

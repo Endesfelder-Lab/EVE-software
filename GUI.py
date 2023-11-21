@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import QApplication
 def adjust_color_brightness(hex_color, percent):
     # Convert hexadecimal color to RGB
     rgb_color = tuple(int(hex_color[1+i:1+i+2], 16) for i in (0, 2, 4))
-    # Convert HSL color back to RGB
+    # Convert HSL color back to RGB 
     rgb_color = tuple(int(round(i + i * percent / 100)) for i in rgb_color)
     # Bound each element between 0 and 255
     rgb_color = tuple(max(0, min(255, i)) for i in rgb_color)
