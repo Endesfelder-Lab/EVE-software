@@ -8,6 +8,7 @@ import matplotlib.patches as patches
 import pandas as pd
 import numpy as np
 import copy
+import appdirs
 # Add the folder 2 folders up to the system path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -173,12 +174,12 @@ class MyGUI(QMainWindow):
         globalSettings['OutputDataFormat']['input'] = 'choice'
         globalSettings['OutputDataFormat']['options'] = ('thunderstorm','minimal')
         globalSettings['OutputDataFormat']['displayName'] = 'Output data format'
-        
+        user_data_folder = appdirs.user_data_dir(appname="Eve", appauthor="UniBonn")
         globalSettings['JSONGUIstorePath'] = {}
-        globalSettings['JSONGUIstorePath']['value'] = "GUI"+os.sep+"storage.json"
+        globalSettings['JSONGUIstorePath']['value'] = user_data_folder+os.sep+"storage.json"
         globalSettings['JSONGUIstorePath']['input'] = str
         globalSettings['GlobalOptionsStorePath'] = {}
-        globalSettings['GlobalOptionsStorePath']['value'] = "GUI" + os.sep + "GlobSettingStorage.json"
+        globalSettings['GlobalOptionsStorePath']['value'] = user_data_folder+os.sep+ "GlobSettingStorage.json"
         globalSettings['GlobalOptionsStorePath']['input'] = str
         
         globalSettings['IgnoreInOptions'] = ('IgnoreInOptions','StoreFinalOutput', 'JSONGUIstorePath','GlobalOptionsStorePath') #Add options here that should NOT show up in the global settings window
@@ -1415,7 +1416,10 @@ class AdvancedSettingsWindow(QMainWindow):
             if key != 'IgnoreInOptions':
                 serialized_settings[key] = value.copy()
                 serialized_settings[key].pop('input', None)
-    
+                
+        # Create the parent folder(s) for the JSON file
+        os.makedirs(os.path.dirname(json_file_path), exist_ok=True)
+
         # Write the globalSettings dictionary to the JSON file
         with open(json_file_path, "w") as json_file:
             json.dump(serialized_settings, json_file)
