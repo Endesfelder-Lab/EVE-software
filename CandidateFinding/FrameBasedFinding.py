@@ -193,7 +193,7 @@ def compute_thread(sub_events, time_bin_frames, batch_size_CandidateFinding, tim
         # Generating candidate dictionary
         # Loading data slices on the fly
         cnt_load=0
-        while events_loaded['t'][-1]<=ROIs[k,2]+time_bin_frames+time_limit_max:
+        while events_loaded['t'][-1]<=ROIs[k,2]+time_bin_frames+time_limit_max: # is this the error here?
             if indices_loaded[1]>=len(sub_events)-1:break
             else:
                 events_loaded,indices_loaded=load_events(sub_events,events_loaded,batch_size_CandidateFinding,indices_loaded)
