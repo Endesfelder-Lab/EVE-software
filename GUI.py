@@ -1,6 +1,7 @@
 from GUI_main import MyGUI
 import sys,argparse,colorsys
 from PyQt5.QtWidgets import QApplication
+import multiprocessing
 
 def adjust_color_brightness(hex_color, percent):
     # Convert hexadecimal color to RGB
@@ -66,6 +67,7 @@ def get_stylesheet():
 
 
 if __name__ == "__main__":
+    multiprocessing.freeze_support()
     app = QApplication(sys.argv)
     
     gui = MyGUI()
