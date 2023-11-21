@@ -34,13 +34,17 @@ class MyGUI(QMainWindow):
         parser = argparse.ArgumentParser(description='EBS fitting - Endesfelder lab - Nov 2023')
         parser.add_argument('--debug', '-d', action='store_true', help='Enable debug')
         args=parser.parse_args()
-        log_file_path = 'GUI/logfile.log'
+        
+        #Create a dictionary to store the global Settings
+        self.globalSettings = self.initGlobalSettings()
+        
+        self.log_file_path = self.globalSettings['LoggingFilePath']['value']
         # Create a logger with the desired log level
         self.logger = logging.getLogger()
         self.logger.setLevel(logging.DEBUG if args.debug else logging.INFO)
 
         # Create the file handler to log to the file
-        file_handler = logging.FileHandler(log_file_path)
+        file_handler = logging.FileHandler(self.log_file_path)
         file_handler.setLevel(logging.INFO)
 
         # Create the stream handler to log to the debug terminal
@@ -50,14 +54,12 @@ class MyGUI(QMainWindow):
         # Add the handlers to the logger
         logging.basicConfig(handlers=[file_handler, stream_handler], level=logging.DEBUG if args.debug else logging.INFO,format="%(asctime)s [%(levelname)s] %(filename)s:%(lineno)d - %(message)s")
  
-        if os.path.exists(log_file_path):
-            open(log_file_path, 'w').close()
+        if os.path.exists(self.log_file_path):
+            open(self.log_file_path, 'w').close()
 
         # Create a dictionary to store the entries
         self.entries = {}
         
-        #Create a dictionary to store the global Settings
-        self.globalSettings = self.initGlobalSettings()
         
         #Create a dictionary that stores info about each file being run (i.e. for metadata)
         self.currentFileInfo = {}
@@ -181,6 +183,9 @@ class MyGUI(QMainWindow):
         globalSettings['GlobalOptionsStorePath'] = {}
         globalSettings['GlobalOptionsStorePath']['value'] = user_data_folder+os.sep+ "GlobSettingStorage.json"
         globalSettings['GlobalOptionsStorePath']['input'] = str
+        globalSettings['LoggingFilePath'] = {}
+        globalSettings['LoggingFilePath']['value'] = user_data_folder+os.sep+"logging.log"
+        globalSettings['LoggingFilePath']['input'] = str
         
         globalSettings['IgnoreInOptions'] = ('IgnoreInOptions','StoreFinalOutput', 'JSONGUIstorePath','GlobalOptionsStorePath') #Add options here that should NOT show up in the global settings window
         return globalSettings
@@ -404,7 +409,7 @@ class MyGUI(QMainWindow):
         self.text_edit = QTextEdit()
         tab_layout.addWidget(self.text_edit, 0, 0)
 
-        self.log_file_path = 'GUI/logfile.log'
+        # self.log_file_path = 'GUI/logfile.log'
         # self.file_watcher = QFileSystemWatcher()
         # self.file_watcher.addPath('GUI/logfile.log')
         # self.file_watcher.fileChanged.connect(self.update_log)
