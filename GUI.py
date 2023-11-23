@@ -65,7 +65,7 @@ def get_stylesheet():
 
 
 
-
+ 
 if __name__ == "__main__":
     multiprocessing.freeze_support()
     app = QApplication(sys.argv)

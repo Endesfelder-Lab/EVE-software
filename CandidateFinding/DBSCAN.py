@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 import time, logging
 from scipy import spatial
+from sklearn.cluster import DBSCAN
 
 # Required function __function_metadata__
 # Should have an entry for every function in this file
@@ -11,10 +12,11 @@ def __function_metadata__():
     return {
         "Finding": {
             "required_kwargs": [
-                {"name": "number_of_neighbours", "description": "Required number of neighbouring events in spatiotemporal voxel","default":17},
-                {"name": "spatial_radius_outer", "description": "Outer radius (in px) to count the neighbours in.","default":7},
-                {"name": "spatial_radius_inner", "description": "Inner radius (in px) to count the neighbours in.","default":1},
+                {"name": "min_cluster_size", "description": "Required number of neighbouring events in spatiotemporal voxel","default":17},
+                {"name": "distance_radius_lookup", "description": "Outer radius (in px) to count the neighbours in.","default":7},
+                {"name": "density_multiplier", "description": "Distance multiplier","default":1.5},
                 {"name": "ratio_ms_to_px", "description": "Ratio of milliseconds to pixels.","default":35},
+                {"name": "DBSCAN_eps", "description": "Eps of DBSCAN.","default":6},
             ],
             "optional_kwargs": [
                {"name": "min_consec", "description": "Minimum number of consecutive events","default":1},
@@ -30,9 +32,9 @@ def __function_metadata__():
 
 def consec_filter(events, min_consec, max_consec):
     # This function filters out events with a minimum and maximum number of consecutive events
-    logging.info('Starts consecutive events filter ...')
-    # Start the timer
-    start_time = time.time()
+    # logging.info('Starts consecutive events filter ...')
+    # # Start the timer
+    # start_time = time.time()
 
     # sorting the events by pixels and create new events array including a consecutive events weight
     # QUESTION: Is this faster than via pd dataframe?
@@ -57,101 +59,51 @@ def consec_filter(events, min_consec, max_consec):
     consec_events = consec_events[(consec_events['w']>=min_consec) & (consec_events['w']<=max_consec)]
 
     # Stop the timer
-    end_time = time.time()
+    # end_time = time.time()
 
     # Calculate the elapsed time
-    elapsed_time = end_time - start_time
-    logging.info(f"Consecutive events filter ran for {elapsed_time} seconds.")
-    logging.info('Filtering done.')
+    # elapsed_time = end_time - start_time
+    # logging.info(f"Consecutive events filter ran for {elapsed_time} seconds.")
+    # logging.info('Filtering done.')
 
     return consec_events
 
-def make_kdtree(events, temporal_duration, spatial_radius_outer):
+def make_kdtree(events, temporal_duration_ms=35):
     # This function creates a KDTree out of an events list
 
     # converting the temporal dimension to be in the same units
-    ratio_micros_to_pixel = temporal_duration / spatial_radius_outer
-    # Is the type conversion working?
-    t = np.copy(events['t']).astype(float)
-    t /= ratio_micros_to_pixel
-
-    # Is this line similar to: points = np.c_[pos['x'].ravel(), pos['y'].ravel(), pos['t'].ravel()]?
-    points = np.column_stack((events['x'], events['y'], t))
+    ratio_microsec_to_pixel = 1/(temporal_duration_ms*1000)
+    nparrfordens = np.column_stack((events['x'], events['y'], events['t']*ratio_microsec_to_pixel))
     
-    # Making the tree
-    tree = spatial.cKDTree(points)
+    #Create KDtree
+    tree = spatial.cKDTree(np.array(nparrfordens))
     
-    return points, tree
+    return tree, nparrfordens
 
-def count_neighbours(points, tree, spatial_radius_inner, spatial_radius_outer, temporal_duration):
-    # This function counts the number of neighbouring events in a spatiotemporal ROI
-    logging.info('Starts count neighbours ...')
+def filter_density(eventTree,nparrfordens,distance_lookup = 4, densityMultiplier = 1.5):
+    neighbors = eventTree.query_ball_tree(eventTree,distance_lookup,eps=distance_lookup/2)
+    frequency = np.array([len(i) for i in neighbors], dtype=np.float64)
+    
+    freq_threshold = np.mean(frequency)*float(densityMultiplier)
+    freq_points_within_range = frequency>=freq_threshold
+    densest_points_within_range_full = nparrfordens[freq_points_within_range,:]
+    
+    return densest_points_within_range_full
 
-    # Start the timer
-    start_time = time.time()
-
-    # creating kd tree from events
-    points, tree = make_kdtree(points, temporal_duration, spatial_radius_outer)
-
-    # Stop the timer
-    end_time = time.time()
-
-    # Calculate the elapsed time
-    elapsed_time = end_time - start_time
-    logging.info(f"Count neighbours ran for {elapsed_time} seconds.")
-
-    # Count the number of neighbours
-
-def neighbours_filter(events, N_neighbours, spatial_radius_inner, spatial_radius_outer, temporal_duration, nr_ev_per_batch, polarity):
-    # This function filters out events with a less neighbouring events than N_neighbours in a spatiotemporal ROI
-    logging.info('Starts neighbours filter ...')
-
-    # Start the timer
-    start_time = time.time()
-
-    polarity_events = events[events['p']==polarity]
-
-    # creating kd tree from events
-    points, tree = make_kdtree(polarity_events, temporal_duration, spatial_radius_outer)
-
-    # calculating the number of batches
-    nr_batches = int(np.ceil(len(polarity_events)/nr_ev_per_batch))
-
-    # counting the number of neighbours for each pixel
-    for batch in range(nr_batches):
-        batch_start = batch * nr_ev_per_batch + 1 * (bool(batch))
-        batch_end = min(batch_start + nr_ev_per_batch, len(polarity_events))
-        batch_points = points[batch_start : batch_end + 1]
-        batch_points, tree = make_kdtree(batch_points, temporal_duration, spatial_radius_outer)
-
-
-    # Additional parameters--> Question: Should these be added to GUI? --> YES!
-    spatial_radius_inner = 1
-    spatial_radius_outer = 7
-    temporal_duration = 50e3 # in µs
-    nr_batches = 10
-    polarity = 1
-
-    # creating kd tree from events
-    logging.info('Making tree ...')
-
-
-
-
-    # Stop the timer
-    end_time = time.time()
-
-    # Calculate the elapsed time
-    elapsed_time = end_time - start_time
-    logging.info(f"Consecutive events filter ran for {elapsed_time} seconds.")
-    logging.info('Filtering done.')
-
-    return events
-
-def clustering(events, DBSCAN_settings):
+def clustering(events, eps=2, min_points_per_cluster=10):
     # This function performs DBSCAN clustering on the events
-    candidates = events
-    return candidates
+    # Use DBSCAN clustering
+    dbscan = DBSCAN(eps=eps, n_jobs=-1, min_samples=min_points_per_cluster)
+    cluster_labels = dbscan.fit_predict(events)
+    
+    #Print how many clusters are found
+    logging.info("Number of clusters found:"+ str(max(cluster_labels)))
+
+    # generate the candidates in from of a dictionary
+    headers = ['x', 'y', 't' ]
+    densest_points_within_range_full_pd = pd.DataFrame(events, columns=headers)
+    
+    return densest_points_within_range_full_pd, cluster_labels
 
 def perfect_ROI(clusters, settings):
     # This function returns a candidates dictionary with the perfect ROIs
@@ -169,27 +121,46 @@ def perfect_ROI(clusters, settings):
 def Finding(npy_array,settings,**kwargs):
     #Check if we have the required kwargs
     [provided_optional_args, missing_optional_args] = utilsHelper.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
-    if "okwarg_1" in provided_optional_args:
-        okwarg1 = float(kwargs["okwarg_1"])
+    if "min_consec" in provided_optional_args:
+        min_consec_ev = float(kwargs["min_consec"])
     else:
         #Default okwarg1 value
-        okwarg1 = 1
+        min_consec_ev = 1
+    if "max_consec" in provided_optional_args:
+        max_consec_ev = float(kwargs["max_consec"])
+    else:
+        #Default okwarg1 value
+        max_consec_ev = 1
     # Start the timer
     start_time = time.time()
     
-    consec_filter(npy_array, 1, 30)
+    logging.info('Starting')
+    consec_events = consec_filter(npy_array, min_consec_ev, max_consec_ev)
+    logging.info('Consec filtering done')
+    consec_event_tree, nparrfordens = make_kdtree(consec_events,temporal_duration_ms=float(kwargs['ratio_ms_to_px']))
+    logging.info('KDtree made done')
+    high_density_events = filter_density(consec_event_tree, nparrfordens, distance_lookup = float(kwargs['distance_radius_lookup']), densityMultiplier = float(kwargs['density_multiplier']))
+    logging.info('high density events obtained done')
+    # Minimum number of points within a cluster
+    clusters, cluster_labels = clustering(high_density_events, eps = float(kwargs['DBSCAN_eps']), min_points_per_cluster = int(kwargs['min_cluster_size']))
+    logging.info('DBSCAN done')
+    #Re-correct for z to time:
+    clusters.loc[:,'t'] = clusters['t']*(float(kwargs['ratio_ms_to_px'])*1000)
+    logging.info('re-corrected for z')
+    print('done')
     
-
-    # generate the candidates in from of a dictionary
     candidates = {}
-    candidates[0] = {}
-    candidates[0]['events'] = pd.DataFrame(npy_array)
-    candidates[0]['cluster_size'] = [np.max(npy_array['y'])-np.min(npy_array['y']), np.max(npy_array['x'])-np.min(npy_array['x']), np.max(npy_array['t'])-np.min(npy_array['t'])]
-    candidates[0]['N_events'] = len(npy_array)
-    
+    for cl in np.unique(cluster_labels):
+        if cl > -1:
+            clusterEvents = clusters[cluster_labels == cl]
+            candidates[cl] = {}
+            candidates[cl]['events'] = clusterEvents
+            candidates[cl]['cluster_size'] = [np.max(clusterEvents['y'])-np.min(clusterEvents['y']), np.max(clusterEvents['x'])-np.min(clusterEvents['x']), np.max(clusterEvents['t'])-np.min(clusterEvents['t'])]
+            candidates[cl]['N_events'] = len(clusterEvents)
+
     # Stop the timer
     end_time = time.time()
-
+ 
     # Calculate the elapsed time
     elapsed_time = end_time - start_time
 

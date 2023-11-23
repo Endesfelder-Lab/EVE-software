@@ -74,6 +74,8 @@ def DBSCAN_finding(npy_array,settings,**kwargs):
     
     
     print('Assigning weights...')
+    #Start time:
+    start_time = time.time()
     #General idea for the weights assigned in this loop:
         #Discard: w = 0
         #Keep: w > 0
@@ -105,6 +107,10 @@ def DBSCAN_finding(npy_array,settings,**kwargs):
     events = events[events['w']!=0]
     #also discard events that have too many consecutive events (very likely hot pixels)
     events = events[events['w'] <= consec_weight_max]
+    #end time:
+    end_time = time.time()
+    #display time:
+    print('Filtering took', end_time-start_time, 'seconds')
     
     
     prob = float("inf")

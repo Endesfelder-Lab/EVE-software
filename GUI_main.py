@@ -305,30 +305,54 @@ class MyGUI(QMainWindow):
         tab_layout.addWidget(self.previewLayout, 5, 0)
         
         #Add a preview layout:
+        
         #Populate with a start time and end time inputs:
-        self.previewLayout.layout().addWidget(QLabel("Start time (ms):"), 0, 0)
-        self.previewLayout.layout().addWidget(QLabel("Duration (ms):"), 0, 1)
+        self.previewLayout.layout().addWidget(QLabel("Start time (ms):"), 0, 0, 1, 2)
+        self.previewLayout.layout().addWidget(QLabel("Duration (ms):"), 0, 2, 1, 2)
         #Also the QLineEdits that have useful names:
         self.preview_startTLineEdit = QLineEdit()
-        self.previewLayout.layout().addWidget(self.preview_startTLineEdit, 1, 0)
+        self.previewLayout.layout().addWidget(self.preview_startTLineEdit, 1, 0, 1, 2)
         #Give this a default value:
         self.preview_startTLineEdit.setText("0")
         #Same for end time:
         self.preview_durationTLineEdit = QLineEdit()
-        self.previewLayout.layout().addWidget(self.preview_durationTLineEdit, 1, 1)
+        self.previewLayout.layout().addWidget(self.preview_durationTLineEdit, 1, 2, 1, 2)
         self.preview_durationTLineEdit.setText("1000")
+        
+        #Also give start/end x/y values:
+        self.previewLayout.layout().addWidget(QLabel("Min X (px):"), 2, 0)
+        self.previewLayout.layout().addWidget(QLabel("Max X (px):"), 2, 1)
+        self.previewLayout.layout().addWidget(QLabel("Min Y (px):"), 2, 2)
+        self.previewLayout.layout().addWidget(QLabel("Max Y (px):"), 2, 3)
+        #Also the QLineEdits that have useful names:
+        self.preview_minXLineEdit = QLineEdit()
+        self.previewLayout.layout().addWidget(self.preview_minXLineEdit, 3, 0)
+        self.preview_minXLineEdit.setText("")
+        self.preview_maxXLineEdit = QLineEdit()
+        self.previewLayout.layout().addWidget(self.preview_maxXLineEdit, 3, 1)
+        self.preview_maxXLineEdit.setText("")
+        self.preview_minYLineEdit = QLineEdit()
+        self.previewLayout.layout().addWidget(self.preview_minYLineEdit, 3, 2)
+        self.preview_minYLineEdit.setText("")
+        self.preview_maxYLineEdit = QLineEdit()
+        self.previewLayout.layout().addWidget(self.preview_maxYLineEdit, 3, 3)
+        self.preview_maxYLineEdit.setText("")
+        
+        
         #Add a preview button:
         self.buttonPreview = QPushButton("Preview")
         #Add a button press event:
-        self.buttonPreview.clicked.connect(lambda: self.previewRun((self.preview_startTLineEdit.text(),self.preview_durationTLineEdit.text())))
+        self.buttonPreview.clicked.connect(lambda: self.previewRun((self.preview_startTLineEdit.text(),self.preview_durationTLineEdit.text()),
+                                                                   (self.preview_minXLineEdit.text(),self.preview_maxXLineEdit.text(),
+                                                                    self.preview_minYLineEdit.text(),self.preview_maxYLineEdit.text())))
         #Add the button to the layout:
-        self.previewLayout.layout().addWidget(self.buttonPreview, 2, 0)
+        self.previewLayout.layout().addWidget(self.buttonPreview, 4, 0)
 
         # #Add spacing
         # # Add an empty QWidget with stretch factor of 1
         # tab_layout.setRowStretch(tab_layout.rowCount(), 1)
 
-    def previewRun(self,timeStretch=(0,1000)):
+    def previewRun(self,timeStretch=(0,1000),xyStretch=(0,0,0,0)):
         #We error out if a folder is chosen rather than a file:
         if not os.path.isfile(self.dataLocationInput.text()):
             logging.error("Please choose a file rather than a folder for previews.")
@@ -380,6 +404,23 @@ class MyGUI(QMainWindow):
         
         self.previewEvents = events
         
+        #Edit values for x,y coordinates:
+        #First check if all entries in array are numbers:
+        try:
+            int(xyStretch[0])
+            int(xyStretch[1])
+            int(xyStretch[2])
+            int(xyStretch[3])
+            if not all(isinstance(x, int) for x in [int(xyStretch[0]),int(xyStretch[1]),int(xyStretch[2]),int(xyStretch[3])]):
+                logging.info("No XY cutting in preview due to not all entries being integers.")
+            else:
+                logging.info("XY cutting in preview to values: "+str(xyStretch[0])+","+str(xyStretch[1])+","+str(xyStretch[2])+","+str(xyStretch[3]))
+                #Filter on x,y coordinates:
+                events = events[(events['x'] >= int(xyStretch[0])) & (events['x'] <= int(xyStretch[1]))]
+                events = events[(events['y'] >= int(xyStretch[2])) & (events['y'] <= int(xyStretch[3]))]
+        except:
+             logging.info("No XY cutting in preview due to not all entries being integers-.")
+        
         #Change global values so nothing is stored:
         globalSettingsOrig = copy.deepcopy(self.globalSettings)
         self.globalSettings['StoreConvertedRawData']['value'] = False
@@ -394,7 +435,7 @@ class MyGUI(QMainWindow):
         self.globalSettings = globalSettingsOrig
         
         #Show the preview panel:
-        self.updateShowPreview()
+        self.updateShowPreview(previewEvents=events)
 
     def setup_postProcessingTab(self):
         tab2_layout = QGridLayout()
@@ -618,7 +659,9 @@ class MyGUI(QMainWindow):
         tab_layout.addWidget(self.previewImage_slider)
             
         
-    def updateShowPreview(self):
+    def updateShowPreview(self,previewEvents=None):
+        if previewEvents is None:
+            previewEvents = self.previewEvents
         #Idea: create some preview image and highlight found clusters and localizations.
         self.allPreviewFigures = []
         #For now: create 5 plots:
@@ -626,7 +669,7 @@ class MyGUI(QMainWindow):
         self.PreviewFrameTime = 100*1000 #in us - maybe user-definable later?
         
         #Obtain the numbers of frames that are displayed
-        nrFramesDisplay = int(np.ceil((max(self.previewEvents['t']))/self.PreviewFrameTime))
+        nrFramesDisplay = int(np.ceil((max(previewEvents['t']))/self.PreviewFrameTime))
         
         #Initialise minimum, maximum colorbar values:
         self.PreviewMinCbarVal = 99
@@ -636,9 +679,9 @@ class MyGUI(QMainWindow):
         for i in range(0,nrFramesDisplay):
             self.PreviewFig[i] = plt.figure()
             #Create an empty array with the sizes of self.previewEvents:
-            frameBasedEvent2dArray = np.zeros((max(self.previewEvents['y'])+1,max(self.previewEvents['x'])+1))
+            frameBasedEvent2dArray = np.zeros((max(previewEvents['y'])+1,max(previewEvents['x'])+1))
             #Get the events belonging to this frame:
-            eventsInThisFrame = self.previewEvents[self.previewEvents['t'] >= i*self.PreviewFrameTime]
+            eventsInThisFrame = previewEvents[previewEvents['t'] >= i*self.PreviewFrameTime]
             eventsInThisFrame = eventsInThisFrame[eventsInThisFrame['t'] < (i+1)*self.PreviewFrameTime]
             
             #Loop over the events and fill the corresponding pixel in frameBasedEvent2dArray:
@@ -651,6 +694,10 @@ class MyGUI(QMainWindow):
             #Show this in plt as an imshow:
             fig = self.PreviewFig[i].add_subplot(111)
             fig.imshow(frameBasedEvent2dArray)
+            #Set axis limits correctly:
+            fig.set_xlim(min(previewEvents['x']),max(previewEvents['x']))
+            fig.set_ylim(min(previewEvents['y']),max(previewEvents['y']))
+            
             
             #Find the 'finding' results in this time-frame
             findingResultsThisTimeFrame = []
