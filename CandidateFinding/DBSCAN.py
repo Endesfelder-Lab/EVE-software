@@ -68,23 +68,40 @@ def consec_filter(events, min_consec, max_consec):
 
     return consec_events
 
-def make_kdtree(events, temporal_duration_ms=35):
+def make_kdtree(events, temporal_duration_ms=35,nleaves = 16):
     # This function creates a KDTree out of an events list
+
+    N=100
+    col1 = np.empty((N,), dtype=int)
+    col2 = np.empty((N,), dtype=float)
+    col3 = np.empty((N,), dtype=str)
+
+    # Stack the arrays horizontally using np.column_stack
+    arr = np.column_stack((col1, col2, col3))
 
     # converting the temporal dimension to be in the same units
     ratio_microsec_to_pixel = 1/(temporal_duration_ms*1000)
-    nparrfordens = np.column_stack((events['x'], events['y'], events['t']*ratio_microsec_to_pixel))
+    colx = np.empty((len(events),), dtype=int)
+    colx = events['x'].astype(int)
+    coly = np.empty((len(events),), dtype=int)
+    coly = events['y'].astype(int)
+    colt = np.empty((len(events),), dtype=float)
+    colt = events['t'].astype(float)*ratio_microsec_to_pixel
+    nparrfordens = np.column_stack((colx, coly, colt))
+    # nparrfordens = np.column_stack(((events['x'].astype(int), events['y'].astype(int), events['t'].astype(float)*ratio_microsec_to_pixel),dtype=[int,int,float]))
     
     #Create KDtree
-    tree = spatial.cKDTree(np.array(nparrfordens))
+    tree = spatial.cKDTree(np.array(nparrfordens), leafsize=nleaves)
     
     return tree, nparrfordens
 
 def filter_density(eventTree,nparrfordens,distance_lookup = 4, densityMultiplier = 1.5):
-    neighbors = eventTree.query_ball_tree(eventTree,distance_lookup,eps=distance_lookup/2)
-    frequency = np.array([len(i) for i in neighbors], dtype=np.float64)
+    
+    neighbors3,_ = eventTree.query(nparrfordens,k=100,distance_upper_bound=distance_lookup,eps=distance_lookup/2)
+    frequency = np.argmax(np.isinf(neighbors3), axis=1)
     
     freq_threshold = np.mean(frequency)*float(densityMultiplier)
+    print(freq_threshold)
     freq_points_within_range = frequency>=freq_threshold
     densest_points_within_range_full = nparrfordens[freq_points_within_range,:]
     
@@ -102,6 +119,8 @@ def clustering(events, eps=2, min_points_per_cluster=10):
     # generate the candidates in from of a dictionary
     headers = ['x', 'y', 't' ]
     densest_points_within_range_full_pd = pd.DataFrame(events, columns=headers)
+    #set correct types:
+    densest_points_within_range_full_pd = densest_points_within_range_full_pd.astype({'x': 'int64', 'y': 'int64', 't': 'float64'})
     
     return densest_points_within_range_full_pd, cluster_labels
 
@@ -137,7 +156,7 @@ def Finding(npy_array,settings,**kwargs):
     logging.info('Starting')
     consec_events = consec_filter(npy_array, min_consec_ev, max_consec_ev)
     logging.info('Consec filtering done')
-    consec_event_tree, nparrfordens = make_kdtree(consec_events,temporal_duration_ms=float(kwargs['ratio_ms_to_px']))
+    consec_event_tree, nparrfordens = make_kdtree(consec_events,temporal_duration_ms=float(kwargs['ratio_ms_to_px']),nleaves=64)
     logging.info('KDtree made done')
     high_density_events = filter_density(consec_event_tree, nparrfordens, distance_lookup = float(kwargs['distance_radius_lookup']), densityMultiplier = float(kwargs['density_multiplier']))
     logging.info('high density events obtained done')
