@@ -71,14 +71,6 @@ def consec_filter(events, min_consec, max_consec):
 def make_kdtree(events, temporal_duration_ms=35,nleaves = 16):
     # This function creates a KDTree out of an events list
 
-    N=100
-    col1 = np.empty((N,), dtype=int)
-    col2 = np.empty((N,), dtype=float)
-    col3 = np.empty((N,), dtype=str)
-
-    # Stack the arrays horizontally using np.column_stack
-    arr = np.column_stack((col1, col2, col3))
-
     # converting the temporal dimension to be in the same units
     ratio_microsec_to_pixel = 1/(temporal_duration_ms*1000)
     colx = np.empty((len(events),), dtype=int)
