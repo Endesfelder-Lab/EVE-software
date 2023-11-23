@@ -36,6 +36,7 @@ def __function_metadata__():
 #Helper functions
 #-------------------------------------------------------------------------------------------------------------------------------
 
+# 2d localization via gaussian fit
 def localization2D(sub_events,pixel_size):
     opt, err, fitting_info = gaussian_fitting(sub_events, 150./pixel_size)
     x = (opt[0]+np.min(sub_events['x']))*pixel_size * bool(err[0]) # in nm
@@ -44,12 +45,13 @@ def localization2D(sub_events,pixel_size):
     p = sub_events['p'][0]
     return np.array([x,y,p,t]), fitting_info
 
+# gaussian fit via scipy.optimize.curve_fit with bounds
 def gaussian_fitting(sub_events, expected_width):
     sub_image=np.zeros((np.max(sub_events['y'])-np.min(sub_events['y'])+1,np.max(sub_events['x'])-np.min(sub_events['x'])+1))
     for k in np.arange(len(sub_events)):
         sub_image[sub_events['y'][k]-np.min(sub_events['y']),sub_events['x'][k]-np.min(sub_events['x'])]+=1
     bounds = ([0., 0., 0., 0., 0., 0.], [np.max(sub_events['x'])-np.min(sub_events['x']), np.max(sub_events['y'])-np.min(sub_events['y']), np.inf, np.inf, np.inf, np.inf])
-    p0 = (np.mean(sub_events['x'])-np.min(sub_events['x']),np.mean(sub_events['y'])-np.min(sub_events['y']),np.std(sub_events['x']),np.std(sub_events['y']),np.max(sub_image),np.median(sub_image))
+    p0 = (np.mean(sub_events['x'])-np.min(sub_events['x']), np.mean(sub_events['y'])-np.min(sub_events['y']), expected_width, expected_width, np.max(sub_image), np.median(sub_image))
     x = np.arange(np.max(sub_events['x'])-np.min(sub_events['x'])+1)
     y = np.arange(np.max(sub_events['y'])-np.min(sub_events['y'])+1)
     X,Y = np.meshgrid(x,y)
@@ -130,6 +132,8 @@ def const_theta(theta0):
 #-------------------------------------------------------------------------------------------------------------------------------
 #Callable functions
 #-------------------------------------------------------------------------------------------------------------------------------
+
+# 2D Gaussian
 def Gaussian2D(candidate_dic,settings,**kwargs):
 
     # Start the timer
@@ -151,6 +155,8 @@ def Gaussian2D(candidate_dic,settings,**kwargs):
             localizations.loc[index] = localization
             index += 1
     localizations = localizations.drop(localizations.tail(nb_fails).index)
+
+    # ToDo: Print fitting_info only if exception is raised
     # if fitting_info != '':
     logging.info(Gaussian_fit_info)
     # Stop the timer
@@ -163,6 +169,7 @@ def Gaussian2D(candidate_dic,settings,**kwargs):
 
     return localizations, Gaussian_fit_info
 
+# ToDo: Modify for 3D to make it functional
 def Gaussian3D(candidate_dic,settings,**kwargs):
     
     pixel_size = float(settings['PixelSize_nm']['value']) # in nm
