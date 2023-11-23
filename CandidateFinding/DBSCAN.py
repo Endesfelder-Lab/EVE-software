@@ -97,7 +97,7 @@ def make_kdtree(events, temporal_duration_ms=35,nleaves = 16):
 
 def filter_density(eventTree,nparrfordens,distance_lookup = 4, densityMultiplier = 1.5):
     
-    neighbors3,_ = eventTree.query(nparrfordens,k=100,distance_upper_bound=distance_lookup,eps=distance_lookup/2)
+    neighbors3,_ = eventTree.query(nparrfordens,k=100,distance_upper_bound=distance_lookup,eps=distance_lookup/2,workers=-1)
     frequency = np.argmax(np.isinf(neighbors3), axis=1)
     
     freq_threshold = np.mean(frequency)*float(densityMultiplier)
