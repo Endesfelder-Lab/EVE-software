@@ -31,88 +31,34 @@ def __function_metadata__():
 #-------------------------------------------------------------------------------------------------------------------------------
 
 def consec_filter(events, min_consec, max_consec):
-   # This function filters out events with a minimum and maximum number of consecutive events
-    # logging.info('Starts consecutive events filter ...')
-    # Start the timer
-    start_time = time.time()
+    # This function filters out events with a minimum and maximum number of consecutive events
 
-    # df creation and sorting
+    # df creation and sorting (sufficient and faster for sort by only x,y)
     df_events = pd.DataFrame(events)
-    
-    # df sorting (sufficient and faster for sort by only x,y)
     df_events = df_events.sort_values(by=['x', 'y'])
-    df_sorting_time = time.time()
-
-    # argsort sorting
-    # Get the indices that would sort the array
-    indices = np.argsort(events, order=['x', 'y', 't'])
-    # Sort the array based on the indices
-    consec_events_sorted = events[indices]
-    argsort_time = time.time()
-
-    # sorting the events by pixels and create new events array including a consecutive events weight
-    events = np.sort(events, order=['x', 'y', 't'])
-    npy_sorting_time = time.time()
-
-    # check if the sorting is correct
-    print("Check sorting methods:", np.count_nonzero(events['t']-df_events['t']), np.count_nonzero(consec_events_sorted['t']-events['t']), np.count_nonzero(consec_events_sorted['t']-df_events['t']))
-    
-    # create consec events array
-    consec_events = np.zeros(events.size, dtype={'names':['x','y','p','t','w'], 'formats':['<u2','<u2','<i2','<i8','<i2']})
-    consec_events[['x','y','p','t']] = events[['x','y','p','t']]
-    
-    # time after sorting
-    sorting_time = time.time()
 
     # finding the consecutive events
-    same_pixel = np.zeros(len(consec_events['x']), dtype=bool)
-    same_pixel[1:] = (consec_events['x'][1:] == consec_events['x'][:-1]) & (consec_events['y'][1:] == consec_events['y'][:-1])
-    same_polarity = np.zeros(len(consec_events['x']), dtype=bool)
-    same_polarity[1:] = consec_events['p'][1:] == consec_events['p'][:-1]
-    check_same_time = time.time()
+    same_pixel = np.zeros(len(df_events['x']), dtype=bool)
+    same_pixel[1:] = (df_events['x'][1:].reset_index(drop=True) == df_events['x'][:-1].reset_index(drop=True)) & (df_events['y'][1:].reset_index(drop=True) == df_events['y'][:-1].reset_index(drop=True))
+    same_polarity = np.zeros(len(df_events['x']), dtype=bool)
+    same_polarity[1:] = df_events['p'][1:].reset_index(drop=True) == df_events['p'][:-1].reset_index(drop=True)
 
-    # assign weights to consecutive events via method 1 (loop only over same pixel and polarity)
+    # assign weights to consecutive events (loop only over same pixel and polarity)
     same_pixel_polarity = same_pixel & same_polarity
     weights = np.zeros(len(events['x']))
     indices = np.where(same_pixel_polarity == True)[0]
-    print(indices)
     for i in indices:
         weights[i-1] = weights[i-1] + 1*(not bool(weights[i-1]))
         weights[i] = weights[i-1] + 1
     df_events['w'] = weights
-    # consec_events = df_events.to_records(index=False)
-    assign1_time = time.time()
-
-    # assign weights to consecutive events via method 2 (loop over all events)
-    weights2 = np.zeros(len(events['x']))
-    for i in range(len(weights2)):
-        if same_pixel[i] and same_polarity[i]:
-            weights2[i-1] = weights2[i-1] + 1*(not bool(weights2[i-1]))
-            weights2[i] = weights2[i-1] + 1
-    consec_events['w'] = weights2
-    assign2_time = time.time()
-
-    # test if both assigning methods are matching
-    print("Test assignment methods:", np.count_nonzero(weights-weights2))
 
     # filtering out events with a minimum and maximum number of consecutive events
-    consec_events = consec_events[(consec_events['w']>=min_consec) & (consec_events['w']<=max_consec)]
+    df_events = df_events[(df_events['w']>=min_consec) & (df_events['w']<=max_consec)]
 
-    # Stop the timer
-    end_time = time.time()
+    # convert df back to structured numpy array
+    consec_events = df_events.to_records(index=False)
 
-    # Calculate the elapsed time
-    elapsed_time = end_time - start_time
-    consec_info = f"""Consecutive events filter ran for {elapsed_time} seconds:\n
-                    Df sorting took {df_sorting_time-start_time} seconds.\n
-                    Argsort sorting took {argsort_time-df_sorting_time} seconds.\n
-                    Sorting took {npy_sorting_time-argsort_time} seconds.\n
-                    Checking same pixel took {check_same_time-sorting_time} seconds.\n
-                    Assigning weights with method 1 took {assign1_time-check_same_time} seconds.\n
-                    Assigning weights with method 2 took {assign2_time-assign1_time} seconds.\n
-                    Filtering took {end_time-assign2_time} seconds."""
-
-    return consec_events, consec_info
+    return consec_events
 
 def make_kdtree(events, temporal_duration_ms=35,nleaves = 16):
     # This function creates a KDTree out of an events list
@@ -194,8 +140,7 @@ def Finding(npy_array,settings,**kwargs):
     start_time = time.time()
     
     logging.info('Starting')
-    consec_events, consec_info = consec_filter(npy_array, min_consec_ev, max_consec_ev)
-    logging.info(consec_info)
+    consec_events = consec_filter(npy_array, min_consec_ev, max_consec_ev)
     logging.info('Consec filtering done')
     consec_event_tree, nparrfordens = make_kdtree(consec_events,temporal_duration_ms=float(kwargs['ratio_ms_to_px']),nleaves=64)
     logging.info('KDtree made done')
