@@ -42,14 +42,17 @@ def localization2D(sub_events,pixel_size):
     x = (opt[0]+np.min(sub_events['x']))*pixel_size * bool(err[0]) # in nm
     y = (opt[1]+np.min(sub_events['y']))*pixel_size * bool(err[1]) # in nm
     t = np.mean(sub_events['t'])/1000. # in ms
-    p = sub_events['p'][0]
+    mean_polarity = sub_events['p'].mean()
+    p = int(mean_polarity == 1) + int(mean_polarity == 0) * 0 + int(mean_polarity > 0 and mean_polarity < 1) * 2
     return np.array([x,y,p,t]), fitting_info
 
 # gaussian fit via scipy.optimize.curve_fit with bounds
 def gaussian_fitting(sub_events, expected_width):
-    sub_image=np.zeros((np.max(sub_events['y'])-np.min(sub_events['y'])+1,np.max(sub_events['x'])-np.min(sub_events['x'])+1))
-    for k in np.arange(len(sub_events)):
-        sub_image[sub_events['y'][k]-np.min(sub_events['y']),sub_events['x'][k]-np.min(sub_events['x'])]+=1
+    min_x = np.min(sub_events['x'])
+    min_y = np.min(sub_events['y'])
+    sub_image=np.zeros((np.max(sub_events['y'])-min_y+1,np.max(sub_events['x'])-min_x+1))
+    for index, event in sub_events.iterrows():
+        sub_image[int(event['y']-min_y),int(event['x']-min_x)]+=1
     bounds = ([0., 0., 0., 0., 0., 0.], [np.max(sub_events['x'])-np.min(sub_events['x']), np.max(sub_events['y'])-np.min(sub_events['y']), np.inf, np.inf, np.inf, np.inf])
     p0 = (np.mean(sub_events['x'])-np.min(sub_events['x']), np.mean(sub_events['y'])-np.min(sub_events['y']), expected_width, expected_width, np.max(sub_image), np.median(sub_image))
     x = np.arange(np.max(sub_events['x'])-np.min(sub_events['x'])+1)

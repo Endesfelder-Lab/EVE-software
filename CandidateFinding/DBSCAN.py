@@ -74,12 +74,12 @@ def make_kdtree(events, temporal_duration_ms=35,nleaves = 16):
     nparrfordens = np.column_stack((colx, coly, colt))
     # nparrfordens = np.column_stack(((events['x'].astype(int), events['y'].astype(int), events['t'].astype(float)*ratio_microsec_to_pixel),dtype=[int,int,float]))
     
-    #Create KDtree
+    # Create KDtree
     tree = spatial.cKDTree(np.array(nparrfordens), leafsize=nleaves)
     
     return tree, nparrfordens
 
-def filter_density(eventTree,nparrfordens,distance_lookup = 4, densityMultiplier = 1.5):
+def filter_density(eventTree,nparrfordens,polarities,distance_lookup = 4, densityMultiplier = 1.5):
     
     maxK = 100
     neighbors3,_ = eventTree.query(nparrfordens,k=maxK,distance_upper_bound=distance_lookup,eps=distance_lookup/2,workers=-1)
@@ -87,38 +87,32 @@ def filter_density(eventTree,nparrfordens,distance_lookup = 4, densityMultiplier
     frequency[frequency==0] = maxK
     
     freq_threshold = np.mean(frequency)*float(densityMultiplier)
-    print(freq_threshold)
     freq_points_within_range = frequency>=freq_threshold
+    polarities = polarities[freq_points_within_range]
     densest_points_within_range_full = nparrfordens[freq_points_within_range,:]
     
-    return densest_points_within_range_full
+    return densest_points_within_range_full, polarities
 
-def clustering(events, eps=2, min_points_per_cluster=10):
+def clustering(events, polarities, eps=2, min_points_per_cluster=10):
     # This function performs DBSCAN clustering on the events
     # Use DBSCAN clustering
     dbscan = DBSCAN(eps=eps, n_jobs=-1, min_samples=min_points_per_cluster)
     cluster_labels = dbscan.fit_predict(events)
     
-    #Print how many clusters are found
+    # Print how many clusters are found
     logging.info("Number of clusters found:"+ str(max(cluster_labels)))
 
     # generate the candidates in from of a dictionary
-    headers = ['x', 'y', 't' ]
+    headers = ['x', 'y', 't']
     densest_points_within_range_full_pd = pd.DataFrame(events, columns=headers)
-    #set correct types:
-    densest_points_within_range_full_pd = densest_points_within_range_full_pd.astype({'x': 'int64', 'y': 'int64', 't': 'float64'})
+    densest_points_within_range_full_pd['p'] = polarities
+    new_order = ['x', 'y', 'p', 't']
+    densest_points_within_range_full_pd = densest_points_within_range_full_pd.reindex(columns=new_order)
+
+    # set correct types:
+    densest_points_within_range_full_pd = densest_points_within_range_full_pd.astype({'x': 'int64', 'y': 'int64', 'p': 'int64', 't': 'float64'})
     
     return densest_points_within_range_full_pd, cluster_labels
-
-def perfect_ROI(clusters, settings):
-    # This function returns a candidates dictionary with the perfect ROIs
-    candidates = {}
-    candidates[0] = {}
-    candidates[0]['events'] = pd.DataFrame(clusters)
-    candidates[0]['cluster_size'] = [np.max(clusters['y'])-np.min(clusters['y']), np.max(clusters['x'])-np.min(clusters['x']), np.max(clusters['t'])-np.min(clusters['t'])]
-    candidates[0]['N_events'] = len(clusters)
-    return candidates
-
 
 #-------------------------------------------------------------------------------------------------------------------------------
 #Callable functions
@@ -129,30 +123,31 @@ def Finding(npy_array,settings,**kwargs):
     if "min_consec" in provided_optional_args:
         min_consec_ev = float(kwargs["min_consec"])
     else:
-        #Default okwarg1 value
+        # Default value for min number of consecutive events
         min_consec_ev = 1
     if "max_consec" in provided_optional_args:
         max_consec_ev = float(kwargs["max_consec"])
     else:
-        #Default okwarg1 value
-        max_consec_ev = 1
+        # Default value for max number of consecutive events
+        max_consec_ev = 30
+
     # Start the timer
     start_time = time.time()
     
     logging.info('Starting')
     consec_events = consec_filter(npy_array, min_consec_ev, max_consec_ev)
     logging.info('Consec filtering done')
+    polarities = consec_events['p']
     consec_event_tree, nparrfordens = make_kdtree(consec_events,temporal_duration_ms=float(kwargs['ratio_ms_to_px']),nleaves=64)
     logging.info('KDtree made done')
-    high_density_events = filter_density(consec_event_tree, nparrfordens, distance_lookup = float(kwargs['distance_radius_lookup']), densityMultiplier = float(kwargs['density_multiplier']))
+    high_density_events, polarities = filter_density(consec_event_tree, nparrfordens, polarities, distance_lookup = float(kwargs['distance_radius_lookup']), densityMultiplier = float(kwargs['density_multiplier']))
     logging.info('high density events obtained done')
     # Minimum number of points within a cluster
-    clusters, cluster_labels = clustering(high_density_events, eps = float(kwargs['DBSCAN_eps']), min_points_per_cluster = int(kwargs['min_cluster_size']))
+    clusters, cluster_labels = clustering(high_density_events, polarities, eps = float(kwargs['DBSCAN_eps']), min_points_per_cluster = int(kwargs['min_cluster_size']))
     logging.info('DBSCAN done')
     #Re-correct for z to time:
     clusters.loc[:,'t'] = clusters['t']*(float(kwargs['ratio_ms_to_px'])*1000)
     logging.info('re-corrected for z')
-    print('done')
     
     #old version kept here, since I haven't 100% stress-tested new method, but seems to be fine
     starttime = time.time()
@@ -210,7 +205,7 @@ def Finding(npy_array,settings,**kwargs):
     # Calculate the elapsed time
     elapsed_time = end_time - start_time
 
-    performance_metadata = f"Dummy function ran for {elapsed_time} seconds."
-    print('Function one ran!')
+    performance_metadata = f"DBSCAN Finding ran for {elapsed_time} seconds."
+    logging.info('DBSCAN finding done')
 
     return candidates, performance_metadata
