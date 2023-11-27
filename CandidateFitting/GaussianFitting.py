@@ -42,7 +42,8 @@ def localization2D(sub_events,pixel_size):
     x = (opt[0]+np.min(sub_events['x']))*pixel_size * bool(err[0]) # in nm
     y = (opt[1]+np.min(sub_events['y']))*pixel_size * bool(err[1]) # in nm
     t = np.mean(sub_events['t'])/1000. # in ms
-    p = sub_events['p'].iloc[0]
+    mean_polarity = sub_events['p'].mean()
+    p = int(mean_polarity == 1) + int(mean_polarity == 0) * 0 + int(mean_polarity > 0 and mean_polarity < 1) * 2
     return np.array([x,y,p,t]), fitting_info
 
 # gaussian fit via scipy.optimize.curve_fit with bounds
