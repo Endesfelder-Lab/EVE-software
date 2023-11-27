@@ -796,6 +796,8 @@ class MyGUI(QMainWindow):
                     if defaultValue is not None:
                         line_edit.setText(str(defaultValue))
                     curr_layout.addWidget(line_edit,2+k+labelposoffset,1)
+                    #Add a on-change listener:
+                    line_edit.textChanged.connect(lambda text,line_edit=line_edit: self.kwargValueInputChanged(line_edit))
             else:
                 labelposoffset -= 1
             
@@ -816,6 +818,44 @@ class MyGUI(QMainWindow):
                 if defaultValue is not None:
                     line_edit.setText(str(defaultValue))
                 curr_layout.addWidget(line_edit,2+(k)+len(reqKwargs)+labelposoffset,1)
+                #Add a on-change listener:
+                line_edit.textChanged.connect(lambda text,line_edit=line_edit: self.kwargValueInputChanged(line_edit))
+    
+    def kwargValueInputChanged(self,line_edit):
+        #Get the function name
+        function = line_edit.objectName().split("#")[1]
+        #Get the kwarg
+        kwarg = line_edit.objectName().split("#")[2]
+        #Get the value
+        value = line_edit.text()
+        expectedType = utils.typeFromKwarg(function,kwarg)
+        if expectedType is not None:
+            if expectedType is not str:
+                try:
+                    value = eval(line_edit.text())
+                    if isinstance(value,expectedType):
+                        self.setLineEditStyle(line_edit,type='Normal')
+                    else:
+                        self.setLineEditStyle(line_edit,type='Warning')
+                except:
+                    #Show as warning
+                    self.setLineEditStyle(line_edit,type='Warning')
+            elif expectedType is str:
+                try:
+                    value = str(line_edit.text())
+                    self.setLineEditStyle(line_edit,type='Normal')
+                except:
+                    #Show as warning
+                    self.setLineEditStyle(line_edit,type='Warning')
+        else:
+            self.setLineEditStyle(line_edit,type='Normal')
+        pass
+    
+    def setLineEditStyle(self,line_edit,type='Normal'):
+        if type == 'Normal':
+            line_edit.setStyleSheet("border: 1px  solid #D5D5E5;")
+        elif type == 'Warning':
+            line_edit.setStyleSheet("border: 1px solid red;")
     
     def checkAndShowWidget(self,layout, widgetName):
         # Iterate over the layout's items

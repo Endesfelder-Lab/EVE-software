@@ -12,15 +12,15 @@ def __function_metadata__():
     return {
         "Finding": {
             "required_kwargs": [
-                {"name": "min_cluster_size", "description": "Required number of neighbouring events in spatiotemporal voxel","default":17},
-                {"name": "distance_radius_lookup", "description": "Outer radius (in px) to count the neighbours in.","default":7},
-                {"name": "density_multiplier", "description": "Distance multiplier","default":1.5},
-                {"name": "ratio_ms_to_px", "description": "Ratio of milliseconds to pixels.","default":35},
-                {"name": "DBSCAN_eps", "description": "Eps of DBSCAN.","default":6},
+                {"name": "min_cluster_size", "description": "Required number of neighbouring events in spatiotemporal voxel","default":17,"type":int},
+                {"name": "distance_radius_lookup", "description": "Outer radius (in px) to count the neighbours in.","default":7,"type":int},
+                {"name": "density_multiplier", "description": "Distance multiplier","default":1.5,"type":float},
+                {"name": "ratio_ms_to_px", "description": "Ratio of milliseconds to pixels.","default":35.0,"type":float},
+                {"name": "DBSCAN_eps", "description": "Eps of DBSCAN.","default":6,"type":int},
             ],
             "optional_kwargs": [
-               {"name": "min_consec", "description": "Minimum number of consecutive events","default":1},
-               {"name": "max_consec", "description": "Maximum number of consecutive events, discards hot pixels","default":30},
+               {"name": "min_consec", "description": "Minimum number of consecutive events","default":1,"type":int},
+               {"name": "max_consec", "description": "Maximum number of consecutive events, discards hot pixels","default":30,"type":int},
             ],
             "help_string": "Returns a test dictionary and metadata string, to check if the program is working properly."
         }
@@ -154,6 +154,8 @@ def Finding(npy_array,settings,**kwargs):
     logging.info('re-corrected for z')
     print('done')
     
+    #old version kept here, since I haven't 100% stress-tested new method, but seems to be fine
+    starttime = time.time()
     candidates = {}
     for cl in np.unique(cluster_labels):
         if cl > -1:
@@ -162,7 +164,46 @@ def Finding(npy_array,settings,**kwargs):
             candidates[cl]['events'] = clusterEvents
             candidates[cl]['cluster_size'] = [np.max(clusterEvents['y'])-np.min(clusterEvents['y']), np.max(clusterEvents['x'])-np.min(clusterEvents['x']), np.max(clusterEvents['t'])-np.min(clusterEvents['t'])]
             candidates[cl]['N_events'] = len(clusterEvents)
+    endtime = time.time()
+    # Print the elapsed time:
+    elapsed_time = endtime - starttime
+    print(f"Candidateforming1: {elapsed_time} seconds.")
 
+
+    #New method that is faster but not working correctly (but almost)
+    # starttime = time.time()
+    # #New method - via external ordering and lookup (Accumarray from MATLAB)
+    # #get some sorting info
+    # order_array = np.argsort(cluster_labels)
+    # #Sort cluster labels on this
+    # cluster_labelsSort = cluster_labels[order_array]
+    # #sort the clusters pd on this - very convoluted
+    # clustersSorted = clusters.assign(P=order_array)
+    # clustersSorted.sort_values('P')
+    # clustersSorted.drop('P', axis=1, inplace=True)
+    # #Get the bincounts - know that clusters start at -1, so add 1 to srart at 0
+    # accarr = np.bincount(cluster_labelsSort+1)
+
+    # candidates = {}
+    # unique_labels = np.unique(cluster_labelsSort)
+    # for cl in unique_labels:
+    #     if cl > -1:
+    #         # clusterEvents = clustersSorted[cluster_labelsSort == cl]
+    #         clusterEvents = clustersSorted[sum(accarr[0:cl+1]):sum(accarr[0:cl+1])+accarr[cl+1]]
+    #         cluster_size = np.array([
+    #             np.max(clusterEvents['y']) - np.min(clusterEvents['y']),
+    #             np.max(clusterEvents['x']) - np.min(clusterEvents['x']),
+    #             np.max(clusterEvents['t']) - np.min(clusterEvents['t'])
+    #         ])
+    #         candidates[cl] = {
+    #             'events': clusterEvents,
+    #             'cluster_size': cluster_size,
+    #             'N_events': len(clusterEvents)
+    #         }
+    # endtime = time.time()
+    # # Print the elapsed time:
+    # elapsed_time = endtime - starttime
+    # logging.info(f"Candidateforming: {elapsed_time} seconds.")
     # Stop the timer
     end_time = time.time()
  

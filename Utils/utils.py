@@ -330,3 +330,25 @@ def functionNameFromDisplayName(displayname,map):
         if pair[0] == displayname:
             print(pair[1])
             return pair[1]
+        
+
+def typeFromKwarg(functionname,kwargname):
+    #Check if the function has a 'type' entry for the specific kwarg. If not, return None. Otherwise, return the type value.
+    typing=None
+    functionparent = functionname.split('.')[0]
+    #Get the full function metadata
+    functionMetadata = eval(f'{str(functionparent)}.__function_metadata__()')
+    for k in range(0,len(functionMetadata[functionname.split('.')[1]]["optional_kwargs"])):
+        if functionMetadata[functionname.split('.')[1]]["optional_kwargs"][k]['name'] == kwargname:
+            #check if this has a default value:
+            if 'type' in functionMetadata[functionname.split('.')[1]]["optional_kwargs"][k]:
+                typing = functionMetadata[functionname.split('.')[1]]["optional_kwargs"][k]['type']
+    #look over required kwargs
+    for k in range(0,len(functionMetadata[functionname.split('.')[1]]["required_kwargs"])):
+        if functionMetadata[functionname.split('.')[1]]["required_kwargs"][k]['name'] == kwargname:
+            #check if this has a default value:
+            if 'type' in functionMetadata[functionname.split('.')[1]]["required_kwargs"][k]:
+                typing = functionMetadata[functionname.split('.')[1]]["required_kwargs"][k]['type']
+    
+    return typing
+
