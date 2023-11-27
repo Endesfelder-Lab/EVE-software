@@ -700,26 +700,28 @@ class MyGUI(QMainWindow):
             
             
             #Find the 'finding' results in this time-frame
-            findingResultsThisTimeFrame = []
-            indices = [i for i in range(len(self.data['FindingResult'][0]))]
+            indices = [l for l in range(len(self.data['FindingResult'][0]))]
             for indexv in indices:
                 try:
                     row = self.data['FindingResult'][0][indexv]
-                    if min(row['events']['t']) >= i*self.PreviewFrameTime and min(row['events']['t']) < (i+1)*self.PreviewFrameTime:
-                        findingResultsThisTimeFrame.append(row)
+                    if self.previewEventStartedOnThisFrame(row,i):
                         # Create a Rectangle object
+                        self.createRectangle(fig,row['events'],'m')
+                    elif self.previewEventEndsOnThisFrame(row,i):
+                        self.createRectangle(fig,row['events'],'c')
+                    elif self.previewEventHappensOnThisFrame(row,i):
                         self.createRectangle(fig,row['events'],'r')
                         
-                        #Also add the corresponding fitting result
-                        try:
-                            localization = self.data['FittingResult'][0].iloc[indexv-1]
-                            fig.plot(localization['x']/self.globalSettings['PixelSize_nm']['value'],localization['y']/self.globalSettings['PixelSize_nm']['value'],'rx', alpha=0.5)
-                        except:
-                            breakpoint
+                        # #Also add the corresponding fitting result
+                        # try:
+                        #     localization = self.data['FittingResult'][0].iloc[indexv-1]
+                        #     fig.plot(localization['x']/self.globalSettings['PixelSize_nm']['value'],localization['y']/self.globalSettings['PixelSize_nm']['value'],'rx', alpha=0.5)
+                        # except:
+                        #     breakpoint
                         
                     #Else if on the next frame:
-                    elif min(row['events']['t']) > (i+1)*self.PreviewFrameTime and min(row['events']['t']) < (i+2)*self.PreviewFrameTime:
-                        self.createRectangle(fig,row['events'],'m')
+                    # elif min(row['events']['t']) > (i+1)*self.PreviewFrameTime and min(row['events']['t']) < (i+2)*self.PreviewFrameTime:
+                    #     self.createRectangle(fig,row['events'],'m')
                 except:
                     pass
                            
@@ -735,18 +737,35 @@ class MyGUI(QMainWindow):
 
 
         self.previewImage_sliderNew = ImageSlider(parent=self,figures=self.allPreviewFigures)
-        
-        # #Remove the old previewImageSlider:
-        # self.previewtab_layout.removeWidget(self.previewImage_slider)
-        # self.previewImage_slider.deleteLater()
-        # #Create the new one:
-        # self.previewtab_layout.addWidget(self.previewImage_sliderNew)
         self.previewImage_slider.update_figures(self.allPreviewFigures)
         
         logging.info('UpdateShowPreview ran!')
  
-    def createRectangle(self,fig,data,col):
-        rect = patches.Rectangle((min(data['x']), min(data['y'])), max(data['x'])-min(data['x']), max(data['y'])-min(data['y']), edgecolor=col, facecolor='none',alpha=0.2)
+    def previewEventStartedOnThisFrame(self,row,frame):
+        if min(row['events']['t']) >= frame*self.PreviewFrameTime and min(row['events']['t']) < (frame+1)*self.PreviewFrameTime:
+            return True
+        else:
+            return False
+    
+    def previewEventHappensOnThisFrame(self,row,frame):
+        if max(row['events']['t']) >= frame*self.PreviewFrameTime and min(row['events']['t']) < (frame+1)*self.PreviewFrameTime:
+            return True
+        else:
+            return False
+        
+    def previewEventEndsOnThisFrame(self,row,frame):
+        if max(row['events']['t']) >= frame*self.PreviewFrameTime and max(row['events']['t']) < (frame+1)*self.PreviewFrameTime:
+            return True
+        else:
+            return False
+        
+ 
+    def createRectangle(self,fig,data,col,padding=0):
+        x_min = min(data['x'])-padding
+        y_min = min(data['y'])-padding
+        width = max(data['x']) - min(data['x'])+padding*2
+        height = max(data['y']) - min(data['y'])+padding*2
+        rect = patches.Rectangle((x_min,y_min),width,height, edgecolor=col, facecolor='none',alpha=0.5)
         # Add the rectangle to the axes
         fig.add_patch(rect)
             
