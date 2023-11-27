@@ -649,14 +649,14 @@ class MyGUI(QMainWindow):
             logging.error('Tried to visualise but no data found!')
     
     def setup_previewTab(self):
-        tab_layout = QGridLayout()
-        self.tab_previewVis.setLayout(tab_layout)
+        self.previewtab_layout = QGridLayout()
+        self.tab_previewVis.setLayout(self.previewtab_layout)
         
         self.PreviewMinCbarVal = 0
         self.PreviewMaxCbarVal = 0
         
         self.previewImage_slider = ImageSlider([],self)
-        tab_layout.addWidget(self.previewImage_slider)
+        self.previewtab_layout.addWidget(self.previewImage_slider)
             
         
     def updateShowPreview(self,previewEvents=None):
@@ -733,6 +733,14 @@ class MyGUI(QMainWindow):
             if np.percentile(frameBasedEvent2dArray,95) > self.PreviewMaxCbarVal:
                 self.PreviewMaxCbarVal = np.max(frameBasedEvent2dArray)
 
+
+        self.previewImage_sliderNew = ImageSlider(parent=self,figures=self.allPreviewFigures)
+        
+        # #Remove the old previewImageSlider:
+        # self.previewtab_layout.removeWidget(self.previewImage_slider)
+        # self.previewImage_slider.deleteLater()
+        # #Create the new one:
+        # self.previewtab_layout.addWidget(self.previewImage_sliderNew)
         self.previewImage_slider.update_figures(self.allPreviewFigures)
         
         logging.info('UpdateShowPreview ran!')
@@ -1515,10 +1523,14 @@ class ImageSlider(QWidget):
         self.current_figure_idx = 0
         self.canvas = FigureCanvas(self.figures[0]) if len(self.figures) > 0 else FigureCanvas()
         
-        # self.toolbar = NavigationToolbar(self.canvas, self)
+        self.toolbar = NavigationToolbar(self.canvas, self)
+        
 
         self.slider = QSlider(Qt.Horizontal)
         self.slider.setRange(0, len(figures) - 1)
+        self.slider.setTickInterval = 1
+        self.slider.setTickPosition = QSlider.TicksBelow
+        self.slider.setSingleStep = 1
         self.slider.valueChanged.connect(self.update_figure)
 
         self.prev_button = QPushButton("Previous")
@@ -1527,32 +1539,69 @@ class ImageSlider(QWidget):
         self.next_button = QPushButton("Next")
         self.next_button.clicked.connect(self.next_figure)
 
-        layout = QVBoxLayout()
-        # layout.addWidget(self.toolbar)
-        layout.addWidget(self.canvas)
-        layout.addWidget(self.slider)
-        layout.addWidget(self.prev_button)
-        layout.addWidget(self.next_button)
-
-        self.setLayout(layout) 
-
-    def update_figure(self, index):        
-        self.current_figure_idx = index
-        self.canvas.figure = self.figures[index]
         
-        if self.parent is not None:
-            try:
-                # Calculate colorbar limits
-                cmin = self.parent.PreviewMinCbarVal
-                cmax = self.parent.PreviewMaxCbarVal
-                self.canvas.figure.axes[0].images[0].set_clim(cmin, cmax)
-                # Set colorbar to gray
-                self.canvas.figure.axes[0].images[0].set_cmap('gray')
-            except:
-                logging.error('Error in setting cbar limits preview')
-                pass
+        self.llayout = QVBoxLayout()
+        
+        self.CanvasLayout = QVBoxLayout()
+        self.CanvasLayout.addWidget(self.toolbar)
+        self.CanvasLayout.addWidget(self.canvas)
+        
+        self.sliderlayout = QHBoxLayout()
+        
+        self.sliderlayout.addWidget(self.slider)
+        self.sliderlayout.addWidget(self.prev_button)
+        self.sliderlayout.addWidget(self.next_button)
+        
+        
+        self.llayout.addLayout(self.CanvasLayout)
+        self.llayout.addLayout(self.sliderlayout)
+        
+        
+        self.setLayout(self.llayout) 
+
+    def update_toolbar(self):
+        print('Update toolbar ran')
+        self.toolbar.update()
+        
+    def update_figure(self, index):
+        if index > -1 and index < len(self.figures) and self.figures[index] is not None:
+            #Before updating, set the current canvas (i.e. the 'old' figure) back to home toolbar settinsg:
+            self.toolbar._actions['home'].trigger()
                     
-        self.canvas.draw()
+            self.current_figure_idx = index
+            self.canvas.figure = self.figures[index]
+            
+            if self.parent is not None:
+                try:
+                    # Calculate colorbar limits
+                    cmin = self.parent.PreviewMinCbarVal
+                    cmax = self.parent.PreviewMaxCbarVal
+                    self.canvas.figure.axes[0].images[0].set_clim(cmin, cmax)
+                    # Set colorbar to gray
+                    self.canvas.figure.axes[0].images[0].set_cmap('gray')
+                except:
+                    logging.error('Error in setting cbar limits preview')
+                    pass
+                
+            # Create a new canvas and toolbar for each figure
+            self.canvas = FigureCanvas(self.figures[index]) if len(self.figures) > 0 else FigureCanvas()
+            self.toolbar = NavigationToolbar(self.canvas, self)
+
+            layout = self.CanvasLayout
+            if layout is not None:
+                # Remove the old canvas and toolbar from the layout
+                for i in reversed(range(layout.count())):
+                    item = layout.itemAt(i)
+                    if isinstance(item.widget(), (FigureCanvas, NavigationToolbar)):
+                        layout.removeWidget(item.widget())
+
+                # Add the new canvas and toolbar to the layout
+                layout.addWidget(self.toolbar)
+                layout.addWidget(self.canvas)
+            
+            # self.update_toolbar()
+            
+            self.canvas.draw()
 
     def previous_figure(self):
         self.update_figure(max(self.current_figure_idx - 1, 0))
