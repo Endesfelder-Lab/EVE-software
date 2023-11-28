@@ -6,8 +6,10 @@ import time, logging
 from scipy import optimize
 import warnings
 from scipy.optimize import OptimizeWarning
-
 warnings.simplefilter("error", OptimizeWarning)
+
+from joblib import Parallel, delayed
+import multiprocessing
 
 # Required function __function_metadata__
 # Should have an entry for every function in this file
@@ -15,8 +17,10 @@ def __function_metadata__():
     return {
         "Gaussian2D": {
             "required_kwargs": [
+                 {"name": "expected_width", "description": "Expected width of Gaussian fit (in nm)","default":150.},
             ],
             "optional_kwargs": [
+                {"name": "multithread","description": "True to use multithread parallelization; False not to.","default":True},
             ],
             "help_string": "Makes a 2D gaussian fit (via least squares) to determine the localization parameters.",
             "display_name": "2D Gaussian"
@@ -36,9 +40,27 @@ def __function_metadata__():
 #Helper functions
 #-------------------------------------------------------------------------------------------------------------------------------
 
+# perform localization for part of candidate dictionary
+def localize_canditates2D(candidate_dic, expected_width, pixel_size):
+    nr_of_localizations = len(candidate_dic)
+    localizations = pd.DataFrame(index=range(nr_of_localizations), columns=['x','y','p','t'])
+    index = 0
+    nb_fails = 0
+    Gaussian_fit_info = ''
+    for candidate_id in list(candidate_dic):
+        localization, fitting_info = localization2D(candidate_dic[candidate_id]['events'], candidate_id, expected_width, pixel_size)
+        if fitting_info != '':
+            Gaussian_fit_info += fitting_info
+            nb_fails +=1
+        else:
+            localizations.loc[index] = localization
+            index += 1
+    localizations = localizations.drop(localizations.tail(nb_fails).index)
+    return localizations, Gaussian_fit_info
+
 # 2d localization via gaussian fit
-def localization2D(sub_events,pixel_size):
-    opt, err, fitting_info = gaussian_fitting(sub_events, 150./pixel_size)
+def localization2D(sub_events, candidate_id, expected_width, pixel_size):
+    opt, err, fitting_info = gaussian_fitting(sub_events, candidate_id, expected_width)
     x = (opt[0]+np.min(sub_events['x']))*pixel_size * bool(err[0]) # in nm
     y = (opt[1]+np.min(sub_events['y']))*pixel_size * bool(err[1]) # in nm
     t = np.mean(sub_events['t'])/1000. # in ms
@@ -47,7 +69,7 @@ def localization2D(sub_events,pixel_size):
     return np.array([x,y,p,t]), fitting_info
 
 # gaussian fit via scipy.optimize.curve_fit with bounds
-def gaussian_fitting(sub_events, expected_width):
+def gaussian_fitting(sub_events, candidate_id, expected_width):
     min_x = np.min(sub_events['x'])
     min_y = np.min(sub_events['y'])
     sub_image=np.zeros((np.max(sub_events['y'])-min_y+1,np.max(sub_events['x'])-min_x+1))
@@ -63,15 +85,15 @@ def gaussian_fitting(sub_events, expected_width):
         popt, pcov = optimize.curve_fit(gauss2d, (X,Y), sub_image.ravel(), p0=p0, gtol=1e-4,ftol=1e-4, bounds=bounds)
         perr = np.sqrt(np.diag(pcov))
     except RuntimeError:
-        fitting_info += 'RuntimeError encountered during fit. No localization generated for this candidate cluster.\n'
+        fitting_info += f'RuntimeError encountered during fit. No localization generated for candidate cluster {candidate_id}.\n'
         popt = np.zeros(6)
         perr = np.zeros(6)
     except ValueError:
-        fitting_info += 'ValueError encountered during fit. No localization generated for this candidate cluster.\n'
+        fitting_info += f'ValueError encountered during fit. No localization generated for candidate cluster {candidate_id}.\n'
         popt = np.zeros(6)
         perr = np.zeros(6)
     except OptimizeWarning:
-        fitting_info += 'OptimizeWarning encountered during fit. No localization generated for this candidate cluster.\n'
+        fitting_info += f'OptimizeWarning encountered during fit. No localization generated for candidate cluster {candidate_id}.\n'
         popt = np.zeros(6)
         perr = np.zeros(6)
     return popt, perr, fitting_info
@@ -132,6 +154,21 @@ def const_theta(theta0):
         return gauss2d_theta(XY, amplitude, x0, y0, sigma_x, sigma_y, offset, theta)
     return const_theta_func
 
+def get_subdictionary(main_dict, start_key, end_key):
+    sub_dict = {k: main_dict[k] for k in range(start_key, end_key + 1) if k in main_dict}
+    return sub_dict
+
+# Slice data to distribute the computation on several cores
+def slice_data(candidate_dic, nb_slices):
+    slice_size=1.*len(candidate_dic)/nb_slices
+    slice_size=np.int64(np.ceil(slice_size))
+    data_split=[]
+    last_key = list(candidate_dic.keys())[-1]
+    for k in np.arange(nb_slices):
+        keys = [k*slice_size, min((k+1)*slice_size-1,last_key)]
+        data_split.append(get_subdictionary(candidate_dic, keys[0], keys[1]))
+    return data_split
+
 #-------------------------------------------------------------------------------------------------------------------------------
 #Callable functions
 #-------------------------------------------------------------------------------------------------------------------------------
@@ -141,16 +178,46 @@ def Gaussian2D(candidate_dic,settings,**kwargs):
 
     # Start the timer
     start_time = time.time()
-    
+
+    # Load the required kwargs
+    expected_width = float(kwargs['expected_width'])
+
+    # Load the optional kwargs
+    multithread = bool(kwargs['multithread'])
+
+    # Initializations - general
     pixel_size = float(settings['PixelSize_nm']['value']) # in nm
+    expected_width = expected_width/pixel_size
+
+    if multithread == True: num_cores = multiprocessing.cpu_count()
+    else: num_cores = 1
+    logging.info("Candidate finding split on "+str(num_cores)+" cores.")
+    init_time = time.time()
+    
+    # Determine all localizations
+    data_split = slice_data(candidate_dic, num_cores)
+    split_time = time.time()
+    RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(localize_canditates2D)(data_split[i], expected_width, pixel_size) for i in range(len(data_split)))
+    RES_time = time.time()
+    LOC = [res[0] for res in RES]
+    INFO = ''.join([res[1] for res in RES])
+    listing_time = time.time()
+
+    localizations = pd.concat(LOC)
+    print("Total number of localizations: ", len(localizations))
+    creating_loc_time = time.time()
+
+    parallel_time = time.time()
+
+    # OLD NON PARALLIZED CODE
     nr_of_localizations = len(candidate_dic)
     localizations = pd.DataFrame(index=range(nr_of_localizations), columns=['x','y','p','t'])
 
     index = 0
     nb_fails = 0
     Gaussian_fit_info = ''
-    for i in np.unique(list(candidate_dic)):
-        localization, fitting_info = localization2D(candidate_dic[i]['events'], pixel_size)
+    for i in list(candidate_dic):
+        localization, fitting_info = localization2D(candidate_dic[i]['events'], i, expected_width, pixel_size)
         if fitting_info != '':
             Gaussian_fit_info += fitting_info
             nb_fails +=1
@@ -158,19 +225,39 @@ def Gaussian2D(candidate_dic,settings,**kwargs):
             localizations.loc[index] = localization
             index += 1
     localizations = localizations.drop(localizations.tail(nb_fails).index)
+    print("Total number of localizations and failed fits: ", len(localizations), nb_fails)
+    non_parallel_time = time.time()
 
     # ToDo: Print fitting_info only if exception is raised
     # if fitting_info != '':
     logging.info(Gaussian_fit_info)
+
     # Stop the timer
     end_time = time.time()
  
     # Calculate the elapsed time
+    init = init_time - start_time
+    split = split_time - init_time
+    RES_t = RES_time - split_time
+    listing = listing_time - RES_time
+    creating_loc_time = creating_loc_time - listing_time
+    parallel = parallel_time - init_time
+    non_parallel = non_parallel_time - parallel_time
+
     elapsed_time = end_time - start_time
+    print(f"""
+    Initialization took {init} seconds.\n
+    Splitting took {split} seconds.\n
+    Reshaping took {RES_t} seconds.\n
+    Listing took {listing} seconds.\n
+    Creating localizations took {creating_loc_time} seconds.\n
+    Parallelization took {parallel} seconds.\n
+    Non-parallelization took {non_parallel} seconds.\n
+    Total time: {elapsed_time} seconds.\n""")
 
     logging.info(f"2D Gaussian fit ran for {elapsed_time} seconds.")
 
-    return localizations, Gaussian_fit_info
+    return localizations, INFO
 
 # ToDo: Modify for 3D to make it functional
 def Gaussian3D(candidate_dic,settings,**kwargs):
