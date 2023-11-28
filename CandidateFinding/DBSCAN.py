@@ -94,6 +94,9 @@ def filter_density(eventTree,nparrfordens,polarities,distance_lookup = 4, densit
     return densest_points_within_range_full, polarities
 
 def clustering(events, polarities, eps=2, min_points_per_cluster=10):
+    if len(events) == 0:
+        logging.warning('No clusters found! DBSCAN not run')
+        return [],[]
     # This function performs DBSCAN clustering on the events
     # Use DBSCAN clustering
     dbscan = DBSCAN(eps=eps, n_jobs=-1, min_samples=min_points_per_cluster)

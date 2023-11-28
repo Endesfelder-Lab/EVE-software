@@ -707,21 +707,31 @@ class MyGUI(QMainWindow):
                     if self.previewEventStartedOnThisFrame(row,i):
                         # Create a Rectangle object
                         self.createRectangle(fig,row['events'],'m')
+                        self.showText(fig,row['events'],str(indexv),'m')
                     elif self.previewEventEndsOnThisFrame(row,i):
                         self.createRectangle(fig,row['events'],'c')
+                        self.showText(fig,row['events'],str(indexv),'c')
                     elif self.previewEventHappensOnThisFrame(row,i):
                         self.createRectangle(fig,row['events'],'r')
+                        self.showText(fig,row['events'],str(indexv),'r')
                         
-                        # #Also add the corresponding fitting result
-                        # try:
-                        #     localization = self.data['FittingResult'][0].iloc[indexv-1]
-                        #     fig.plot(localization['x']/self.globalSettings['PixelSize_nm']['value'],localization['y']/self.globalSettings['PixelSize_nm']['value'],'rx', alpha=0.5)
-                        # except:
-                        #     breakpoint
                         
                     #Else if on the next frame:
                     # elif min(row['events']['t']) > (i+1)*self.PreviewFrameTime and min(row['events']['t']) < (i+2)*self.PreviewFrameTime:
                     #     self.createRectangle(fig,row['events'],'m')
+                except:
+                    pass
+                
+                try:
+                    
+                    #Also add the corresponding fitting result
+                    try:
+                        #Check if the localization is on this frame
+                        localization = self.data['FittingResult'][0].iloc[indexv-1]
+                        if localization['t']*1000 >= i*self.PreviewFrameTime and localization['t']*1000 < (i+1)*self.PreviewFrameTime:
+                            fig.plot(localization['x']/self.globalSettings['PixelSize_nm']['value'],localization['y']/self.globalSettings['PixelSize_nm']['value'],'rx', alpha=0.5)
+                    except:
+                        breakpoint
                 except:
                     pass
                            
@@ -761,14 +771,18 @@ class MyGUI(QMainWindow):
         
  
     def createRectangle(self,fig,data,col,padding=0):
-        x_min = min(data['x'])-padding
-        y_min = min(data['y'])-padding
+        x_min = min(data['x'])-.5-padding
+        y_min = min(data['y'])-.5-padding
         width = max(data['x']) - min(data['x'])+padding*2
         height = max(data['y']) - min(data['y'])+padding*2
         rect = patches.Rectangle((x_min,y_min),width,height, edgecolor=col, facecolor='none',alpha=0.5)
         # Add the rectangle to the axes
         fig.add_patch(rect)
-            
+        
+    def showText(self,fig,data,strv,col,padding=0):
+        #Add the text!
+        fig.text(max(data['x']),max(data['y']),str(strv),color=col)
+                
     def changeLayout_choice(self,curr_layout,className,displayNameToFunctionNameMap):
         logging.debug('Changing layout'+curr_layout.parent().objectName())
         #This removes everything except the first entry (i.e. the drop-down menu)
