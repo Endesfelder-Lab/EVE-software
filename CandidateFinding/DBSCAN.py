@@ -167,7 +167,18 @@ def get_cluster_bounding_boxes(events, cluster_labels,padding_xy=0,padding_t=0):
             except:
                 #if it's a 1-px-sized cluster, we can't get a convex hull, so we simply do this:
                 bounding_boxes[cluster_id] = (min(cluster_points['x'])-padding_xy, max(cluster_points['x'])+padding_xy, min(cluster_points['y'])-padding_xy, max(cluster_points['y'])+padding_xy, min(cluster_points['t'])-padding_t, max(cluster_points['t'])+padding_t)
-                
+            
+    #Loop over the bounding boxes, and if it's bigger than some params, remove it:
+    xymaxsize = 20
+    tmaxsize = np.inf
+    listToRem = []
+    for bboxid in bounding_boxes:
+        if (bounding_boxes[bboxid][1]-bounding_boxes[bboxid][0]) > xymaxsize or (bounding_boxes[bboxid][3]-bounding_boxes[bboxid][2]) > xymaxsize or (bounding_boxes[bboxid][5]-bounding_boxes[bboxid][4]) > np.inf:
+            listToRem.append(bboxid)
+    for index in reversed(listToRem):
+        logging.info('Removed bboxid: '+str(index)+' because it was too big')
+        bounding_boxes.pop(index)
+    
     return bounding_boxes
 
 def get_events_in_bbox(npyarr,bboxes,ms_to_px,multiThread=True):
