@@ -436,7 +436,10 @@ class MyGUI(QMainWindow):
         
         #Show the preview panel:
         self.updateShowPreview(previewEvents=events)
-
+        
+        #Update the loclist
+        self.updateLocList()
+        
     def setup_postProcessingTab(self):
         tab2_layout = QGridLayout()
         self.tab_postProcessing.setLayout(tab2_layout)
@@ -1044,7 +1047,6 @@ class MyGUI(QMainWindow):
                 nrDigits = 2
                 item = QTableWidgetItem(f"{round(self.data['FittingResult'][0].iloc[r, c], nrDigits):.{nrDigits}f}")
                 self.LocListTable.setItem(r, c, item)
-        
         
         #Add headers
         self.LocListTable.setHorizontalHeaderLabels(self.data['FittingResult'][0].columns.tolist())
