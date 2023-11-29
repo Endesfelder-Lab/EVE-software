@@ -743,10 +743,11 @@ class MyGUI(QMainWindow):
             
             #Check cbar values:
             #Check the 1st percentile:
-            if np.percentile(frameBasedEvent2dArray,5) < self.PreviewMinCbarVal:
-                self.PreviewMinCbarVal = np.min(frameBasedEvent2dArray)
-            if np.percentile(frameBasedEvent2dArray,95) > self.PreviewMaxCbarVal:
-                self.PreviewMaxCbarVal = np.max(frameBasedEvent2dArray)
+            pctile = 1
+            if np.percentile(frameBasedEvent2dArray,pctile) < self.PreviewMinCbarVal:
+                self.PreviewMinCbarVal = np.percentile(frameBasedEvent2dArray,pctile)
+            if np.percentile(frameBasedEvent2dArray,(100-pctile)) > self.PreviewMaxCbarVal:
+                self.PreviewMaxCbarVal = np.percentile(frameBasedEvent2dArray,(100-pctile))
 
 
         self.previewImage_sliderNew = ImageSlider(parent=self,figures=self.allPreviewFigures)

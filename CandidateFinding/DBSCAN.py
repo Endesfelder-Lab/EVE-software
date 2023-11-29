@@ -5,6 +5,8 @@ import numpy as np
 import time, logging
 from scipy import spatial
 from sklearn.cluster import DBSCAN
+from concurrent.futures import ThreadPoolExecutor
+import multiprocessing
 
 # Required function __function_metadata__
 # Should have an entry for every function in this file
@@ -168,24 +170,71 @@ def get_cluster_bounding_boxes(events, cluster_labels,padding_xy=0,padding_t=0):
                 
     return bounding_boxes
 
-def get_events_in_bbox(npyarr,bboxes,ms_to_px):
+def get_events_in_bbox(npyarr,bboxes,ms_to_px,multiThread=True):
+    #Get empty candidate dictionary
     candidates = {}
-    
-    #Loop over all bboxes:
-    for bboxid in range(len(bboxes)):
-        bbox = bboxes[bboxid]
-        filtered_array = npyarr[(npyarr['x'] >= bbox[0]) & (npyarr['x'] <= bbox[1]) & (npyarr['y'] >= bbox[2]) & (npyarr['y'] <= bbox[3]) & (npyarr['t'] >= bbox[4]*1000*ms_to_px) & (npyarr['t'] <= bbox[5]*1000*ms_to_px)]
-        
-        #Change filtered_array to a pd dataframe:
-        filtered_df = pd.DataFrame(filtered_array)
-        
-        candidates[bboxid] = {}
-        candidates[bboxid]['events'] = filtered_df
-        candidates[bboxid]['cluster_size'] = [np.max(filtered_array['y'])-np.min(filtered_array['y']), np.max(filtered_array['x'])-np.min(filtered_array['x']), np.max(filtered_array['t'])-np.min(filtered_array['t'])]
-        candidates[bboxid]['N_events'] = len(filtered_array)
-    
+    if multiThread == False:        
+        #Loop over all bboxes:
+        for bboxid in range(len(bboxes)):
+            bbox = bboxes[bboxid]
+            filtered_array = npyarr[(npyarr['x'] >= bbox[0]) & (npyarr['x'] <= bbox[1]) & (npyarr['y'] >= bbox[2]) & (npyarr['y'] <= bbox[3]) & (npyarr['t'] >= bbox[4]*1000*ms_to_px) & (npyarr['t'] <= bbox[5]*1000*ms_to_px)]
+            
+            #Change filtered_array to a pd dataframe:
+            filtered_df = pd.DataFrame(filtered_array)
+            
+            candidates[bboxid] = {}
+            candidates[bboxid]['events'] = filtered_df
+            candidates[bboxid]['cluster_size'] = [np.max(filtered_array['y'])-np.min(filtered_array['y']), np.max(filtered_array['x'])-np.min(filtered_array['x']), np.max(filtered_array['t'])-np.min(filtered_array['t'])]
+            candidates[bboxid]['N_events'] = len(filtered_array)
+    elif multiThread == True:
+        num_cores = multiprocessing.cpu_count()
+        logging.info("Bounding box finding split on "+str(num_cores)+" cores.")
+        executor = ThreadPoolExecutor(max_workers=num_cores)  # Set the number of threads as desired
+
+        # Create a list to store the results of the findbbox function
+        results = []
+
+        # Iterate over the bounding boxes
+        for bbox in bboxes.values():
+            # Submit each findbbox call to the ThreadPoolExecutor
+            future = executor.submit(findbbox, npyarr, min_x=bbox[0], max_x=bbox[1], min_y=bbox[2], max_y=bbox[3], min_t=bbox[4]*1000*ms_to_px, max_t=bbox[5]*1000*ms_to_px)
+            results.append(future)
+
+        # Wait for all the submitted tasks to complete
+        executor.shutdown()
+
+        # Retrieve the results from the futures
+        for future, bboxid in zip(results, bboxes.keys()):
+            filtered_array = npyarr[future.result()]
+            filtered_df2 = pd.DataFrame(filtered_array)
+            candidates[bboxid] = {}
+            candidates[bboxid]['events'] = filtered_df2
+            candidates[bboxid]['cluster_size'] = [np.max(filtered_array['y'])-np.min(filtered_array['y']), np.max(filtered_array['x'])-np.min(filtered_array['x']), np.max(filtered_array['t'])-np.min(filtered_array['t'])]
+            candidates[bboxid]['N_events'] = len(filtered_array)
     
     return candidates
+
+
+def findbbox(points, min_x=-np.inf, max_x=np.inf, min_y=-np.inf,
+                        max_y=np.inf, min_t=-np.inf, max_t=np.inf):
+    """ Adapted from:
+https://stackoverflow.com/questions/42352622/finding-points-within-a-bounding-box-with-numpy
+
+    """
+    bound_x = np.logical_and(points['x'] >= min_x, points['x'] <= max_x)
+    bound_y = np.logical_and(points['y'] >= min_y, points['y'] <= max_y)
+    bound_t = np.logical_and(points['t'] >= min_t, points['t'] <= max_t)
+    bb_filter = np.logical_and(np.logical_and(bound_x, bound_y), bound_t)
+    return bb_filter
+
+def process_bbox(args):
+    bbox, npyarr, ms_to_px = args
+    filtered_array = npyarr[(npyarr['x'] >= bbox[0]) & (npyarr['x'] <= bbox[1]) & (npyarr['y'] >= bbox[2]) & (npyarr['y'] <= bbox[3]) & (npyarr['t'] >= bbox[4]*1000*ms_to_px) & (npyarr['t'] <= bbox[5]*1000*ms_to_px)]
+    filtered_df = pd.DataFrame(filtered_array)
+    cluster_size = [np.max(filtered_array['y'])-np.min(filtered_array['y']), np.max(filtered_array['x'])-np.min(filtered_array['x']), np.max(filtered_array['t'])-np.min(filtered_array['t'])]
+    N_events = len(filtered_array)
+    return filtered_df, cluster_size, N_events
+
 #-------------------------------------------------------------------------------------------------------------------------------
 #Callable functions
 #-------------------------------------------------------------------------------------------------------------------------------
