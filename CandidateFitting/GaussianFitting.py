@@ -41,9 +41,10 @@ def __function_metadata__():
 #-------------------------------------------------------------------------------------------------------------------------------
 
 # perform localization for part of candidate dictionary
-def localize_canditates2D(candidate_dic, expected_width, pixel_size):
+def localize_canditates2D(i, candidate_dic, expected_width, pixel_size):
+    print('Localizing PSFs (thread '+str(i)+')...')
     nr_of_localizations = len(candidate_dic)
-    localizations = pd.DataFrame(index=range(nr_of_localizations), columns=['x','y','p','t'])
+    localizations = pd.DataFrame(index=range(nr_of_localizations), columns=['x','y','p','t']) #, dtypes={'x': 'float64', 'y': 'float64', 'p': 'int8', 't': 'float64'}
     index = 0
     nb_fails = 0
     Gaussian_fit_info = ''
@@ -55,14 +56,16 @@ def localize_canditates2D(candidate_dic, expected_width, pixel_size):
         else:
             localizations.loc[index] = localization
             index += 1
-    localizations = localizations.drop(localizations.tail(nb_fails).index)
+    localizations = localizations.drop(localizations.tail(nb_fails).index) # localizations = localizations.iloc[:index]
+    # localizations = pd.DataFrame({'x': x[:index], 'y': y[:index], 'p': p[:index], 't': t[:index]})
+    print('Localizing PSFs (thread '+str(i)+') done!')
     return localizations, Gaussian_fit_info
 
 # 2d localization via gaussian fit
 def localization2D(sub_events, candidate_id, expected_width, pixel_size):
     opt, err, fitting_info = gaussian_fitting(sub_events, candidate_id, expected_width)
-    x = (opt[0]+np.min(sub_events['x']))*pixel_size * bool(err[0]) # in nm
-    y = (opt[1]+np.min(sub_events['y']))*pixel_size * bool(err[1]) # in nm
+    x = (opt[0]+np.min(sub_events['x']))*pixel_size # in nm
+    y = (opt[1]+np.min(sub_events['y']))*pixel_size # in nm
     t = np.mean(sub_events['t'])/1000. # in ms
     mean_polarity = sub_events['p'].mean()
     p = int(mean_polarity == 1) + int(mean_polarity == 0) * 0 + int(mean_polarity > 0 and mean_polarity < 1) * 2
@@ -196,24 +199,24 @@ def Gaussian2D(candidate_dic,settings,**kwargs):
     
     # Determine all localizations
     data_split = slice_data(candidate_dic, num_cores)
-    RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(localize_canditates2D)(data_split[i], expected_width, pixel_size) for i in range(len(data_split)))
+    RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(localize_canditates2D)(i, data_split[i], expected_width, pixel_size) for i in range(len(data_split)))
     
-    LOC = [res[0] for res in RES]
-    localizations = pd.concat(LOC)
+    localization_list = [res[0] for res in RES]
+    localizations = pd.concat(localization_list)
     
     # Fit performance information
     nb_fails = len(candidate_dic)-len(localizations)
-    INFO=""
+    gaussian_fit_info = ''
     if nb_fails == 0:
-        INFO += "Gaussian fitting was successful for all candidate clusters."
+        gaussian_fit_info += "Gaussian fitting was successful for all candidate clusters."
     elif nb_fails == 1:
-        INFO += "Gaussian fitting failed for 1 candidate cluster:\n"
+        gaussian_fit_info += "Gaussian fitting failed for 1 candidate cluster:\n"
     else:
-        INFO += f"Gaussian fitting failed for {nb_fails} candidate clusters:\n"
-    INFO += ''.join([res[1] for res in RES])
-    logging.info(INFO)
+        gaussian_fit_info += f"Gaussian fitting failed for {nb_fails} candidate clusters:\n"
+    gaussian_fit_info += ''.join([res[1] for res in RES])
+    logging.info(gaussian_fit_info)
 
-    return localizations, INFO
+    return localizations, gaussian_fit_info
 
 # ToDo: Modify for 3D to make it functional
 def Gaussian3D(candidate_dic,settings,**kwargs):
