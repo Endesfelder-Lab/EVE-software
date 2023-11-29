@@ -10,7 +10,7 @@ from sklearn.cluster import DBSCAN
 # Should have an entry for every function in this file
 def __function_metadata__():
     return {
-        "Finding": {
+        "DBSCAN_onlyHighDensity": {
             "required_kwargs": [
                 {"name": "min_cluster_size", "description": "Required number of neighbouring events in spatiotemporal voxel","default":17,"type":int},
                 {"name": "distance_radius_lookup", "description": "Outer radius (in px) to count the neighbours in.","default":7,"type":int},
@@ -22,7 +22,22 @@ def __function_metadata__():
                {"name": "min_consec", "description": "Minimum number of consecutive events","default":1,"type":int},
                {"name": "max_consec", "description": "Maximum number of consecutive events, discards hot pixels","default":30,"type":int},
             ],
-            "help_string": "Returns a test dictionary and metadata string, to check if the program is working properly."
+            "help_string": "DBSCAN, only return events that are considered high-density."
+        },
+        "DBSCAN_allEvents": {
+            "required_kwargs": [
+                {"name": "min_cluster_size", "description": "Required number of neighbouring events in spatiotemporal voxel","default":17,"type":int},
+                {"name": "distance_radius_lookup", "description": "Outer radius (in px) to count the neighbours in.","default":7,"type":int},
+                {"name": "density_multiplier", "description": "Distance multiplier","default":1.5,"type":float},
+                {"name": "ratio_ms_to_px", "description": "Ratio of milliseconds to pixels.","default":35.0,"type":float},
+                {"name": "DBSCAN_eps", "description": "Eps of DBSCAN.","default":6,"type":int},
+                {"name": "padding_xy", "description": "Result padding in x,y pixels.","default":2,"type":int},
+            ],
+            "optional_kwargs": [
+               {"name": "min_consec", "description": "Minimum number of consecutive events","default":1,"type":int},
+               {"name": "max_consec", "description": "Maximum number of consecutive events, discards hot pixels","default":30,"type":int},
+            ],
+            "help_string": "DBSCAN on high-density, but returns all events in the bounding box specified by DBSCAN."
         }
     }
 
@@ -30,9 +45,7 @@ def __function_metadata__():
 #Helper functions
 #-------------------------------------------------------------------------------------------------------------------------------
 
-def consec_filter(events, min_consec, max_consec):
-    # This function filters out events with a minimum and maximum number of consecutive events
-
+def determineWeights(events):
     # df creation and sorting (sufficient and faster for sort by only x,y)
     df_events = pd.DataFrame(events)
     df_events = df_events.sort_values(by=['x', 'y'])
@@ -51,7 +64,14 @@ def consec_filter(events, min_consec, max_consec):
         weights[i-1] = weights[i-1] + 1*(not bool(weights[i-1]))
         weights[i] = weights[i-1] + 1
     df_events['w'] = weights
+    
+    return weights,df_events
 
+
+def consec_filter(events, min_consec, max_consec,weights = None,df_events=None):
+    # This function filters out events with a minimum and maximum number of consecutive events
+    if weights is None:
+        weights,df_events = determineWeights(events)
     # filtering out events with a minimum and maximum number of consecutive events
     df_events = df_events[(df_events['w']>=min_consec) & (df_events['w']<=max_consec)]
 
@@ -59,6 +79,20 @@ def consec_filter(events, min_consec, max_consec):
     consec_events = df_events.to_records(index=False)
 
     return consec_events
+
+def hotPixel_filter(events, max_consec, weights=None,df_events=None):
+    # This function filters out events with a maximum number of consecutive events
+    if weights is None:
+        weights,df_events = determineWeights(events)
+    
+    # filtering out events with a minimum and maximum number of consecutive events
+    df_events = df_events[(df_events['w']<=max_consec)]
+
+    # convert df back to structured numpy array
+    filtered_events = df_events.to_records(index=False)
+
+    return filtered_events
+    
 
 def make_kdtree(events, temporal_duration_ms=35,nleaves = 16):
     # This function creates a KDTree out of an events list
@@ -117,10 +151,87 @@ def clustering(events, polarities, eps=2, min_points_per_cluster=10):
     
     return densest_points_within_range_full_pd, cluster_labels
 
+def get_cluster_bounding_boxes(events, cluster_labels,padding_xy=0,padding_t=0):
+    from scipy.spatial import ConvexHull
+    bounding_boxes = {}
+    for cluster_id in np.unique(cluster_labels):
+        if cluster_id != -1:  # Ignore noise points
+            cluster_points = events[cluster_labels == cluster_id]
+            #Get the min max values based on a convex hull
+            try:
+                hull = ConvexHull(np.column_stack((cluster_points['x'], cluster_points['y'], cluster_points['t'])))
+                #And obtain the bounding box
+                bounding_boxes[cluster_id] = (hull.min_bound[0]-padding_xy, hull.max_bound[0]+padding_xy, hull.min_bound[1]-padding_xy, hull.max_bound[1]+padding_xy, hull.min_bound[2]-padding_t, hull.max_bound[2]+padding_t)
+            except:
+                #if it's a 1-px-sized cluster, we can't get a convex hull, so we simply do this:
+                bounding_boxes[cluster_id] = (min(cluster_points['x'])-padding_xy, max(cluster_points['x'])+padding_xy, min(cluster_points['y'])-padding_xy, max(cluster_points['y'])+padding_xy, min(cluster_points['t'])-padding_t, max(cluster_points['t'])+padding_t)
+                
+    return bounding_boxes
+
+def get_events_in_bbox(npyarr,bboxes,ms_to_px):
+    candidates = {}
+    
+    #Loop over all bboxes:
+    for bboxid in range(len(bboxes)):
+        bbox = bboxes[bboxid]
+        filtered_array = npyarr[(npyarr['x'] >= bbox[0]) & (npyarr['x'] <= bbox[1]) & (npyarr['y'] >= bbox[2]) & (npyarr['y'] <= bbox[3]) & (npyarr['t'] >= bbox[4]*1000*ms_to_px) & (npyarr['t'] <= bbox[5]*1000*ms_to_px)]
+        
+        #Change filtered_array to a pd dataframe:
+        filtered_df = pd.DataFrame(filtered_array)
+        
+        candidates[bboxid] = {}
+        candidates[bboxid]['events'] = filtered_df
+        candidates[bboxid]['cluster_size'] = [np.max(filtered_array['y'])-np.min(filtered_array['y']), np.max(filtered_array['x'])-np.min(filtered_array['x']), np.max(filtered_array['t'])-np.min(filtered_array['t'])]
+        candidates[bboxid]['N_events'] = len(filtered_array)
+    
+    
+    return candidates
 #-------------------------------------------------------------------------------------------------------------------------------
 #Callable functions
 #-------------------------------------------------------------------------------------------------------------------------------
-def Finding(npy_array,settings,**kwargs):
+def DBSCAN_allEvents(npy_array,settings,**kwargs):
+    [provided_optional_args, missing_optional_args] = utilsHelper.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
+    if "min_consec" in provided_optional_args:
+        min_consec_ev = float(kwargs["min_consec"])
+    else:
+        # Default value for min number of consecutive events
+        min_consec_ev = 1
+    if "max_consec" in provided_optional_args:
+        max_consec_ev = float(kwargs["max_consec"])
+    else:
+        # Default value for max number of consecutive events
+        max_consec_ev = 30
+
+    # Start the timer
+    start_time = time.time()
+    
+    logging.info('Starting')
+    weights,df_events = determineWeights(npy_array)
+    consec_events = consec_filter(npy_array, min_consec_ev, max_consec_ev,weights=weights,df_events=df_events)
+    logging.info('Consec filtering done')
+    polarities = consec_events['p']
+    consec_event_tree, nparrfordens = make_kdtree(consec_events,temporal_duration_ms=float(kwargs['ratio_ms_to_px']),nleaves=64)
+    logging.info('KDtree made done')
+    high_density_events, polarities = filter_density(consec_event_tree, nparrfordens, polarities, distance_lookup = float(kwargs['distance_radius_lookup']), densityMultiplier = float(kwargs['density_multiplier']))
+    logging.info('high density events obtained done')
+    # Minimum number of points within a cluster
+    clustersHD, cluster_labels = clustering(high_density_events, polarities, eps = float(kwargs['DBSCAN_eps']), min_points_per_cluster = int(kwargs['min_cluster_size']))
+    logging.info('DBSCAN done')
+    bboxes = get_cluster_bounding_boxes(clustersHD, cluster_labels,padding_xy = int(kwargs['padding_xy']),padding_t = int(kwargs['padding_xy']))
+    logging.info('Getting bounding boxes done')
+    hotpixel_filtered_events = hotPixel_filter(npy_array,max_consec_ev,weights=weights,df_events=df_events)
+    candidates = get_events_in_bbox(hotpixel_filtered_events,bboxes,float(kwargs['ratio_ms_to_px']))
+    logging.info('Candidates obtained')
+    
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    
+    performance_metadata = f"DBSCAN Finding ran for {elapsed_time} seconds."
+    logging.info('DBSCAN finding done')
+
+    return candidates, performance_metadata
+
+def DBSCAN_onlyHighDensity(npy_array,settings,**kwargs):
     #Check if we have the required kwargs
     [provided_optional_args, missing_optional_args] = utilsHelper.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
     if "min_consec" in provided_optional_args:

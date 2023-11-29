@@ -773,8 +773,8 @@ class MyGUI(QMainWindow):
     def createRectangle(self,fig,data,col,padding=0):
         x_min = min(data['x'])-.5-padding
         y_min = min(data['y'])-.5-padding
-        width = max(data['x']) - min(data['x'])+padding*2
-        height = max(data['y']) - min(data['y'])+padding*2
+        width = (max(data['x']) - min(data['x']))+padding*2+1
+        height = (max(data['y']) - min(data['y']))+padding*2+1
         rect = patches.Rectangle((x_min,y_min),width,height, edgecolor=col, facecolor='none',alpha=0.5)
         # Add the rectangle to the axes
         fig.add_patch(rect)
