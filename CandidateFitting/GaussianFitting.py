@@ -44,7 +44,7 @@ def __function_metadata__():
 def localize_canditates2D(i, candidate_dic, expected_width, pixel_size):
     print('Localizing PSFs (thread '+str(i)+')...')
     nr_of_localizations = len(candidate_dic)
-    localizations = pd.DataFrame(index=range(nr_of_localizations), columns=['x','y','p','t']) #, dtypes={'x': 'float64', 'y': 'float64', 'p': 'int8', 't': 'float64'}
+    localizations = pd.DataFrame(index=range(nr_of_localizations), columns=['candidate_id','x','y','x_err','y_err','p','t', 'nr_of_events']) #, dtypes={'x': 'float64', 'y': 'float64', 'p': 'int8', 't': 'float64'}
     index = 0
     nb_fails = 0
     Gaussian_fit_info = ''
@@ -66,10 +66,12 @@ def localization2D(sub_events, candidate_id, expected_width, pixel_size):
     opt, err, fitting_info = gaussian_fitting(sub_events, candidate_id, expected_width)
     x = (opt[0]+np.min(sub_events['x']))*pixel_size # in nm
     y = (opt[1]+np.min(sub_events['y']))*pixel_size # in nm
+    x_err = err[0]*pixel_size # in nm
+    y_err = err[1]*pixel_size # in nm
     t = np.mean(sub_events['t'])/1000. # in ms
     mean_polarity = sub_events['p'].mean()
     p = int(mean_polarity == 1) + int(mean_polarity == 0) * 0 + int(mean_polarity > 0 and mean_polarity < 1) * 2
-    return np.array([x,y,p,t]), fitting_info
+    return np.array([candidate_id, x,y,x_err,y_err,p,t,len(sub_events)]), fitting_info
 
 # gaussian fit via scipy.optimize.curve_fit with bounds
 def gaussian_fitting(sub_events, candidate_id, expected_width):
@@ -109,8 +111,8 @@ def gauss2d(XY, x0, y0, sigma_x, sigma_y, amplitude, offset):
 
 def localization3D(sub_events,pixel_size):
     opt, err, fitting_info = gaussian_fitting_theta(sub_events, 150./pixel_size)
-    x = (opt[0]+np.min(sub_events['x']))*pixel_size * bool(err[0]) # in nm
-    y = (opt[1]+np.min(sub_events['y']))*pixel_size * bool(err[1]) # in nm
+    x = (opt[0]+np.min(sub_events['x']))*pixel_size # in nm
+    y = (opt[1]+np.min(sub_events['y']))*pixel_size # in nm
     t = np.mean(sub_events['t'])/1000. # in ms
     p = sub_events['p'][0]
     return np.array([x,y,p,t]), fitting_info
@@ -195,10 +197,21 @@ def Gaussian2D(candidate_dic,settings,**kwargs):
 
     if multithread == True: num_cores = multiprocessing.cpu_count()
     else: num_cores = 1
-    logging.info("Candidate fitting split on "+str(num_cores)+" cores.")
     
+    
+    nb_candidates = len(candidate_dic)
+    if nb_candidates < num_cores:
+        njobs = 1
+        num_cores = 1
+    elif nb_candidates/num_cores > 100:
+        njobs = np.int64(np.ceil(nb_candidates/100.))
+    else:
+        njobs = num_cores
+
+    logging.info("Candidate fitting split in "+str(njobs)+" jobs and divided on "+str(num_cores)+" cores.")
+
     # Determine all localizations
-    data_split = slice_data(candidate_dic, num_cores)
+    data_split = slice_data(candidate_dic, njobs)
     RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(localize_canditates2D)(i, data_split[i], expected_width, pixel_size) for i in range(len(data_split)))
     
     localization_list = [res[0] for res in RES]
