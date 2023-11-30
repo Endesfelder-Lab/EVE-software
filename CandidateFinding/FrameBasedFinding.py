@@ -21,10 +21,8 @@ def __function_metadata__():
                 {"name": "exclusion_radius", "description": "Radius of the exclusion area (if two or more PSFs are closer than twice the value, they will all be discarded) (in pixels)","default":4.},
                 {"name": "min_diameter", "description": "Minimum radius of the thresholded area (in pixels)","default":1.25},
                 {"name": "max_diameter", "description": "Maximum radius of the thresholded area (in pixels)","default":4.},
-                {"name": "time_bin_frames", "description": "time bin (in ms) of the frames", "default":100.},
+                {"name": "frame_time", "description": "frame time in (ms)", "default":100.},
                 {"name": "candidate_radius", "description": "Radius of the area around the localization (in px)","default":4.},
-                {"name": "time_limit_min", "description": "Relative lower time limit (in ms) of the events to consider within an ROI (t0-t_min).","default":60},
-                {"name": "time_limit_max", "description": "Relative upper time limit (in ms) of the events to consider within an ROI (t0+t_max).","default":200},
             ],
             "optional_kwargs": [
                 {"name": "polarity","description": "Polarity of the events","default":1},
@@ -123,23 +121,9 @@ def process_frame(frame, times, min_diameter, max_diameter, exclusion_radius, ca
     ROIs[:,2]=times[0]
     return ROIs
 
-# Load events
-def load_events(ev_list,ev_loaded,sl_size,ind_loaded):
-    ind_max=np.min([len(ev_list),ind_loaded[1]+sl_size])
-    ev_loaded=np.append(ev_loaded,ev_list[ind_loaded[1]:ind_max])
-    return ev_loaded,[ind_loaded[0],ind_max]
-
-# Unload events
-def unload_events(ev_loaded,t_min,ind_loaded):
-    msk=(ev_loaded['t']>=t_min)
-    if np.sum(msk)==0:msk[-1]=True
-    ev_loaded=ev_loaded[msk]
-    ind_min=np.argmax(msk)
-    return ev_loaded,[ind_loaded[0]+ind_min,ind_loaded[1]]
-
 # Generate single candidate dictionary entry for specified ROI + parameter
-def generate_candidate(events, ROI, time_limit_min, time_limit_max, candidate_radius):
-    msk=(events['t']>=ROI[2]-time_limit_min)*(events['t']<ROI[2]+time_limit_max)
+def generate_candidate(events, ROI, frame_time, candidate_radius):
+    msk=(events['t']>=ROI[2])*(events['t']<ROI[2]+frame_time)
     rho=(events['y']-ROI[0])**2+(events['x']-ROI[1])**2
     msk*=(rho<=candidate_radius**2)
     sub_events=events[msk]
@@ -149,36 +133,45 @@ def generate_candidate(events, ROI, time_limit_min, time_limit_max, candidate_ra
     candidate['N_events'] = len(sub_events)
     return candidate
 
+# Calculate number of jobs on CPU
+def nb_jobs(events, num_cores, frame_time):
+    time_tot = events['t'][-1]-events['t'][0]
+    time_base = frame_time
+    if time_tot < frame_time or num_cores == 1:
+        njobs = 1
+        num_cores = 1
+        time_base = time_tot
+    elif time_tot/frame_time > num_cores:
+        njobs = np.int64(np.ceil(time_tot/frame_time))
+    else:
+        njobs = np.int64(np.ceil(time_tot/frame_time))
+        num_cores = njobs
+    return njobs, num_cores, time_base
+
 # Slice data to distribute the computation on several cores
-def slice_data(events,nb_slices):
-    slice_size=1.*len(events)/nb_slices
-    slice_size=np.int64(np.ceil(slice_size))
+def slice_data(events, num_cores, frame_time):
+    njobs, num_cores, time_slice = nb_jobs(events, num_cores, frame_time)
     data_split=[]
-    for k in np.arange(nb_slices):
-        ind=[np.compat.long(k*slice_size),np.compat.long((k+1)*slice_size)]
-        data_split.append(events[ind[0]:ind[1]])
-    return data_split
+    t_min = events['t'][0]
+    t_max = events['t'][-1]
+    for k in np.arange(njobs):
+        times=[t_min+k*time_slice, min(t_min+(k+1)*time_slice, t_max)]
+        msk = (events['t']>=times[0])*(events['t']<times[1])
+        data_split.append(events[msk])
+    return data_split, njobs, num_cores
 
 # Candidate finding routine on a single core
-def compute_thread(sub_events, time_bin_frames, batch_size_CandidateFinding, time_limit_min, time_limit_max, candidate_radius, min_diameter, max_diameter, exclusion_radius, kernel1, kernel2, kernel, threshold_detection, frame_size):
+def compute_thread(i, sub_events, frame_time, candidate_radius, min_diameter, max_diameter, exclusion_radius, kernel1, kernel2, kernel, threshold_detection, frame_size):
+    print('Finding candidates (thread '+str(i)+')...')
     time_max=np.max(sub_events['t'])
     time_min=np.min(sub_events['t'])
-    nb_frames=int(np.ceil((time_max-time_min)/time_bin_frames))
+    nb_frames=int(np.ceil((time_max-time_min)/frame_time))
     ROIs=[]
-    events_loaded=sub_events[0:2]
-    indices_loaded=[0,2]
     for k in np.arange(nb_frames):
-        times=[time_min+k*time_bin_frames,time_min+(k+1)*time_bin_frames]
-        # Processing events
-        # Load data slices on the fly
-        cnt_load=0
-        while events_loaded['t'][-1]<=times[1]:
-            if indices_loaded[1]>=len(sub_events)-1:break
-            else:
-                events_loaded,indices_loaded=load_events(sub_events,events_loaded,batch_size_CandidateFinding,indices_loaded)
-                if cnt_load==0:
-                    events_loaded,indices_loaded=unload_events(events_loaded,times[0],indices_loaded)
-                cnt_load+=1
+        times=[time_min+k*frame_time,time_min+(k+1)*frame_time]
+        # load all events in frame
+        msk=(sub_events['t']>=times[0])*(sub_events['t']<times[1])
+        events_loaded=sub_events[msk]
         # Detect PSFs
         frame=generate_single_frame(events_loaded, times, frame_size)
         ROIs.append(process_frame(frame, times, min_diameter, max_diameter, exclusion_radius, candidate_radius, kernel1, kernel2, kernel, threshold_detection))
@@ -186,26 +179,17 @@ def compute_thread(sub_events, time_bin_frames, batch_size_CandidateFinding, tim
     gc.collect()
     
     candidates = {}
-    events_loaded=sub_events[0:2]
-    indices_loaded=[0,2]
     dict_index = 0
+    # Generating candidate dictionary
     for k in np.arange(np.shape(ROIs)[0]):
-        # Generating candidate dictionary
-        # Loading data slices on the fly
-        cnt_load=0
-        while events_loaded['t'][-1]<=ROIs[k,2]+time_bin_frames+time_limit_max: # is this the error here?
-            if indices_loaded[1]>=len(sub_events)-1:break
-            else:
-                events_loaded,indices_loaded=load_events(sub_events,events_loaded,batch_size_CandidateFinding,indices_loaded)
-                if cnt_load==0:
-                    events_loaded,indices_loaded=unload_events(events_loaded,ROIs[k,2]-time_limit_min,indices_loaded)
-                cnt_load+=1
-        # Generate candidate dictionary
+        # Loading all events in time limits
+        msk = (sub_events['t']>=ROIs[k][2])*(sub_events['t']<ROIs[k][2]+frame_time)
+        events_loaded = sub_events[msk]
         key_list = list(candidates.keys())
         if len(candidates)!=0:
             dict_index = max(key_list)+1
-        candidates[dict_index]=generate_candidate(events_loaded, ROIs[k,:], time_limit_min, time_limit_max, candidate_radius)
-    
+        candidates[dict_index]=generate_candidate(events_loaded, ROIs[k,:], frame_time, candidate_radius)
+    print('Finding candidates (thread '+str(i)+') done!')
     return candidates
 
 
@@ -216,26 +200,22 @@ def FrameBased_finding(npy_array,settings,**kwargs):
     # Check if we have the required kwargs
     [provided_optional_args, missing_optional_args] = utilsHelper.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
 
-    logging.info("Load and initiate all parameters...")
+    logging.info("Load and initiate all parameters of candidate finding...")
     # Load the required kwargs
     threshold_detection = float(kwargs['threshold_detection'])
     exclusion_radius = float(kwargs['exclusion_radius'])
     min_diameter = float(kwargs['min_diameter'])
     max_diameter = float(kwargs['max_diameter'])
-    time_bin_frames = float(kwargs['time_bin_frames'])*1000.
+    frame_time = float(kwargs['frame_time'])*1000.
     candidate_radius = float(kwargs['candidate_radius'])
-    time_limit_min = float(kwargs['time_limit_min'])*1000.
-    time_limit_max = float(kwargs['time_limit_max'])*1000.
 
     # Load the optional kwargs
     polarity = int(kwargs['polarity'])
-    multithread = bool(kwargs['multithread'])
+    multithread = utilsHelper.strtobool(kwargs['multithread'])
 
     # Initializations - general
-    batch_size_CandidateFinding=50000       # Slice sizes when loading the events data on the fly
     if multithread == True: num_cores = multiprocessing.cpu_count()
     else: num_cores = 1
-    logging.info("Candidate finding split on "+str(num_cores)+" cores.")
 
     # Initializations - wavelet
     kernel1=np.array([0.0625,0.25,0.375,0.25,0.0625])
@@ -250,8 +230,9 @@ def FrameBased_finding(npy_array,settings,**kwargs):
     if polarity==0 or polarity==1:
         events = npy_array[npy_array['p']==polarity]
         frame_size=[np.max(events['y'])+1,np.max(events['x'])+1]
-        events_split = slice_data(events,num_cores)
-        RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(compute_thread)(events_split[i], time_bin_frames, batch_size_CandidateFinding, time_limit_min, time_limit_max, candidate_radius, min_diameter, max_diameter, exclusion_radius, kernel1, kernel2, kernel, threshold_detection, frame_size) for i in range(len(events_split)))
+        events_split, njobs, num_cores = slice_data(events, num_cores, frame_time)
+        print("Candidate fitting split in "+str(njobs)+" job(s) and divided on "+str(num_cores)+" core(s).")
+        RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(compute_thread)(i, events_split[i], frame_time, candidate_radius, min_diameter, max_diameter, exclusion_radius, kernel1, kernel2, kernel, threshold_detection, frame_size) for i in range(len(events_split)))
         for i in range(len(RES)):
             for candidate in RES[i].items():
                 candidates[index] = candidate[1]
@@ -263,7 +244,7 @@ def FrameBased_finding(npy_array,settings,**kwargs):
         events = npy_array[npy_array['p']==0]
         frame_size=[np.max(events['y'])+1,np.max(events['x'])+1]
         events_split = slice_data(events,num_cores)
-        RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(compute_thread)(events_split[i], time_bin_frames, batch_size_CandidateFinding, time_limit_min, time_limit_max, candidate_radius, min_diameter, max_diameter, exclusion_radius, kernel1, kernel2, kernel, threshold_detection, frame_size) for i in range(len(events_split)))
+        RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(compute_thread)(events_split[i], frame_time, candidate_radius, min_diameter, max_diameter, exclusion_radius, kernel1, kernel2, kernel, threshold_detection, frame_size) for i in range(len(events_split)))
         for i in range(len(RES)):
             for candidate in RES[i].items():
                 candidates[index] = candidate[1]
@@ -275,7 +256,7 @@ def FrameBased_finding(npy_array,settings,**kwargs):
         events = npy_array[npy_array['p']==1]
         frame_size=[np.max(events['y'])+1,np.max(events['x'])+1]
         events_split = slice_data(events,num_cores)
-        RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(compute_thread)(events_split[i], time_bin_frames, batch_size_CandidateFinding, time_limit_min, time_limit_max, candidate_radius, min_diameter, max_diameter, exclusion_radius, kernel1, kernel2, kernel, threshold_detection, frame_size) for i in range(len(events_split)))
+        RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(compute_thread)(events_split[i], frame_time, candidate_radius, min_diameter, max_diameter, exclusion_radius, kernel1, kernel2, kernel, threshold_detection, frame_size) for i in range(len(events_split)))
         for i in range(len(RES)):
             for candidate in RES[i].items():
                 candidates[index] = candidate[1]
