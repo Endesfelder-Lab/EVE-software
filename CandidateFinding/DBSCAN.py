@@ -7,6 +7,7 @@ from scipy import spatial
 from sklearn.cluster import DBSCAN
 from concurrent.futures import ThreadPoolExecutor
 import multiprocessing
+from joblib import Parallel, delayed
 
 # Required function __function_metadata__
 # Should have an entry for every function in this file
@@ -201,30 +202,82 @@ def get_events_in_bbox(npyarr,bboxes,ms_to_px,multiThread=True):
         num_cores = multiprocessing.cpu_count()
         logging.info("Bounding box finding split on "+str(num_cores)+" cores.")
         executor = ThreadPoolExecutor(max_workers=num_cores)  # Set the number of threads as desired
+        
+        #Sort the bounding boxes by start-time:
+        sorted_bboxes = sorted(bboxes.values(), key=lambda bbox: bbox[4])
+        
+        #Split into num_cores sections:
+        bboxes_split = np.array_split(sorted_bboxes, num_cores)
+        
+        #Split the npyarr based on the min, max time of bboxes_split:
+        npyarr_split={}
+        for i in range(0,num_cores):
+            selectionArea = (npyarr['t'] >= np.min(bboxes_split[i][:,4])*1000*ms_to_px) & (npyarr['t'] <= np.max(bboxes_split[i][:,5])*1000*ms_to_px)
+            npyarr_split[i] = npyarr[selectionArea]
 
-        # Create a list to store the results of the findbbox function
-        results = []
-
+        RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(findbboxes)(npyarr_split[i],bboxes_split[i],ms_to_px) for i in range(num_cores))
+        
+        #res in RES contains an array of arrays, where e.g. res[0] is the indeces of the events that belong to bbox 0, etc
+        result = [res for res in RES]
+        
+        #Get all results as candidates dataframes as wanted:
+        candidates = {}
+        counter = 0
+        for r in range(len(result)):
+            for b in range(len(result[r])):
+                filtered_array = npyarr_split[r][result[r][b]]
+                filtered_df2 = pd.DataFrame(filtered_array)
+                candidates[counter] = {}
+                candidates[counter]['events'] = filtered_df2
+                candidates[counter]['cluster_size'] = [np.max(filtered_array['y'])-np.min(filtered_array['y']), np.max(filtered_array['x'])-np.min(filtered_array['x']), np.max(filtered_array['t'])-np.min(filtered_array['t'])]
+                candidates[counter]['N_events'] = len(filtered_array)
+                counter +=1
+        
+        
+        # # for i in range(0,num_cores):
+        # #     result
+        # result_dfs = [pd.DataFrame(df_dict).T[0] for df_dict in result]
+        # for i in range(num_cores):
+        #     result_dfs[i] += min_index[i]
+        # results = pd.concat(result_dfs, axis=0, ignore_index=True)
+        
         # Iterate over the bounding boxes
-        for bbox in bboxes.values():
-            # Submit each findbbox call to the ThreadPoolExecutor
-            future = executor.submit(findbbox, npyarr, min_x=bbox[0], max_x=bbox[1], min_y=bbox[2], max_y=bbox[3], min_t=bbox[4]*1000*ms_to_px, max_t=bbox[5]*1000*ms_to_px)
-            results.append(future)
+        # for bbox in bboxes.values():
+        #     # Submit each findbbox call to the ThreadPoolExecutor
+        #     future = executor.submit(findbbox, npyarr, min_x=bbox[0], max_x=bbox[1], min_y=bbox[2], max_y=bbox[3], min_t=bbox[4]*1000*ms_to_px, max_t=bbox[5]*1000*ms_to_px)
+        #     results.append(future)
 
         # Wait for all the submitted tasks to complete
-        executor.shutdown()
+        # executor.shutdown()
 
         # Retrieve the results from the futures
-        for future, bboxid in zip(results, bboxes.keys()):
-            filtered_array = npyarr[future.result()]
-            filtered_df2 = pd.DataFrame(filtered_array)
-            candidates[bboxid] = {}
-            candidates[bboxid]['events'] = filtered_df2
-            candidates[bboxid]['cluster_size'] = [np.max(filtered_array['y'])-np.min(filtered_array['y']), np.max(filtered_array['x'])-np.min(filtered_array['x']), np.max(filtered_array['t'])-np.min(filtered_array['t'])]
-            candidates[bboxid]['N_events'] = len(filtered_array)
+        # for future, bboxid in zip(results, bboxes.keys()):
+        #     filtered_array = npyarr[future.result()]
+        #     filtered_df2 = pd.DataFrame(filtered_array)
+        #     candidates[bboxid] = {}
+        #     candidates[bboxid]['events'] = filtered_df2
+        #     candidates[bboxid]['cluster_size'] = [np.max(filtered_array['y'])-np.min(filtered_array['y']), np.max(filtered_array['x'])-np.min(filtered_array['x']), np.max(filtered_array['t'])-np.min(filtered_array['t'])]
+        #     candidates[bboxid]['N_events'] = len(filtered_array)
+        
+        # candidates = {}
+        # for r in range(len(results)):
+        #     filtered_array = npyarr[results[r]+1]
+        #     filtered_df2 = pd.DataFrame(filtered_array)
+        #     candidates[r] = {}
+        #     candidates[r]['events'] = filtered_df2
+        #     candidates[r]['cluster_size'] = [np.max(filtered_array['y'])-np.min(filtered_array['y']), np.max(filtered_array['x'])-np.min(filtered_array['x']), np.max(filtered_array['t'])-np.min(filtered_array['t'])]
+        #     candidates[r]['N_events'] = len(filtered_array)
     
+        print('Done')
     return candidates
 
+def findbboxes(points, bboxes,ms_to_px):
+    res = {}
+    #Split the bboxes to separate findbbox function calls:
+    for bbox_id in range(len(bboxes)):
+        bbox = bboxes[bbox_id]
+        res[bbox_id] = findbbox(points, min_x=bbox[0], max_x=bbox[1], min_y=bbox[2], max_y=bbox[3], min_t=bbox[4]*1000*ms_to_px, max_t=bbox[5]*1000*ms_to_px)
+    return res
 
 def findbbox(points, min_x=-np.inf, max_x=np.inf, min_y=-np.inf,
                         max_y=np.inf, min_t=-np.inf, max_t=np.inf):
@@ -236,6 +289,8 @@ https://stackoverflow.com/questions/42352622/finding-points-within-a-bounding-bo
     bound_y = np.logical_and(points['y'] >= min_y, points['y'] <= max_y)
     bound_t = np.logical_and(points['t'] >= min_t, points['t'] <= max_t)
     bb_filter = np.logical_and(np.logical_and(bound_x, bound_y), bound_t)
+    #Transform this to a list of indeces where bb_filter == true:
+    bb_filter = np.where(bb_filter == True)
     return bb_filter
 
 def process_bbox(args):
