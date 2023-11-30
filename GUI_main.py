@@ -1141,6 +1141,9 @@ class MyGUI(QMainWindow):
         if self.globalSettings['OutputDataFormat']['value'] == 'minimal':
             self.data['FittingResult'][0].to_csv(storeLocation)
         elif self.globalSettings['OutputDataFormat']['value'] == 'thunderstorm':
+            #Add a frame column to fittingResult:
+            self.data['FittingResult'][0]['frame'] = self.data['FittingResult'][0]['t'].apply(round).astype(int)
+            self.data['FittingResult'][0]['frame'] -= min(self.data['FittingResult'][0]['frame'])-1
             #Create thunderstorm headers
             headers = list(self.data['FittingResult'][0].columns)
             headers = ['\"x [nm]\"' if header == 'x' else '\"y [nm]\"' if header == 'y' else '\"z [nm]\"' if header == 'z' else '\"t [ms]\"' if header == 't' else header for header in headers]
