@@ -243,8 +243,9 @@ def FrameBased_finding(npy_array,settings,**kwargs):
         # Do first negative events...
         events = npy_array[npy_array['p']==0]
         frame_size=[np.max(events['y'])+1,np.max(events['x'])+1]
-        events_split = slice_data(events,num_cores)
-        RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(compute_thread)(events_split[i], frame_time, candidate_radius, min_diameter, max_diameter, exclusion_radius, kernel1, kernel2, kernel, threshold_detection, frame_size) for i in range(len(events_split)))
+        events_split, njobs, num_cores = slice_data(events, num_cores, frame_time)
+        print("Candidate fitting split in "+str(njobs)+" job(s) and divided on "+str(num_cores)+" core(s).")
+        RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(compute_thread)(i, events_split[i], frame_time, candidate_radius, min_diameter, max_diameter, exclusion_radius, kernel1, kernel2, kernel, threshold_detection, frame_size) for i in range(len(events_split)))
         for i in range(len(RES)):
             for candidate in RES[i].items():
                 candidates[index] = candidate[1]
@@ -255,8 +256,9 @@ def FrameBased_finding(npy_array,settings,**kwargs):
         # ... and then positive events.
         events = npy_array[npy_array['p']==1]
         frame_size=[np.max(events['y'])+1,np.max(events['x'])+1]
-        events_split = slice_data(events,num_cores)
-        RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(compute_thread)(events_split[i], frame_time, candidate_radius, min_diameter, max_diameter, exclusion_radius, kernel1, kernel2, kernel, threshold_detection, frame_size) for i in range(len(events_split)))
+        events_split, njobs, num_cores = slice_data(events, num_cores, frame_time)
+        print("Candidate fitting split in "+str(njobs)+" job(s) and divided on "+str(num_cores)+" core(s).")
+        RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(compute_thread)(i, events_split[i], frame_time, candidate_radius, min_diameter, max_diameter, exclusion_radius, kernel1, kernel2, kernel, threshold_detection, frame_size) for i in range(len(events_split)))
         for i in range(len(RES)):
             for candidate in RES[i].items():
                 candidates[index] = candidate[1]
