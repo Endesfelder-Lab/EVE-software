@@ -12,6 +12,8 @@ from scipy.spatial import ConvexHull
 import multiprocessing
 from functools import partial
 import open3d as o3d
+from joblib import Parallel, delayed
+import multiprocessing
 
 # Required function __function_metadata__
 # Should have an entry for every function in this file
@@ -238,6 +240,49 @@ def compute_bounding_box(cluster_id,events=None,cluster_labels=None,padding_xy=N
         bounding_box = (np.min(cluster_points['x'])-padding_xy, np.max(cluster_points['x'])+padding_xy, np.min(cluster_points['y'])-padding_xy, np.max(cluster_points['y'])+padding_xy, np.min(cluster_points['t'])-padding_t, np.max(cluster_points['t'])+padding_t)
     return (cluster_id, bounding_box)
 
+
+def kdtree_assisted_lookup(bbox_bunch,ms_to_px,kdtree1d,lookup_list,npyarr):
+    min_x_arr = [bbox[0] for bbox in bbox_bunch.values()]
+    max_x_arr = [bbox[1] for bbox in bbox_bunch.values()]
+    min_y_arr = [bbox[2] for bbox in bbox_bunch.values()]
+    max_y_arr = [bbox[3] for bbox in bbox_bunch.values()]
+    min_t_arr = [bbox[4]*1000*ms_to_px for bbox in bbox_bunch.values()]
+    max_t_arr = [bbox[5]*1000*ms_to_px for bbox in bbox_bunch.values()]
+    
+    result = {}
+    result['x']={}
+    lb_x = np.transpose(min_x_arr)
+    ub_x = np.transpose(max_x_arr)
+    mp_x = np.mean([lb_x,ub_x],axis=0)
+    rad_x = np.subtract(ub_x,lb_x)/2
+    iv = np.transpose([mp_x,mp_x])
+    result['x'] = kdtree1d['x'].query_ball_point(iv, np.sqrt(2)*rad_x,workers=-1)
+    
+    result['y']={}
+    lb_y = np.transpose(min_y_arr)
+    ub_y = np.transpose(max_y_arr)
+    mp_y = np.mean([lb_y,ub_y],axis=0)
+    rad_y = np.subtract(ub_y,lb_y)/2
+    iv = np.transpose([mp_y,mp_y])
+    result['y'] = kdtree1d['y'].query_ball_point(iv, np.sqrt(2)*rad_y,workers=-1)
+    
+    #Get all results as candidates dataframes as wanted:
+    filtered_df2={}
+    for t in range(len(min_x_arr)):      
+        #Filter only on x,y
+        a1 = np.isin(lookup_list['x'][result['x'][t]],result['y'][t],assume_unique=True)
+        filtered_array = npyarr[lookup_list['x'][result['x'][t]][a1]]
+        
+        #Filter on t
+        bound_t = np.logical_and(filtered_array['t'] >= min_t_arr[t], filtered_array['t'] <= max_t_arr[t])
+        
+        #Fully filtered:
+        filtered_array2 = filtered_array[bound_t]
+                    
+        filtered_df2[t] = pd.DataFrame(filtered_array2)
+    
+    return filtered_df2
+
 def get_events_in_bbox(npyarr,bboxes,ms_to_px,multiThread=True):
     #Get empty candidate dictionary
     candidates = {}
@@ -291,85 +336,149 @@ def get_events_in_bbox(npyarr,bboxes,ms_to_px,multiThread=True):
 
         
     elif multiThread == True:
-        start_time = time.time()
-        num_cores = multiprocessing.cpu_count()
-        logging.info("Bounding box finding split on "+str(num_cores)+" cores.")
+        # start_time = time.time()
+        # num_cores = multiprocessing.cpu_count()
+        # logging.info("Bounding box finding split on "+str(num_cores)+" cores.")
         
-        #Sort the bounding boxes by start-time:
-        sorted_bboxes = sorted(bboxes.values(), key=lambda bbox: bbox[4])
+        # #Sort the bounding boxes by start-time:
+        # sorted_bboxes = sorted(bboxes.values(), key=lambda bbox: bbox[4])
         
-        #Split into num_cores sections:
-        bboxes_split = np.array_split(sorted_bboxes, num_cores)
+        # #Split into num_cores sections:
+        # bboxes_split = np.array_split(sorted_bboxes, num_cores)
         
-        #Split the npyarr based on the min, max time of bboxes_split:
-        npyarr_split={}
-        for i in range(0,num_cores):
-            selectionArea = (npyarr['t'] >= np.min(bboxes_split[i][:,4])*1000*ms_to_px) & (npyarr['t'] <= np.max(bboxes_split[i][:,5])*1000*ms_to_px)
-            npyarr_split[i] = npyarr[selectionArea]
+        # #Split the npyarr based on the min, max time of bboxes_split:
+        # npyarr_split={}
+        # for i in range(0,num_cores):
+        #     selectionArea = (npyarr['t'] >= np.min(bboxes_split[i][:,4])*1000*ms_to_px) & (npyarr['t'] <= np.max(bboxes_split[i][:,5])*1000*ms_to_px)
+        #     npyarr_split[i] = npyarr[selectionArea]
 
-        RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(findbboxes)(npyarr_split[i],bboxes_split[i],ms_to_px) for i in range(num_cores))
+        # RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(findbboxes)(npyarr_split[i],bboxes_split[i],ms_to_px) for i in range(num_cores))
         
-        #res in RES contains an array of arrays, where e.g. res[0] is the indeces of the events that belong to bbox 0, etc
-        result = [res for res in RES]
+        # #res in RES contains an array of arrays, where e.g. res[0] is the indeces of the events that belong to bbox 0, etc
+        # result = [res for res in RES]
         
-        #Get all results as candidates dataframes as wanted:
+        # #Get all results as candidates dataframes as wanted:
+        # candidates = {}
+        # counter = 0
+        # for r in range(len(result)):
+        #     for b in range(len(result[r])):
+        #         filtered_array = npyarr_split[r][result[r][b]]
+        #         filtered_df2 = pd.DataFrame(filtered_array)
+        #         candidates[counter] = {}
+        #         candidates[counter]['events'] = filtered_df2
+        #         candidates[counter]['cluster_size'] = [np.max(filtered_array['y'])-np.min(filtered_array['y']), np.max(filtered_array['x'])-np.min(filtered_array['x']), np.max(filtered_array['t'])-np.min(filtered_array['t'])]
+        #         candidates[counter]['N_events'] = len(filtered_array)
+        #         counter +=1
+                
+        # end_time = time.time()
+        # candidatesTrue = candidates
+        # logging.info('Time to get bounding boxes: '+str(end_time-start_time))
+        
+        time_start = time.time()
+        
         candidates = {}
+        #Create a 1d kdtree of the x-values of npyarr:
+        lookup_list = {}
+        kdtree1d = {}
+    
+        #Run kdtrees on x and y:
+        datax = np.zeros((len(npyarr),2))
+        datax[:, 0] = npyarr['x']
+        datax[:, 1] = npyarr['x']
+        lookup_list['x'] = np.argsort(datax[:, 0])
+        kdtree1d['x'] = spatial.cKDTree(datax)
+        datay = np.zeros((len(npyarr),2))
+        datay[:, 0] = npyarr['y']
+        datay[:, 1] = npyarr['y']
+        lookup_list['y'] = np.argsort(datay[:, 0])
+        kdtree1d['y'] = spatial.cKDTree(datay)
+
+        
+        bunch_size = 50
+        num_splits = int(np.ceil(len(bboxes)/bunch_size))
+        #Split bboxes into bunches:
+        bbox_bunches = split_dict(bboxes, num_splits)
+        num_cores = multiprocessing.cpu_count()
+        
+        RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(kdtree_assisted_lookup)(bbox_bunches[r],ms_to_px,kdtree1d,lookup_list,npyarr) for r in range(len(bbox_bunches)))
+        result = [res for res in RES]
+        # for r, split_dictv in enumerate(bbox_bunches):
+        #     outp = kdtree_assisted_lookup(bbox_bunches[r],ms_to_px,kdtree1d,lookup_list,npyarr)
+        
         counter = 0
         for r in range(len(result)):
             for b in range(len(result[r])):
-                filtered_array = npyarr_split[r][result[r][b]]
+                filtered_array = result[r][b]
                 filtered_df2 = pd.DataFrame(filtered_array)
-                candidates[counter] = {}
-                candidates[counter]['events'] = filtered_df2
-                candidates[counter]['cluster_size'] = [np.max(filtered_array['y'])-np.min(filtered_array['y']), np.max(filtered_array['x'])-np.min(filtered_array['x']), np.max(filtered_array['t'])-np.min(filtered_array['t'])]
-                candidates[counter]['N_events'] = len(filtered_array)
-                counter +=1
                 
-        end_time = time.time()
-        logging.info('Time to get bounding boxes: '+str(end_time-start_time))
+                indexv = counter
+                candidates[indexv] = {}
+                candidates[indexv]['events'] = filtered_df2
+                candidates[indexv]['cluster_size'] = [np.max(filtered_array['y'])-np.min(filtered_array['y']), np.max(filtered_array['x'])-np.min(filtered_array['x']), np.max(filtered_array['t'])-np.min(filtered_array['t'])]
+                candidates[indexv]['N_events'] = len(filtered_array)
+                counter+=1
         
+        time_end = time.time()
+        print(time_end-time_start)
+                
         
-        start_time = time.time()
-        num_cores = multiprocessing.cpu_count()
-        logging.info("Bounding box finding split on "+str(num_cores)+" cores.")
+             
         
-        #Sort the bounding boxes by start-time:
-        sorted_bboxes = sorted(bboxes.values(), key=lambda bbox: bbox[4])
+        # start_time = time.time()
+        # num_cores = multiprocessing.cpu_count()
+        # logging.info("Bounding box finding split on "+str(num_cores)+" cores.")
         
-        #Split into num_cores sections:
-        bboxes_split = np.array_split(sorted_bboxes, num_cores)
+        # #Sort the bounding boxes by start-time:
+        # sorted_bboxes = sorted(bboxes.values(), key=lambda bbox: bbox[4])
         
-        #Split the npyarr based on the min, max time of bboxes_split:
-        npyarr_split={}
-        for i in range(0,num_cores):
-            selectionArea = (npyarr['t'] >= np.min(bboxes_split[i][:,4])*1000*ms_to_px) & (npyarr['t'] <= np.max(bboxes_split[i][:,5])*1000*ms_to_px)
-            npyarr_split[i] = npyarr[selectionArea]
+        # #Split into num_cores sections:
+        # bboxes_split = np.array_split(sorted_bboxes, num_cores)
+        
+        # #Split the npyarr based on the min, max time of bboxes_split:
+        # npyarr_split={}
+        # for i in range(0,num_cores):
+        #     selectionArea = (npyarr['t'] >= np.min(bboxes_split[i][:,4])*1000*ms_to_px) & (npyarr['t'] <= np.max(bboxes_split[i][:,5])*1000*ms_to_px)
+        #     npyarr_split[i] = npyarr[selectionArea]
 
-        RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(findbboxeso3d)(npyarr_split[i],bboxes_split[i],ms_to_px) for i in range(num_cores))
+        # RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(findbboxeso3d)(npyarr_split[i],bboxes_split[i],ms_to_px) for i in range(num_cores))
         
-        #res in RES contains an array of arrays, where e.g. res[0] is the indeces of the events that belong to bbox 0, etc
-        result = [res for res in RES]
+        # #res in RES contains an array of arrays, where e.g. res[0] is the indeces of the events that belong to bbox 0, etc
+        # result = [res for res in RES]
         
-        #Get all results as candidates dataframes as wanted:
-        candidates = {}
-        counter = 0
-        for r in range(len(result)):
-            for b in range(len(result[r])):
-                filtered_array = npyarr_split[r][result[r][b]]
-                filtered_df2 = pd.DataFrame(filtered_array)
-                candidates[counter] = {}
-                candidates[counter]['events'] = filtered_df2
-                candidates[counter]['cluster_size'] = [np.max(filtered_array['y'])-np.min(filtered_array['y']), np.max(filtered_array['x'])-np.min(filtered_array['x']), np.max(filtered_array['t'])-np.min(filtered_array['t'])]
-                candidates[counter]['N_events'] = len(filtered_array)
-                counter +=1
+        # #Get all results as candidates dataframes as wanted:
+        # candidates = {}
+        # counter = 0
+        # for r in range(len(result)):
+        #     for b in range(len(result[r])):
+        #         filtered_array = npyarr_split[r][result[r][b]]
+        #         filtered_df2 = pd.DataFrame(filtered_array)
+        #         candidates[counter] = {}
+        #         candidates[counter]['events'] = filtered_df2
+        #         candidates[counter]['cluster_size'] = [np.max(filtered_array['y'])-np.min(filtered_array['y']), np.max(filtered_array['x'])-np.min(filtered_array['x']), np.max(filtered_array['t'])-np.min(filtered_array['t'])]
+        #         candidates[counter]['N_events'] = len(filtered_array)
+        #         counter +=1
                 
-        end_time = time.time()
-        logging.info('Time to get bounding boxes o3d: '+str(end_time-start_time))
+        # end_time = time.time()
+        # logging.info('Time to get bounding boxes o3d: '+str(end_time-start_time))
         
     
         print('Done')
     return candidates
 
+
+def split_dict(dictionary, num_splits):
+    keys = list(dictionary.keys())
+    split_keys = np.array_split(keys, num_splits)
+    split_dicts = [{key: dictionary[key] for key in split_keys[i]} for i in range(num_splits)]
+    return split_dicts
+
+# Define a custom distance function
+def distance_1dkdtree(point,lb,ub):
+    if point > lb and point < ub:
+        return 1
+    else:
+        return 0 
+    
 def findbboxeso3d(points,bboxes,ms_to_px):
     point_cloud = o3d.geometry.PointCloud()
     point_cloud.points = o3d.utility.Vector3dVector(zip(points['x'],points['y'],points['t']))
@@ -496,7 +605,6 @@ def DBSCAN_allEvents(npy_array,settings,**kwargs):
     bboxes = get_cluster_bounding_boxes(clustersHD, cluster_labels,padding_xy = int(kwargs['padding_xy']),padding_t = int(kwargs['padding_xy']))
     logging.info('Getting bounding boxes done')
     hotpixel_filtered_events = hotPixel_filter(npy_array,max_consec_ev,weights=weights,df_events=df_events)
-    
     candidates = get_events_in_bbox(hotpixel_filtered_events,bboxes,float(kwargs['ratio_ms_to_px']))
     logging.info('Candidates obtained')
     
