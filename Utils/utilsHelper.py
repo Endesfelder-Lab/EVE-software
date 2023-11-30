@@ -18,3 +18,13 @@ def argumentChecking(dictionaryInfo, function_name, given_kwargs):
     
     #Return the provided and missing optional arguments
     return [provided_opt_args, missing_opt_args]
+
+# Convert a string representation of truth to true (1) or false (0), or raise an exception
+def strtobool(val):
+    val = val.lower()
+    if val in ('y', 'yes', 't', 'true','on', '1'):
+        return 1
+    elif val in ('n', 'no', 'f', 'false', 'off', '0'):
+        return 0
+    else:
+        raise ValueError("invalid truth value %r" % (val,))
