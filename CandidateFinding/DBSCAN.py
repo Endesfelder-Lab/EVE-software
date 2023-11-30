@@ -8,6 +8,10 @@ from sklearn.cluster import DBSCAN
 from concurrent.futures import ThreadPoolExecutor
 import multiprocessing
 from joblib import Parallel, delayed
+from scipy.spatial import ConvexHull
+import multiprocessing
+from functools import partial
+import open3d as o3d
 
 # Required function __function_metadata__
 # Should have an entry for every function in this file
@@ -155,20 +159,55 @@ def clustering(events, polarities, eps=2, min_points_per_cluster=10):
     return densest_points_within_range_full_pd, cluster_labels
 
 def get_cluster_bounding_boxes(events, cluster_labels,padding_xy=0,padding_t=0):
-    from scipy.spatial import ConvexHull
+    # start_time = time.time()
+    # bounding_boxes = {}
+    # for cluster_id in np.unique(cluster_labels):
+    #     if cluster_id != -1:  # Ignore noise points
+    #         cluster_points = events[cluster_labels == cluster_id]
+    #         #Get the min max values based on a convex hull
+    #         try:
+    #             hull = ConvexHull(np.column_stack((cluster_points['x'], cluster_points['y'], cluster_points['t'])))
+    #             #And obtain the bounding box
+    #             bounding_boxes[cluster_id] = (hull.min_bound[0]-padding_xy, hull.max_bound[0]+padding_xy, hull.min_bound[1]-padding_xy, hull.max_bound[1]+padding_xy, hull.min_bound[2]-padding_t, hull.max_bound[2]+padding_t)
+    #         except:
+    #             #if it's a 1-px-sized cluster, we can't get a convex hull, so we simply do this:
+    #             bounding_boxes[cluster_id] = (min(cluster_points['x'])-padding_xy, max(cluster_points['x'])+padding_xy, min(cluster_points['y'])-padding_xy, max(cluster_points['y'])+padding_xy, min(cluster_points['t'])-padding_t, max(cluster_points['t'])+padding_t)
+    
+    # end_time = time.time()
+    # logging.info('Time to get bounding boxes: '+str(end_time-start_time))
+    
+    
+    start_time = time.time()
     bounding_boxes = {}
     for cluster_id in np.unique(cluster_labels):
         if cluster_id != -1:  # Ignore noise points
-            cluster_points = events[cluster_labels == cluster_id]
-            #Get the min max values based on a convex hull
-            try:
-                hull = ConvexHull(np.column_stack((cluster_points['x'], cluster_points['y'], cluster_points['t'])))
-                #And obtain the bounding box
-                bounding_boxes[cluster_id] = (hull.min_bound[0]-padding_xy, hull.max_bound[0]+padding_xy, hull.min_bound[1]-padding_xy, hull.max_bound[1]+padding_xy, hull.min_bound[2]-padding_t, hull.max_bound[2]+padding_t)
-            except:
-                #if it's a 1-px-sized cluster, we can't get a convex hull, so we simply do this:
-                bounding_boxes[cluster_id] = (min(cluster_points['x'])-padding_xy, max(cluster_points['x'])+padding_xy, min(cluster_points['y'])-padding_xy, max(cluster_points['y'])+padding_xy, min(cluster_points['t'])-padding_t, max(cluster_points['t'])+padding_t)
-            
+            bounding_boxes[cluster_id] = compute_bounding_boxC(cluster_id,events=events,cluster_labels=cluster_labels,padding_xy=padding_xy,padding_t=padding_t)
+    
+    end_time = time.time()
+    logging.info('Time to get bounding boxesC: '+str(end_time-start_time))
+    
+    
+    # start_time = time.time()
+    # bounding_boxes = {}
+    # cluster_ids = np.unique(cluster_labels)
+    # valid_cluster_ids = cluster_ids[cluster_ids != -1]  # Filter out noise 
+
+    # # Define a partial function with fixed arguments
+    # partial_compute_bounding_box = partial(compute_bounding_box, events=events, cluster_labels=cluster_labels, padding_xy=padding_xy, padding_t=padding_t)
+
+    # # Create a pool of worker processes
+    # pool = multiprocessing.Pool()
+
+    # # Map the function to the cluster IDs in parallel
+    # results = pool.map(partial_compute_bounding_box, valid_cluster_ids)
+
+    # # Collect the results into the bounding_boxes dictionary
+    # bounding_boxes = {cluster_id: bounding_box for cluster_id, bounding_box in results}
+    
+    # end_time = time.time()
+    # logging.info('Time to get bounding boxes new: '+str(end_time-start_time))
+    
+    
     #Loop over the bounding boxes, and if it's bigger than some params, remove it:
     xymaxsize = 20
     tmaxsize = np.inf
@@ -182,15 +221,40 @@ def get_cluster_bounding_boxes(events, cluster_labels,padding_xy=0,padding_t=0):
     
     return bounding_boxes
 
+def compute_bounding_boxC(cluster_id,events=None,cluster_labels=None,padding_xy=None,padding_t=None):
+    cluster_points = events[cluster_labels == cluster_id]
+    x_coordinates = cluster_points['x'].tolist()
+    y_coordinates = cluster_points['y'].tolist()
+    t_coordinates = cluster_points['t'].tolist()
+    return [min(x_coordinates)-padding_xy, max(x_coordinates)+padding_xy, min(y_coordinates)-padding_xy, max(y_coordinates)+padding_xy, min(t_coordinates)-padding_t, max(t_coordinates)+padding_t]
+
+# Define a function to compute the bounding box for a given cluster ID
+def compute_bounding_box(cluster_id,events=None,cluster_labels=None,padding_xy=None,padding_t=None):
+    cluster_points = events[cluster_labels == cluster_id]
+    try:
+        hull = ConvexHull(np.column_stack((cluster_points['x'], cluster_points['y'], cluster_points['t'])))
+        bounding_box = (hull.min_bound[0]-padding_xy, hull.max_bound[0]+padding_xy, hull.min_bound[1]-padding_xy, hull.max_bound[1]+padding_xy, hull.min_bound[2]-padding_t, hull.max_bound[2]+padding_t)
+    except:
+        bounding_box = (np.min(cluster_points['x'])-padding_xy, np.max(cluster_points['x'])+padding_xy, np.min(cluster_points['y'])-padding_xy, np.max(cluster_points['y'])+padding_xy, np.min(cluster_points['t'])-padding_t, np.max(cluster_points['t'])+padding_t)
+    return (cluster_id, bounding_box)
+
 def get_events_in_bbox(npyarr,bboxes,ms_to_px,multiThread=True):
     #Get empty candidate dictionary
     candidates = {}
-    if multiThread == False:        
+    if multiThread == False:      
+        start_time = time.time()
         #Loop over all bboxes:
-        for bboxid in range(len(bboxes)):
+        for bboxid, _ in bboxes.items():
             bbox = bboxes[bboxid]
-            filtered_array = npyarr[(npyarr['x'] >= bbox[0]) & (npyarr['x'] <= bbox[1]) & (npyarr['y'] >= bbox[2]) & (npyarr['y'] <= bbox[3]) & (npyarr['t'] >= bbox[4]*1000*ms_to_px) & (npyarr['t'] <= bbox[5]*1000*ms_to_px)]
-            
+            conditions = [
+                npyarr['x'] >= bbox[0],
+                npyarr['x'] <= bbox[1],
+                npyarr['y'] >= bbox[2],
+                npyarr['y'] <= bbox[3],
+                npyarr['t'] >= bbox[4]*1000*ms_to_px,
+                npyarr['t'] <= bbox[5]*1000*ms_to_px
+            ]
+            filtered_array = npyarr[np.logical_and.reduce(conditions)]
             #Change filtered_array to a pd dataframe:
             filtered_df = pd.DataFrame(filtered_array)
             
@@ -198,10 +262,38 @@ def get_events_in_bbox(npyarr,bboxes,ms_to_px,multiThread=True):
             candidates[bboxid]['events'] = filtered_df
             candidates[bboxid]['cluster_size'] = [np.max(filtered_array['y'])-np.min(filtered_array['y']), np.max(filtered_array['x'])-np.min(filtered_array['x']), np.max(filtered_array['t'])-np.min(filtered_array['t'])]
             candidates[bboxid]['N_events'] = len(filtered_array)
+        end_time = time.time()
+        logging.info('Time to get bounding boxes: '+str(end_time-start_time))
+        
+        
+        candidates2 = {}
+        start_time = time.time()
+        point_cloud = o3d.geometry.PointCloud()
+        point_cloud.points = o3d.utility.Vector3dVector(zip(npyarr['x'],npyarr['y'],npyarr['t']))
+        
+        for bboxid, _ in bboxes.items():
+            bbox = bboxes[bboxid]
+            # Create the axis-aligned bounding box with the specified dimensions
+            aabb = o3d.geometry.AxisAlignedBoundingBox(min_bound=(bbox[0], bbox[2], bbox[4]*1000*ms_to_px), max_bound=(bbox[1], bbox[3], bbox[5]*1000*ms_to_px))
+
+            # Get the indices of points within the bounding box
+            indices = aabb.get_point_indices_within_bounding_box(point_cloud.points)
+            filtered_array = npyarr[indices]
+            #Change filtered_array to a pd dataframe:
+            filtered_df = pd.DataFrame(filtered_array)
+            
+            candidates2[bboxid] = {}
+            candidates2[bboxid]['events'] = filtered_df
+            candidates2[bboxid]['cluster_size'] = [np.max(filtered_array['y'])-np.min(filtered_array['y']), np.max(filtered_array['x'])-np.min(filtered_array['x']), np.max(filtered_array['t'])-np.min(filtered_array['t'])]
+            candidates2[bboxid]['N_events'] = len(filtered_array)
+        end_time = time.time()
+        logging.info('Time to get bounding boxes o3d: '+str(end_time-start_time))
+
+        
     elif multiThread == True:
+        start_time = time.time()
         num_cores = multiprocessing.cpu_count()
         logging.info("Bounding box finding split on "+str(num_cores)+" cores.")
-        executor = ThreadPoolExecutor(max_workers=num_cores)  # Set the number of threads as desired
         
         #Sort the bounding boxes by start-time:
         sorted_bboxes = sorted(bboxes.values(), key=lambda bbox: bbox[4])
@@ -232,44 +324,70 @@ def get_events_in_bbox(npyarr,bboxes,ms_to_px,multiThread=True):
                 candidates[counter]['cluster_size'] = [np.max(filtered_array['y'])-np.min(filtered_array['y']), np.max(filtered_array['x'])-np.min(filtered_array['x']), np.max(filtered_array['t'])-np.min(filtered_array['t'])]
                 candidates[counter]['N_events'] = len(filtered_array)
                 counter +=1
+                
+        end_time = time.time()
+        logging.info('Time to get bounding boxes: '+str(end_time-start_time))
         
         
-        # # for i in range(0,num_cores):
-        # #     result
-        # result_dfs = [pd.DataFrame(df_dict).T[0] for df_dict in result]
-        # for i in range(num_cores):
-        #     result_dfs[i] += min_index[i]
-        # results = pd.concat(result_dfs, axis=0, ignore_index=True)
+        start_time = time.time()
+        num_cores = multiprocessing.cpu_count()
+        logging.info("Bounding box finding split on "+str(num_cores)+" cores.")
         
-        # Iterate over the bounding boxes
-        # for bbox in bboxes.values():
-        #     # Submit each findbbox call to the ThreadPoolExecutor
-        #     future = executor.submit(findbbox, npyarr, min_x=bbox[0], max_x=bbox[1], min_y=bbox[2], max_y=bbox[3], min_t=bbox[4]*1000*ms_to_px, max_t=bbox[5]*1000*ms_to_px)
-        #     results.append(future)
+        #Sort the bounding boxes by start-time:
+        sorted_bboxes = sorted(bboxes.values(), key=lambda bbox: bbox[4])
+        
+        #Split into num_cores sections:
+        bboxes_split = np.array_split(sorted_bboxes, num_cores)
+        
+        #Split the npyarr based on the min, max time of bboxes_split:
+        npyarr_split={}
+        for i in range(0,num_cores):
+            selectionArea = (npyarr['t'] >= np.min(bboxes_split[i][:,4])*1000*ms_to_px) & (npyarr['t'] <= np.max(bboxes_split[i][:,5])*1000*ms_to_px)
+            npyarr_split[i] = npyarr[selectionArea]
 
-        # Wait for all the submitted tasks to complete
-        # executor.shutdown()
-
-        # Retrieve the results from the futures
-        # for future, bboxid in zip(results, bboxes.keys()):
-        #     filtered_array = npyarr[future.result()]
-        #     filtered_df2 = pd.DataFrame(filtered_array)
-        #     candidates[bboxid] = {}
-        #     candidates[bboxid]['events'] = filtered_df2
-        #     candidates[bboxid]['cluster_size'] = [np.max(filtered_array['y'])-np.min(filtered_array['y']), np.max(filtered_array['x'])-np.min(filtered_array['x']), np.max(filtered_array['t'])-np.min(filtered_array['t'])]
-        #     candidates[bboxid]['N_events'] = len(filtered_array)
+        RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(findbboxeso3d)(npyarr_split[i],bboxes_split[i],ms_to_px) for i in range(num_cores))
         
-        # candidates = {}
-        # for r in range(len(results)):
-        #     filtered_array = npyarr[results[r]+1]
-        #     filtered_df2 = pd.DataFrame(filtered_array)
-        #     candidates[r] = {}
-        #     candidates[r]['events'] = filtered_df2
-        #     candidates[r]['cluster_size'] = [np.max(filtered_array['y'])-np.min(filtered_array['y']), np.max(filtered_array['x'])-np.min(filtered_array['x']), np.max(filtered_array['t'])-np.min(filtered_array['t'])]
-        #     candidates[r]['N_events'] = len(filtered_array)
+        #res in RES contains an array of arrays, where e.g. res[0] is the indeces of the events that belong to bbox 0, etc
+        result = [res for res in RES]
+        
+        #Get all results as candidates dataframes as wanted:
+        candidates = {}
+        counter = 0
+        for r in range(len(result)):
+            for b in range(len(result[r])):
+                filtered_array = npyarr_split[r][result[r][b]]
+                filtered_df2 = pd.DataFrame(filtered_array)
+                candidates[counter] = {}
+                candidates[counter]['events'] = filtered_df2
+                candidates[counter]['cluster_size'] = [np.max(filtered_array['y'])-np.min(filtered_array['y']), np.max(filtered_array['x'])-np.min(filtered_array['x']), np.max(filtered_array['t'])-np.min(filtered_array['t'])]
+                candidates[counter]['N_events'] = len(filtered_array)
+                counter +=1
+                
+        end_time = time.time()
+        logging.info('Time to get bounding boxes o3d: '+str(end_time-start_time))
+        
     
         print('Done')
     return candidates
+
+def findbboxeso3d(points,bboxes,ms_to_px):
+    point_cloud = o3d.geometry.PointCloud()
+    point_cloud.points = o3d.utility.Vector3dVector(zip(points['x'],points['y'],points['t']))
+    
+    res = {}
+    #Split the bboxes to separate findbbox function calls:
+    for bbox_id in range(len(bboxes)):
+        bbox = bboxes[bbox_id]
+        res[bbox_id] = findbboxo3d(point_cloud, min_x=bbox[0], max_x=bbox[1], min_y=bbox[2], max_y=bbox[3], min_t=bbox[4]*1000*ms_to_px, max_t=bbox[5]*1000*ms_to_px)
+    return res
+
+def findbboxo3d(pointCloud, min_x=-np.inf, max_x=np.inf, min_y=-np.inf,
+                        max_y=np.inf, min_t=-np.inf, max_t=np.inf):
+    # Create the axis-aligned bounding box with the specified dimensions
+    aabb = o3d.geometry.AxisAlignedBoundingBox(min_bound=(min_x, min_y, min_t), max_bound=(max_x, max_y, max_t))
+    # Get the indices of points within the bounding box
+    indices = aabb.get_point_indices_within_bounding_box(pointCloud.points)
+    return indices
 
 def findbboxes(points, bboxes,ms_to_px):
     res = {}
@@ -293,6 +411,18 @@ https://stackoverflow.com/questions/42352622/finding-points-within-a-bounding-bo
     bb_filter = np.where(bb_filter == True)
     return bb_filter
 
+def findbboxnew(npyarr, min_x=-np.inf, max_x=np.inf, min_y=-np.inf,
+                        max_y=np.inf, min_t=-np.inf, max_t=np.inf):
+                
+    bound_x = np.logical_and(npyarr['x'] >= min_x, npyarr['x'] <= max_x)
+    bound_y = np.logical_and(npyarr['y'] >= min_y, npyarr['y'] <= max_y)
+    bound_t = np.logical_and(npyarr['t'] >= min_t, npyarr['t'] <= max_t)
+    bb_filter = np.logical_and(np.logical_and(bound_x, bound_y), bound_t)
+    filtered_df = pd.DataFrame(npyarr[bb_filter])
+    return filtered_df
+
+
+
 def process_bbox(args):
     bbox, npyarr, ms_to_px = args
     filtered_array = npyarr[(npyarr['x'] >= bbox[0]) & (npyarr['x'] <= bbox[1]) & (npyarr['y'] >= bbox[2]) & (npyarr['y'] <= bbox[3]) & (npyarr['t'] >= bbox[4]*1000*ms_to_px) & (npyarr['t'] <= bbox[5]*1000*ms_to_px)]
@@ -300,6 +430,37 @@ def process_bbox(args):
     cluster_size = [np.max(filtered_array['y'])-np.min(filtered_array['y']), np.max(filtered_array['x'])-np.min(filtered_array['x']), np.max(filtered_array['t'])-np.min(filtered_array['t'])]
     N_events = len(filtered_array)
     return filtered_df, cluster_size, N_events
+
+
+def o3d_getclusterbounding_boxes(events, cluster_labels,padding_xy = 0,padding_t = 0):
+    x=3
+    
+    
+    start_time = time.time()
+    bounding_boxes = {}
+    for cluster_id in np.unique(cluster_labels):
+        if cluster_id != -1:  # Ignore noise points
+            bounding_boxes[cluster_id] = compute_bounding_boxC(cluster_id,events=events,cluster_labels=cluster_labels,padding_xy=padding_xy,padding_t=padding_t)
+    
+    end_time = time.time()
+    logging.info('Time to get bounding boxesC: '+str(end_time-start_time))
+    
+    
+    start_time = time.time()
+    bounding_boxes2 = {}
+    for cluster_id in np.unique(cluster_labels):
+        if cluster_id != -1:  # Ignore noise points
+            cluster_points = events[cluster_labels == cluster_id]
+            # Create a PointCloud object from the numpy array
+            point_cloud = o3d.geometry.PointCloud()
+            point_cloud.points = o3d.utility.Vector3dVector(zip(cluster_points['x'],cluster_points['y'],cluster_points['t']))
+            
+            # Compute the axis-aligned bounding box
+            aabb = point_cloud.get_axis_aligned_bounding_box()
+            bounding_boxes2[cluster_id] = (aabb.get_min_bound()[0]-padding_xy, aabb.get_max_bound()[0]+padding_xy, aabb.get_min_bound()[1]-padding_xy, aabb.get_max_bound()[1]+padding_xy, aabb.get_min_bound()[2]-padding_t, aabb.get_max_bound()[2]+padding_t)
+    end_time = time.time()
+    logging.info('Time to get bounding boxes o3d: '+str(end_time-start_time))
+
 
 #-------------------------------------------------------------------------------------------------------------------------------
 #Callable functions
@@ -335,6 +496,7 @@ def DBSCAN_allEvents(npy_array,settings,**kwargs):
     bboxes = get_cluster_bounding_boxes(clustersHD, cluster_labels,padding_xy = int(kwargs['padding_xy']),padding_t = int(kwargs['padding_xy']))
     logging.info('Getting bounding boxes done')
     hotpixel_filtered_events = hotPixel_filter(npy_array,max_consec_ev,weights=weights,df_events=df_events)
+    
     candidates = get_events_in_bbox(hotpixel_filtered_events,bboxes,float(kwargs['ratio_ms_to_px']))
     logging.info('Candidates obtained')
     
