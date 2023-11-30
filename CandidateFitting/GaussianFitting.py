@@ -18,6 +18,7 @@ def __function_metadata__():
         "Gaussian2D": {
             "required_kwargs": [
                  {"name": "expected_width", "description": "Expected width of Gaussian fit (in nm)","default":150.},
+                 {"name": "fitting_tolerance", "description": "Discard localizations with uncertainties larger than this value times the pixel size. ","default":1.},
             ],
             "optional_kwargs": [
                 {"name": "multithread","description": "True to use multithread parallelization; False not to.","default":True},
@@ -41,37 +42,38 @@ def __function_metadata__():
 #-------------------------------------------------------------------------------------------------------------------------------
 
 # perform localization for part of candidate dictionary
-def localize_canditates2D(i, candidate_dic, expected_width, pixel_size):
+def localize_canditates2D(i, candidate_dic, expected_width, pixel_size, fitting_tolerance):
     print('Localizing PSFs (thread '+str(i)+')...')
     nr_of_localizations = len(candidate_dic)
-    localizations = pd.DataFrame(index=range(nr_of_localizations), columns=['candidate_id','x','y','x_err','y_err','p','t', 'nr_of_events']) #, dtypes={'x': 'float64', 'y': 'float64', 'p': 'int8', 't': 'float64'}
+    localizations = pd.DataFrame(index=range(nr_of_localizations), columns=['candidate_id', 'x', 'y', 'del_x', 'del_y', 'p', 't']) #, dtype={'candidate_id': 'int64', 'x': 'float64', 'y': 'float64', 'del_x': 'float64', 'del_y': 'int8', 'p': 'int8', 't': 'float64'}) 
     index = 0
     nb_fails = 0
     Gaussian_fit_info = ''
     for candidate_id in list(candidate_dic):
-        localization, fitting_info = localization2D(candidate_dic[candidate_id]['events'], candidate_id, expected_width, pixel_size)
+        localization, fitting_info = localization2D(candidate_dic[candidate_id]['events'], candidate_id, expected_width, pixel_size, fitting_tolerance)
         if fitting_info != '':
             Gaussian_fit_info += fitting_info
             nb_fails +=1
         else:
             localizations.loc[index] = localization
             index += 1
-    localizations = localizations.drop(localizations.tail(nb_fails).index) # localizations = localizations.iloc[:index]
-    # localizations = pd.DataFrame({'x': x[:index], 'y': y[:index], 'p': p[:index], 't': t[:index]})
+    localizations = localizations.drop(localizations.tail(nb_fails).index)
     print('Localizing PSFs (thread '+str(i)+') done!')
     return localizations, Gaussian_fit_info
 
 # 2d localization via gaussian fit
-def localization2D(sub_events, candidate_id, expected_width, pixel_size):
+def localization2D(sub_events, candidate_id, expected_width, pixel_size, fitting_tolerance):
     opt, err, fitting_info = gaussian_fitting(sub_events, candidate_id, expected_width)
     x = (opt[0]+np.min(sub_events['x']))*pixel_size # in nm
     y = (opt[1]+np.min(sub_events['y']))*pixel_size # in nm
-    x_err = err[0]*pixel_size # in nm
-    y_err = err[1]*pixel_size # in nm
+    del_x = err[0]*pixel_size # in nm
+    del_y = err[1]*pixel_size # in nm
+    if del_x > fitting_tolerance*pixel_size or del_y > fitting_tolerance*pixel_size:
+        fitting_info = f'Fitting uncertainties exceed the tolerance. No localization generated for candidate cluster  {candidate_id}.\n'
     t = np.mean(sub_events['t'])/1000. # in ms
     mean_polarity = sub_events['p'].mean()
     p = int(mean_polarity == 1) + int(mean_polarity == 0) * 0 + int(mean_polarity > 0 and mean_polarity < 1) * 2
-    return np.array([candidate_id, x,y,x_err,y_err,p,t,len(sub_events)]), fitting_info
+    return np.array([candidate_id, x, y, del_x, del_y, p, t]), fitting_info
 
 # gaussian fit via scipy.optimize.curve_fit with bounds
 def gaussian_fitting(sub_events, candidate_id, expected_width):
@@ -87,7 +89,7 @@ def gaussian_fitting(sub_events, candidate_id, expected_width):
     X,Y = np.meshgrid(x,y)
     fitting_info = ''
     try:
-        popt, pcov = optimize.curve_fit(gauss2d, (X,Y), sub_image.ravel(), p0=p0, gtol=1e-4,ftol=1e-4, bounds=bounds)
+        popt, pcov = optimize.curve_fit(gauss2d, (X,Y), sub_image.ravel(), p0=p0, bounds=bounds) #, gtol=1e-4,ftol=1e-4
         perr = np.sqrt(np.diag(pcov))
     except RuntimeError:
         fitting_info += f'RuntimeError encountered during fit. No localization generated for candidate cluster {candidate_id}.\n'
@@ -187,9 +189,10 @@ def Gaussian2D(candidate_dic,settings,**kwargs):
 
     # Load the required kwargs
     expected_width = float(kwargs['expected_width'])
+    fitting_tolerance = float(kwargs['fitting_tolerance'])
 
     # Load the optional kwargs
-    multithread = bool(kwargs['multithread'])
+    multithread = utilsHelper.strtobool(kwargs['multithread'])
 
     # Initializations - general
     pixel_size = float(settings['PixelSize_nm']['value']) # in nm
@@ -198,9 +201,9 @@ def Gaussian2D(candidate_dic,settings,**kwargs):
     if multithread == True: num_cores = multiprocessing.cpu_count()
     else: num_cores = 1
     
-    
+    # calculate number of jobs on CPU
     nb_candidates = len(candidate_dic)
-    if nb_candidates < num_cores:
+    if nb_candidates < num_cores or num_cores == 1:
         njobs = 1
         num_cores = 1
     elif nb_candidates/num_cores > 100:
@@ -208,11 +211,11 @@ def Gaussian2D(candidate_dic,settings,**kwargs):
     else:
         njobs = num_cores
 
-    logging.info("Candidate fitting split in "+str(njobs)+" jobs and divided on "+str(num_cores)+" cores.")
+    logging.info("Candidate fitting split in "+str(njobs)+" job(s) and divided on "+str(num_cores)+" core(s).")
 
     # Determine all localizations
     data_split = slice_data(candidate_dic, njobs)
-    RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(localize_canditates2D)(i, data_split[i], expected_width, pixel_size) for i in range(len(data_split)))
+    RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(localize_canditates2D)(i, data_split[i], expected_width, pixel_size, fitting_tolerance) for i in range(len(data_split)))
     
     localization_list = [res[0] for res in RES]
     localizations = pd.concat(localization_list)
@@ -228,6 +231,8 @@ def Gaussian2D(candidate_dic,settings,**kwargs):
         gaussian_fit_info += f"Gaussian fitting failed for {nb_fails} candidate clusters:\n"
     gaussian_fit_info += ''.join([res[1] for res in RES])
     logging.info(gaussian_fit_info)
+
+    logging.info(f'Number of localizations found: {len(localizations)}')
 
     return localizations, gaussian_fit_info
 
