@@ -336,44 +336,6 @@ def get_events_in_bbox(npyarr,bboxes,ms_to_px,multiThread=True):
 
         
     elif multiThread == True:
-        # start_time = time.time()
-        # num_cores = multiprocessing.cpu_count()
-        # logging.info("Bounding box finding split on "+str(num_cores)+" cores.")
-        
-        # #Sort the bounding boxes by start-time:
-        # sorted_bboxes = sorted(bboxes.values(), key=lambda bbox: bbox[4])
-        
-        # #Split into num_cores sections:
-        # bboxes_split = np.array_split(sorted_bboxes, num_cores)
-        
-        # #Split the npyarr based on the min, max time of bboxes_split:
-        # npyarr_split={}
-        # for i in range(0,num_cores):
-        #     selectionArea = (npyarr['t'] >= np.min(bboxes_split[i][:,4])*1000*ms_to_px) & (npyarr['t'] <= np.max(bboxes_split[i][:,5])*1000*ms_to_px)
-        #     npyarr_split[i] = npyarr[selectionArea]
-
-        # RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(findbboxes)(npyarr_split[i],bboxes_split[i],ms_to_px) for i in range(num_cores))
-        
-        # #res in RES contains an array of arrays, where e.g. res[0] is the indeces of the events that belong to bbox 0, etc
-        # result = [res for res in RES]
-        
-        # #Get all results as candidates dataframes as wanted:
-        # candidates = {}
-        # counter = 0
-        # for r in range(len(result)):
-        #     for b in range(len(result[r])):
-        #         filtered_array = npyarr_split[r][result[r][b]]
-        #         filtered_df2 = pd.DataFrame(filtered_array)
-        #         candidates[counter] = {}
-        #         candidates[counter]['events'] = filtered_df2
-        #         candidates[counter]['cluster_size'] = [np.max(filtered_array['y'])-np.min(filtered_array['y']), np.max(filtered_array['x'])-np.min(filtered_array['x']), np.max(filtered_array['t'])-np.min(filtered_array['t'])]
-        #         candidates[counter]['N_events'] = len(filtered_array)
-        #         counter +=1
-                
-        # end_time = time.time()
-        # candidatesTrue = candidates
-        # logging.info('Time to get bounding boxes: '+str(end_time-start_time))
-        
         time_start = time.time()
         
         candidates = {}
@@ -383,7 +345,7 @@ def get_events_in_bbox(npyarr,bboxes,ms_to_px,multiThread=True):
 
         
         bunch_size = 50
-        num_splits = int(np.ceil(len(bboxes)/bunch_size))
+        num_splits = max(1,int(np.ceil(len(bboxes)/bunch_size)))
                 
         #Run kdtrees on x and y:
         datax = np.zeros((len(npyarr),2))

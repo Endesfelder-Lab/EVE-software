@@ -70,7 +70,7 @@ class MyGUI(QMainWindow):
         #Set some major settings on the UI
         super().__init__()
         self.setWindowTitle("Eve - alphaVersion")
-        self.setMinimumSize(400, 300)  # Set minimum size for the GUI window
+        self.setMinimumSize(600, 800)  # Set minimum size for the GUI window
         
         #Set the central widget that contains everything
         #This is a group box that contains a grid layout. We fill everything inside this grid layout
@@ -300,10 +300,53 @@ class MyGUI(QMainWindow):
         
         
         #Add a run tab:
+        self.runLayout = QGroupBox("Run")
+        self.runLayout.setObjectName("groupboxRun")
+        self.runLayout.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.runLayout.setLayout(QGridLayout())
+        
+        
+        
+        #Populate with a start time and end time inputs:
+        self.runLayout.layout().addWidget(QLabel("Start time (ms):"), 0,0)
+        self.runLayout.layout().addWidget(QLabel("Duration (ms):"), 0,1)
+        #Also the QLineEdits that have useful names:
+        self.run_startTLineEdit = QLineEdit()
+        self.runLayout.layout().addWidget(self.run_startTLineEdit, 1,0)
+        #Give this a default value:
+        self.run_startTLineEdit.setText("0")
+        #Same for end time:
+        self.run_durationTLineEdit = QLineEdit()
+        self.runLayout.layout().addWidget(self.run_durationTLineEdit, 1,1)
+        self.run_durationTLineEdit.setText("Inf")
+        
+        #Also give start/end x/y values:
+        self.runLayout.layout().addWidget(QLabel("Min X (px):"), 0, 2)
+        self.runLayout.layout().addWidget(QLabel("Max X (px):"), 0, 3)
+        self.runLayout.layout().addWidget(QLabel("Min Y (px):"), 0, 4)
+        self.runLayout.layout().addWidget(QLabel("Max Y (px):"), 0, 5)
+        #Also the QLineEdits that have useful names:
+        self.run_minXLineEdit = QLineEdit()
+        self.runLayout.layout().addWidget(self.run_minXLineEdit, 1, 2)
+        self.run_minXLineEdit.setText("0")
+        self.run_maxXLineEdit = QLineEdit()
+        self.runLayout.layout().addWidget(self.run_maxXLineEdit, 1, 3)
+        self.run_maxXLineEdit.setText("Inf")
+        self.run_minYLineEdit = QLineEdit()
+        self.runLayout.layout().addWidget(self.run_minYLineEdit, 1, 4)
+        self.run_minYLineEdit.setText("0")
+        self.run_maxYLineEdit = QLineEdit()
+        self.runLayout.layout().addWidget(self.run_maxYLineEdit, 1, 5)
+        self.run_maxYLineEdit.setText("Inf")
+        
         self.buttonProcessingRun = QPushButton("Run")
         self.buttonProcessingRun.clicked.connect(lambda: self.run_processing())
-        tab_layout.layout().addWidget(self.buttonProcessingRun,3,0)
+        self.runLayout.layout().addWidget(self.buttonProcessingRun,2,0,1,6)
 
+        tab_layout.addWidget(self.runLayout, 3, 0)
+        
+        
+        
         #Add spacing so that the previewLayout is pushed to the bottom:
         tab_layout.setRowStretch(4, 1)
         
@@ -395,9 +438,7 @@ class MyGUI(QMainWindow):
         elif self.dataLocationInput.text().endswith('.npy'):
             #For npy, load the events in memory
             data = np.load(self.dataLocationInput.text(), mmap_mode='r')
-            indices = np.where((data['t'] >= int(timeStretch[0])*1000) & (data['t'] <= int(timeStretch[0])*1000+int(timeStretch[1])*1000))
-            # Access the partial data using the indices
-            events = data[indices]
+            events = self.filterEvents_npy_t(data,timeStretch)
             #Check if we have at least 1 event:
             if len(events) > 0:
                 # correct the coordinates and time stamps
@@ -415,22 +456,7 @@ class MyGUI(QMainWindow):
         
         self.previewEvents = events
         
-        #Edit values for x,y coordinates:
-        #First check if all entries in array are numbers:
-        try:
-            int(xyStretch[0])
-            int(xyStretch[1])
-            int(xyStretch[2])
-            int(xyStretch[3])
-            if not all(isinstance(x, int) for x in [int(xyStretch[0]),int(xyStretch[1]),int(xyStretch[2]),int(xyStretch[3])]):
-                logging.info("No XY cutting in preview due to not all entries being integers.")
-            else:
-                logging.info("XY cutting in preview to values: "+str(xyStretch[0])+","+str(xyStretch[1])+","+str(xyStretch[2])+","+str(xyStretch[3]))
-                #Filter on x,y coordinates:
-                events = events[(events['x'] >= int(xyStretch[0])) & (events['x'] <= int(xyStretch[1]))]
-                events = events[(events['y'] >= int(xyStretch[2])) & (events['y'] <= int(xyStretch[3]))]
-        except:
-             logging.info("No XY cutting in preview due to not all entries being integers-.")
+        self.previewEvents = self.filterEvents_xy(self.previewEvents,xyStretch)
         
         #Change global values so nothing is stored:
         globalSettingsOrig = copy.deepcopy(self.globalSettings)
@@ -450,7 +476,38 @@ class MyGUI(QMainWindow):
         
         #Update the loclist
         self.updateLocList()
+    
+    def filterEvents_npy_t(self,events,tStretch=(-np.Inf,np.Inf)):
+        #tStretch is (start, duration)
+        indices = np.where((events['t'] >= float(tStretch[0])*1000) & (events['t'] <= float(tStretch[0])*1000+float(tStretch[1])*1000))
+        # Access the partial data using the indices
+        events = events[indices]
         
+        if len(events) == 0:
+            logging.warning("No events found in the chosen time frame.")
+        
+        return events
+    
+    def filterEvents_xy(self,events,xyStretch=(-np.Inf,-np.Inf,np.Inf,np.Inf)):
+        #Edit values for x,y coordinates:
+        #First check if all entries in array are numbers:
+        try:
+            float(xyStretch[0])
+            float(xyStretch[1])
+            float(xyStretch[2])
+            float(xyStretch[3])
+            if not all(isinstance(x, float) for x in [float(xyStretch[0]),float(xyStretch[1]),float(xyStretch[2]),float(xyStretch[3])]):
+                logging.info("No XY cutting due to not all entries being floats.")
+            else:
+                logging.info("XY cutting to values: "+str(xyStretch[0])+","+str(xyStretch[1])+","+str(xyStretch[2])+","+str(xyStretch[3]))
+                #Filter on x,y coordinates:
+                events = events[(events['x'] >= float(xyStretch[0])) & (events['x'] <= float(xyStretch[1]))]
+                events = events[(events['y'] >= float(xyStretch[2])) & (events['y'] <= float(xyStretch[3]))]
+        except:
+             logging.warning("No XY cutting due to not all entries being float-.")
+        
+        return events
+    
     def setup_postProcessingTab(self):
         tab2_layout = QGridLayout()
         self.tab_postProcessing.setLayout(tab2_layout)
@@ -944,9 +1001,18 @@ class MyGUI(QMainWindow):
             return None
             #Load the data: 
         if dataLocation.endswith('.npy'):
-            return np.load(dataLocation)
+            npyevents = np.load(dataLocation, mmap_mode='r')
+            #Select xytp area specified:
+            npyevents = self.filterEvents_npy_t(npyevents,tStretch=(float(self.run_startTLineEdit.text()),float(self.run_durationTLineEdit.text())))
+            npyevents = self.filterEvents_xy(npyevents,xyStretch=(float(self.run_minXLineEdit.text()),float(self.run_maxXLineEdit.text()),float(self.run_minYLineEdit.text()),float(self.run_maxYLineEdit.text())))
+                
+            return npyevents
         elif dataLocation.endswith('.raw'):
             events = self.RawToNpy(dataLocation)
+            #Select xytp area specified:
+            events = self.filterEvents_npy_t(events,tStretch=(float(self.run_startTLineEdit.text()),float(self.run_durationTLineEdit.text())))
+            events = self.filterEvents_xy(events,xyStretch=(float(self.run_minXLineEdit.text()),float(self.run_maxXLineEdit.text()),float(self.run_minYLineEdit.text()),float(self.run_maxYLineEdit.text())))
+            
             return events
     
     def RawToNpy(self,filepath,buffer_size = 1e8,time_batches = 50e3):        
@@ -1122,8 +1188,7 @@ class MyGUI(QMainWindow):
             for k in range(len(BatchFindingResult[0])):
                 if self.filter_finding_on_chunking(BatchFindingResult[0][k],self.chunckloading_currentLimits):
                     # append BatchFindingResult[0][k] to the full result:
-                    #Shouldn't be appended, but should be a new entry in the dict:
-                    # self.data['FindingResult'][0] = np.append(self.data['FindingResult'][0],BatchFindingResult[0][k])     
+                    #Shouldn't be appended, but should be a new entry in the dict: 
                     self.data['FindingResult'][0][len(self.data['FindingResult'][0])] = BatchFindingResult[0][k]
         
         
@@ -1182,11 +1247,17 @@ class MyGUI(QMainWindow):
             sys.path.append(self.globalSettings['MetaVisionPath']['value']) 
             from metavision_core.event_io.raw_reader import RawReader
             record_raw = RawReader(fileToRun)
+            
+            
+            #FSeek to start time according to specifications
+            record_raw.seek_time(float(self.run_startTLineEdit.text())*1000)
+            
             #Read all chunks:
             self.chunckloading_number_chuck = 0
             events_prev = np.zeros(0, dtype={'names': ['x', 'y', 'p', 't'], 'formats': ['<u2', '<u2', '<i2', '<i8'], 'offsets': [0, 2, 4, 8], 'itemsize': 16})
             self.chunckloading_finished_chunking = False
             self.chunckloading_currentLimits = [[0,0],[0,0]]
+            
             while self.chunckloading_finished_chunking == False:
                 if self.chunckloading_number_chuck == 0:
                     events = record_raw.load_delta_t(float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000+float(self.globalSettings['FindingBatchingTimeOverlapMs']['value'])*1000)
@@ -1194,7 +1265,10 @@ class MyGUI(QMainWindow):
                     events = record_raw.load_delta_t(float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000)
                 if len(events) > 0:
                     logging.info('New chunk analysis starting') 
-                    
+                    #limit to requested xy
+                    events = self.filterEvents_xy(events,xyStretch=(float(self.run_minXLineEdit.text()),float(self.run_maxXLineEdit.text()),float(self.run_minYLineEdit.text()),float(self.run_maxYLineEdit.text())))
+                    #limit to requested t
+                    events = self.filterEvents_npy_t(events,tStretch=(-np.Inf,(float(self.run_startTLineEdit.text())+float(self.run_durationTLineEdit.text())))*1000)
                     
                     self.chunckloading_currentLimits = [[(self.chunckloading_number_chuck)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000,(self.chunckloading_number_chuck+1)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000],[(self.chunckloading_number_chuck)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000-float(self.globalSettings['FindingBatchingTimeOverlapMs']['value'])*1000,(self.chunckloading_number_chuck+1)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000+float(self.globalSettings['FindingBatchingTimeOverlapMs']['value'])*1000]]
                     #Add events_prev before these events:
@@ -1206,11 +1280,21 @@ class MyGUI(QMainWindow):
                 else:
                     logging.info('Finished chunking!')
                     self.chunckloading_finished_chunking = True
+                    
         elif self.dataLocationInput.text().endswith('.npy'):
             #For npy, load the events in memory
             data = np.load(self.dataLocationInput.text(), mmap_mode='r')
+            dataset_minx = data['x'].min()
+            dataset_miny = data['y'].min()
             
-             #Read all chunks:
+            if float(self.run_startTLineEdit.text()) > data['t'].min()/1000 or float(self.run_startTLineEdit.text())+float(self.run_durationTLineEdit.text()) < data['t'].max()/1000:
+                #Fully limit to t according to specifications
+                data = self.filterEvents_npy_t(data,tStretch=(float(self.run_startTLineEdit.text()),float(self.run_durationTLineEdit.text())))
+            
+                #set start time to zero (required for chunking):
+                data['t'] -= min(data['t'])
+            
+            #Read all chunks:
             self.chunckloading_number_chuck = 0
             self.chunckloading_finished_chunking = False
             self.chunckloading_currentLimits = [[0,0],[0,0]]
@@ -1222,7 +1306,13 @@ class MyGUI(QMainWindow):
                 if sum(indices) > 0:
                     # Access the partial data using the indices
                     events = data[indices]
+                    
+                    #Filter to xy
+                    events = self.filterEvents_xy(events,xyStretch=(dataset_minx+float(self.run_minXLineEdit.text()),dataset_minx+float(self.run_maxXLineEdit.text()),dataset_miny+float(self.run_minYLineEdit.text()),dataset_miny+float(self.run_maxYLineEdit.text())))
                     #Run partial on this:
+                    if len(events) == 0:
+                        logging.warning('Prematurely finished chunking!')
+                        pass
                     self.FindingBatching(events)
                     self.chunckloading_number_chuck+=1
                 else:
@@ -1230,6 +1320,11 @@ class MyGUI(QMainWindow):
                     self.chunckloading_finished_chunking = True
         else:
             logging.error("Please choose a .raw or .npy file for previews.")
+            return
+        
+        #Check if some candidates are found:
+        if len(self.data['FindingResult'][0]) == 0:
+            logging.error("No candidates found at all! Stopping analysis.")
             return
         
         #All finding is done, continue with fitting:
@@ -1280,7 +1375,9 @@ class MyGUI(QMainWindow):
                 self.data['FittingResult'] = eval(str(FittingEvalText))
                 logging.info('Candidate fitting done!')
                 logging.debug(self.data['FittingResult'])
-                
+                if len(self.data['FittingResult'][0]) == 0:
+                    logging.error('No localizations found after fitting!')
+                    return
                 #Create and store the metadata
                 if self.globalSettings['StoreFileMetadata']['value']:
                     self.createAndStoreFileMetadata()
