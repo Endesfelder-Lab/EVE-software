@@ -187,6 +187,17 @@ class MyGUI(QMainWindow):
         globalSettings['LoggingFilePath']['value'] = user_data_folder+os.sep+"logging.log"
         globalSettings['LoggingFilePath']['input'] = str
         
+        globalSettings['FindingBatching'] = {}
+        globalSettings['FindingBatching']['value'] = True
+        globalSettings['FindingBatching']['input'] = bool
+        globalSettings['FindingBatchingTimeMs'] = {}
+        globalSettings['FindingBatchingTimeMs']['value'] = 50000
+        globalSettings['FindingBatchingTimeMs']['input'] = float
+        globalSettings['FindingBatchingTimeOverlapMs'] = {}
+        globalSettings['FindingBatchingTimeOverlapMs']['value'] = 500
+        globalSettings['FindingBatchingTimeOverlapMs']['input'] = float
+        
+        
         globalSettings['IgnoreInOptions'] = ('IgnoreInOptions','StoreFinalOutput', 'JSONGUIstorePath','GlobalOptionsStorePath') #Add options here that should NOT show up in the global settings window
         return globalSettings
     
@@ -288,7 +299,7 @@ class MyGUI(QMainWindow):
         self.changeLayout_choice(self.groupboxFitting.layout(),"CandidateFitting_candidateFittingDropdown",self.Fitting_functionNameToDisplayNameMapping)
         
         
-        #Add a run button:
+        #Add a run tab:
         self.buttonProcessingRun = QPushButton("Run")
         self.buttonProcessingRun.clicked.connect(lambda: self.run_processing())
         tab_layout.layout().addWidget(self.buttonProcessingRun,3,0)
@@ -660,8 +671,7 @@ class MyGUI(QMainWindow):
         
         self.previewImage_slider = ImageSlider([],self)
         self.previewtab_layout.addWidget(self.previewImage_slider)
-            
-        
+               
     def updateShowPreview(self,previewEvents=None):
         if previewEvents is None:
             previewEvents = self.previewEvents
@@ -773,7 +783,6 @@ class MyGUI(QMainWindow):
         else:
             return False
         
- 
     def createRectangle(self,fig,data,col,padding=0):
         x_min = min(data['x'])-.5-padding
         y_min = min(data['y'])-.5-padding
@@ -1071,24 +1080,181 @@ class MyGUI(QMainWindow):
         if not onlyFitting:
             #Run the analysis on a single file
             self.currentFileInfo['CurrentFileLoc'] = FileName
-            npyData = self.loadRawData(FileName)
-            if npyData is None:
-                return
-            
-            #Check polarity
-            self.checkPolarity(npyData)
-            
-            #Sort event list on time
-            npyData = npyData[np.argsort(npyData,order='t')]
-            
+            if self.globalSettings['FindingBatching']['value']== False:
+                npyData = self.loadRawData(FileName)
+                if npyData is None:
+                    return
+                
+                #Check polarity
+                self.checkPolarity(npyData)
+                
+                #Sort event list on time
+                npyData = npyData[np.argsort(npyData,order='t')]
+                
+                #Run finding/fitting
+                self.runFindingAndFitting(npyData)
+            elif self.globalSettings['FindingBatching']['value']== True or self.globalSettings['FindingBatching']['value']== 2:
+                self.runFindingBatching()
             
         #If we only fit, we still run more or less the same info, butwe don't care about the npyData in the CurrentFileLoc.
         elif onlyFitting:
             self.currentFileInfo['CurrentFileLoc'] = FileName
             logging.info('Candidate finding NOT performed')
             npyData = None
+            self.runFindingAndFitting(npyData)
         
-        self.runFindingAndFitting(npyData)
+    
+    def FindingBatching(self,npyData):
+        #For now, print start and final time:
+        logging.info(self.chunckloading_currentLimits)
+        logging.info('Start time: '+str(npyData[0]['t']))
+        logging.info('End time: '+str(npyData[-1]['t']))
+        
+        FindingEvalText = self.getFunctionEvalText('Finding',"npyData","self.globalSettings")
+        if FindingEvalText is not None:
+            self.data['FindingMethod'] = str(FindingEvalText)
+            BatchFindingResult = eval(str(FindingEvalText))
+            
+            #Append the metadata
+            self.data['FindingResult'][1] = np.append(self.data['FindingResult'][1],BatchFindingResult[1])
+            
+            #Append to the fullr esult
+            for k in range(len(BatchFindingResult[0])):
+                if self.filter_finding_on_chunking(BatchFindingResult[0][k],self.chunckloading_currentLimits):
+                    # append BatchFindingResult[0][k] to the full result:
+                    #Shouldn't be appended, but should be a new entry in the dict:
+                    # self.data['FindingResult'][0] = np.append(self.data['FindingResult'][0],BatchFindingResult[0][k])     
+                    self.data['FindingResult'][0][len(self.data['FindingResult'][0])] = BatchFindingResult[0][k]
+        
+        
+    def filter_finding_on_chunking(self,candidate,chunking_limits):
+        #Return true if it should be in this chunk, false if not
+        
+        #Looking at end of chunk:
+        #Special case: start is after the overlap-start of next, and end is before the overlap-end of this:
+        if min(candidate['events']['t']) > chunking_limits[0][1]-(chunking_limits[1][1]-chunking_limits[0][1]) and max(candidate['events']['t']) < chunking_limits[1][1]:
+            #This will mean this candidate will be found in this chunk and in the next chunk:
+            #Check if the mean t is in this frame or not:
+            meant = np.mean(candidate['events']['t'])
+            if meant<chunking_limits[0][1]:
+                return True
+            else:
+                return False
+        #Looking at start of chunk:
+        #Special case: start is after the overlap-start of previous, and end is before the overlap-end of this:
+        elif min(candidate['events']['t']) > chunking_limits[1][0] and max(candidate['events']['t']) < chunking_limits[0][0]+(chunking_limits[1][1]-chunking_limits[0][1]):
+            #This will mean this candidate will be found in this chunk and in the previous chunk:
+            #Check if the mean t is in this frame or not:
+            meant = np.mean(candidate['events']['t'])
+            if meant>chunking_limits[0][0]:
+                return True
+            else:
+                return False
+        #Clear pass: start is after the true start of this, end is before the true end of this:
+        elif min(candidate['events']['t']) > chunking_limits[0][0] and max(candidate['events']['t']) < chunking_limits[0][1]:
+            return True
+        #Looking at end of chunk:
+        #Clear fail: start is after the true end of this
+        elif min(candidate['events']['t']) > chunking_limits[0][1]:
+            return False
+        #Looking at start of chunk:
+        #Clear fail: end is before the true start of this chunk
+        elif max(candidate['events']['t']) < chunking_limits[0][0]:
+            return False
+        else:
+            if max(candidate['events']['t'])-min(candidate['events']['t']) > (chunking_limits[1][1]-chunking_limits[0][1]):
+                logging.warning('This candidate might be cut off due to batching! Considering increasing overlap!')
+                return True
+            else:
+                logging.error('This candidate is never assigned! Should not happen!')
+                return False
+        
+    
+    def runFindingBatching(self):
+        logging.info('Batching-dependant finding starting!')
+        fileToRun = self.currentFileInfo['CurrentFileLoc']
+        
+        self.data['FindingResult'] = {}
+        self.data['FindingResult'][0] = {}
+        self.data['FindingResult'][1] = []
+        #For batching, we only load data between some timepoints.
+        if fileToRun.endswith('.raw'):
+            sys.path.append(self.globalSettings['MetaVisionPath']['value']) 
+            from metavision_core.event_io.raw_reader import RawReader
+            record_raw = RawReader(fileToRun)
+            #Read all chunks:
+            self.chunckloading_number_chuck = 0
+            events_prev = np.zeros(0, dtype={'names': ['x', 'y', 'p', 't'], 'formats': ['<u2', '<u2', '<i2', '<i8'], 'offsets': [0, 2, 4, 8], 'itemsize': 16})
+            self.chunckloading_finished_chunking = False
+            self.chunckloading_currentLimits = [[0,0],[0,0]]
+            while self.chunckloading_finished_chunking == False:
+                if self.chunckloading_number_chuck == 0:
+                    events = record_raw.load_delta_t(float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000+float(self.globalSettings['FindingBatchingTimeOverlapMs']['value'])*1000)
+                else:
+                    events = record_raw.load_delta_t(float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000)
+                if len(events) > 0:
+                    logging.info('New chunk analysis starting') 
+                    
+                    
+                    self.chunckloading_currentLimits = [[(self.chunckloading_number_chuck)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000,(self.chunckloading_number_chuck+1)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000],[(self.chunckloading_number_chuck)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000-float(self.globalSettings['FindingBatchingTimeOverlapMs']['value'])*1000,(self.chunckloading_number_chuck+1)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000+float(self.globalSettings['FindingBatchingTimeOverlapMs']['value'])*1000]]
+                    #Add events_prev before these events:
+                    events = np.concatenate((events_prev,events))
+                    self.FindingBatching(events)
+                    
+                    events_prev = events[events['t']>((self.chunckloading_number_chuck+1)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000-float(self.globalSettings['FindingBatchingTimeOverlapMs']['value'])*1000)]
+                    self.chunckloading_number_chuck += 1
+                else:
+                    logging.info('Finished chunking!')
+                    self.chunckloading_finished_chunking = True
+        elif self.dataLocationInput.text().endswith('.npy'):
+            #For npy, load the events in memory
+            data = np.load(self.dataLocationInput.text(), mmap_mode='r')
+            
+             #Read all chunks:
+            self.chunckloading_number_chuck = 0
+            self.chunckloading_finished_chunking = False
+            self.chunckloading_currentLimits = [[0,0],[0,0]]
+            while self.chunckloading_finished_chunking == False:
+                
+                self.chunckloading_currentLimits = [[(self.chunckloading_number_chuck)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000,(self.chunckloading_number_chuck+1)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000],[(self.chunckloading_number_chuck)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000-float(self.globalSettings['FindingBatchingTimeOverlapMs']['value'])*1000,(self.chunckloading_number_chuck+1)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000+float(self.globalSettings['FindingBatchingTimeOverlapMs']['value'])*1000]]
+                
+                indices = np.logical_and((data['t'] >= self.chunckloading_currentLimits[1][0]), (data['t'] <= self.chunckloading_currentLimits[1][1]))
+                if sum(indices) > 0:
+                    # Access the partial data using the indices
+                    events = data[indices]
+                    #Run partial on this:
+                    self.FindingBatching(events)
+                    self.chunckloading_number_chuck+=1
+                else:
+                    logging.info('Finished chunking!')
+                    self.chunckloading_finished_chunking = True
+        else:
+            logging.error("Please choose a .raw or .npy file for previews.")
+            return
+        
+        #All finding is done, continue with fitting:
+        self.runFitting()
+        
+        # self.previewEvents = events
+        
+        # #Edit values for x,y coordinates:
+        # #First check if all entries in array are numbers:
+        # try:
+        #     int(xyStretch[0])
+        #     int(xyStretch[1])
+        #     int(xyStretch[2])
+        #     int(xyStretch[3])
+        #     if not all(isinstance(x, int) for x in [int(xyStretch[0]),int(xyStretch[1]),int(xyStretch[2]),int(xyStretch[3])]):
+        #         logging.info("No XY cutting in preview due to not all entries being integers.")
+        #     else:
+        #         logging.info("XY cutting in preview to values: "+str(xyStretch[0])+","+str(xyStretch[1])+","+str(xyStretch[2])+","+str(xyStretch[3]))
+        #         #Filter on x,y coordinates:
+        #         events = events[(events['x'] >= int(xyStretch[0])) & (events['x'] <= int(xyStretch[1]))]
+        #         events = events[(events['y'] >= int(xyStretch[2])) & (events['y'] <= int(xyStretch[3]))]
+        # except:
+        #      logging.info("No XY cutting in preview due to not all entries being integers-.")
+             
+    
     
     def runFindingAndFitting(self,npyData):
         #Run the finding function!
@@ -1196,6 +1362,7 @@ Custom output from fitting function:
         moduleMethodEvalTexts = []
         all_layouts = self.findChild(QWidget, "groupbox"+className).findChildren(QLayout)[0]
         
+        
         methodKwargNames_method = []
         methodKwargValues_method = []
         methodName_method = ''
@@ -1204,7 +1371,7 @@ Custom output from fitting function:
             item = all_layouts.itemAt(index)
             widget = item.widget()
                         
-            if ("LineEdit" in widget.objectName()) and widget.isVisible():
+            if ("LineEdit" in widget.objectName()) and widget.isVisibleTo(self.tab_processing):
                 # The objectName will be along the lines of foo#bar#str
                 #Check if the objectname is part of a method or part of a scoring
                 split_list = widget.objectName().split('#')
@@ -1219,7 +1386,7 @@ Custom output from fitting function:
             for index in range(all_layouts.count()):
                 item = all_layouts.itemAt(index)
                 widget = item.widget()
-                if isinstance(widget,QComboBox) and widget.isVisible() and className in widget.objectName():
+                if isinstance(widget,QComboBox) and widget.isVisibleTo(self.tab_processing) and className in widget.objectName():
                     if className == 'Finding':
                         methodName_method = utils.functionNameFromDisplayName(widget.currentText(),self.Finding_functionNameToDisplayNameMapping)
                     elif className == 'Fitting':

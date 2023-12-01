@@ -380,7 +380,11 @@ def get_events_in_bbox(npyarr,bboxes,ms_to_px,multiThread=True):
         #Create a 1d kdtree of the x-values of npyarr:
         lookup_list = {}
         kdtree1d = {}
-    
+
+        
+        bunch_size = 50
+        num_splits = int(np.ceil(len(bboxes)/bunch_size))
+                
         #Run kdtrees on x and y:
         datax = np.zeros((len(npyarr),2))
         datax[:, 0] = npyarr['x']
@@ -392,18 +396,13 @@ def get_events_in_bbox(npyarr,bboxes,ms_to_px,multiThread=True):
         datay[:, 1] = npyarr['y']
         lookup_list['y'] = np.argsort(datay[:, 0])
         kdtree1d['y'] = spatial.cKDTree(datay)
-
         
-        bunch_size = 50
-        num_splits = int(np.ceil(len(bboxes)/bunch_size))
         #Split bboxes into bunches:
         bbox_bunches = split_dict(bboxes, num_splits)
         num_cores = multiprocessing.cpu_count()
         
         RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(kdtree_assisted_lookup)(bbox_bunches[r],ms_to_px,kdtree1d,lookup_list,npyarr) for r in range(len(bbox_bunches)))
         result = [res for res in RES]
-        # for r, split_dictv in enumerate(bbox_bunches):
-        #     outp = kdtree_assisted_lookup(bbox_bunches[r],ms_to_px,kdtree1d,lookup_list,npyarr)
         
         counter = 0
         for r in range(len(result)):
