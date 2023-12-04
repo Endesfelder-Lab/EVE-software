@@ -70,7 +70,7 @@ class MyGUI(QMainWindow):
         #Set some major settings on the UI
         super().__init__()
         self.setWindowTitle("Eve - alphaVersion")
-        self.setMinimumSize(600, 800)  # Set minimum size for the GUI window
+        self.setMinimumSize(600, 1000)  # Set minimum size for the GUI window
         
         #Set the central widget that contains everything
         #This is a group box that contains a grid layout. We fill everything inside this grid layout
@@ -260,7 +260,7 @@ class MyGUI(QMainWindow):
         self.groupboxFinding.setObjectName("groupboxFinding")
         self.groupboxFinding.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.groupboxFinding.setLayout(QGridLayout())
-        tab_layout.addWidget(self.groupboxFinding, 1, 0)
+        tab_layout.addWidget(self.groupboxFinding, 2, 0)
         
         # Create a QComboBox and add options - this is the FINDING dropdown
         self.candidateFindingDropdown = QComboBox(self)
@@ -282,7 +282,7 @@ class MyGUI(QMainWindow):
         self.groupboxFitting.setObjectName("groupboxFitting")
         self.groupboxFitting.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.groupboxFitting.setLayout(QGridLayout())
-        tab_layout.addWidget(self.groupboxFitting, 2, 0)
+        tab_layout.addWidget(self.groupboxFitting, 3, 0)
         
         # Create a QComboBox and add options - this is the FITTING dropdown
         self.candidateFittingDropdown = QComboBox(self)
@@ -298,6 +298,51 @@ class MyGUI(QMainWindow):
         #On startup/initiatlisation: also do changeLayout_choice
         self.changeLayout_choice(self.groupboxFitting.layout(),"CandidateFitting_candidateFittingDropdown",self.Fitting_functionNameToDisplayNameMapping)
         
+        #Add a data selection tab
+        self.dataSelectionLayout = QGroupBox("Data selection")
+        self.dataSelectionLayout.setObjectName("groupboxRun")
+        self.dataSelectionLayout.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.dataSelectionLayout.setLayout(QGridLayout())
+        tab_layout.addWidget(self.dataSelectionLayout, 1, 0)
+        
+        #Populate with a start time and end time inputs:
+        self.dataSelectionLayout.layout().addWidget(QLabel("Start time (ms):"), 0,0)
+        self.dataSelectionLayout.layout().addWidget(QLabel("Duration (ms):"), 0,1)
+        #Also the QLineEdits that have useful names:
+        self.run_startTLineEdit = QLineEdit()
+        self.run_startTLineEdit.setObjectName('run_startTLineEdit')
+        self.dataSelectionLayout.layout().addWidget(self.run_startTLineEdit, 1,0)
+        #Give this a default value:
+        self.run_startTLineEdit.setText("0")
+        #Same for end time:
+        self.run_durationTLineEdit = QLineEdit()
+        self.run_durationTLineEdit.setObjectName('run_durationTLineEdit')
+        self.dataSelectionLayout.layout().addWidget(self.run_durationTLineEdit, 1,1)
+        self.run_durationTLineEdit.setText("Inf")
+        
+        #Also give start/end x/y values:
+        self.dataSelectionLayout.layout().addWidget(QLabel("Min X (px):"), 0, 2)
+        self.dataSelectionLayout.layout().addWidget(QLabel("Max X (px):"), 0, 3)
+        self.dataSelectionLayout.layout().addWidget(QLabel("Min Y (px):"), 0, 4)
+        self.dataSelectionLayout.layout().addWidget(QLabel("Max Y (px):"), 0, 5)
+        #Also the QLineEdits that have useful names:
+        self.run_minXLineEdit = QLineEdit()
+        self.run_minXLineEdit.setObjectName('run_minXLineEdit')
+        self.dataSelectionLayout.layout().addWidget(self.run_minXLineEdit, 1, 2)
+        self.run_minXLineEdit.setText("0")
+        self.run_maxXLineEdit = QLineEdit()
+        self.run_maxXLineEdit.setObjectName('run_maxXLineEdit')
+        self.dataSelectionLayout.layout().addWidget(self.run_maxXLineEdit, 1, 3)
+        self.run_maxXLineEdit.setText("Inf")
+        self.run_minYLineEdit = QLineEdit()
+        self.run_minYLineEdit.setObjectName('run_minYLineEdit')
+        self.dataSelectionLayout.layout().addWidget(self.run_minYLineEdit, 1, 4)
+        self.run_minYLineEdit.setText("0")
+        self.run_maxYLineEdit = QLineEdit()
+        self.run_maxYLineEdit.setObjectName('run_maxYLineEdit')
+        self.dataSelectionLayout.layout().addWidget(self.run_maxYLineEdit, 1, 5)
+        self.run_maxYLineEdit.setText("Inf")
+        
         
         #Add a run tab:
         self.runLayout = QGroupBox("Run")
@@ -305,54 +350,17 @@ class MyGUI(QMainWindow):
         self.runLayout.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.runLayout.setLayout(QGridLayout())
         
-        #Populate with a start time and end time inputs:
-        self.runLayout.layout().addWidget(QLabel("Start time (ms):"), 0,0)
-        self.runLayout.layout().addWidget(QLabel("Duration (ms):"), 0,1)
-        #Also the QLineEdits that have useful names:
-        self.run_startTLineEdit = QLineEdit()
-        self.run_startTLineEdit.setObjectName('run_startTLineEdit')
-        self.runLayout.layout().addWidget(self.run_startTLineEdit, 1,0)
-        #Give this a default value:
-        self.run_startTLineEdit.setText("0")
-        #Same for end time:
-        self.run_durationTLineEdit = QLineEdit()
-        self.run_durationTLineEdit.setObjectName('run_durationTLineEdit')
-        self.runLayout.layout().addWidget(self.run_durationTLineEdit, 1,1)
-        self.run_durationTLineEdit.setText("Inf")
-        
-        #Also give start/end x/y values:
-        self.runLayout.layout().addWidget(QLabel("Min X (px):"), 0, 2)
-        self.runLayout.layout().addWidget(QLabel("Max X (px):"), 0, 3)
-        self.runLayout.layout().addWidget(QLabel("Min Y (px):"), 0, 4)
-        self.runLayout.layout().addWidget(QLabel("Max Y (px):"), 0, 5)
-        #Also the QLineEdits that have useful names:
-        self.run_minXLineEdit = QLineEdit()
-        self.run_minXLineEdit.setObjectName('run_minXLineEdit')
-        self.runLayout.layout().addWidget(self.run_minXLineEdit, 1, 2)
-        self.run_minXLineEdit.setText("0")
-        self.run_maxXLineEdit = QLineEdit()
-        self.run_maxXLineEdit.setObjectName('run_maxXLineEdit')
-        self.runLayout.layout().addWidget(self.run_maxXLineEdit, 1, 3)
-        self.run_maxXLineEdit.setText("Inf")
-        self.run_minYLineEdit = QLineEdit()
-        self.run_minYLineEdit.setObjectName('run_minYLineEdit')
-        self.runLayout.layout().addWidget(self.run_minYLineEdit, 1, 4)
-        self.run_minYLineEdit.setText("0")
-        self.run_maxYLineEdit = QLineEdit()
-        self.run_maxYLineEdit.setObjectName('run_maxYLineEdit')
-        self.runLayout.layout().addWidget(self.run_maxYLineEdit, 1, 5)
-        self.run_maxYLineEdit.setText("Inf")
         
         self.buttonProcessingRun = QPushButton("Run")
         self.buttonProcessingRun.clicked.connect(lambda: self.run_processing())
         self.runLayout.layout().addWidget(self.buttonProcessingRun,2,0,1,6)
 
-        tab_layout.addWidget(self.runLayout, 3, 0)
+        tab_layout.addWidget(self.runLayout, 4, 0)
         
         
         
         #Add spacing so that the previewLayout is pushed to the bottom:
-        tab_layout.setRowStretch(4, 1)
+        tab_layout.setRowStretch(5, 1)
         
         
         #Add a preview box:
@@ -360,7 +368,7 @@ class MyGUI(QMainWindow):
         self.previewLayout.setObjectName("groupboxPreview")
         self.previewLayout.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.previewLayout.setLayout(QGridLayout())
-        tab_layout.addWidget(self.previewLayout, 5, 0)
+        tab_layout.addWidget(self.previewLayout, 9, 0)
         
         #Add a preview layout:
         
