@@ -305,18 +305,18 @@ class MyGUI(QMainWindow):
         self.runLayout.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.runLayout.setLayout(QGridLayout())
         
-        
-        
         #Populate with a start time and end time inputs:
         self.runLayout.layout().addWidget(QLabel("Start time (ms):"), 0,0)
         self.runLayout.layout().addWidget(QLabel("Duration (ms):"), 0,1)
         #Also the QLineEdits that have useful names:
         self.run_startTLineEdit = QLineEdit()
+        self.run_startTLineEdit.setObjectName('run_startTLineEdit')
         self.runLayout.layout().addWidget(self.run_startTLineEdit, 1,0)
         #Give this a default value:
         self.run_startTLineEdit.setText("0")
         #Same for end time:
         self.run_durationTLineEdit = QLineEdit()
+        self.run_durationTLineEdit.setObjectName('run_durationTLineEdit')
         self.runLayout.layout().addWidget(self.run_durationTLineEdit, 1,1)
         self.run_durationTLineEdit.setText("Inf")
         
@@ -327,15 +327,19 @@ class MyGUI(QMainWindow):
         self.runLayout.layout().addWidget(QLabel("Max Y (px):"), 0, 5)
         #Also the QLineEdits that have useful names:
         self.run_minXLineEdit = QLineEdit()
+        self.run_minXLineEdit.setObjectName('run_minXLineEdit')
         self.runLayout.layout().addWidget(self.run_minXLineEdit, 1, 2)
         self.run_minXLineEdit.setText("0")
         self.run_maxXLineEdit = QLineEdit()
+        self.run_maxXLineEdit.setObjectName('run_maxXLineEdit')
         self.runLayout.layout().addWidget(self.run_maxXLineEdit, 1, 3)
         self.run_maxXLineEdit.setText("Inf")
         self.run_minYLineEdit = QLineEdit()
+        self.run_minYLineEdit.setObjectName('run_minYLineEdit')
         self.runLayout.layout().addWidget(self.run_minYLineEdit, 1, 4)
         self.run_minYLineEdit.setText("0")
         self.run_maxYLineEdit = QLineEdit()
+        self.run_maxYLineEdit.setObjectName('run_maxYLineEdit')
         self.runLayout.layout().addWidget(self.run_maxYLineEdit, 1, 5)
         self.run_maxYLineEdit.setText("Inf")
         
@@ -365,11 +369,13 @@ class MyGUI(QMainWindow):
         self.previewLayout.layout().addWidget(QLabel("Duration (ms):"), 0, 2, 1, 2)
         #Also the QLineEdits that have useful names:
         self.preview_startTLineEdit = QLineEdit()
+        self.preview_startTLineEdit.setObjectName('preview_startTLineEdit')
         self.previewLayout.layout().addWidget(self.preview_startTLineEdit, 1, 0, 1, 2)
         #Give this a default value:
         self.preview_startTLineEdit.setText("0")
         #Same for end time:
         self.preview_durationTLineEdit = QLineEdit()
+        self.preview_durationTLineEdit.setObjectName('preview_durationTLineEdit')
         self.previewLayout.layout().addWidget(self.preview_durationTLineEdit, 1, 2, 1, 2)
         self.preview_durationTLineEdit.setText("1000")
         
@@ -380,15 +386,19 @@ class MyGUI(QMainWindow):
         self.previewLayout.layout().addWidget(QLabel("Max Y (px):"), 2, 3)
         #Also the QLineEdits that have useful names:
         self.preview_minXLineEdit = QLineEdit()
+        self.preview_minXLineEdit.setObjectName('preview_minXLineEdit')
         self.previewLayout.layout().addWidget(self.preview_minXLineEdit, 3, 0)
         self.preview_minXLineEdit.setText("")
         self.preview_maxXLineEdit = QLineEdit()
+        self.preview_maxXLineEdit.setObjectName('preview_maxXLineEdit')
         self.previewLayout.layout().addWidget(self.preview_maxXLineEdit, 3, 1)
         self.preview_maxXLineEdit.setText("")
         self.preview_minYLineEdit = QLineEdit()
+        self.preview_minYLineEdit.setObjectName('preview_minYLineEdit')
         self.previewLayout.layout().addWidget(self.preview_minYLineEdit, 3, 2)
         self.preview_minYLineEdit.setText("")
         self.preview_maxYLineEdit = QLineEdit()
+        self.preview_maxYLineEdit.setObjectName('preview_maxYLineEdit')
         self.previewLayout.layout().addWidget(self.preview_maxYLineEdit, 3, 3)
         self.preview_maxYLineEdit.setText("")
         
@@ -1273,9 +1283,10 @@ class MyGUI(QMainWindow):
                     self.chunckloading_currentLimits = [[(self.chunckloading_number_chuck)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000,(self.chunckloading_number_chuck+1)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000],[(self.chunckloading_number_chuck)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000-float(self.globalSettings['FindingBatchingTimeOverlapMs']['value'])*1000,(self.chunckloading_number_chuck+1)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000+float(self.globalSettings['FindingBatchingTimeOverlapMs']['value'])*1000]]
                     #Add events_prev before these events:
                     events = np.concatenate((events_prev,events))
-                    self.FindingBatching(events)
-                    
-                    events_prev = events[events['t']>((self.chunckloading_number_chuck+1)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000-float(self.globalSettings['FindingBatchingTimeOverlapMs']['value'])*1000)]
+                    if len(events) > 0:
+                        self.FindingBatching(events)
+                        
+                        events_prev = events[events['t']>((self.chunckloading_number_chuck+1)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000-float(self.globalSettings['FindingBatchingTimeOverlapMs']['value'])*1000)]
                     self.chunckloading_number_chuck += 1
                 else:
                     logging.info('Finished chunking!')
@@ -1636,8 +1647,10 @@ Custom output from fitting function:
             if isinstance(widget, QLineEdit) or isinstance(widget, QComboBox):
                 fields[widget.objectName()] = widget
             elif isinstance(widget, QWidget):
-                for child_widget in widget.children():
-                    find_editable_fields(child_widget)
+                # for child_widget in widget.children():
+                #     find_editable_fields(child_widget)
+                for children_widget in widget.findChildren(QWidget):
+                    find_editable_fields(children_widget)
 
         find_editable_fields(self)
         return fields
