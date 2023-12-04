@@ -24,3 +24,5 @@ threadpoolctl==3.2.0
 tqdm==4.66.1
 tzdata==2023.3
 zipp==3.17.0
+appdirs==1.4.4
+shapely==2.0.2

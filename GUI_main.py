@@ -177,6 +177,9 @@ class MyGUI(QMainWindow):
         globalSettings['OutputDataFormat']['options'] = ('thunderstorm','minimal')
         globalSettings['OutputDataFormat']['displayName'] = 'Output data format'
         user_data_folder = appdirs.user_data_dir(appname="Eve", appauthor="UniBonn")
+        #Check if this folder already exists, if not, create it:
+        if not os.path.exists(user_data_folder):
+            os.makedirs(user_data_folder)
         globalSettings['JSONGUIstorePath'] = {}
         globalSettings['JSONGUIstorePath']['value'] = user_data_folder+os.sep+"storage.json"
         globalSettings['JSONGUIstorePath']['input'] = str
