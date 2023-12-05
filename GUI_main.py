@@ -302,48 +302,60 @@ class MyGUI(QMainWindow):
         self.changeLayout_choice(self.groupboxFitting.layout(),"CandidateFitting_candidateFittingDropdown",self.Fitting_functionNameToDisplayNameMapping)
         
         #Add a data selection tab
-        self.dataSelectionLayout = QGroupBox("Data selection")
+        self.dataSelectionLayout = ClickableGroupBox("Data selection")
+        self.dataSelectionLayout.setCheckable(True)
         self.dataSelectionLayout.setObjectName("groupboxRun")
         self.dataSelectionLayout.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.dataSelectionLayout.setLayout(QGridLayout())
         tab_layout.addWidget(self.dataSelectionLayout, 1, 0)
         
+        self.dataSelectionPolarityLayout = QGroupBox("Polarity")
+        self.dataSelectionPolarityLayout.setLayout(QGridLayout())
+        self.dataSelectionTimeLayout = QGroupBox("Time")
+        self.dataSelectionTimeLayout.setLayout(QGridLayout())
+        self.dataSelectionPositionLayout = QGroupBox("Position")
+        self.dataSelectionPositionLayout.setLayout(QGridLayout())
+        
+        self.dataSelectionLayout.layout().addWidget(self.dataSelectionPolarityLayout,0,0)
+        self.dataSelectionLayout.layout().addWidget(self.dataSelectionTimeLayout,0,1)
+        self.dataSelectionLayout.layout().addWidget(self.dataSelectionPositionLayout,0,2)
+        
         #Populate with a start time and end time inputs:
-        self.dataSelectionLayout.layout().addWidget(QLabel("Start time (ms):"), 0,0)
-        self.dataSelectionLayout.layout().addWidget(QLabel("Duration (ms):"), 0,1)
+        self.dataSelectionTimeLayout.layout().addWidget(QLabel("Start time (ms):"), 0,0)
+        self.dataSelectionTimeLayout.layout().addWidget(QLabel("Duration (ms):"), 2,0)
         #Also the QLineEdits that have useful names:
         self.run_startTLineEdit = QLineEdit()
         self.run_startTLineEdit.setObjectName('run_startTLineEdit')
-        self.dataSelectionLayout.layout().addWidget(self.run_startTLineEdit, 1,0)
+        self.dataSelectionTimeLayout.layout().addWidget(self.run_startTLineEdit, 1,0)
         #Give this a default value:
         self.run_startTLineEdit.setText("0")
         #Same for end time:
         self.run_durationTLineEdit = QLineEdit()
         self.run_durationTLineEdit.setObjectName('run_durationTLineEdit')
-        self.dataSelectionLayout.layout().addWidget(self.run_durationTLineEdit, 1,1)
+        self.dataSelectionTimeLayout.layout().addWidget(self.run_durationTLineEdit, 3,0)
         self.run_durationTLineEdit.setText("Inf")
         
         #Also give start/end x/y values:
-        self.dataSelectionLayout.layout().addWidget(QLabel("Min X (px):"), 0, 2)
-        self.dataSelectionLayout.layout().addWidget(QLabel("Max X (px):"), 0, 3)
-        self.dataSelectionLayout.layout().addWidget(QLabel("Min Y (px):"), 0, 4)
-        self.dataSelectionLayout.layout().addWidget(QLabel("Max Y (px):"), 0, 5)
+        self.dataSelectionPositionLayout.layout().addWidget(QLabel("Min X (px):"), 0, 0)
+        self.dataSelectionPositionLayout.layout().addWidget(QLabel("Max X (px):"), 0, 1)
+        self.dataSelectionPositionLayout.layout().addWidget(QLabel("Min Y (px):"), 2, 0)
+        self.dataSelectionPositionLayout.layout().addWidget(QLabel("Max Y (px):"), 2, 1)
         #Also the QLineEdits that have useful names:
         self.run_minXLineEdit = QLineEdit()
         self.run_minXLineEdit.setObjectName('run_minXLineEdit')
-        self.dataSelectionLayout.layout().addWidget(self.run_minXLineEdit, 1, 2)
+        self.dataSelectionPositionLayout.layout().addWidget(self.run_minXLineEdit, 1, 0)
         self.run_minXLineEdit.setText("0")
         self.run_maxXLineEdit = QLineEdit()
         self.run_maxXLineEdit.setObjectName('run_maxXLineEdit')
-        self.dataSelectionLayout.layout().addWidget(self.run_maxXLineEdit, 1, 3)
+        self.dataSelectionPositionLayout.layout().addWidget(self.run_maxXLineEdit, 1, 1)
         self.run_maxXLineEdit.setText("Inf")
         self.run_minYLineEdit = QLineEdit()
         self.run_minYLineEdit.setObjectName('run_minYLineEdit')
-        self.dataSelectionLayout.layout().addWidget(self.run_minYLineEdit, 1, 4)
+        self.dataSelectionPositionLayout.layout().addWidget(self.run_minYLineEdit, 3, 0)
         self.run_minYLineEdit.setText("0")
         self.run_maxYLineEdit = QLineEdit()
         self.run_maxYLineEdit.setObjectName('run_maxYLineEdit')
-        self.dataSelectionLayout.layout().addWidget(self.run_maxYLineEdit, 1, 5)
+        self.dataSelectionPositionLayout.layout().addWidget(self.run_maxYLineEdit, 3, 1)
         self.run_maxYLineEdit.setText("Inf")
         
         
@@ -1982,3 +1994,25 @@ class ImageSlider(QWidget):
         self.figures = new_figures
         self.slider.setRange(0, len(new_figures) - 1)
         self.update_figure(0)
+
+#Pressing clickable group boxes collapses them
+class ClickableGroupBox(QGroupBox):
+    def __init__(self, title):
+        super().__init__(title)
+        # self.setCheckable(True)
+        # self.setChecked(True)  # Expanded by default
+
+        self.clicked.connect(self.toggleCollapsed)
+        # Remove the checkbox indicator
+        self.setStyleSheet("QGroupBox::indicator { width: 0; }")
+ 
+    def toggleCollapsed(self, checked):
+        layout = self.layout()
+        if layout is not None:
+            for i in range(layout.count()):
+                item = layout.itemAt(i)
+                widget = item.widget()
+                if widget is not None:
+                    widget.setVisible(checked)
+            layout.invalidate()
+            self.adjustSize()
