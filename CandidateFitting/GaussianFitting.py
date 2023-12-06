@@ -41,109 +41,106 @@ def __function_metadata__():
 #Helper functions
 #-------------------------------------------------------------------------------------------------------------------------------
 
+class fit:
+
+    def __init__(self, events, candidateID):
+        self.candidateID = candidateID
+        self.xlim = [np.min(events['x']), np.max(events['x'])]
+        self.ylim = [np.min(events['y']), np.max(events['y'])]
+        self.xstats = [np.mean(events['x']), np.std(events['x'])]
+        self.ystats = [np.mean(events['y']), np.std(events['y'])]
+        self.image = self.hist2d(events)
+        self.imstats = [np.max(self.image), np.median(self.image)]
+        self.mesh = self.meshgrid()
+        self.fit_info = ''
+
+    def hist2d(self, events):
+        image=np.zeros((self.ylim[1]-self.ylim[0]+1,self.xlim[1]-self.xlim[0]+1))
+        for index, event in events.iterrows():
+            image[int(event['y']-self.ylim[0]),int(event['x']-self.xlim[0])]+=1
+        image = image.ravel()
+        return image
+    
+    def meshgrid(self):
+        x = np.arange(self.xlim[1]-self.xlim[0]+1)
+        y = np.arange(self.ylim[1]-self.ylim[0]+1)
+        X,Y = np.meshgrid(x,y)
+        return X,Y
+    
+    def __call__(self, func, **kwargs):
+        try:
+            popt, pcov = optimize.curve_fit(func, self.mesh, self.image, **kwargs) #, gtol=1e-4,ftol=1e-4
+            perr = np.sqrt(np.diag(pcov))
+        except RuntimeError:
+            self.fit_info += f'RuntimeError encountered during fit. No localization generated for candidate cluster {self.candidateID}.\n'
+            popt = np.zeros(6)
+            perr = np.zeros(6)
+        except ValueError:
+            self.fit_info += f'ValueError encountered during fit. No localization generated for candidate cluster {self.candidateID}.\n'
+            popt = np.zeros(6)
+            perr = np.zeros(6)
+        except OptimizeWarning:
+            self.fit_info += f'OptimizeWarning encountered during fit. No localization generated for candidate cluster {self.candidateID}.\n'
+            popt = np.zeros(6)
+            perr = np.zeros(6)
+        return popt, perr
+
+class gauss2D(fit):
+
+    def __init__(self, events, candidateID, width, fitting_tolerance, pixel_size):
+        super().__init__(events, candidateID)
+        self.bounds = self.bounds()
+        self.p0 = self.p0(width)
+        self.fitting_tolerance = fitting_tolerance
+        self.pixel_size = pixel_size
+
+    def bounds(self):
+        bounds = ([0., 0., 0., 0., 0., 0.], [self.xlim[1]-self.xlim[0], self.ylim[1]-self.ylim[0], np.inf, np.inf, np.inf, np.inf])
+        return bounds
+    
+    def p0(self, width):
+        p0 = (self.xstats[0]-self.xlim[0], self.ystats[0]-self.ylim[0], width, width, self.imstats[0], self.imstats[1])
+        return p0
+    
+    def func(self, XY, x0, y0, sigma_x, sigma_y, amplitude, offset):
+        X, Y = XY
+        g = offset + amplitude * np.exp( - ((X-x0)**2/(2*sigma_x**2) + (Y-y0)**2/(2*sigma_y**2)))
+        return g.ravel()
+    
+    def __call__(self, events, **kwargs):
+        opt, err = super().__call__(self.func, bounds=self.bounds, p0=self.p0, **kwargs)
+        x = (opt[0]+self.xlim[0])*self.pixel_size # in nm
+        y = (opt[1]+self.ylim[0])*self.pixel_size # in nm
+        del_x = err[0]*self.pixel_size # in nm
+        del_y = err[1]*self.pixel_size # in nm
+        if del_x > self.fitting_tolerance*self.pixel_size or del_y > self.fitting_tolerance*self.pixel_size:
+            self.fit_info = f'Fitting uncertainties exceed the tolerance. No localization generated for candidate cluster {self.candidateID}.\n'
+        t = np.mean(events['t'])/1000. # in ms
+        mean_polarity = events['p'].mean()
+        p = int(mean_polarity == 1) + int(mean_polarity == 0) * 0 + int(mean_polarity > 0 and mean_polarity < 1) * 2
+        return np.array([self.candidateID, x, y, del_x, del_y, p, t]), self.fit_info
+
+
 # perform localization for part of candidate dictionary
-def localize_canditates2D(i, candidate_dic, expected_width, pixel_size, fitting_tolerance):
+def localize_canditates2D(i, candidate_dic, func, df_cols, *args, **kwargs):
     print('Localizing PSFs (thread '+str(i)+')...')
     nr_of_localizations = len(candidate_dic)
-    localizations = pd.DataFrame(index=range(nr_of_localizations), columns=['candidate_id', 'x', 'y', 'del_x', 'del_y', 'p', 't']) #, dtype={'candidate_id': 'int64', 'x': 'float64', 'y': 'float64', 'del_x': 'float64', 'del_y': 'int8', 'p': 'int8', 't': 'float64'}) 
+    localizations = pd.DataFrame(index=range(nr_of_localizations), columns = df_cols)
     index = 0
     nb_fails = 0
-    Gaussian_fit_info = ''
+    info = ''
     for candidate_id in list(candidate_dic):
-        localization, fitting_info = localization2D(candidate_dic[candidate_id]['events'], candidate_id, expected_width, pixel_size, fitting_tolerance)
+        fitting = func(candidate_dic[candidate_id]['events'], candidate_id, *args)
+        localization, fitting_info = fitting(candidate_dic[candidate_id]['events'], **kwargs)
         if fitting_info != '':
-            Gaussian_fit_info += fitting_info
+            info += fitting_info
             nb_fails +=1
         else:
             localizations.loc[index] = localization
             index += 1
     localizations = localizations.drop(localizations.tail(nb_fails).index)
     print('Localizing PSFs (thread '+str(i)+') done!')
-    return localizations, Gaussian_fit_info
-
-# 2d localization via gaussian fit
-def localization2D(sub_events, candidate_id, expected_width, pixel_size, fitting_tolerance):
-    opt, err, fitting_info = gaussian_fitting(sub_events, candidate_id, expected_width)
-    x = (opt[0]+np.min(sub_events['x']))*pixel_size # in nm
-    y = (opt[1]+np.min(sub_events['y']))*pixel_size # in nm
-    del_x = err[0]*pixel_size # in nm
-    del_y = err[1]*pixel_size # in nm
-    if del_x > fitting_tolerance*pixel_size or del_y > fitting_tolerance*pixel_size:
-        fitting_info = f'Fitting uncertainties exceed the tolerance. No localization generated for candidate cluster  {candidate_id}.\n'
-    t = np.mean(sub_events['t'])/1000. # in ms
-    mean_polarity = sub_events['p'].mean()
-    p = int(mean_polarity == 1) + int(mean_polarity == 0) * 0 + int(mean_polarity > 0 and mean_polarity < 1) * 2
-    return np.array([candidate_id, x, y, del_x, del_y, p, t]), fitting_info
-
-# gaussian fit via scipy.optimize.curve_fit with bounds
-def gaussian_fitting(sub_events, candidate_id, expected_width):
-    min_x = np.min(sub_events['x'])
-    min_y = np.min(sub_events['y'])
-    sub_image=np.zeros((np.max(sub_events['y'])-min_y+1,np.max(sub_events['x'])-min_x+1))
-    for index, event in sub_events.iterrows():
-        sub_image[int(event['y']-min_y),int(event['x']-min_x)]+=1
-    bounds = ([0., 0., 0., 0., 0., 0.], [np.max(sub_events['x'])-np.min(sub_events['x']), np.max(sub_events['y'])-np.min(sub_events['y']), np.inf, np.inf, np.inf, np.inf])
-    p0 = (np.mean(sub_events['x'])-np.min(sub_events['x']), np.mean(sub_events['y'])-np.min(sub_events['y']), expected_width, expected_width, np.max(sub_image), np.median(sub_image))
-    x = np.arange(np.max(sub_events['x'])-np.min(sub_events['x'])+1)
-    y = np.arange(np.max(sub_events['y'])-np.min(sub_events['y'])+1)
-    X,Y = np.meshgrid(x,y)
-    fitting_info = ''
-    try:
-        popt, pcov = optimize.curve_fit(gauss2d, (X,Y), sub_image.ravel(), p0=p0, bounds=bounds) #, gtol=1e-4,ftol=1e-4
-        perr = np.sqrt(np.diag(pcov))
-    except RuntimeError:
-        fitting_info += f'RuntimeError encountered during fit. No localization generated for candidate cluster {candidate_id}.\n'
-        popt = np.zeros(6)
-        perr = np.zeros(6)
-    except ValueError:
-        fitting_info += f'ValueError encountered during fit. No localization generated for candidate cluster {candidate_id}.\n'
-        popt = np.zeros(6)
-        perr = np.zeros(6)
-    except OptimizeWarning:
-        fitting_info += f'OptimizeWarning encountered during fit. No localization generated for candidate cluster {candidate_id}.\n'
-        popt = np.zeros(6)
-        perr = np.zeros(6)
-    return popt, perr, fitting_info
-
-# normal 2D Gaussian without rotation
-def gauss2d(XY, x0, y0, sigma_x, sigma_y, amplitude, offset):
-    X, Y = XY
-    g = offset + amplitude * np.exp( - ((X-x0)**2/(2*sigma_x**2) + (Y-y0)**2/(2*sigma_y**2)))
-    return g.ravel()
-
-def localization3D(sub_events,pixel_size):
-    opt, err, fitting_info = gaussian_fitting_theta(sub_events, 150./pixel_size)
-    x = (opt[0]+np.min(sub_events['x']))*pixel_size # in nm
-    y = (opt[1]+np.min(sub_events['y']))*pixel_size # in nm
-    t = np.mean(sub_events['t'])/1000. # in ms
-    p = sub_events['p'][0]
-    return np.array([x,y,p,t]), fitting_info
-
-def gaussian_fitting_theta(sub_events, expected_width):
-    sub_image=np.zeros((np.max(sub_events['y'])-np.min(sub_events['y'])+1,np.max(sub_events['x'])-np.min(sub_events['x'])+1))
-    for k in np.arange(len(sub_events)):
-        sub_image[sub_events['y'][k]-np.min(sub_events['y']),sub_events['x'][k]-np.min(sub_events['x'])]+=1
-    bounds = ([0., 0., 0., 0., 0., 0.], [np.max(sub_events['x'])-np.min(sub_events['x']), np.max(sub_events['y'])-np.min(sub_events['y']), np.inf, np.inf, np.inf, np.inf])
-    p0 = (np.mean(sub_events['x'])-np.min(sub_events['x']),np.mean(sub_events['y'])-np.min(sub_events['y']),np.std(sub_events['x']),np.std(sub_events['y']),np.max(sub_image),np.median(sub_image))
-    x = np.arange(np.max(sub_events['x'])-np.min(sub_events['x'])+1)
-    y = np.arange(np.max(sub_events['y'])-np.min(sub_events['y'])+1)
-    X,Y = np.meshgrid(x,y)
-    try:
-        popt, pcov = optimize.curve_fit(gauss2d, (X,Y), sub_image.ravel(), p0=p0, gtol=1e-4,ftol=1e-4, bounds=bounds)
-        perr = np.sqrt(np.diag(pcov))
-    except RuntimeError:
-        fitting_info += 'RuntimeError encountered during fit. No localization generated for this candidate cluster.\n'
-        popt = np.zeros(6)
-        perr = np.zeros(6)
-    except ValueError:
-        fitting_info += 'ValueError encountered during fit. No localization generated for this candidate cluster.\n'
-        popt = np.zeros(6)
-        perr = np.zeros(6)
-    except OptimizeWarning:
-        fitting_info += 'OptimizeWarning encountered during fit. No localization generated for this candidate cluster.\n'
-        popt = np.zeros(6)
-        perr = np.zeros(6)
-    return popt, perr, fitting_info
+    return localizations, info
 
 # 2D Gaussian with rotation (angle theta in [rad])
 def gauss2d_theta(XY, amplitude, x0, y0, sigma_x, sigma_y, offset, theta):  
@@ -182,6 +179,9 @@ def slice_data(candidate_dic, nb_slices):
 
 # 2D Gaussian
 def Gaussian2D(candidate_dic,settings,**kwargs):
+    # Start the timer
+    start_time = time.time()
+
     # Check if we have the required kwargs
     [provided_optional_args, missing_optional_args] = utilsHelper.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
 
@@ -197,6 +197,9 @@ def Gaussian2D(candidate_dic,settings,**kwargs):
     # Initializations - general
     pixel_size = float(settings['PixelSize_nm']['value']) # in nm
     expected_width = expected_width/pixel_size
+    fit_func = gauss2D
+    params = expected_width, fitting_tolerance, pixel_size
+    df_cols = ['candidate_id', 'x', 'y', 'del_x', 'del_y', 'p', 't']
 
     if multithread == True: num_cores = multiprocessing.cpu_count()
     else: num_cores = 1
@@ -215,45 +218,33 @@ def Gaussian2D(candidate_dic,settings,**kwargs):
 
     # Determine all localizations
     data_split = slice_data(candidate_dic, njobs)
-    RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(localize_canditates2D)(i, data_split[i], expected_width, pixel_size, fitting_tolerance) for i in range(len(data_split)))
+    RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(localize_canditates2D)(i, data_split[i], fit_func, df_cols, *params) for i in range(len(data_split)))
     
     localization_list = [res[0] for res in RES]
     localizations = pd.concat(localization_list)
     
     # Fit performance information
     nb_fails = len(candidate_dic)-len(localizations)
+    n_loc_info = f'Number of localizations found: {len(localizations)}'
+    logging.info(n_loc_info)
+    n_fails_info = f'Gaussian fitting failed for {nb_fails} candidate cluster(s).'
+    logging.info(n_fails_info)
     gaussian_fit_info = ''
-    if nb_fails == 0:
-        gaussian_fit_info += "Gaussian fitting was successful for all candidate clusters."
-    elif nb_fails == 1:
-        gaussian_fit_info += "Gaussian fitting failed for 1 candidate cluster:\n"
-    else:
-        gaussian_fit_info += f"Gaussian fitting failed for {nb_fails} candidate clusters:\n"
     gaussian_fit_info += ''.join([res[1] for res in RES])
     logging.info(gaussian_fit_info)
 
-    logging.info(f'Number of localizations found: {len(localizations)}')
+    # Stop the timer
+    end_time = time.time()
+    timing_info = f'Gaussian fitting took {end_time-start_time} seconds.'
+    logging.info(timing_info)
+    gaussian_fit_info = timing_info + '\n' + n_loc_info + '\n' + n_fails_info + '\n' + gaussian_fit_info
 
     return localizations, gaussian_fit_info
 
 # ToDo: Modify for 3D to make it functional
 def Gaussian3D(candidate_dic,settings,**kwargs):
     
-    pixel_size = float(settings['PixelSize_nm']['value']) # in nm
-    theta = float(kwargs['Theta_deg']['value'])*2.*np.pi/360. # in rad
-    nr_of_localizations = len(candidate_dic)
-    localizations = pd.DataFrame(index=range(nr_of_localizations), columns=['x','y','p','t'])
-
-    index = 0
+    localizations = pd.DataFrame(index=range(candidate_dic), columns=['x','y','p','t'])
     Gaussian_fit_info = ''
-    for i in np.unique(list(candidate_dic)):
-        localization, fitting_info = localization3D(candidate_dic[i]['events'], pixel_size)
-        if fitting_info != '':
-            Gaussian_fit_info += fitting_info
-        else:
-            localizations.loc[index] = localization
-            index += 1
-    
-    logging.info(Gaussian_fit_info)
     
     return localizations, Gaussian_fit_info
