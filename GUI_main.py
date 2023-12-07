@@ -1,5 +1,4 @@
-# from csbdeep.io import save_tiff_imagej_compatible
-# from stardist import _draw_polygons, export_imagej_rois
+#General imports
 import sys, os, logging, json, argparse, datetime, glob, csv, ast, platform, threading
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -9,19 +8,22 @@ import pandas as pd
 import numpy as np
 import copy
 import appdirs
+
+#Imports for PyQt5 (GUI)
+from PyQt5 import QtWidgets, QtGui
+from PyQt5.QtGui import QCursor, QTextCursor
+from PyQt5.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QTableWidget, QTableWidgetItem, QLayout, QMainWindow, QLabel, QPushButton, QSizePolicy, QGroupBox, QTabWidget, QGridLayout, QWidget, QComboBox, QLineEdit, QFileDialog, QToolBar, QCheckBox,QDesktopWidget, QMessageBox, QTextEdit, QSlider
+from PyQt5.QtCore import Qt, QPoint, QProcess, QCoreApplication, QTimer, QFileSystemWatcher, QFile
+
+#Custom imports
 # Add the folder 2 folders up to the system path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 #Import all scripts in the custom script folders
 from CandidateFitting import *
 from CandidateFinding import *
 #Obtain the helperfunctions
 from Utils import utils, utilsHelper
 
-from PyQt5 import QtWidgets, QtGui
-from PyQt5.QtGui import QCursor, QTextCursor
-from PyQt5.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QTableWidget, QTableWidgetItem, QLayout, QMainWindow, QLabel, QPushButton, QSizePolicy, QGroupBox, QTabWidget, QGridLayout, QWidget, QComboBox, QLineEdit, QFileDialog, QToolBar, QCheckBox,QDesktopWidget, QMessageBox, QTextEdit, QSlider
-from PyQt5.QtCore import Qt, QPoint, QProcess, QCoreApplication, QTimer, QFileSystemWatcher, QFile
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
 # Main script
@@ -29,17 +31,45 @@ from PyQt5.QtCore import Qt, QPoint, QProcess, QCoreApplication, QTimer, QFileSy
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
 
 class MyGUI(QMainWindow):
+#GUI class - needs to be initialised and is initalised in gui.py
     def __init__(self):
+        """
+        Initializes the GUI.
+        Sets up the whole GUI and allt abs
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
+        
         #Create parser
         parser = argparse.ArgumentParser(description='EBS fitting - Endesfelder lab - Nov 2023')
+        #Look for debug argument
         parser.add_argument('--debug', '-d', action='store_true', help='Enable debug')
         args=parser.parse_args()
         
+        """
+        Dictionary creation used throughout GUI
+        """
         #Create a dictionary to store the global Settings
         self.globalSettings = self.initGlobalSettings()
         
-        self.log_file_path = self.globalSettings['LoggingFilePath']['value']
+        # Create a dictionary to store the entries
+        self.entries = {}
+        
+        #Create a dictionary that stores info about each file being run (i.e. for metadata)
+        self.currentFileInfo = {}
+        
+        #Create a dictionary that stores data and passes it between finding,fitting,saving, etc
+        self.data = {}
+        
+        """
+        Logger creation, both text output and stored to .log file
+        """
         # Create a logger with the desired log level
+        self.log_file_path = self.globalSettings['LoggingFilePath']['value']
         self.logger = logging.getLogger()
         self.logger.setLevel(logging.DEBUG if args.debug else logging.INFO)
 
@@ -57,31 +87,28 @@ class MyGUI(QMainWindow):
         if os.path.exists(self.log_file_path):
             open(self.log_file_path, 'w').close()
 
-        # Create a dictionary to store the entries
-        self.entries = {}
-        
-        
-        #Create a dictionary that stores info about each file being run (i.e. for metadata)
-        self.currentFileInfo = {}
-        
-        #Create a dictionary that stores data and passes it between finding,fitting,saving, etc
-        self.data = {}
-        
-        #Set some major settings on the UI
+        """
+        GUI initalisation
+        Generally, the GUI consists of QGroupBoxes containing QGridLayouts which contain the input fields and buttons and such
+        """
+        #Initialisation - title and size
         super().__init__()
         self.setWindowTitle("Eve - alphaVersion")
         self.setMinimumSize(600, 1000)  # Set minimum size for the GUI window
         
-        #Set the central widget that contains everything
+        #Set the central widget that contains everything (self.central_widget)
         #This is a group box that contains a grid layout. We fill everything inside this grid layout
         self.central_widget = QGroupBox()
         self.setCentralWidget(self.central_widget)
         self.layout = QGridLayout()
         self.central_widget.setLayout(self.layout)
 
+        """
+        Global settings group box
+        """
         #Create a global settings group box
         self.globalSettingsGroupBox = QGroupBox("Global settings")
-        self.globalSettingsGroupBox.setLayout(QGridLayout())
+        self.globalSettingsGroupBox.setLayout(QGridLayout()) #Give it a grid layout as well
         
         #Create an advanced settings button that opens a new window
         self.advancedSettingsButton = QPushButton("Advanced settings", self)
@@ -103,11 +130,15 @@ class MyGUI(QMainWindow):
         #Add the global settings group box to the central widget
         self.layout.addWidget(self.globalSettingsGroupBox, 0, 0)
 
+        """
+        Main tab widget (containing processing, post-processing etc tabs)
+        """
         #Create a tab widget and add this to the main group box
         self.mainTabWidget = QTabWidget()
         self.mainTabWidget.setTabPosition(QTabWidget.South)
         self.layout.addWidget(self.mainTabWidget, 2, 0)
         
+        #Add the individual tabs
         self.tab_processing = QWidget()
         self.mainTabWidget.addTab(self.tab_processing, "Processing")
         self.tab_postProcessing = QWidget()
@@ -135,10 +166,28 @@ class MyGUI(QMainWindow):
         #Load the GUI settings from last time:
         self.load_entries_from_json()
     
+    def setup_tab(self, tab_name):
+    #Generic function to set up tabs - basically a look-up to other functions
+        tab_mapping = {
+            'Processing': self.setup_processingTab,
+            'Post-processing': self.setup_postProcessingTab,
+            'Save/Load': self.setup_saveloadTab,
+            'Visualisation': self.setup_visualisationTab,
+            'LocalizationList': self.setup_loclistTab,
+            'Run info': self.setup_logFileTab,
+            'Preview visualisation': self.setup_previewTab
+        }
+        #Run the setup of this tab
+        setup_func = tab_mapping.get(tab_name)
+        if setup_func:
+            setup_func()
+            
     def open_advanced_settings(self):
+        #Function that opens the advanced settings window
         self.advancedSettingsWindow.show()
     
     def initGlobalSettings(self):
+        #Initialisation of the global settings - runs on startup to get all these values, then these can be changed later
         globalSettings = {}
         globalSettings['PixelSize_nm'] = {}
         globalSettings['PixelSize_nm']['value'] = 80
@@ -190,6 +239,7 @@ class MyGUI(QMainWindow):
         globalSettings['LoggingFilePath']['value'] = user_data_folder+os.sep+"logging.log"
         globalSettings['LoggingFilePath']['input'] = str
         
+        #Finding batching info
         globalSettings['FindingBatching'] = {}
         globalSettings['FindingBatching']['value'] = True
         globalSettings['FindingBatching']['input'] = bool
@@ -200,44 +250,40 @@ class MyGUI(QMainWindow):
         globalSettings['FindingBatchingTimeOverlapMs']['value'] = 500
         globalSettings['FindingBatchingTimeOverlapMs']['input'] = float
         
-        
-        globalSettings['IgnoreInOptions'] = ('IgnoreInOptions','StoreFinalOutput', 'JSONGUIstorePath','GlobalOptionsStorePath') #Add options here that should NOT show up in the global settings window
+        #Add options here that should NOT show up in the global settings window - i.e. options that should not be changed
+        globalSettings['IgnoreInOptions'] = ('IgnoreInOptions','StoreFinalOutput', 'JSONGUIstorePath','GlobalOptionsStorePath') 
         return globalSettings
     
-    # Function to handle the button click event
     def datasetSearchButtonClicked(self):
+        # Function that handles the dataset 'File' lookup button
         logging.debug('data lookup search button clicked')
         file_path, _ = QFileDialog.getOpenFileName(self, "Select File",filter="EBS files (*.raw *.npy);;All Files (*)")
         if file_path:
             self.dataLocationInput.setText(file_path)
     
     def datasetFolderButtonClicked(self):
+        # Function that handles the dataset 'Folder' lookup
         logging.debug('data lookup Folder button clicked')
         folder_path = QFileDialog.getExistingDirectory(self, "Select Folder")
         if folder_path:
             self.dataLocationInput.setText(folder_path)
     
-    def setup_tab(self, tab_name):
-        tab_mapping = {
-            'Processing': self.setup_processingTab,
-            'Post-processing': self.setup_postProcessingTab,
-            'Save/Load': self.setup_saveloadTab,
-            'Visualisation': self.setup_visualisationTab,
-            'LocalizationList': self.setup_loclistTab,
-            'Run info': self.setup_logFileTab,
-            'Preview visualisation': self.setup_previewTab
-        }
-        #Run the setup of this tab
-        setup_func = tab_mapping.get(tab_name)
-        if setup_func:
-            setup_func()
-            
     def setup_processingTab(self):
+        """
+        Sets up the processing tab by creating the necessary layouts and adding the required widgets.
+
+        Parameters:
+            None
+
+        Returns:
+            None
+        """
         #Create a grid layout and set it
         tab_layout = QGridLayout()
         self.tab_processing.setLayout(tab_layout)
-        
-        #add a box with multiple horizontally oriented entires:
+        """
+        Dataset location and searching Grid Layout
+        """
         self.datasetLocation_layout = QGridLayout()
         tab_layout.addLayout(self.datasetLocation_layout, 0, 0)
         
@@ -248,59 +294,17 @@ class MyGUI(QMainWindow):
         self.dataLocationInput = QLineEdit()
         self.dataLocationInput.setObjectName("processing_dataLocationInput")
         self.datasetLocation_layout.layout().addWidget(self.dataLocationInput, 0, 1,2,1)
-        # Create the search button
+        # Create the search buttons
         self.datasetSearchButton = QPushButton("File...")
         self.datasetSearchButton.clicked.connect(self.datasetSearchButtonClicked)
         self.datasetLocation_layout.layout().addWidget(self.datasetSearchButton, 0, 2)
         self.datasetFolderButton = QPushButton("Folder...")
         self.datasetFolderButton.clicked.connect(self.datasetFolderButtonClicked)
         self.datasetLocation_layout.layout().addWidget(self.datasetFolderButton, 1, 2)
-        #Add the global settings group box to the central widget
-        # self.layout.addWidget(self.datasetsSettingsGroupBox, 1, 0)
 
-        #Add a group box on candiddate finding
-        self.groupboxFinding = QGroupBox("Candidate finding")
-        self.groupboxFinding.setObjectName("groupboxFinding")
-        self.groupboxFinding.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.groupboxFinding.setLayout(QGridLayout())
-        tab_layout.addWidget(self.groupboxFinding, 2, 0)
-        
-        # Create a QComboBox and add options - this is the FINDING dropdown
-        self.candidateFindingDropdown = QComboBox(self)
-        options = utils.functionNamesFromDir('CandidateFinding')
-        displaynames, self.Finding_functionNameToDisplayNameMapping = utils.displayNamesFromFunctionNames(options)
-        self.candidateFindingDropdown.setObjectName("CandidateFinding_candidateFindingDropdown")
-        self.candidateFindingDropdown.addItems(displaynames)
-        #Add the candidateFindingDropdown to the layout
-        self.groupboxFinding.layout().addWidget(self.candidateFindingDropdown,1,0,1,2)
-        #Activation for candidateFindingDropdown.activated
-        self.candidateFindingDropdown.activated.connect(lambda: self.changeLayout_choice(self.groupboxFinding.layout(),"CandidateFinding_candidateFindingDropdown",self.Finding_functionNameToDisplayNameMapping))
-        
-        
-        #On startup/initiatlisation: also do changeLayout_choice
-        self.changeLayout_choice(self.groupboxFinding.layout(),"CandidateFinding_candidateFindingDropdown",self.Finding_functionNameToDisplayNameMapping)
-        
-        
-        self.groupboxFitting = QGroupBox("Candidate fitting")
-        self.groupboxFitting.setObjectName("groupboxFitting")
-        self.groupboxFitting.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.groupboxFitting.setLayout(QGridLayout())
-        tab_layout.addWidget(self.groupboxFitting, 3, 0)
-        
-        # Create a QComboBox and add options - this is the FITTING dropdown
-        self.candidateFittingDropdown = QComboBox(self)
-        options = utils.functionNamesFromDir('CandidateFitting')
-        self.candidateFittingDropdown.setObjectName("CandidateFitting_candidateFittingDropdown")
-        displaynames, self.Fitting_functionNameToDisplayNameMapping = utils.displayNamesFromFunctionNames(options)
-        self.candidateFittingDropdown.addItems(displaynames)
-        #Add the candidateFindingDropdown to the layout
-        self.groupboxFitting.layout().addWidget(self.candidateFittingDropdown,1,0,1,2)
-        #Activation for candidateFindingDropdown.activated
-        self.candidateFittingDropdown.activated.connect(lambda: self.changeLayout_choice(self.groupboxFitting.layout(),"CandidateFitting_candidateFittingDropdown",self.Fitting_functionNameToDisplayNameMapping))
-        
-        #On startup/initiatlisation: also do changeLayout_choice
-        self.changeLayout_choice(self.groupboxFitting.layout(),"CandidateFitting_candidateFittingDropdown",self.Fitting_functionNameToDisplayNameMapping)
-        
+        """
+        Data selection Grid Layout
+        """
         #Add a data selection tab
         self.dataSelectionLayout = ClickableGroupBox("Data selection")
         self.dataSelectionLayout.setCheckable(True)
@@ -309,6 +313,7 @@ class MyGUI(QMainWindow):
         self.dataSelectionLayout.setLayout(QGridLayout())
         tab_layout.addWidget(self.dataSelectionLayout, 1, 0)
         
+        #Add smaller GridLayouts for Polarity, Time, Position
         self.dataSelectionPolarityLayout = QGroupBox("Polarity")
         self.dataSelectionPolarityLayout.setLayout(QGridLayout())
         self.dataSelectionTimeLayout = QGroupBox("Time")
@@ -316,6 +321,7 @@ class MyGUI(QMainWindow):
         self.dataSelectionPositionLayout = QGroupBox("Position")
         self.dataSelectionPositionLayout.setLayout(QGridLayout())
         
+        #Add them
         self.dataSelectionLayout.layout().addWidget(self.dataSelectionPolarityLayout,0,0)
         self.dataSelectionLayout.layout().addWidget(self.dataSelectionTimeLayout,0,1)
         self.dataSelectionLayout.layout().addWidget(self.dataSelectionPositionLayout,0,2)
@@ -358,13 +364,61 @@ class MyGUI(QMainWindow):
         self.dataSelectionPositionLayout.layout().addWidget(self.run_maxYLineEdit, 3, 1)
         self.run_maxYLineEdit.setText("Inf")
         
+        """
+        Candidate Finding Grid Layout
+        """
+        #Add a group box on candiddate finding
+        self.groupboxFinding = QGroupBox("Candidate finding")
+        self.groupboxFinding.setObjectName("groupboxFinding")
+        self.groupboxFinding.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.groupboxFinding.setLayout(QGridLayout())
+        tab_layout.addWidget(self.groupboxFinding, 2, 0)
         
+        # Create a QComboBox and add options - this is the FINDING dropdown
+        self.candidateFindingDropdown = QComboBox(self)
+        options = utils.functionNamesFromDir('CandidateFinding')
+        displaynames, self.Finding_functionNameToDisplayNameMapping = utils.displayNamesFromFunctionNames(options)
+        self.candidateFindingDropdown.setObjectName("CandidateFinding_candidateFindingDropdown")
+        self.candidateFindingDropdown.addItems(displaynames)
+        #Add the candidateFindingDropdown to the layout
+        self.groupboxFinding.layout().addWidget(self.candidateFindingDropdown,1,0,1,2)
+        #Activation for candidateFindingDropdown.activated
+        self.candidateFindingDropdown.activated.connect(lambda: self.changeLayout_choice(self.groupboxFinding.layout(),"CandidateFinding_candidateFindingDropdown",self.Finding_functionNameToDisplayNameMapping))
+        
+        #On startup/initiatlisation: also do changeLayout_choice
+        self.changeLayout_choice(self.groupboxFinding.layout(),"CandidateFinding_candidateFindingDropdown",self.Finding_functionNameToDisplayNameMapping)
+        
+        """
+        Candidate Fitting Grid Layout
+        """
+        self.groupboxFitting = QGroupBox("Candidate fitting")
+        self.groupboxFitting.setObjectName("groupboxFitting")
+        self.groupboxFitting.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.groupboxFitting.setLayout(QGridLayout())
+        tab_layout.addWidget(self.groupboxFitting, 3, 0)
+        
+        # Create a QComboBox and add options - this is the FITTING dropdown
+        self.candidateFittingDropdown = QComboBox(self)
+        options = utils.functionNamesFromDir('CandidateFitting')
+        self.candidateFittingDropdown.setObjectName("CandidateFitting_candidateFittingDropdown")
+        displaynames, self.Fitting_functionNameToDisplayNameMapping = utils.displayNamesFromFunctionNames(options)
+        self.candidateFittingDropdown.addItems(displaynames)
+        #Add the candidateFindingDropdown to the layout
+        self.groupboxFitting.layout().addWidget(self.candidateFittingDropdown,1,0,1,2)
+        #Activation for candidateFindingDropdown.activated
+        self.candidateFittingDropdown.activated.connect(lambda: self.changeLayout_choice(self.groupboxFitting.layout(),"CandidateFitting_candidateFittingDropdown",self.Fitting_functionNameToDisplayNameMapping))
+        
+        #On startup/initiatlisation: also do changeLayout_choice
+        self.changeLayout_choice(self.groupboxFitting.layout(),"CandidateFitting_candidateFittingDropdown",self.Fitting_functionNameToDisplayNameMapping)
+               
+        """
+        "Run" Group Box
+        """
         #Add a run tab:
         self.runLayout = QGroupBox("Run")
         self.runLayout.setObjectName("groupboxRun")
         self.runLayout.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.runLayout.setLayout(QGridLayout())
-        
         
         self.buttonProcessingRun = QPushButton("Run")
         self.buttonProcessingRun.clicked.connect(lambda: self.run_processing())
@@ -372,20 +426,21 @@ class MyGUI(QMainWindow):
 
         tab_layout.addWidget(self.runLayout, 4, 0)
         
-        
-        
+        """
+        Spacing between things above and things below
+        """
         #Add spacing so that the previewLayout is pushed to the bottom:
         tab_layout.setRowStretch(5, 1)
         
-        
+        """
+        Preview Group Box
+        """
         #Add a preview box:
         self.previewLayout = QGroupBox("Preview")
         self.previewLayout.setObjectName("groupboxPreview")
         self.previewLayout.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.previewLayout.setLayout(QGridLayout())
         tab_layout.addWidget(self.previewLayout, 9, 0)
-        
-        #Add a preview layout:
         
         #Populate with a start time and end time inputs:
         self.previewLayout.layout().addWidget(QLabel("Start time (ms):"), 0, 0, 1, 2)
@@ -425,19 +480,15 @@ class MyGUI(QMainWindow):
         self.previewLayout.layout().addWidget(self.preview_maxYLineEdit, 3, 3)
         self.preview_maxYLineEdit.setText("")
         
-        
         #Add a preview button:
         self.buttonPreview = QPushButton("Preview")
         #Add a button press event:
-        self.buttonPreview.clicked.connect(lambda: self.previewRun((self.preview_startTLineEdit.text(),self.preview_durationTLineEdit.text()),
+        self.buttonPreview.clicked.connect(lambda: self.previewRun((self.preview_startTLineEdit.text(), 
+                                                                    self.preview_durationTLineEdit.text()),
                                                                    (self.preview_minXLineEdit.text(),self.preview_maxXLineEdit.text(),
                                                                     self.preview_minYLineEdit.text(),self.preview_maxYLineEdit.text())))
         #Add the button to the layout:
         self.previewLayout.layout().addWidget(self.buttonPreview, 4, 0)
-
-        # #Add spacing
-        # # Add an empty QWidget with stretch factor of 1
-        # tab_layout.setRowStretch(tab_layout.rowCount(), 1)
 
     def previewRun(self,timeStretch=(0,1000),xyStretch=(0,0,0,0)):
         #We error out if a folder is chosen rather than a file:
