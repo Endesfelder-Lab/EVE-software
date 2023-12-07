@@ -491,22 +491,34 @@ class MyGUI(QMainWindow):
         self.previewLayout.layout().addWidget(self.buttonPreview, 4, 0)
 
     def previewRun(self,timeStretch=(0,1000),xyStretch=(0,0,0,0)):
-        #We error out if a folder is chosen rather than a file:
+        """
+        Generates the preview of a run analysis.
+
+        Parameters:
+             timeStretch (tuple): A tuple containing the start and end times for the preview.
+             xyStretch (tuple): A tuple containing the minimum and maximum x and y coordinates for the preview.
+
+        Returns:
+             None
+        """
+        #Checking if a file is selected rather than a folder:
         if not os.path.isfile(self.dataLocationInput.text()):
             logging.error("Please choose a file rather than a folder for previews.")
             return
         
-        #Specifically for preview runs, we don't need to load the whole data, only between preview_startT and preview_endT.
+        #Specifically for preview runs, we don't need to load the whole data, only between preview_startT and preview_endT. This is handled differently for RAW or NPY files:
         #Thus, we check if it's raw or npy:
         if self.dataLocationInput.text().endswith('.raw'):
             sys.path.append(self.globalSettings['MetaVisionPath']['value']) 
             from metavision_core.event_io.raw_reader import RawReader
             record_raw = RawReader(self.dataLocationInput.text())
+            
+            #Seek to the start time if the start time is > 0:
             if int(timeStretch[0]) > 0:
                 record_raw.seek_time(int(timeStretch[0])*1000)
                 
-            events=np.empty
             #Load all events
+            events=np.empty
             events = record_raw.load_delta_t(int(timeStretch[1])*1000)
             #Check if we have at least 1 event:
             if len(events) > 0:
@@ -519,9 +531,11 @@ class MyGUI(QMainWindow):
             else:
                 logging.error("Preview - No events found in the chosen time frame.")
                 return
+        #Logic if a numpy file is selected:
         elif self.dataLocationInput.text().endswith('.npy'):
             #For npy, load the events in memory
             data = np.load(self.dataLocationInput.text(), mmap_mode='r')
+            #Filter them on time:
             events = self.filterEvents_npy_t(data,timeStretch)
             #Check if we have at least 1 event:
             if len(events) > 0:
@@ -538,11 +552,11 @@ class MyGUI(QMainWindow):
             logging.error("Please choose a .raw or .npy file for previews.")
             return
         
+        #Load the events in self memory and filter on XY
         self.previewEvents = events
-        
         self.previewEvents = self.filterEvents_xy(self.previewEvents,xyStretch)
         
-        #Change global values so nothing is stored:
+        #Change global values so nothing is stored - we just want a preview run. This is later set back to orig values (globalSettingsOrig):
         globalSettingsOrig = copy.deepcopy(self.globalSettings)
         self.globalSettings['StoreConvertedRawData']['value'] = False
         self.globalSettings['StoreFileMetadata']['value'] = False
@@ -555,40 +569,44 @@ class MyGUI(QMainWindow):
         #Reset global settings
         self.globalSettings = globalSettingsOrig
         
-        #Show the preview panel:
+        #Update the preview panel and localization list:
         self.updateShowPreview(previewEvents=events)
-        
-        #Update the loclist
         self.updateLocList()
     
     def filterEvents_npy_t(self,events,tStretch=(-np.Inf,np.Inf)):
+        """
+        Filter events that are in a numpy array to a certain time-stretch.
+        """
         #tStretch is (start, duration)
         indices = np.where((events['t'] >= float(tStretch[0])*1000) & (events['t'] <= float(tStretch[0])*1000+float(tStretch[1])*1000))
         # Access the partial data using the indices
         events = events[indices]
         
+        #Warning if no events are found
         if len(events) == 0:
             logging.warning("No events found in the chosen time frame.")
         
         return events
     
     def filterEvents_xy(self,events,xyStretch=(-np.Inf,-np.Inf,np.Inf,np.Inf)):
+        """
+        Filter events that are in a numpy array to a certain xy stretch.
+        """
         #Edit values for x,y coordinates:
         #First check if all entries in array are numbers:
         try:
-            float(xyStretch[0])
-            float(xyStretch[1])
-            float(xyStretch[2])
-            float(xyStretch[3])
+            #Check if they all are floats:
             if not all(isinstance(x, float) for x in [float(xyStretch[0]),float(xyStretch[1]),float(xyStretch[2]),float(xyStretch[3])]):
                 logging.info("No XY cutting due to not all entries being floats.")
+            #If they are all float values, we can proceed
             else:
                 logging.info("XY cutting to values: "+str(xyStretch[0])+","+str(xyStretch[1])+","+str(xyStretch[2])+","+str(xyStretch[3]))
                 #Filter on x,y coordinates:
                 events = events[(events['x'] >= float(xyStretch[0])) & (events['x'] <= float(xyStretch[1]))]
                 events = events[(events['y'] >= float(xyStretch[2])) & (events['y'] <= float(xyStretch[3]))]
         except:
-             logging.warning("No XY cutting due to not all entries being float-.")
+            #Warning if something crashes. Note the extra dash to the end of the warning
+            logging.warning("No XY cutting due to not all entries being float-.")
         
         return events
     
