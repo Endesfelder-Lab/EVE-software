@@ -8,6 +8,7 @@ import pandas as pd
 import numpy as np
 import copy
 import appdirs
+import pickle
 
 #Imports for PyQt5 (GUI)
 from PyQt5 import QtWidgets, QtGui
@@ -1523,7 +1524,6 @@ class MyGUI(QMainWindow):
         logging.debug('Attempting to store finding results output')
         #Store the Finding results output
         # np.save(self.currentFileInfo['CurrentFileLoc'][:-4]+'_FindingResults_'+datetime.datetime.now().strftime("%Y%m%d_%H%M%S")+'.npy',self.data['FindingResult'][0])
-        import pickle
         file_path = self.currentFileInfo['CurrentFileLoc'][:-4]+'_FindingResults_'+datetime.datetime.now().strftime("%Y%m%d_%H%M%S")+'.pickle'
         with open(file_path, 'wb') as file:
             pickle.dump(self.data['FindingResult'][0], file)
