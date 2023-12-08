@@ -172,7 +172,6 @@ class MyGUI(QMainWindow):
         tab_mapping = {
             'Processing': self.setup_processingTab,
             'Post-processing': self.setup_postProcessingTab,
-            'Save/Load': self.setup_saveloadTab,
             'Visualisation': self.setup_visualisationTab,
             'LocalizationList': self.setup_loclistTab,
             'Run info': self.setup_logFileTab,
@@ -612,6 +611,9 @@ class MyGUI(QMainWindow):
         return events
     
     def setup_postProcessingTab(self):
+        """
+        Dummy function that set up the post-processing tab
+        """
         tab2_layout = QGridLayout()
         self.tab_postProcessing.setLayout(tab2_layout)
         
@@ -619,15 +621,14 @@ class MyGUI(QMainWindow):
         tab2_layout.addWidget(self.label2, 0, 0)
 
     def setup_logFileTab(self):
+        """
+        Function that set up the logger lab ('Run Info')
+        """
+        #It's simply a grid layout that only contains a text edit. This text edit is filled with the Log file ever 1 second
         tab_layout = QGridLayout()
         self.tab_logfileInfo.setLayout(tab_layout)
         self.text_edit = QTextEdit()
         tab_layout.addWidget(self.text_edit, 0, 0)
-
-        # self.log_file_path = 'GUI/logfile.log'
-        # self.file_watcher = QFileSystemWatcher()
-        # self.file_watcher.addPath('GUI/logfile.log')
-        # self.file_watcher.fileChanged.connect(self.update_log)
         
         self.last_modified = os.path.getmtime(self.log_file_path)
 
@@ -638,27 +639,30 @@ class MyGUI(QMainWindow):
         self.update_log()
 
     def check_logfile_modification(self):
+        """
+        Function checking for modification of the .log file, and if it changed, the text edit is updated
+        """
         current_modified = os.path.getmtime(self.log_file_path)
         if current_modified != self.last_modified:
             self.update_log()
             self.last_modified = current_modified
             
     def update_log(self):
+        """
+        Function that updates the text of the 'run info' tab if the log file has been modified
+        """
         if QFile.exists(self.log_file_path):
             with open(self.log_file_path, 'r') as file:
                 log_contents = file.read()
                 self.text_edit.setPlainText(log_contents)
                 self.text_edit.moveCursor(QTextCursor.End)
                 self.text_edit.ensureCursorVisible()
-                
-    def setup_saveloadTab(self):
-        tab3_layout = QGridLayout()
-        self.tab_saveLoad.setLayout(tab3_layout)
-        
-        self.label3 = QLabel("Hello from Tab 3!")
-        tab3_layout.addWidget(self.label3, 0, 0)
         
     def setup_loclistTab(self):
+        """
+        Function that's setting up the localization list tab
+        """
+        #Simply a grid layout that contains an (empty to start with) table:
         tab4_layout = QGridLayout()
         self.tab_locList.setLayout(tab4_layout)
         
@@ -667,11 +671,14 @@ class MyGUI(QMainWindow):
         tab4_layout.addWidget(self.LocListTable, 0, 0)
         
     def setup_visualisationTab(self):
+        """
+        Function to set up the Visualisation tab (scatter, average shifted histogram and such)
+        """
         #Add a vertical layout, not a grid layout:
         visualisationTab_vertical_container = QVBoxLayout()
         self.tab_visualisation.setLayout(visualisationTab_vertical_container)
         
-        #Add a horizontal layout to the first row of the vertical layout:
+        #Add a horizontal layout to the first row of the vertical layout - this contains the buttons:
         visualisationTab_horizontal_container = QHBoxLayout()
         visualisationTab_vertical_container.addLayout(visualisationTab_horizontal_container)
         
@@ -687,16 +694,20 @@ class MyGUI(QMainWindow):
         #Give it a function on click:
         self.buttonInterpHist.clicked.connect(lambda: self.plotLinearInterpHist())
         
+        #Create an empty figure and store it as self.data:
         self.data['figurePlot'], self.data['figureAx'] = plt.subplots(figsize=(5, 5))
         self.data['figureCanvas'] = FigureCanvas(self.data['figurePlot'])
-        
         self.data['figurePlot'].tight_layout()
         
+        #Add a navigation toolbar (zoom, pan etc)
         visualisationTab_vertical_container.addWidget(NavigationToolbar(self.data['figureCanvas'], self))
-        
+        #Add the canvas to the tab
         visualisationTab_vertical_container.addWidget(self.data['figureCanvas'])
     
     def plotScatter(self):
+        """
+        Function that creates a scatter plot from the localizations
+        """
         #check if we have results stored:
         if 'FittingMethod' in self.data:
             logging.debug('Attempting to show scatter plot')
@@ -727,7 +738,11 @@ class MyGUI(QMainWindow):
         else:
             logging.error('Tried to visualise but no data found!')
     
-    def plotLinearInterpHist(self,pixel_recon_dim=100):
+    def plotLinearInterpHist(self,pixel_recon_dim=10):
+        """
+        Function that creates an average-shifted histogram (linearly-interpolated histogram)
+        Currently hard-coded on both pixel_recon_dim = 10, and run with 3-x-3 shifts
+        """
         #check if we have results stored:
         if 'FittingMethod' in self.data:
             #Code inspired by Frontiers Martens et al
@@ -823,16 +838,27 @@ class MyGUI(QMainWindow):
             logging.error('Tried to visualise but no data found!')
     
     def setup_previewTab(self):
+        """
+        Function that creates the preview tab
+        Very practically, it creates 10 figures, stores those in memory, and displays them when necessary
+        """
+        #It's a grid layout
         self.previewtab_layout = QGridLayout()
         self.tab_previewVis.setLayout(self.previewtab_layout)
         
+        #It requires global variables for the color-bar limits (to allow the same limits for all images of the preview)
         self.PreviewMinCbarVal = 0
         self.PreviewMaxCbarVal = 0
         
+        #It creates the ImageSlider class
         self.previewImage_slider = ImageSlider([],self)
         self.previewtab_layout.addWidget(self.previewImage_slider)
                
     def updateShowPreview(self,previewEvents=None):
+        """
+        Function that's called to update the preview (or show it). Requires the previewEvents, or uses the self.previewEvents.
+        Hardcoded to show the events as 100-ms-time bins.
+        """
         if previewEvents is None:
             previewEvents = self.previewEvents
         #Idea: create some preview image and highlight found clusters and localizations.
@@ -850,6 +876,7 @@ class MyGUI(QMainWindow):
         
         #Loop over the frames:
         for i in range(0,nrFramesDisplay):
+            #Create an empty figure
             self.PreviewFig[i] = plt.figure()
             #Create an empty array with the sizes of self.previewEvents:
             frameBasedEvent2dArray = np.zeros((max(previewEvents['y'])+1,max(previewEvents['x'])+1))
@@ -864,18 +891,18 @@ class MyGUI(QMainWindow):
                 else:
                     frameBasedEvent2dArray[eventsInThisFrame[j]['y'],eventsInThisFrame[j]['x']] += 1
             
-            #Show this in plt as an imshow:
+            #Show this in plt as an imshow - we never call plt.show(), so it never really shows:
             fig = self.PreviewFig[i].add_subplot(111)
             fig.imshow(frameBasedEvent2dArray)
             #Set axis limits correctly:
             fig.set_xlim(min(previewEvents['x']),max(previewEvents['x']))
             fig.set_ylim(min(previewEvents['y']),max(previewEvents['y']))
             
-            
             #Find the 'finding' results in this time-frame
             indices = [l for l in range(len(self.data['FindingResult'][0]))]
             for indexv in indices:
                 try:
+                    #Plot it as a rectangle with a magenta, red, or cyan color, depending on it starting, middling, or ending on this frame.
                     row = self.data['FindingResult'][0][indexv]
                     if self.previewEventStartedOnThisFrame(row,i):
                         # Create a Rectangle object
@@ -887,21 +914,16 @@ class MyGUI(QMainWindow):
                     elif self.previewEventHappensOnThisFrame(row,i):
                         self.createRectangle(fig,row['events'],'r')
                         self.showText(fig,row['events'],str(indexv),'r')
-                        
-                        
-                    #Else if on the next frame:
-                    # elif min(row['events']['t']) > (i+1)*self.PreviewFrameTime and min(row['events']['t']) < (i+2)*self.PreviewFrameTime:
-                    #     self.createRectangle(fig,row['events'],'m')
                 except:
                     pass
                 
                 try:
-                    
                     #Also add the corresponding fitting result
                     try:
                         #Check if the localization is on this frame
                         localization = self.data['FittingResult'][0].iloc[indexv-1]
                         if localization['t']*1000 >= i*self.PreviewFrameTime and localization['t']*1000 < (i+1)*self.PreviewFrameTime:
+                            #If so, add a cross
                             fig.plot(localization['x']/self.globalSettings['PixelSize_nm']['value'],localization['y']/self.globalSettings['PixelSize_nm']['value'],'rx', alpha=0.5)
                     except:
                         breakpoint
@@ -919,31 +941,43 @@ class MyGUI(QMainWindow):
             if np.percentile(frameBasedEvent2dArray,(100-pctile)) > self.PreviewMaxCbarVal:
                 self.PreviewMaxCbarVal = np.percentile(frameBasedEvent2dArray,(100-pctile))
 
-
+        #Create a new ImageSlider and update the figure
         self.previewImage_sliderNew = ImageSlider(parent=self,figures=self.allPreviewFigures)
         self.previewImage_slider.update_figures(self.allPreviewFigures)
         
         logging.info('UpdateShowPreview ran!')
  
     def previewEventStartedOnThisFrame(self,row,frame):
+        """
+        Function that checks if a preview event *started* on this frame
+        """
         if min(row['events']['t']) >= frame*self.PreviewFrameTime and min(row['events']['t']) < (frame+1)*self.PreviewFrameTime:
             return True
         else:
             return False
     
     def previewEventHappensOnThisFrame(self,row,frame):
+        """
+        Function that checks if a preview event *is happening* on this frame
+        """
         if max(row['events']['t']) >= frame*self.PreviewFrameTime and min(row['events']['t']) < (frame+1)*self.PreviewFrameTime:
             return True
         else:
             return False
         
     def previewEventEndsOnThisFrame(self,row,frame):
+        """
+        Function that checks if a preview event *ended* on this frame
+        """
         if max(row['events']['t']) >= frame*self.PreviewFrameTime and max(row['events']['t']) < (frame+1)*self.PreviewFrameTime:
             return True
         else:
             return False
         
     def createRectangle(self,fig,data,col,padding=0):
+        """
+        Helper function to create a rectangle with certain padding
+        """
         x_min = min(data['x'])-.5-padding
         y_min = min(data['y'])-.5-padding
         width = (max(data['x']) - min(data['x']))+padding*2+1
@@ -953,6 +987,9 @@ class MyGUI(QMainWindow):
         fig.add_patch(rect)
         
     def showText(self,fig,data,strv,col,padding=0):
+        """
+        Helper function to show text at a certain position
+        """
         #Add the text!
         fig.text(max(data['x']),max(data['y']),str(strv),color=col)
                 
