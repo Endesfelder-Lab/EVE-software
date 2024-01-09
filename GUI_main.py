@@ -1224,9 +1224,7 @@ class MyGUI(QMainWindow):
                     logging.error('Error in processing file '+file)
         #If it's a file...
         elif os.path.isfile(self.dataLocationInput.text()):
-            self.processSingleFile(self.dataLocationInput.text())
-        #If it's nothing - only continue if we actually load a finding result:
-        else:
+            #Check if we are loading existing finding
             if 'ExistingFinding' in self.candidateFindingDropdown.currentText():
                 logging.info('Skipping finding processing, going to fitting')
                 
@@ -1238,6 +1236,9 @@ class MyGUI(QMainWindow):
                 
                 #Reset the global setting:
                 self.globalSettings['StoreFindingOutput']['value']=origStoreFindingSetting
+            else:
+                #Otherwise normally process a single file
+                self.processSingleFile(self.dataLocationInput.text())
          
         self.updateGUIafterNewResults()       
         return
@@ -1467,6 +1468,10 @@ class MyGUI(QMainWindow):
         if len(self.data['FindingResult'][0]) == 0:
             logging.error("No candidates found at all! Stopping analysis.")
             return
+        
+        #store finding results:
+        if self.globalSettings['StoreFindingOutput']['value']:
+            self.storeFindingOutput()
         
         #All finding is done, continue with fitting:
         self.runFitting()
