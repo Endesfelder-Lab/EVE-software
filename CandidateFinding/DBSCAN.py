@@ -583,7 +583,7 @@ def DBSCAN_allEvents(npy_array,settings,**kwargs):
     end_time = time.time()
     elapsed_time = end_time - start_time
     
-    performance_metadata = f"DBSCAN Finding ran for {elapsed_time} seconds."
+    performance_metadata = ""
     logging.info('DBSCAN finding done')
 
     return candidates, performance_metadata
@@ -676,7 +676,7 @@ def DBSCAN_onlyHighDensity(npy_array,settings,**kwargs):
     # Calculate the elapsed time
     elapsed_time = end_time - start_time
 
-    performance_metadata = f"DBSCAN Finding ran for {elapsed_time} seconds."
+    performance_metadata = ""
     logging.info('DBSCAN finding done')
 
     return candidates, performance_metadata

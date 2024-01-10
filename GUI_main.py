@@ -9,6 +9,7 @@ import numpy as np
 import copy
 import appdirs
 import pickle
+import time
 
 #Imports for PyQt5 (GUI)
 from PyQt5 import QtWidgets, QtGui
@@ -1284,6 +1285,11 @@ class MyGUI(QMainWindow):
         return npyData
     
     def processSingleFile(self,FileName,onlyFitting=False):
+
+        #Runtime of finding and fitting
+        self.currentFileInfo['FindingTime'] = 0
+        self.currentFileInfo['FittingTime'] = 0
+
         if not onlyFitting:
             #Run the analysis on a single file
             self.currentFileInfo['CurrentFileLoc'] = FileName
@@ -1379,7 +1385,7 @@ class MyGUI(QMainWindow):
     def runFindingBatching(self):
         logging.info('Batching-dependant finding starting!')
         fileToRun = self.currentFileInfo['CurrentFileLoc']
-        
+        self.currentFileInfo['FindingTime'] = time.time()
         self.data['FindingResult'] = {}
         self.data['FindingResult'][0] = {}
         self.data['FindingResult'][1] = []
@@ -1472,6 +1478,9 @@ class MyGUI(QMainWindow):
         #store finding results:
         if self.globalSettings['StoreFindingOutput']['value']:
             self.storeFindingOutput()
+        self.currentFileInfo['FindingTime'] = time.time() - self.currentFileInfo['FindingTime']
+        logging.info('Number of candidates found: '+str(len(self.data['FindingResult'][0])))
+        logging.info('Candidate finding took '+str(self.currentFileInfo['FindingTime'])+' seconds.')
         
         #All finding is done, continue with fitting:
         self.runFitting()
@@ -1501,8 +1510,12 @@ class MyGUI(QMainWindow):
         #Run the finding function!
         FindingEvalText = self.getFunctionEvalText('Finding',"npyData","self.globalSettings")
         if FindingEvalText is not None:
+            self.currentFileInfo['FindingTime'] = time.time()
             self.data['FindingMethod'] = str(FindingEvalText)
             self.data['FindingResult'] = eval(str(FindingEvalText))
+            self.currentFileInfo['FindingTime'] = time.time() - self.currentFileInfo['FindingTime']
+            logging.info('Number of candidates found: '+str(len(self.data['FindingResult'][0])))
+            logging.info('Candidate finding took '+str(self.currentFileInfo['FindingTime'])+' seconds.')
             logging.info('Candidate finding done!')
             logging.debug(self.data['FindingResult'])
             if self.globalSettings['StoreFindingOutput']['value']:
@@ -1517,8 +1530,12 @@ class MyGUI(QMainWindow):
             #Run the finding function!
             FittingEvalText = self.getFunctionEvalText('Fitting',"self.data['FindingResult'][0]","self.globalSettings")
             if FittingEvalText is not None:
+                self.currentFileInfo['FittingTime'] = time.time()
                 self.data['FittingMethod'] = str(FittingEvalText)
                 self.data['FittingResult'] = eval(str(FittingEvalText))
+                self.currentFileInfo['FittingTime'] = time.time() - self.currentFileInfo['FittingTime']
+                logging.info('Number of localizations found: '+str(len(self.data['FittingResult'][0])))
+                logging.info('Candidate fitting took '+str(self.currentFileInfo['FittingTime'])+' seconds.')
                 logging.info('Candidate fitting done!')
                 logging.debug(self.data['FittingResult'])
                 if len(self.data['FittingResult'][0]) == 0:
@@ -1582,12 +1599,18 @@ Analysis routine finished at {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%
 Methodology used:
 {self.data['FindingMethod']}
 
+Number of candidates found: {len(self.data['FindingResult'][0])}
+Candidate finding took {self.currentFileInfo['FindingTime']} seconds.
+
 Custom output from finding function:
 {self.data['FindingResult'][1]}
 
 ---- Fitting metadata output: ----
 Methodology used:
 {self.data['FittingMethod']}
+
+Number of localizations found: {len(self.data['FittingResult'][0])}
+Candidate fitting took {self.currentFileInfo['FittingTime']} seconds.
 
 Custom output from fitting function:
 {self.data['FittingResult'][1]}

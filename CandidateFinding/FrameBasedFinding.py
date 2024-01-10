@@ -237,7 +237,6 @@ def FrameBased_finding(npy_array,settings,**kwargs):
             for candidate in RES[i].items():
                 candidates[index] = candidate[1]
                 index+=1
-        candidates_info += f'Number of candidates found: {len(candidates)}'
 
     elif polarity==2:
         # Do first negative events...
@@ -267,7 +266,6 @@ def FrameBased_finding(npy_array,settings,**kwargs):
         candidates_info += f'Number of positive candidates found: {Nb_pos_candidates}'
                 
     else: logging.error('Polarity must be 0, 1 or 2.')
-    logging.info(candidates_info)
     
-    performance_metadata = ''
+    performance_metadata = candidates_info
     return candidates, performance_metadata

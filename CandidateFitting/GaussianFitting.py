@@ -228,9 +228,6 @@ def slice_data(candidate_dic, nb_slices):
 
 # 2D Gaussian
 def Gaussian2D(candidate_dic,settings,**kwargs):
-    # Start the timer
-    start_time = time.time()
-
     # Check if we have the required kwargs
     [provided_optional_args, missing_optional_args] = utilsHelper.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
 
@@ -267,27 +264,18 @@ def Gaussian2D(candidate_dic,settings,**kwargs):
     
     # Fit performance information
     nb_fails = len(candidate_dic)-len(localizations)
-    n_loc_info = f'Number of localizations found: {len(localizations)}'
-    logging.info(n_loc_info)
     n_fails_info = f'Gaussian fitting failed for {nb_fails} candidate cluster(s).'
     logging.info(n_fails_info)
     gaussian_fit_info = ''
     gaussian_fit_info += ''.join([res[1] for res in RES])
     logging.info(gaussian_fit_info)
 
-    # Stop the timer
-    end_time = time.time()
-    timing_info = f'Gaussian fitting took {end_time-start_time} seconds.'
-    logging.info(timing_info)
-    gaussian_fit_info = timing_info + '\n' + n_loc_info + '\n' + n_fails_info + '\n' + gaussian_fit_info
+    gaussian_fit_info = n_fails_info + '\n' + gaussian_fit_info
 
     return localizations, gaussian_fit_info
 
 # 2D LogGaussian
 def LogGaussian2D(candidate_dic,settings,**kwargs):
-    # Start the timer
-    start_time = time.time()
-
     # Check if we have the required kwargs
     [provided_optional_args, missing_optional_args] = utilsHelper.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
 
@@ -324,27 +312,18 @@ def LogGaussian2D(candidate_dic,settings,**kwargs):
     
     # Fit performance information
     nb_fails = len(candidate_dic)-len(localizations)
-    n_loc_info = f'Number of localizations found: {len(localizations)}'
-    logging.info(n_loc_info)
-    n_fails_info = f'LogGaussian fitting failed for {nb_fails} candidate cluster(s).'
+    n_fails_info = f'Gaussian fitting failed for {nb_fails} candidate cluster(s).'
     logging.info(n_fails_info)
     gaussian_fit_info = ''
     gaussian_fit_info += ''.join([res[1] for res in RES])
     logging.info(gaussian_fit_info)
 
-    # Stop the timer
-    end_time = time.time()
-    timing_info = f'LogGaussian fitting took {end_time-start_time} seconds.'
-    logging.info(timing_info)
-    gaussian_fit_info = timing_info + '\n' + n_loc_info + '\n' + n_fails_info + '\n' + gaussian_fit_info
+    gaussian_fit_info = n_fails_info + '\n' + gaussian_fit_info
 
     return localizations, gaussian_fit_info
 
-# ToDo: Modify for 3D to make it functional
+# ToDo: Include calibration file to transform sigma_x/sigma_y to z height
 def Gaussian3D(candidate_dic,settings,**kwargs):
-    # Start the timer
-    start_time = time.time()
-
     # Check if we have the required kwargs
     [provided_optional_args, missing_optional_args] = utilsHelper.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
 
@@ -382,18 +361,12 @@ def Gaussian3D(candidate_dic,settings,**kwargs):
     
     # Fit performance information
     nb_fails = len(candidate_dic)-len(localizations)
-    n_loc_info = f'Number of localizations found: {len(localizations)}'
-    logging.info(n_loc_info)
-    n_fails_info = f'LogGaussian fitting failed for {nb_fails} candidate cluster(s).'
+    n_fails_info = f'Gaussian fitting failed for {nb_fails} candidate cluster(s).'
     logging.info(n_fails_info)
     gaussian_fit_info = ''
     gaussian_fit_info += ''.join([res[1] for res in RES])
     logging.info(gaussian_fit_info)
 
-    # Stop the timer
-    end_time = time.time()
-    timing_info = f'LogGaussian fitting took {end_time-start_time} seconds.'
-    logging.info(timing_info)
-    gaussian_fit_info = timing_info + '\n' + n_loc_info + '\n' + n_fails_info + '\n' + gaussian_fit_info
+    gaussian_fit_info = n_fails_info + '\n' + gaussian_fit_info
 
     return localizations, gaussian_fit_info
