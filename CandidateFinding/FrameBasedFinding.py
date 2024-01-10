@@ -129,7 +129,7 @@ def generate_candidate(events, ROI, frame_time, candidate_radius):
     sub_events=events[msk]
     candidate = {}
     candidate['events'] = pd.DataFrame(sub_events)
-    candidate['cluster_size'] = [np.max(sub_events['y'])-np.min(sub_events['y']), np.max(sub_events['x'])-np.min(sub_events['x']), np.max(sub_events['t'])-np.min(sub_events['t'])]
+    candidate['cluster_size'] = [np.max(sub_events['y'])-np.min(sub_events['y'])+1, np.max(sub_events['x'])-np.min(sub_events['x'])+1, np.max(sub_events['t'])-np.min(sub_events['t'])]
     candidate['N_events'] = len(sub_events)
     return candidate
 

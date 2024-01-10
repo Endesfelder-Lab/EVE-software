@@ -305,7 +305,7 @@ def get_events_in_bbox(npyarr,bboxes,ms_to_px,multiThread=True):
             
             candidates[bboxid] = {}
             candidates[bboxid]['events'] = filtered_df
-            candidates[bboxid]['cluster_size'] = [np.max(filtered_array['y'])-np.min(filtered_array['y']), np.max(filtered_array['x'])-np.min(filtered_array['x']), np.max(filtered_array['t'])-np.min(filtered_array['t'])]
+            candidates[bboxid]['cluster_size'] = [np.max(filtered_array['y'])-np.min(filtered_array['y'])+1, np.max(filtered_array['x'])-np.min(filtered_array['x'])+1, np.max(filtered_array['t'])-np.min(filtered_array['t'])]
             candidates[bboxid]['N_events'] = len(filtered_array)
         end_time = time.time()
         logging.info('Time to get bounding boxes: '+str(end_time-start_time))
@@ -547,6 +547,9 @@ def DBSCAN_allEvents(npy_array,settings,**kwargs):
     else:
         # Default value for max number of consecutive events
         max_consec_ev = 30
+
+    mask = npy_array['p'] != 0
+    npy_array = npy_array[mask]
 
     # Start the timer
     start_time = time.time()
