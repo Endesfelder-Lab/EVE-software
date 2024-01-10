@@ -81,8 +81,15 @@ def consec_filter(events, min_consec, max_consec,weights = None,df_events=None):
     # This function filters out events with a minimum and maximum number of consecutive events
     if weights is None:
         weights,df_events = determineWeights(events)
-    # filtering out events with a minimum and maximum number of consecutive events
-    df_events = df_events[(df_events['w']>=min_consec) & (df_events['w']<=max_consec)]
+    # filtering out events with a minimum number of consecutive events
+    df_events = df_events[(df_events['w']>=min_consec)]
+
+    # filtering out pixels that have more than max_consec number of consecutive events
+    high_consec_events = df_events[(df_events['w']>max_consec)]
+    hotPixels = high_consec_events[['x','y']].values.tolist()
+    unique_hotPixels = set(map(tuple, hotPixels))
+    mask = df_events[['x', 'y']].apply(tuple, axis=1).isin(unique_hotPixels)
+    df_events = df_events[~mask]
 
     # convert df back to structured numpy array
     consec_events = df_events.to_records(index=False)
@@ -94,8 +101,12 @@ def hotPixel_filter(events, max_consec, weights=None,df_events=None):
     if weights is None:
         weights,df_events = determineWeights(events)
     
-    # filtering out events with a minimum and maximum number of consecutive events
-    df_events = df_events[(df_events['w']<=max_consec)]
+    # filtering out pixels that have more than max_consec number of consecutive events
+    high_consec_events = df_events[(df_events['w']>max_consec)]
+    hotPixels = high_consec_events[['x','y']].values.tolist()
+    unique_hotPixels = set(map(tuple, hotPixels))
+    mask = df_events[['x', 'y']].apply(tuple, axis=1).isin(unique_hotPixels)
+    df_events = df_events[~mask]
 
     # convert df back to structured numpy array
     filtered_events = df_events.to_records(index=False)
@@ -547,9 +558,6 @@ def DBSCAN_allEvents(npy_array,settings,**kwargs):
     else:
         # Default value for max number of consecutive events
         max_consec_ev = 30
-
-    mask = npy_array['p'] != 0
-    npy_array = npy_array[mask]
 
     # Start the timer
     start_time = time.time()
