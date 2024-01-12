@@ -14,6 +14,7 @@ from functools import partial
 import open3d as o3d
 from joblib import Parallel, delayed
 import multiprocessing
+import bisect
 
 # Required function __function_metadata__
 # Should have an entry for every function in this file
@@ -294,6 +295,38 @@ def kdtree_assisted_lookup(bbox_bunch,ms_to_px,kdtree1d,lookup_list,npyarr):
     
     return filtered_df2
 
+
+
+def get_events_in_bbox_fast(npyarr,bboxes,ms_to_px):
+    #Get empty candidate dictionary
+    
+    candidates = {}   
+    start_time = time.time()
+    #Loop over all bboxes:
+    for bboxid, _ in bboxes.items():
+        bbox = bboxes[bboxid]
+        conditions = [
+            npyarr['x'] >= bbox[0],
+            npyarr['x'] <= bbox[1],
+            npyarr['y'] >= bbox[2],
+            npyarr['y'] <= bbox[3],
+            npyarr['t'] >= bbox[4]*1000*ms_to_px,
+            npyarr['t'] <= bbox[5]*1000*ms_to_px
+        ]
+        filtered_array = npyarr[np.logical_and.reduce(conditions)]
+        #Change filtered_array to a pd dataframe:
+        filtered_df = pd.DataFrame(filtered_array)
+        
+        candidates[bboxid] = {}
+        candidates[bboxid]['events'] = filtered_df
+        candidates[bboxid]['cluster_size'] = [np.max(filtered_array['y'])-np.min(filtered_array['y']), np.max(filtered_array['x'])-np.min(filtered_array['x']), np.max(filtered_array['t'])-np.min(filtered_array['t'])]
+        candidates[bboxid]['N_events'] = len(filtered_array)
+    end_time = time.time()
+    logging.info('Time to get bounding boxes: '+str(end_time-start_time))
+    return candidates
+        
+
+
 def get_events_in_bbox(npyarr,bboxes,ms_to_px,multiThread=True):
     #Get empty candidate dictionary
     candidates = {}
@@ -438,6 +471,60 @@ def get_events_in_bbox(npyarr,bboxes,ms_to_px,multiThread=True):
     return candidates
 
 
+def get_events_in_bbox_bisect(npyarr,bboxes,ms_to_px):
+    
+    #Sort on t:
+    npy_sort_t = np.zeros((len(npyarr),2))
+    #First column is the order:
+    npy_sort_t[:,0] = np.argsort(npyarr['t'])
+    #second column is the time:
+    npy_sort_t[:,1] = np.sort(npyarr, order='t')['t']
+    
+    #Sort on x:
+    npy_sort_x = np.zeros((len(npyarr),2))
+    #First column is the order:
+    npy_sort_x[:,0] = np.argsort(npyarr['x'])
+    #second column is the time:
+    npy_sort_x[:,1] = np.sort(npyarr, order='x')['x']
+    
+    npy_sort_y = np.zeros((len(npyarr),2))
+    #First column is the order:
+    npy_sort_y[:,0] = np.argsort(npyarr['y'])
+    #second column is the time:
+    npy_sort_y[:,1] = np.sort(npyarr, order='y')['y']
+    
+    candidates = {} 
+    start_time = time.time()
+    #Loop over all bboxes:
+    for bboxid, _ in bboxes.items():
+        bbox = bboxes[bboxid]
+        startindex_x = bisect.bisect_left(npy_sort_x[:,1],bbox[0])
+        endindex_x = bisect.bisect_right(npy_sort_x[:,1],bbox[1])
+        startindex_y = bisect.bisect_left(npy_sort_y[:,1],bbox[2])
+        endindex_y = bisect.bisect_right(npy_sort_y[:,1],bbox[3])
+        startindex_t = bisect.bisect_left(npy_sort_t[:,1],bbox[4]*1000*ms_to_px)
+        endindex_t = bisect.bisect_right(npy_sort_t[:,1],bbox[5]*1000*ms_to_px)
+        
+        valid_indeces_x = npy_sort_x[startindex_x:endindex_x,0]
+        valid_indeces_y = npy_sort_y[startindex_y:endindex_y,0]
+        valid_indeces_t = npy_sort_t[startindex_t:endindex_t,0]
+        
+        #find the indeces where all of those is true:
+        common_values = np.intersect1d(np.intersect1d(valid_indeces_x, valid_indeces_y), valid_indeces_t)
+
+        filtered_array = npyarr[common_values.astype(int)]
+        #Change filtered_array to a pd dataframe:
+        filtered_df = pd.DataFrame(filtered_array)
+        
+        candidates[bboxid] = {}
+        candidates[bboxid]['events'] = filtered_df
+        candidates[bboxid]['cluster_size'] = [np.max(filtered_array['y'])-np.min(filtered_array['y']), np.max(filtered_array['x'])-np.min(filtered_array['x']), np.max(filtered_array['t'])-np.min(filtered_array['t'])]
+        candidates[bboxid]['N_events'] = len(filtered_array)
+    end_time = time.time()
+    
+    logging.info('Time to get bounding boxesBisect: '+str(end_time-start_time))
+    return candidates
+
 def split_dict(dictionary, num_splits):
     keys = list(dictionary.keys())
     split_keys = np.array_split(keys, num_splits)
@@ -502,8 +589,6 @@ def findbboxnew(npyarr, min_x=-np.inf, max_x=np.inf, min_y=-np.inf,
     filtered_df = pd.DataFrame(npyarr[bb_filter])
     return filtered_df
 
-
-
 def process_bbox(args):
     bbox, npyarr, ms_to_px = args
     filtered_array = npyarr[(npyarr['x'] >= bbox[0]) & (npyarr['x'] <= bbox[1]) & (npyarr['y'] >= bbox[2]) & (npyarr['y'] <= bbox[3]) & (npyarr['t'] >= bbox[4]*1000*ms_to_px) & (npyarr['t'] <= bbox[5]*1000*ms_to_px)]
@@ -511,7 +596,6 @@ def process_bbox(args):
     cluster_size = [np.max(filtered_array['y'])-np.min(filtered_array['y']), np.max(filtered_array['x'])-np.min(filtered_array['x']), np.max(filtered_array['t'])-np.min(filtered_array['t'])]
     N_events = len(filtered_array)
     return filtered_df, cluster_size, N_events
-
 
 def o3d_getclusterbounding_boxes(events, cluster_labels,padding_xy = 0,padding_t = 0):
     x=3
@@ -541,7 +625,6 @@ def o3d_getclusterbounding_boxes(events, cluster_labels,padding_xy = 0,padding_t
             bounding_boxes2[cluster_id] = (aabb.get_min_bound()[0]-padding_xy, aabb.get_max_bound()[0]+padding_xy, aabb.get_min_bound()[1]-padding_xy, aabb.get_max_bound()[1]+padding_xy, aabb.get_min_bound()[2]-padding_t, aabb.get_max_bound()[2]+padding_t)
     end_time = time.time()
     logging.info('Time to get bounding boxes o3d: '+str(end_time-start_time))
-
 
 #-------------------------------------------------------------------------------------------------------------------------------
 #Callable functions
@@ -577,8 +660,11 @@ def DBSCAN_allEvents(npy_array,settings,**kwargs):
     bboxes = get_cluster_bounding_boxes(clustersHD, cluster_labels,padding_xy = int(kwargs['padding_xy']),padding_t = int(kwargs['padding_xy']))
     logging.info('Getting bounding boxes done')
     hotpixel_filtered_events = hotPixel_filter(npy_array,max_consec_ev,weights=weights,df_events=df_events)
-    candidates = get_events_in_bbox(hotpixel_filtered_events,bboxes,float(kwargs['ratio_ms_to_px']))
-    logging.info('Candidates obtained')
+    logging.info('Hotpixel filtering completed')
+    # candidates = get_events_in_bbox(hotpixel_filtered_events,bboxes,float(kwargs['ratio_ms_to_px']))
+    # logging.info('Candidates obtained')
+    candidates = get_events_in_bbox_bisect(hotpixel_filtered_events,bboxes,float(kwargs['ratio_ms_to_px']))
+    logging.info('CandidatesBissect obtained')
     
     end_time = time.time()
     elapsed_time = end_time - start_time
