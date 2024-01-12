@@ -1333,10 +1333,13 @@ class MyGUI(QMainWindow):
             
             #Append to the fullr esult
             for k in range(len(BatchFindingResult[0])):
-                if self.filter_finding_on_chunking(BatchFindingResult[0][k],self.chunckloading_currentLimits):
-                    # append BatchFindingResult[0][k] to the full result:
-                    #Shouldn't be appended, but should be a new entry in the dict: 
-                    self.data['FindingResult'][0][len(self.data['FindingResult'][0])] = BatchFindingResult[0][k]
+                try:
+                    if self.filter_finding_on_chunking(BatchFindingResult[0][k],self.chunckloading_currentLimits):
+                        # append BatchFindingResult[0][k] to the full result:
+                        #Shouldn't be appended, but should be a new entry in the dict: 
+                        self.data['FindingResult'][0][len(self.data['FindingResult'][0])] = BatchFindingResult[0][k]
+                except:
+                    print('issues with index '+str(k))
         
         
     def filter_finding_on_chunking(self,candidate,chunking_limits):
