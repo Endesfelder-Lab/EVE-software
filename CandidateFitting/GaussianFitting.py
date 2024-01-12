@@ -136,7 +136,8 @@ class gauss2D(fit):
         t = np.mean(events['t'])/1000. # in ms
         mean_polarity = events['p'].mean()
         p = int(mean_polarity == 1) + int(mean_polarity == 0) * 0 + int(mean_polarity > 0 and mean_polarity < 1) * 2
-        return np.array([self.candidateID, x, y, mse, del_x, del_y, p, t]), self.fit_info
+        loc_df = pd.DataFrame({'candidate_id': self.candidateID, 'x': x, 'y': y, 'mse': mse, 'del_x': del_x, 'del_y': del_y, 'p': p, 't': t}, index=[0]) #return np.array([self.candidateID, x, y, mse, del_x, del_y, p, t]), self.fit_info
+        return loc_df, self.fit_info
 
 # 2d log gaussian fit
 class loggauss2D(gauss2D):
@@ -175,10 +176,9 @@ class gauss3D(gauss2D):
 
 
 # perform localization for part of candidate dictionary
-def localize_canditates2D(i, candidate_dic, func, df_cols, *args, **kwargs):
+def localize_canditates2D(i, candidate_dic, func, *args, **kwargs):
     print('Localizing PSFs (thread '+str(i)+')...')
-    nr_of_localizations = len(candidate_dic)
-    localizations = pd.DataFrame(index=range(nr_of_localizations), columns = df_cols)
+    localizations = []
     index = 0
     nb_fails = 0
     info = ''
@@ -189,9 +189,9 @@ def localize_canditates2D(i, candidate_dic, func, df_cols, *args, **kwargs):
             info += fitting_info
             nb_fails +=1
         else:
-            localizations.loc[index] = localization
+            localizations.append(localization)
             index += 1
-    localizations = localizations.drop(localizations.tail(nb_fails).index)
+    localizations = pd.concat(localizations, ignore_index=True)
     print('Localizing PSFs (thread '+str(i)+') done!')
     return localizations, info
 
@@ -245,7 +245,6 @@ def Gaussian2D(candidate_dic,settings,**kwargs):
     expected_width = expected_width/pixel_size
     fit_func = gauss2D
     params = expected_width, fitting_tolerance, pixel_size
-    df_cols = ['candidate_id', 'x', 'y', 'mse', 'del_x', 'del_y', 'p', 't']
 
     if multithread == True: num_cores = multiprocessing.cpu_count()
     else: num_cores = 1
@@ -257,7 +256,7 @@ def Gaussian2D(candidate_dic,settings,**kwargs):
     logging.info("Candidate fitting split in "+str(njobs)+" job(s) and divided on "+str(num_cores)+" core(s).")
 
     # Determine all localizations
-    RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(localize_canditates2D)(i, data_split[i], fit_func, df_cols, *params) for i in range(len(data_split)))
+    RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(localize_canditates2D)(i, data_split[i], fit_func, *params) for i in range(len(data_split)))
     
     localization_list = [res[0] for res in RES]
     localizations = pd.concat(localization_list)
@@ -293,7 +292,6 @@ def LogGaussian2D(candidate_dic,settings,**kwargs):
     expected_width = expected_width/pixel_size
     fit_func = loggauss2D
     params = expected_width, fitting_tolerance, pixel_size
-    df_cols = ['candidate_id', 'x', 'y', 'mse', 'del_x', 'del_y', 'p', 't']
 
     if multithread == True: num_cores = multiprocessing.cpu_count()
     else: num_cores = 1
@@ -305,7 +303,7 @@ def LogGaussian2D(candidate_dic,settings,**kwargs):
     logging.info("Candidate fitting split in "+str(njobs)+" job(s) and divided on "+str(num_cores)+" core(s).")
 
     # Determine all localizations
-    RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(localize_canditates2D)(i, data_split[i], fit_func, df_cols, *params) for i in range(len(data_split)))
+    RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(localize_canditates2D)(i, data_split[i], fit_func, *params) for i in range(len(data_split)))
     
     localization_list = [res[0] for res in RES]
     localizations = pd.concat(localization_list)
@@ -342,7 +340,6 @@ def Gaussian3D(candidate_dic,settings,**kwargs):
     theta = np.radians(float(kwargs['theta']))
     fit_func = gauss3D
     params = expected_width, fitting_tolerance, pixel_size, theta
-    df_cols = ['candidate_id', 'x', 'y', 'mse', 'del_x', 'del_y', 'p', 't']
 
     if multithread == True: num_cores = multiprocessing.cpu_count()
     else: num_cores = 1
@@ -354,7 +351,7 @@ def Gaussian3D(candidate_dic,settings,**kwargs):
     logging.info("Candidate fitting split in "+str(njobs)+" job(s) and divided on "+str(num_cores)+" core(s).")
 
     # Determine all localizations
-    RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(localize_canditates2D)(i, data_split[i], fit_func, df_cols, *params) for i in range(len(data_split)))
+    RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(localize_canditates2D)(i, data_split[i], fit_func, *params) for i in range(len(data_split)))
     
     localization_list = [res[0] for res in RES]
     localizations = pd.concat(localization_list)
