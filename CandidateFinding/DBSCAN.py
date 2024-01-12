@@ -41,13 +41,28 @@ def __function_metadata__():
                 {"name": "density_multiplier", "description": "Distance multiplier","default":1.5,"type":float},
                 {"name": "ratio_ms_to_px", "description": "Ratio of milliseconds to pixels.","default":35.0,"type":float},
                 {"name": "DBSCAN_eps", "description": "Eps of DBSCAN.","default":6,"type":int},
-                {"name": "padding_xy", "description": "Result padding in x,y pixels.","default":2,"type":int},
+                {"name": "padding_xy", "description": "Result padding in x,y pixels.","default":0,"type":int},
             ],
             "optional_kwargs": [
                {"name": "min_consec", "description": "Minimum number of consecutive events","default":1,"type":int},
                {"name": "max_consec", "description": "Maximum number of consecutive events, discards hot pixels","default":30,"type":int},
             ],
             "help_string": "DBSCAN on high-density, but returns all events in the bounding box specified by DBSCAN."
+        },
+        "DBSCAN_allEvents_remove_outliers": {
+            "required_kwargs": [
+                {"name": "neighbour_points", "description": "Removes points that has less than this number of neighbours in neighbour_radius","default":30,"type":int},
+                {"name": "neighbour_radius", "description": "Removes points that has less than neighbour_points in this radius","default":3.0,"type":float},
+                {"name": "min_cluster_size", "description": "Required number of neighbouring events in spatiotemporal voxel","default":17,"type":int},
+                {"name": "ratio_ms_to_px", "description": "Ratio of milliseconds to pixels.","default":35.0,"type":float},
+                {"name": "DBSCAN_eps", "description": "Eps of DBSCAN.","default":3,"type":int},
+                {"name": "padding_xy", "description": "Result padding in x,y pixels.","default":2,"type":int},
+            ],
+            "optional_kwargs": [
+               {"name": "min_consec", "description": "Minimum number of consecutive events","default":1,"type":int},
+               {"name": "max_consec", "description": "Maximum number of consecutive events, discards hot pixels","default":30,"type":int},
+            ],
+            "help_string": "Removes outliers via o3d's remove_radius_outlier."
         }
     }
 
@@ -55,6 +70,30 @@ def __function_metadata__():
 #Helper functions
 #-------------------------------------------------------------------------------------------------------------------------------
 
+
+def remove_radius_outlier_o3d(events,nb_points=30,radius=3,print_progress=True,ms_to_px=35):
+    polarities = events['p']
+    
+    data_for_o3d = events
+    start_time = time.time()
+    point_cloud = o3d.geometry.PointCloud()
+    point_cloud.points = o3d.utility.Vector3dVector(zip(data_for_o3d['x'],data_for_o3d['y'],data_for_o3d['t']/(1000*ms_to_px)))
+    
+    cleaned_pcp =point_cloud.remove_radius_outlier(30, 3, print_progress=True)
+    
+    pcp = np.asarray(cleaned_pcp[0].points)
+    #change columns 0 and 1 to integer values:
+    pcp[:,0] = pcp[:,0].astype(int)
+    pcp[:,1] = pcp[:,1].astype(int)
+    
+    polarities_remaining=polarities[cleaned_pcp[1]]
+    
+    #transform back to titled columns:
+    # events_remaining = pd.DataFrame({'x': pcp[:, 0], 'y': pcp[:, 1], 't': pcp[:, 2], 'p': polarities_remaining})
+    
+    logging.info(str(len(pcp))+"/"+str(len(events))+":"+str(len(pcp)/len(events)*100)+" % of data kept after remove-radius-outlier")
+    return pcp, polarities_remaining
+    
 def determineWeights(events):
     # df creation and sorting (sufficient and faster for sort by only x,y)
     df_events = pd.DataFrame(events)
@@ -295,38 +334,6 @@ def kdtree_assisted_lookup(bbox_bunch,ms_to_px,kdtree1d,lookup_list,npyarr):
     
     return filtered_df2
 
-
-
-def get_events_in_bbox_fast(npyarr,bboxes,ms_to_px):
-    #Get empty candidate dictionary
-    
-    candidates = {}   
-    start_time = time.time()
-    #Loop over all bboxes:
-    for bboxid, _ in bboxes.items():
-        bbox = bboxes[bboxid]
-        conditions = [
-            npyarr['x'] >= bbox[0],
-            npyarr['x'] <= bbox[1],
-            npyarr['y'] >= bbox[2],
-            npyarr['y'] <= bbox[3],
-            npyarr['t'] >= bbox[4]*1000*ms_to_px,
-            npyarr['t'] <= bbox[5]*1000*ms_to_px
-        ]
-        filtered_array = npyarr[np.logical_and.reduce(conditions)]
-        #Change filtered_array to a pd dataframe:
-        filtered_df = pd.DataFrame(filtered_array)
-        
-        candidates[bboxid] = {}
-        candidates[bboxid]['events'] = filtered_df
-        candidates[bboxid]['cluster_size'] = [np.max(filtered_array['y'])-np.min(filtered_array['y']), np.max(filtered_array['x'])-np.min(filtered_array['x']), np.max(filtered_array['t'])-np.min(filtered_array['t'])]
-        candidates[bboxid]['N_events'] = len(filtered_array)
-    end_time = time.time()
-    logging.info('Time to get bounding boxes: '+str(end_time-start_time))
-    return candidates
-        
-
-
 def get_events_in_bbox(npyarr,bboxes,ms_to_px,multiThread=True):
     #Get empty candidate dictionary
     candidates = {}
@@ -469,7 +476,6 @@ def get_events_in_bbox(npyarr,bboxes,ms_to_px,multiThread=True):
     
         print('Done')
     return candidates
-
 
 def get_events_in_bbox_bisect(npyarr,bboxes,ms_to_px):
     
@@ -664,8 +670,8 @@ def DBSCAN_allEvents(npy_array,settings,**kwargs):
     # candidates = get_events_in_bbox(hotpixel_filtered_events,bboxes,float(kwargs['ratio_ms_to_px']))
     # logging.info('Candidates obtained')
     candidates = get_events_in_bbox_bisect(hotpixel_filtered_events,bboxes,float(kwargs['ratio_ms_to_px']))
-    logging.info('CandidatesBissect obtained')
-    
+    logging.info('Candidates obtained (via bbox bisect)')
+        
     end_time = time.time()
     elapsed_time = end_time - start_time
     
@@ -765,4 +771,37 @@ def DBSCAN_onlyHighDensity(npy_array,settings,**kwargs):
     performance_metadata = ""
     logging.info('DBSCAN finding done')
 
+    return candidates, performance_metadata
+
+def DBSCAN_allEvents_remove_outliers(npy_array,settings,**kwargs):
+    #Check if we have the required kwargs
+    [provided_optional_args, missing_optional_args] = utilsHelper.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
+    if "min_consec" in provided_optional_args:
+        min_consec_ev = float(kwargs["min_consec"])
+    else:
+        # Default value for min number of consecutive events
+        min_consec_ev = 1
+    if "max_consec" in provided_optional_args:
+        max_consec_ev = float(kwargs["max_consec"])
+    else:
+        # Default value for max number of consecutive events
+        max_consec_ev = 30
+    
+    
+    weights,df_events = determineWeights(npy_array)
+    hotpixel_filtered_events = hotPixel_filter(npy_array,max_consec_ev,weights=weights,df_events=df_events)
+    logging.info('Hotpixel filtering completed')
+    filtered_events, polarities = remove_radius_outlier_o3d(hotpixel_filtered_events,nb_points=30,radius=3,print_progress=True,ms_to_px=float(kwargs['ratio_ms_to_px']))
+    
+    
+    clustersHD, cluster_labels = clustering(filtered_events, polarities, eps = float(kwargs['DBSCAN_eps']), min_points_per_cluster = int(kwargs['min_cluster_size']))
+    logging.info('DBSCAN done')
+    bboxes = get_cluster_bounding_boxes(clustersHD, cluster_labels,padding_xy = int(kwargs['padding_xy']),padding_t = int(kwargs['padding_xy']))
+    logging.info('Getting bounding boxes done')
+    
+    candidates = get_events_in_bbox_bisect(hotpixel_filtered_events,bboxes,float(kwargs['ratio_ms_to_px']))
+    logging.info('Candidates obtained (via bbox bisect)')
+    
+    
+    performance_metadata = ""
     return candidates, performance_metadata
