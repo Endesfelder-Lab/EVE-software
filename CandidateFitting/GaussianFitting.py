@@ -191,7 +191,10 @@ def localize_canditates2D(i, candidate_dic, func, *args, **kwargs):
         else:
             localizations.append(localization)
             index += 1
-    localizations = pd.concat(localizations, ignore_index=True)
+    if localizations == []:
+        localizations = pd.DataFrame()
+    else:
+        localizations = pd.concat(localizations, ignore_index=True)
     print('Localizing PSFs (thread '+str(i)+') done!')
     return localizations, info
 
