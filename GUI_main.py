@@ -879,7 +879,7 @@ class MyGUI(QMainWindow):
         #Create an empty figure and store it as self.data:
         self.data['figurePlot3D'] = plt.figure(figsize=(6.8, 4))
         self.data['figurePlot3D'].suptitle('3D pointcloud of candidate cluster')
-        self.data['figureAx3D'] = self.data['figurePlot3D'].add_subplot(111, projection='3D')
+        self.data['figureAx3D'] = self.data['figurePlot3D'].add_subplot(111, projection='3d')
         self.data['figureCanvas3D'] = FigureCanvas(self.data['figurePlot3D'])
         self.data['figurePlot3D'].tight_layout()
         self.data['figurePlot3D'].subplots_adjust(top=0.95)
@@ -928,10 +928,10 @@ class MyGUI(QMainWindow):
             logging.error('Tried to visualise candidate, but no ID was given!')
 
         elif 'FindingMethod' in self.data and int(self.entryCanPreview.text()) < len(self.data['FindingResult'][0]):
+            self.data['CandidatePreviewID'] = int(self.entryCanPreview.text())
             logging.debug(f"Attempting to show candidate {self.data['CandidatePreviewID']}.")
 
             # Get some info about the candidate
-            self.data['CandidatePreviewID'] = int(self.entryCanPreview.text())
             N_events = self.data['FindingResult'][0][self.data['CandidatePreviewID']]['N_events']
             cluster_size = self.data['FindingResult'][0][self.data['CandidatePreviewID']]['cluster_size']
             self.candidate_info.setText(f"This candidate cluster contains {N_events} events and has dimensions ({cluster_size[0]}, {cluster_size[1]}, {cluster_size[2]}).")
