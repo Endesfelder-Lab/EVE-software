@@ -606,36 +606,55 @@ class MyGUI(QMainWindow):
         
         events_id = 0
         partialFinding = {}
+        partialFitting = {}
         for events in self.previewEventsDict:
             if self.dataSelectionPolarityDropdown.currentText() != "Pos and Neg separately":
                 #Run the current finding and fitting routine only on these events:
                 self.runFindingAndFitting(events,runFitting=True,storeFinding=False)
             else:
-                #Run the current finding and fitting routine only on these events, WITHOUT fitting:
-                self.runFindingAndFitting(events,runFitting=False,storeFinding=False)
+                #Run the current finding and fitting routine only on these events:
+                self.runFindingAndFitting(events,runFitting=True,storeFinding=False)
+                #we store our finding and fitting results like this:
                 partialFinding[events_id] = self.data['FindingResult']
+                partialFitting[events_id] = self.data['FittingResult']
             
             events_id+=1
             
         #If the data was split in two parts... (or more)
         if events_id > 1:
             updated_partialFinding = []
-            updated_metadatastring = ''
+            updated_partialFindingMetadatastring = ''
+            updated_partialFitting = []
+            updated_partialFittingMetadatastring = ''
+            totNrFindingIncrease = 0
             for i in range(events_id):
-                updated_metadatastring = updated_metadatastring+partialFinding[i][1]+'\n'
+                curr_finding_id = 0
+                updated_partialFindingMetadatastring = updated_partialFindingMetadatastring+partialFinding[i][1]+'\n'
+                updated_partialFittingMetadatastring = updated_partialFittingMetadatastring+partialFitting[i][1]+'\n'
                 for eachEntry in partialFinding[i][0].items():
-                    updated_partialFinding.append(eachEntry[1])
-            
-            #updated_partialFinding should be transformed to a dictionary
-            res_dict = {i: updated_partialFinding[i] for i in range(len(updated_partialFinding))}
-            
+                    #Change to dictionary
+                    #Ensure that index is correctly increased
+                    dictLine = {curr_finding_id+totNrFindingIncrease: eachEntry[1]}
+                    updated_partialFinding.append(dictLine)
+                    curr_finding_id+=1
+                for index,row in partialFitting[i][0].iterrows():
+                    row.candidate_id+=totNrFindingIncrease
+                    updated_partialFitting.append(row)
+                
+                #increase the total number of findings
+                totNrFindingIncrease+=curr_finding_id
             #Store them again in the self.data['FindingResult']
             self.data['FindingResult']={}
-            self.data['FindingResult'][0] = res_dict
-            self.data['FindingResult'][1] = updated_metadatastring
+            self.data['FindingResult'][0] = updated_partialFinding
+            self.data['FindingResult'][1] = updated_partialFindingMetadatastring
+            #Fitting should be changed to pd df
+            res_dict_fitting = pd.DataFrame(updated_partialFitting)
+            #Store them again in the self.data['FindingResult']
+            self.data['FittingResult']={}
+            self.data['FittingResult'][0] = res_dict_fitting
+            self.data['FittingResult'][1] = updated_partialFittingMetadatastring
             
-            #and run fitting on this updated info:
-            self.runFitting()
+            #To test: np.shape(self.data['FittingResult'][0])[0]
         
         #Reset global settings
         self.globalSettings = globalSettingsOrig
@@ -924,7 +943,6 @@ class MyGUI(QMainWindow):
         else:
             logging.error('Tried to visualise but no data found!')
 
-
     def setup_canPreviewTab(self):
         """
         Function to setup the Candidate Preview tab
@@ -983,7 +1001,6 @@ class MyGUI(QMainWindow):
         canPreviewtab_vertical_container.addWidget(NavigationToolbar(self.data['figureCanvasProjection'], self))
         #Add the canvas to the tab
         canPreviewtab_vertical_container.addWidget(self.data['figureCanvasProjection'])
-
 
     def updateCandidatePreview(self):
         """
@@ -1076,7 +1093,6 @@ class MyGUI(QMainWindow):
             self.candidate_info.setText('Tried to visualise candidate but no data found!')
             logging.error('Tried to visualise candidate but no data found!')
 
-    
     def setup_previewTab(self):
         """
         Function that creates the preview tab
@@ -1241,6 +1257,7 @@ class MyGUI(QMainWindow):
         curr_dropdown = self.getMethodDropdownInfo(curr_layout,className)
         #Get the kw-arguments from the current dropdown.
         current_selected_function = utils.functionNameFromDisplayName(curr_dropdown.currentText(),displayNameToFunctionNameMap)
+        current_selected_polarity = utils.polaritySelectedFromDisplayName(curr_dropdown.currentText())
         reqKwargs = utils.reqKwargsFromFunction(current_selected_function)
         #Add a widget-pair for every kw-arg
         labelposoffset = 0
@@ -1248,12 +1265,12 @@ class MyGUI(QMainWindow):
             #Value is used for scoring, and takes the output of the method
             if reqKwargs[k] != 'methodValue':
                 label = QLabel(f"<b>{reqKwargs[k]}</b>")
-                label.setObjectName(f"Label#{current_selected_function}#{reqKwargs[k]}")
+                label.setObjectName(f"Label#{current_selected_function}#{reqKwargs[k]}#{current_selected_polarity}")
                 if self.checkAndShowWidget(curr_layout,label.objectName()) == False:
                     label.setToolTip(utils.infoFromMetadata(current_selected_function,specificKwarg=reqKwargs[k]))
                     curr_layout.addWidget(label,2+(k)+labelposoffset,0)
                 line_edit = QLineEdit()
-                line_edit.setObjectName(f"LineEdit#{current_selected_function}#{reqKwargs[k]}")
+                line_edit.setObjectName(f"LineEdit#{current_selected_function}#{reqKwargs[k]}#{current_selected_polarity}")
                 defaultValue = utils.defaultValueFromKwarg(current_selected_function,reqKwargs[k])
                 if self.checkAndShowWidget(curr_layout,line_edit.objectName()) == False:
                     line_edit.setToolTip(utils.infoFromMetadata(current_selected_function,specificKwarg=reqKwargs[k]))
@@ -1270,12 +1287,12 @@ class MyGUI(QMainWindow):
         #Add a widget-pair for every kwarg
         for k in range(len(optKwargs)):
             label = QLabel(f"<i>{optKwargs[k]}</i>")
-            label.setObjectName(f"Label#{current_selected_function}#{optKwargs[k]}")
+            label.setObjectName(f"Label#{current_selected_function}#{optKwargs[k]}#{current_selected_polarity}")
             if self.checkAndShowWidget(curr_layout,label.objectName()) == False:
                 label.setToolTip(utils.infoFromMetadata(current_selected_function,specificKwarg=optKwargs[k]))
                 curr_layout.addWidget(label,2+(k)+len(reqKwargs)+labelposoffset,0)
             line_edit = QLineEdit()
-            line_edit.setObjectName(f"LineEdit#{current_selected_function}#{optKwargs[k]}")
+            line_edit.setObjectName(f"LineEdit#{current_selected_function}#{optKwargs[k]}#{current_selected_polarity}")
             defaultValue = utils.defaultValueFromKwarg(current_selected_function,optKwargs[k])
             if self.checkAndShowWidget(curr_layout,line_edit.objectName()) == False:
                 line_edit.setToolTip(utils.infoFromMetadata(current_selected_function,specificKwarg=optKwargs[k]))
@@ -1565,6 +1582,7 @@ class MyGUI(QMainWindow):
                 #Logic for if there are multiple entires in npyDataCell
                 events_id = 0
                 partialFinding = {}
+                partialFitting = {}
                 for npyData in npyDataCell:
                     if npyData is None:
                         return
@@ -1576,31 +1594,48 @@ class MyGUI(QMainWindow):
                         #Run the current finding and fitting routine only on these events:
                         self.runFindingAndFitting(npyData,runFitting=True,storeFinding=True)
                     else:
-                        #Run the current finding and fitting routine only on these events, WITHOUT fitting:
-                        self.runFindingAndFitting(npyData,runFitting=False,storeFinding=True)
+                        #Run the current finding and fitting routine only on these events:
+                        self.runFindingAndFitting(npyData,runFitting=True,storeFinding=False)
+                        #we store our finding and fitting results like this:
                         partialFinding[events_id] = self.data['FindingResult']
+                        partialFitting[events_id] = self.data['FittingResult']
                     
                     events_id+=1
-                        
+            
                 #If the data was split in two parts... (or more)
                 if events_id > 1:
                     updated_partialFinding = []
-                    updated_metadatastring = ''
+                    updated_partialFindingMetadatastring = ''
+                    updated_partialFitting = []
+                    updated_partialFittingMetadatastring = ''
+                    totNrFindingIncrease = 0
                     for i in range(events_id):
-                        updated_metadatastring = updated_metadatastring+partialFinding[i][1]+'\n'
+                        curr_finding_id = 0
+                        updated_partialFindingMetadatastring = updated_partialFindingMetadatastring+partialFinding[i][1]+'\n'
+                        updated_partialFittingMetadatastring = updated_partialFittingMetadatastring+partialFitting[i][1]+'\n'
                         for eachEntry in partialFinding[i][0].items():
-                            updated_partialFinding.append(eachEntry[1])
+                            #Change to dictionary
+                            #Ensure that index is correctly increased
+                            dictLine = {curr_finding_id+totNrFindingIncrease: eachEntry[1]}
+                            updated_partialFinding.append(dictLine)
+                            curr_finding_id+=1
+                        for index,row in partialFitting[i][0].iterrows():
+                            row.candidate_id+=totNrFindingIncrease
+                            updated_partialFitting.append(row)
                         
-                    #updated_partialFinding should be transformed to a dictionary
-                    res_dict = {i: updated_partialFinding[i] for i in range(len(updated_partialFinding))}
-                    
+                        #increase the total number of findings
+                        totNrFindingIncrease+=curr_finding_id
                     #Store them again in the self.data['FindingResult']
                     self.data['FindingResult']={}
-                    self.data['FindingResult'][0] = res_dict
-                    self.data['FindingResult'][1] = updated_metadatastring
-                    
-                    #and run fitting on this updated info:
-                    self.runFitting()
+                    self.data['FindingResult'][0] = updated_partialFinding
+                    self.data['FindingResult'][1] = updated_partialFindingMetadatastring
+                    #Fitting should be changed to pd df
+                    res_dict_fitting = pd.DataFrame(updated_partialFitting)
+                    #Store them again in the self.data['FindingResult']
+                    self.data['FittingResult']={}
+                    self.data['FittingResult'][0] = res_dict_fitting
+                    self.data['FittingResult'][1] = updated_partialFittingMetadatastring
+    
     
             elif self.globalSettings['FindingBatching']['value']== True or self.globalSettings['FindingBatching']['value']== 2:
                 self.runFindingBatching()
@@ -1802,8 +1837,6 @@ class MyGUI(QMainWindow):
         #         events = events[(events['y'] >= int(xyStretch[2])) & (events['y'] <= int(xyStretch[3]))]
         # except:
         #      logging.info("No XY cutting in preview due to not all entries being integers-.")
-             
-    
     
     def runFindingAndFitting(self,npyData,runFitting=True,storeFinding=True):
         #Run the finding function!
@@ -1895,27 +1928,27 @@ class MyGUI(QMainWindow):
         logging.debug('Attempting to create and store file metadata')
         try:
             metadatastring = f"""Metadata information for file {self.currentFileInfo['CurrentFileLoc']}
-Analysis routine finished at {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+            Analysis routine finished at {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 
----- Finding metadata output: ----
-Methodology used:
-{self.data['FindingMethod']}
+            ---- Finding metadata output: ----
+            Methodology used:
+            {self.data['FindingMethod']}
 
-Number of candidates found: {len(self.data['FindingResult'][0])}
-Candidate finding took {self.currentFileInfo['FindingTime']} seconds.
+            Number of candidates found: {len(self.data['FindingResult'][0])}
+            Candidate finding took {self.currentFileInfo['FindingTime']} seconds.
 
-Custom output from finding function:
-{self.data['FindingResult'][1]}
+            Custom output from finding function:
+            {self.data['FindingResult'][1]}
 
----- Fitting metadata output: ----
-Methodology used:
-{self.data['FittingMethod']}
+            ---- Fitting metadata output: ----
+            Methodology used:
+            {self.data['FittingMethod']}
 
-Number of localizations found: {len(self.data['FittingResult'][0])}
-Candidate fitting took {self.currentFileInfo['FittingTime']} seconds.
+            Number of localizations found: {len(self.data['FittingResult'][0])}
+            Candidate fitting took {self.currentFileInfo['FittingTime']} seconds.
 
-Custom output from fitting function:
-{self.data['FittingResult'][1]}
+            Custom output from fitting function:
+            {self.data['FittingResult'][1]}
             """
             #Store this metadatastring:
             with open(self.getStoreLocationPartial()+'_RunInfo_'+datetime.datetime.now().strftime("%Y%m%d_%H%M%S")+'.txt', 'w') as f:
