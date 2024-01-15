@@ -632,10 +632,7 @@ class MyGUI(QMainWindow):
                 updated_partialFindingMetadatastring = updated_partialFindingMetadatastring+partialFinding[i][1]+'\n'
                 updated_partialFittingMetadatastring = updated_partialFittingMetadatastring+partialFitting[i][1]+'\n'
                 for eachEntry in partialFinding[i][0].items():
-                    #Change to dictionary
-                    #Ensure that index is correctly increased
-                    dictLine = {curr_finding_id+totNrFindingIncrease: eachEntry[1]}
-                    updated_partialFinding.append(dictLine)
+                    updated_partialFinding.append(eachEntry[1])
                     curr_finding_id+=1
                 for index,row in partialFitting[i][0].iterrows():
                     row.candidate_id+=totNrFindingIncrease
@@ -643,9 +640,10 @@ class MyGUI(QMainWindow):
                 
                 #increase the total number of findings
                 totNrFindingIncrease+=curr_finding_id
+                
             #Store them again in the self.data['FindingResult']
             self.data['FindingResult']={}
-            self.data['FindingResult'][0] = updated_partialFinding
+            self.data['FindingResult'][0] = dict(zip(range(len(updated_partialFinding)), updated_partialFinding))
             self.data['FindingResult'][1] = updated_partialFindingMetadatastring
             #Fitting should be changed to pd df
             res_dict_fitting = pd.DataFrame(updated_partialFitting)
@@ -1614,10 +1612,7 @@ class MyGUI(QMainWindow):
                         updated_partialFindingMetadatastring = updated_partialFindingMetadatastring+partialFinding[i][1]+'\n'
                         updated_partialFittingMetadatastring = updated_partialFittingMetadatastring+partialFitting[i][1]+'\n'
                         for eachEntry in partialFinding[i][0].items():
-                            #Change to dictionary
-                            #Ensure that index is correctly increased
-                            dictLine = {curr_finding_id+totNrFindingIncrease: eachEntry[1]}
-                            updated_partialFinding.append(dictLine)
+                            updated_partialFinding.append(eachEntry[1])
                             curr_finding_id+=1
                         for index,row in partialFitting[i][0].iterrows():
                             row.candidate_id+=totNrFindingIncrease
@@ -1625,9 +1620,10 @@ class MyGUI(QMainWindow):
                         
                         #increase the total number of findings
                         totNrFindingIncrease+=curr_finding_id
+                        
                     #Store them again in the self.data['FindingResult']
                     self.data['FindingResult']={}
-                    self.data['FindingResult'][0] = updated_partialFinding
+                    self.data['FindingResult'][0] = dict(zip(range(len(updated_partialFinding)), updated_partialFinding))
                     self.data['FindingResult'][1] = updated_partialFindingMetadatastring
                     #Fitting should be changed to pd df
                     res_dict_fitting = pd.DataFrame(updated_partialFitting)
