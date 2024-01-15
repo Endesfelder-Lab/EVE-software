@@ -94,7 +94,10 @@ def spline_fit_candidates(i, candidate_dic, smoothing_factor, localization_sampl
         loc_df, spline_fit_info = candidate_spline(candidate, candidate_id, smoothing_factor, localization_sampling, pixel_size, **kwargs)
         dfs.append(loc_df)
         fitting_info += spline_fit_info
-    df = pd.concat(dfs, ignore_index=True)
+    if dfs == []:
+        df = pd.DataFrame()
+    else:
+        df = pd.concat(dfs, ignore_index=True)
     print('Fitting splines (thread ' + str(i) + ') done!')
     return df, fitting_info
 
