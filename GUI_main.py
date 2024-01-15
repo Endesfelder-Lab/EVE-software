@@ -15,7 +15,7 @@ import time
 #Imports for PyQt5 (GUI)
 from PyQt5 import QtWidgets, QtGui
 from PyQt5.QtGui import QCursor, QTextCursor, QIntValidator
-from PyQt5.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QTableWidget, QTableWidgetItem, QLayout, QMainWindow, QLabel, QPushButton, QSizePolicy, QGroupBox, QTabWidget, QGridLayout, QWidget, QComboBox, QLineEdit, QFileDialog, QToolBar, QCheckBox,QDesktopWidget, QMessageBox, QTextEdit, QSlider
+from PyQt5.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QTableWidget, QTableWidgetItem, QLayout, QMainWindow, QLabel, QPushButton, QSizePolicy, QGroupBox, QTabWidget, QGridLayout, QWidget, QComboBox, QLineEdit, QFileDialog, QToolBar, QCheckBox,QDesktopWidget, QMessageBox, QTextEdit, QSlider, QSpacerItem
 from PyQt5.QtCore import Qt, QPoint, QProcess, QCoreApplication, QTimer, QFileSystemWatcher, QFile
 
 #Custom imports
@@ -332,6 +332,18 @@ class MyGUI(QMainWindow):
         self.dataSelectionLayout.layout().addWidget(self.dataSelectionTimeLayout,0,1)
         self.dataSelectionLayout.layout().addWidget(self.dataSelectionPositionLayout,0,2)
         
+        #Populate Polarity layout with a dropdown:
+        self.dataSelectionPolarityLayout.layout().addWidget(QLabel("Polarity:"), 0,0)
+        self.dataSelectionPolarityDropdown = QComboBox()
+        self.dataSelectionPolarityDropdown.addItem("All events treated equal")
+        self.dataSelectionPolarityDropdown.addItem("Only Positive")
+        self.dataSelectionPolarityDropdown.addItem("Only Negative")
+        self.dataSelectionPolarityDropdown.addItem("Pos and Neg separately")
+        self.dataSelectionPolarityLayout.layout().addWidget(self.dataSelectionPolarityDropdown, 1,0)
+        #Add one of those addStretch to push it all to the top:
+        self.dataSelectionPolarityLayout.layout().addItem(QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding), 2,0)
+        
+        
         #Populate with a start time and end time inputs:
         self.dataSelectionTimeLayout.layout().addWidget(QLabel("Start time (ms):"), 0,0)
         self.dataSelectionTimeLayout.layout().addWidget(QLabel("Duration (ms):"), 2,0)
@@ -562,6 +574,29 @@ class MyGUI(QMainWindow):
         self.previewEvents = events
         self.previewEvents = self.filterEvents_xy(self.previewEvents,xyStretch)
         
+        self.previewEventsDict = []
+        
+        #filter on polarity:
+        if self.dataSelectionPolarityDropdown.currentText() == "Pos and Neg separately":
+            #Run everything twice
+            #Get positive events only:
+            npyevents_pos = self.filterEvents_npy_p(self.previewEvents,pValue=1)
+            self.previewEventsDict.append(npyevents_pos)
+            #Get negative events only:
+            npyevents_neg = self.filterEvents_npy_p(self.previewEvents,pValue=0)
+            self.previewEventsDict.append(npyevents_neg)
+        elif self.dataSelectionPolarityDropdown.currentText() == "Only Positive":
+            #Run everything once
+            npyevents_pos = self.filterEvents_npy_p(self.previewEvents,pValue=1)
+            self.previewEventsDict.append(npyevents_pos)
+        elif self.dataSelectionPolarityDropdown.currentText() == "Only Negative":
+            #Run everything once
+            npyevents_neg = self.filterEvents_npy_p(self.previewEvents,pValue=0)
+            self.previewEventsDict.append(npyevents_neg)
+        elif self.dataSelectionPolarityDropdown.currentText() == "All events treated equal":
+            #Don't do any filtering
+            self.previewEventsDict.append(self.previewEvents)
+            
         #Change global values so nothing is stored - we just want a preview run. This is later set back to orig values (globalSettingsOrig):
         globalSettingsOrig = copy.deepcopy(self.globalSettings)
         self.globalSettings['StoreConvertedRawData']['value'] = False
@@ -569,14 +604,45 @@ class MyGUI(QMainWindow):
         self.globalSettings['StoreFinalOutput']['value'] = False
         self.globalSettings['StoreFindingOutput']['value'] = False
         
-        #Run the current finding and fitting routine only on these events:
-        self.runFindingAndFitting(events)
+        events_id = 0
+        partialFinding = {}
+        for events in self.previewEventsDict:
+            if self.dataSelectionPolarityDropdown.currentText() != "Pos and Neg separately":
+                #Run the current finding and fitting routine only on these events:
+                self.runFindingAndFitting(events,runFitting=True,storeFinding=False)
+            else:
+                #Run the current finding and fitting routine only on these events, WITHOUT fitting:
+                self.runFindingAndFitting(events,runFitting=False,storeFinding=False)
+                partialFinding[events_id] = self.data['FindingResult']
+            
+            events_id+=1
+            
+        #If the data was split in two parts... (or more)
+        if events_id > 1:
+            updated_partialFinding = []
+            updated_metadatastring = ''
+            for i in range(events_id):
+                updated_metadatastring = updated_metadatastring+partialFinding[i][1]+'\n'
+                for eachEntry in partialFinding[i][0].items():
+                    updated_partialFinding.append(eachEntry[1])
+            
+            #updated_partialFinding should be transformed to a dictionary
+            res_dict = {i: updated_partialFinding[i] for i in range(len(updated_partialFinding))}
+            
+            #Store them again in the self.data['FindingResult']
+            self.data['FindingResult']={}
+            self.data['FindingResult'][0] = res_dict
+            self.data['FindingResult'][1] = updated_metadatastring
+            
+            #and run fitting on this updated info:
+            self.runFitting()
         
         #Reset global settings
         self.globalSettings = globalSettingsOrig
         
         #Update the preview panel and localization list:
-        self.updateShowPreview(previewEvents=events)
+        #Note that self.previewEvents is XYT cut, but NOT p-cut
+        self.updateShowPreview(previewEvents=self.previewEvents)
         self.updateLocList()
     
     def filterEvents_npy_t(self,events,tStretch=(-np.Inf,np.Inf)):
@@ -593,6 +659,21 @@ class MyGUI(QMainWindow):
             logging.warning("No events found in the chosen time frame.")
         
         return events
+    
+    def filterEvents_npy_p(self,events,pValue=0):
+        """
+        Filter events that are in a numpy array to a certain polarity
+        """
+        #tStretch is (start, duration)
+        indices = np.where((events['p'] == pValue))
+        # Access the partial data using the indices
+        eventsFiltered = events[indices]
+        
+        #Warning if no events are found
+        if len(eventsFiltered) == 0:
+            logging.warning("No events found with the chosen polarity: "+str(pValue))
+        
+        return eventsFiltered
     
     def filterEvents_xy(self,events,xyStretch=(-np.Inf,-np.Inf,np.Inf,np.Inf)):
         """
@@ -1293,19 +1374,46 @@ class MyGUI(QMainWindow):
             return None
             #Load the data: 
         if dataLocation.endswith('.npy'):
+            eventsDict = []
             npyevents = np.load(dataLocation, mmap_mode='r')
-            #Select xytp area specified:
+            
+            #First filter all events on xy,t:
             npyevents = self.filterEvents_npy_t(npyevents,tStretch=(float(self.run_startTLineEdit.text()),float(self.run_durationTLineEdit.text())))
             npyevents = self.filterEvents_xy(npyevents,xyStretch=(float(self.run_minXLineEdit.text()),float(self.run_maxXLineEdit.text()),float(self.run_minYLineEdit.text()),float(self.run_maxYLineEdit.text())))
                 
-            return npyevents
+            #Determine whether two or one outputs needs to be returned - based on polarity option
+            if self.dataSelectionPolarityDropdown.currentText() == "Pos and Neg separately":
+                #Run everything twice
+                #Get positive events only:
+                npyevents_pos = self.filterEvents_npy_p(npyevents,pValue=1)
+                eventsDict.append(npyevents_pos)
+                #Get negative events only:
+                npyevents_neg = self.filterEvents_npy_p(npyevents,pValue=0)
+                eventsDict.append(npyevents_neg)
+            elif self.dataSelectionPolarityDropdown.currentText() == "Only Positive":
+                #Run everything once
+                npyevents_pos = self.filterEvents_npy_p(npyevents,pValue=1)
+                eventsDict.append(npyevents_pos)
+            elif self.dataSelectionPolarityDropdown.currentText() == "Only Negative":
+                #Run everything once
+                npyevents_neg = self.filterEvents_npy_p(npyevents,pValue=0)
+                eventsDict.append(npyevents_neg)
+            elif self.dataSelectionPolarityDropdown.currentText() == "All events treated equal":
+                #Don't do any filtering
+                eventsDict.append(npyevents)
+            
+            return eventsDict
         elif dataLocation.endswith('.raw'):
+            eventsDict = []
             events = self.RawToNpy(dataLocation)
             #Select xytp area specified:
             events = self.filterEvents_npy_t(events,tStretch=(float(self.run_startTLineEdit.text()),float(self.run_durationTLineEdit.text())))
             events = self.filterEvents_xy(events,xyStretch=(float(self.run_minXLineEdit.text()),float(self.run_maxXLineEdit.text()),float(self.run_minYLineEdit.text()),float(self.run_maxYLineEdit.text())))
             
-            return events
+            #append events to eventsDict:
+            eventsDict.append(events)
+            
+            return eventsDict
     
     def RawToNpy(self,filepath,buffer_size = 1e8,time_batches = 50e3):        
         if(os.path.exists(filepath[:-4]+'.npy')):
@@ -1445,18 +1553,48 @@ class MyGUI(QMainWindow):
             #Run the analysis on a single file
             self.currentFileInfo['CurrentFileLoc'] = FileName
             if self.globalSettings['FindingBatching']['value']== False:
-                npyData = self.loadRawData(FileName)
-                if npyData is None:
-                    return
-                
-                #Check polarity
-                self.checkPolarity(npyData)
-                
-                #Sort event list on time
-                npyData = npyData[np.argsort(npyData,order='t')]
-                
-                #Run finding/fitting
-                self.runFindingAndFitting(npyData)
+                npyDataCell = self.loadRawData(FileName)
+                #Note that npyDataCell has 2 entries if pos/neg are treated seperately, otherwise just one entry:
+                #Logic for if there are multiple entires in npyDataCell
+                events_id = 0
+                partialFinding = {}
+                for npyData in npyDataCell:
+                    if npyData is None:
+                        return
+                    
+                    #Sort event list on time
+                    npyData = npyData[np.argsort(npyData,order='t')]
+                    
+                    if self.dataSelectionPolarityDropdown.currentText() != "Pos and Neg separately":
+                        #Run the current finding and fitting routine only on these events:
+                        self.runFindingAndFitting(npyData,runFitting=True,storeFinding=True)
+                    else:
+                        #Run the current finding and fitting routine only on these events, WITHOUT fitting:
+                        self.runFindingAndFitting(npyData,runFitting=False,storeFinding=True)
+                        partialFinding[events_id] = self.data['FindingResult']
+                    
+                    events_id+=1
+                        
+                #If the data was split in two parts... (or more)
+                if events_id > 1:
+                    updated_partialFinding = []
+                    updated_metadatastring = ''
+                    for i in range(events_id):
+                        updated_metadatastring = updated_metadatastring+partialFinding[i][1]+'\n'
+                        for eachEntry in partialFinding[i][0].items():
+                            updated_partialFinding.append(eachEntry[1])
+                        
+                    #updated_partialFinding should be transformed to a dictionary
+                    res_dict = {i: updated_partialFinding[i] for i in range(len(updated_partialFinding))}
+                    
+                    #Store them again in the self.data['FindingResult']
+                    self.data['FindingResult']={}
+                    self.data['FindingResult'][0] = res_dict
+                    self.data['FindingResult'][1] = updated_metadatastring
+                    
+                    #and run fitting on this updated info:
+                    self.runFitting()
+    
             elif self.globalSettings['FindingBatching']['value']== True or self.globalSettings['FindingBatching']['value']== 2:
                 self.runFindingBatching()
             
@@ -1660,7 +1798,7 @@ class MyGUI(QMainWindow):
              
     
     
-    def runFindingAndFitting(self,npyData):
+    def runFindingAndFitting(self,npyData,runFitting=True,storeFinding=True):
         #Run the finding function!
         FindingEvalText = self.getFunctionEvalText('Finding',"npyData","self.globalSettings")
         if FindingEvalText is not None:
@@ -1672,12 +1810,15 @@ class MyGUI(QMainWindow):
             logging.info('Candidate finding took '+str(self.currentFileInfo['FindingTime'])+' seconds.')
             logging.info('Candidate finding done!')
             logging.debug(self.data['FindingResult'])
-            if self.globalSettings['StoreFindingOutput']['value']:
-                self.storeFindingOutput()
+            if storeFinding:
+                if self.globalSettings['StoreFindingOutput']['value']:
+                    self.storeFindingOutput()
             #And run the fitting
-            self.runFitting()
+            if runFitting:
+                self.runFitting()
         else:
             logging.error('Candidate finding NOT performed')
+
             
     def runFitting(self):
         if self.data['FindingResult'][0] is not None:
