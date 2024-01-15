@@ -15,6 +15,7 @@ import open3d as o3d
 from joblib import Parallel, delayed
 import multiprocessing
 import bisect
+import numexpr as ne
 
 # Required function __function_metadata__
 # Should have an entry for every function in this file
@@ -531,6 +532,46 @@ def get_events_in_bbox_bisect(npyarr,bboxes,ms_to_px):
     logging.info('Time to get bounding boxesBisect: '+str(end_time-start_time))
     return candidates
 
+def get_events_in_bbox_NE(npyarr,bboxes,ms_to_px):
+    #Faster bbox-finding than bisect or single/multi-thread above:
+    #First, get all events within the biggest 3D sphere around the bbox via NE (numexpr)
+    candidates={}
+    xdata = npyarr['x']
+    ydata = npyarr['y']
+    tdata = npyarr['t']/(1000*ms_to_px)
+    for bboxid, _ in bboxes.items():
+        bbox = bboxes[bboxid]
+        
+        #Idea: via ne, get all locs in a circle around the bbox, then filter the events in that circle
+        bbox_midpoint = (np.mean([bbox[0],bbox[1]]),np.mean([bbox[2],bbox[3]]),np.mean([bbox[4],bbox[5]]))
+        cx = bbox_midpoint[0]
+        cy = bbox_midpoint[1]
+        ct = bbox_midpoint[2]
+        bbox_radius = np.max([bbox[1]-bbox[0],bbox[3]-bbox[2],bbox[5]-bbox[4]])
+        
+        res = ne.evaluate('((xdata-cx)**2 + (ydata-cy)**2 + (tdata-ct))<bbox_radius**2')
+        
+        firstFilter = npyarr[res]
+        
+        #Then perform a 'normal' bbox filter which is now much faster since we already filtered out 99% of data
+        conditions = [
+            firstFilter['x'] >= bbox[0],
+            firstFilter['x'] <= bbox[1],
+            firstFilter['y'] >= bbox[2],
+            firstFilter['y'] <= bbox[3],
+            firstFilter['t'] >= bbox[4]*(1000*ms_to_px),
+            firstFilter['t'] <= bbox[5]*(1000*ms_to_px)
+        ]
+        filtered_array = firstFilter[np.logical_and.reduce(conditions)]
+        #Change filtered_array to a pd dataframe:
+        filtered_df = pd.DataFrame(filtered_array)
+        candidates[bboxid] = {}
+        candidates[bboxid]['events'] = filtered_df
+        candidates[bboxid]['cluster_size'] = [np.max(filtered_array['y'])-np.min(filtered_array['y'])+1, np.max(filtered_array['x'])-np.min(filtered_array['x'])+1, np.max(filtered_array['t'])-np.min(filtered_array['t'])]
+        candidates[bboxid]['N_events'] = len(filtered_array)
+    
+    return candidates
+        
 def split_dict(dictionary, num_splits):
     keys = list(dictionary.keys())
     split_keys = np.array_split(keys, num_splits)
@@ -669,9 +710,10 @@ def DBSCAN_allEvents(npy_array,settings,**kwargs):
     logging.info('Hotpixel filtering completed')
     # candidates = get_events_in_bbox(hotpixel_filtered_events,bboxes,float(kwargs['ratio_ms_to_px']))
     # logging.info('Candidates obtained')
-    candidates = get_events_in_bbox_bisect(hotpixel_filtered_events,bboxes,float(kwargs['ratio_ms_to_px']))
-    logging.info('Candidates obtained (via bbox bisect)')
-        
+    # candidates = get_events_in_bbox_bisect(hotpixel_filtered_events,bboxes,float(kwargs['ratio_ms_to_px']))
+    candidates = get_events_in_bbox_NE(hotpixel_filtered_events,bboxes,float(kwargs['ratio_ms_to_px']))
+    logging.info('Candidates obtained (via bbox NE)')
+    
     end_time = time.time()
     elapsed_time = end_time - start_time
     
