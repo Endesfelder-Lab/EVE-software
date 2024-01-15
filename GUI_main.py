@@ -877,72 +877,80 @@ class MyGUI(QMainWindow):
         self.canPreviewtab_horizontal_container2.addWidget(self.candidate_info)
 
         #Create an empty figure and store it as self.data:
-        self.data['figureCanPlot'] = plt.figure(figsize=(6.8, 4))
-        self.data['figureCanPlot'].suptitle('3D pointcloud of candidate cluster')
-        self.data['figureCanAx'] = self.data['figureCanPlot'].add_subplot(111, projection='3d')
-        self.data['figureCanCanvas'] = FigureCanvas(self.data['figureCanPlot'])
-        self.data['figureCanPlot'].tight_layout()
-        self.data['figureCanPlot'].subplots_adjust(top=0.95)
+        self.data['figurePlot3D'] = plt.figure(figsize=(6.8, 4))
+        self.data['figurePlot3D'].suptitle('3D pointcloud of candidate cluster')
+        self.data['figureAx3D'] = self.data['figurePlot3D'].add_subplot(111, projection='3D')
+        self.data['figureCanvas3D'] = FigureCanvas(self.data['figurePlot3D'])
+        self.data['figurePlot3D'].tight_layout()
+        self.data['figurePlot3D'].subplots_adjust(top=0.95)
         
         #Add a navigation toolbar (zoom, pan etc)
-        canPreviewtab_vertical_container.addWidget(NavigationToolbar(self.data['figureCanCanvas'], self))
+        canPreviewtab_vertical_container.addWidget(NavigationToolbar(self.data['figureCanvas3D'], self))
         #Add the canvas to the tab
-        canPreviewtab_vertical_container.addWidget(self.data['figureCanCanvas'])
+        canPreviewtab_vertical_container.addWidget(self.data['figureCanvas3D'])
 
         #Create a second empty figure and store it as self.data:
-        self.data['figureCanPlot2'] = plt.figure(figsize=(6.8, 4))
-        self.data['figureCanPlot2'].suptitle('2D projections of candidate cluster')
-        self.data['figureCanAx2'] = self.data['figureCanPlot2'].add_subplot(121)
-        self.data['figureCanAx3'] = self.data['figureCanPlot2'].add_subplot(222)
-        self.data['figureCanAx4'] = self.data['figureCanPlot2'].add_subplot(224)
-        self.data['figureCanCanvas2'] = FigureCanvas(self.data['figureCanPlot2'])
-        self.data['figureCanPlot2'].tight_layout()
+        self.data['figurePlotProjection'] = plt.figure(figsize=(6.8, 4))
+        self.data['figurePlotProjection'].suptitle('2D projections of candidate cluster')
+        self.data['figureAxProjectionXY'] = self.data['figurePlotProjection'].add_subplot(121)
+        self.data['figureAxProjectionXT'] = self.data['figurePlotProjection'].add_subplot(222)
+        self.data['figureAxProjectionYT'] = self.data['figurePlotProjection'].add_subplot(224)
+        self.data['figureCanvasProjection'] = FigureCanvas(self.data['figurePlotProjection'])
+        self.data['figurePlotProjection'].tight_layout()
         
         #Add a navigation toolbar (zoom, pan etc)
-        canPreviewtab_vertical_container.addWidget(NavigationToolbar(self.data['figureCanCanvas2'], self))
+        canPreviewtab_vertical_container.addWidget(NavigationToolbar(self.data['figureCanvasProjection'], self))
         #Add the canvas to the tab
-        canPreviewtab_vertical_container.addWidget(self.data['figureCanCanvas2'])
+        canPreviewtab_vertical_container.addWidget(self.data['figureCanvasProjection'])
 
 
     def updateCandidatePreview(self):
         """
         Function that's called when the button to show the candidate is clicked
         """
+
+        # Clear all plots
         self.candidate_info.setText('')
-        self.data['figureCanAx'].clear()
-        self.data['figureCanCanvas'].draw()
-        self.data['figureCanAx2'].clear()
-        self.data['figureCanAx3'].clear()
-        self.data['figureCanAx4'].clear()
-        self.data['figureCanAx3'].set_aspect('auto')
-        self.data['figureCanAx4'].set_aspect('auto')
-        self.data['figureCanCanvas2'].draw()
+
+        self.data['figureAx3D'].clear()
+        self.data['figureCanvas3D'].draw()
+
+        self.data['figureAxProjectionXY'].clear()
+        self.data['figureAxProjectionXT'].clear()
+        self.data['figureAxProjectionYT'].clear()
+        self.data['figureAxProjectionXT'].set_aspect('auto')
+        self.data['figureAxProjectionYT'].set_aspect('auto')
+        self.data['figureCanvasProjection'].draw()
+
+        # Check the candidate entry field
         if self.entryCanPreview.text()=='':
             self.candidate_info.setText('Tried to visualise candidate, but no ID was given!')
             logging.error('Tried to visualise candidate, but no ID was given!')
+
         elif 'FindingMethod' in self.data and int(self.entryCanPreview.text()) < len(self.data['FindingResult'][0]):
+            logging.debug(f"Attempting to show candidate {self.data['CandidatePreviewID']}.")
+
+            # Get some info about the candidate
             self.data['CandidatePreviewID'] = int(self.entryCanPreview.text())
             N_events = self.data['FindingResult'][0][self.data['CandidatePreviewID']]['N_events']
             cluster_size = self.data['FindingResult'][0][self.data['CandidatePreviewID']]['cluster_size']
             self.candidate_info.setText(f"This candidate cluster contains {N_events} events and has dimensions ({cluster_size[0]}, {cluster_size[1]}, {cluster_size[2]}).")
-            logging.debug('Attempting to show scatter plot')
-            #Clear axis
-            self.data['figureCanAx'].clear()
-            #Do a 3D scatterplot of the event data
-            self.data['figureCanAx'].scatter(self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['x'], self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['y'], self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['t']*1e-3)
-            self.data['figureCanAx'].set_xlabel('x [px]')
-            self.data['figureCanAx'].set_ylabel('y [px]')
-            self.data['figureCanAx'].set_zlabel('t [ms]')
 
-            #Give it a nice layout
-            self.data['figureCanPlot'].tight_layout()
-            self.data['figureCanPlot'].subplots_adjust(top=0.95)
+            # Do a 3d scatterplot of the event data
+            self.data['figureAx3D'].scatter(self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['x'], self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['y'], self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['t']*1e-3)
+            self.data['figureAx3D'].set_xlabel('x [px]')
+            self.data['figureAx3D'].set_ylabel('y [px]')
+            self.data['figureAx3D'].set_zlabel('t [ms]')
 
-            #Update drawing of the canvas
-            self.data['figureCanCanvas'].draw()
-            logging.info('3D scatter plot of candidate drawn')
+            # Give it a nice layout
+            self.data['figurePlot3D'].tight_layout()
+            self.data['figurePlot3D'].subplots_adjust(top=0.95)
 
-            # get projections
+            # Update drawing of the canvas
+            self.data['figureCanvas3D'].draw()
+            logging.info(f"3D scatter plot of candidate {self.data['CandidatePreviewID']} drawn.")
+
+            # Get xyt-limits of candidate events
             self.xlim = [np.min(self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['x']), np.max(self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['x'])]
             self.ylim = [np.min(self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['y']), np.max(self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['y'])]
             self.tlim = [np.min(self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['t']*1e-3), np.max(self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['t']*1e-3)]
@@ -960,29 +968,28 @@ class MyGUI(QMainWindow):
             hist_tx, t_edges, x_edges = np.histogram2d(self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['t']*1e-3, self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['x'], bins=(t_bins, x_bins))
             hist_ty, t_edges, y_edges = np.histogram2d(self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['t']*1e-3, self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['y'], bins=(t_bins, y_bins))
 
-            #Clear axis
-            self.data['figureCanAx2'].clear()
-
+            # Set goodlooking aspect ratio depending on nr of xyt-bins
             aspectty = 3. * (len(t_edges)-1) / (len(y_edges)-1)
             aspecttx = 3. * (len(t_edges)-1) / (len(x_edges)-1)
-            self.data['figureCanAx2'].imshow(hist_xy.T, extent=[x_edges[0], x_edges[-1], y_edges[0], y_edges[-1]], origin='lower', aspect='equal', interpolation='none')
-            self.data['figureCanAx3'].imshow(hist_tx.T, extent=[t_edges[0], t_edges[-1], x_edges[0], x_edges[-1]], origin='lower', aspect=aspecttx, interpolation='none')
-            self.data['figureCanAx4'].imshow(hist_ty.T, extent=[t_edges[0], t_edges[-1], y_edges[0], y_edges[-1]], origin='lower', aspect=aspectty, interpolation='none')
+
+            # Plot the 2D histograms
+            self.data['figureAxProjectionXY'].imshow(hist_xy.T, extent=[x_edges[0], x_edges[-1], y_edges[0], y_edges[-1]], origin='lower', aspect='equal', interpolation='none')
+            self.data['figureAxProjectionXT'].imshow(hist_tx.T, extent=[t_edges[0], t_edges[-1], x_edges[0], x_edges[-1]], origin='lower', aspect=aspecttx, interpolation='none')
+            self.data['figureAxProjectionYT'].imshow(hist_ty.T, extent=[t_edges[0], t_edges[-1], y_edges[0], y_edges[-1]], origin='lower', aspect=aspectty, interpolation='none')
             
             # Add and set labels
-            self.data['figureCanAx2'].set_xlabel('x [px]')
-            self.data['figureCanAx2'].set_ylabel('y [px]')
-            self.data['figureCanAx3'].set_ylabel('x [px]')
-            self.data['figureCanAx4'].set_ylabel('y [px]')
-            # self.data['figureCanAx3'].set_xticklabels([])
-            self.data['figureCanAx4'].set_xlabel('t [ms]')
+            self.data['figureAxProjectionXY'].set_xlabel('x [px]')
+            self.data['figureAxProjectionXY'].set_ylabel('y [px]')
+            self.data['figureAxProjectionXT'].set_ylabel('x [px]')
+            self.data['figureAxProjectionYT'].set_ylabel('y [px]')
+            self.data['figureAxProjectionYT'].set_xlabel('t [ms]')
             
-            #Give it a nice layout
-            self.data['figureCanPlot2'].tight_layout()
+            # Give it a nice layout
+            self.data['figurePlotProjection'].tight_layout()
 
-            #Update drawing of the canvas
-            self.data['figureCanCanvas2'].draw()
-            logging.info("2D event-projections of candidate drawn")
+            #U pdate drawing of the canvas
+            self.data['figureCanvasProjection'].draw()
+            logging.info(f"2D event-projections of candidate {self.data['CandidatePreviewID']} drawn.")
 
         else: 
             self.candidate_info.setText('Tried to visualise candidate but no data found!')
