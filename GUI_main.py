@@ -105,6 +105,9 @@ class MyGUI(QMainWindow):
         self.setCentralWidget(self.central_widget)
         self.layout = QGridLayout()
         self.central_widget.setLayout(self.layout)
+        
+        self.polarityDropdownNames = ['All events treated equal','Positive only','Negative only','Pos and neg seperately']
+        self.polarityDropdownOrder = [0,1,2,3]
 
         """
         Global settings group box
@@ -335,10 +338,10 @@ class MyGUI(QMainWindow):
         #Populate Polarity layout with a dropdown:
         self.dataSelectionPolarityLayout.layout().addWidget(QLabel("Polarity:"), 0,0)
         self.dataSelectionPolarityDropdown = QComboBox()
-        self.dataSelectionPolarityDropdown.addItem("All events treated equal")
-        self.dataSelectionPolarityDropdown.addItem("Only Positive")
-        self.dataSelectionPolarityDropdown.addItem("Only Negative")
-        self.dataSelectionPolarityDropdown.addItem("Pos and Neg separately")
+        self.dataSelectionPolarityDropdown.addItem(self.polarityDropdownNames[self.polarityDropdownOrder[0]])
+        self.dataSelectionPolarityDropdown.addItem(self.polarityDropdownNames[self.polarityDropdownOrder[1]])
+        self.dataSelectionPolarityDropdown.addItem(self.polarityDropdownNames[self.polarityDropdownOrder[2]])
+        self.dataSelectionPolarityDropdown.addItem(self.polarityDropdownNames[self.polarityDropdownOrder[3]])
         self.dataSelectionPolarityLayout.layout().addWidget(self.dataSelectionPolarityDropdown, 1,0)
         #Add one of those addStretch to push it all to the top:
         self.dataSelectionPolarityLayout.layout().addItem(QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding), 2,0)
@@ -577,7 +580,7 @@ class MyGUI(QMainWindow):
         self.previewEventsDict = []
         
         #filter on polarity:
-        if self.dataSelectionPolarityDropdown.currentText() == "Pos and Neg separately":
+        if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[3]:
             #Run everything twice
             #Get positive events only:
             npyevents_pos = self.filterEvents_npy_p(self.previewEvents,pValue=1)
@@ -585,15 +588,18 @@ class MyGUI(QMainWindow):
             #Get negative events only:
             npyevents_neg = self.filterEvents_npy_p(self.previewEvents,pValue=0)
             self.previewEventsDict.append(npyevents_neg)
-        elif self.dataSelectionPolarityDropdown.currentText() == "Only Positive":
+        #Only positive
+        elif self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[1]:
             #Run everything once
             npyevents_pos = self.filterEvents_npy_p(self.previewEvents,pValue=1)
             self.previewEventsDict.append(npyevents_pos)
-        elif self.dataSelectionPolarityDropdown.currentText() == "Only Negative":
+        #Only negative
+        elif self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[2]:
             #Run everything once
             npyevents_neg = self.filterEvents_npy_p(self.previewEvents,pValue=0)
             self.previewEventsDict.append(npyevents_neg)
-        elif self.dataSelectionPolarityDropdown.currentText() == "All events treated equal":
+        #No discrimination
+        elif self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[0]:
             #Don't do any filtering
             self.previewEventsDict.append(self.previewEvents)
             
@@ -608,7 +614,7 @@ class MyGUI(QMainWindow):
         partialFinding = {}
         partialFitting = {}
         for events in self.previewEventsDict:
-            if self.dataSelectionPolarityDropdown.currentText() != "Pos and Neg separately":
+            if self.dataSelectionPolarityDropdown.currentText() != self.polarityDropdownNames[3]:
                 #Run the current finding and fitting routine only on these events:
                 self.runFindingAndFitting(events,runFitting=True,storeFinding=False)
             else:
@@ -628,18 +634,16 @@ class MyGUI(QMainWindow):
             updated_partialFittingMetadatastring = ''
             totNrFindingIncrease = 0
             for i in range(events_id):
-                curr_finding_id = 0
                 updated_partialFindingMetadatastring = updated_partialFindingMetadatastring+partialFinding[i][1]+'\n'
                 updated_partialFittingMetadatastring = updated_partialFittingMetadatastring+partialFitting[i][1]+'\n'
                 for eachEntry in partialFinding[i][0].items():
                     updated_partialFinding.append(eachEntry[1])
-                    curr_finding_id+=1
                 for index,row in partialFitting[i][0].iterrows():
                     row.candidate_id+=totNrFindingIncrease
                     updated_partialFitting.append(row)
                 
                 #increase the total number of findings
-                totNrFindingIncrease+=curr_finding_id
+                totNrFindingIncrease+=eachEntry[0]+1
                 
             #Store them again in the self.data['FindingResult']
             self.data['FindingResult']={}
@@ -1404,7 +1408,7 @@ class MyGUI(QMainWindow):
             npyevents = self.filterEvents_xy(npyevents,xyStretch=(float(self.run_minXLineEdit.text()),float(self.run_maxXLineEdit.text()),float(self.run_minYLineEdit.text()),float(self.run_maxYLineEdit.text())))
                 
             #Determine whether two or one outputs needs to be returned - based on polarity option
-            if self.dataSelectionPolarityDropdown.currentText() == "Pos and Neg separately":
+            if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[3]:
                 #Run everything twice
                 #Get positive events only:
                 npyevents_pos = self.filterEvents_npy_p(npyevents,pValue=1)
@@ -1412,15 +1416,15 @@ class MyGUI(QMainWindow):
                 #Get negative events only:
                 npyevents_neg = self.filterEvents_npy_p(npyevents,pValue=0)
                 eventsDict.append(npyevents_neg)
-            elif self.dataSelectionPolarityDropdown.currentText() == "Only Positive":
+            elif self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[1]:
                 #Run everything once
                 npyevents_pos = self.filterEvents_npy_p(npyevents,pValue=1)
                 eventsDict.append(npyevents_pos)
-            elif self.dataSelectionPolarityDropdown.currentText() == "Only Negative":
+            elif self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[2]:
                 #Run everything once
                 npyevents_neg = self.filterEvents_npy_p(npyevents,pValue=0)
                 eventsDict.append(npyevents_neg)
-            elif self.dataSelectionPolarityDropdown.currentText() == "All events treated equal":
+            elif self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[0]:
                 #Don't do any filtering
                 eventsDict.append(npyevents)
             
@@ -1588,7 +1592,7 @@ class MyGUI(QMainWindow):
                     #Sort event list on time
                     npyData = npyData[np.argsort(npyData,order='t')]
                     
-                    if self.dataSelectionPolarityDropdown.currentText() != "Pos and Neg separately":
+                    if self.dataSelectionPolarityDropdown.currentText() != self.polarityDropdownNames[3]:
                         #Run the current finding and fitting routine only on these events:
                         self.runFindingAndFitting(npyData,runFitting=True,storeFinding=True)
                     else:
@@ -1608,18 +1612,16 @@ class MyGUI(QMainWindow):
                     updated_partialFittingMetadatastring = ''
                     totNrFindingIncrease = 0
                     for i in range(events_id):
-                        curr_finding_id = 0
                         updated_partialFindingMetadatastring = updated_partialFindingMetadatastring+partialFinding[i][1]+'\n'
                         updated_partialFittingMetadatastring = updated_partialFittingMetadatastring+partialFitting[i][1]+'\n'
                         for eachEntry in partialFinding[i][0].items():
                             updated_partialFinding.append(eachEntry[1])
-                            curr_finding_id+=1
                         for index,row in partialFitting[i][0].iterrows():
                             row.candidate_id+=totNrFindingIncrease
                             updated_partialFitting.append(row)
                         
                         #increase the total number of findings
-                        totNrFindingIncrease+=curr_finding_id
+                        totNrFindingIncrease+=eachEntry[0]+1
                         
                     #Store them again in the self.data['FindingResult']
                     self.data['FindingResult']={}
