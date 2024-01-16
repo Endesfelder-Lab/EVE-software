@@ -345,6 +345,7 @@ class MyGUI(QMainWindow):
         self.dataSelectionPolarityLayout.layout().addWidget(self.dataSelectionPolarityDropdown, 1,0)
         #Add a lambda function to this dropdown:
         self.dataSelectionPolarityDropdown.currentIndexChanged.connect(lambda: self.polarityDropdownChanged())
+        self.dataSelectionPolarityDropdown.setObjectName('selectPolarityOptions_dropdown')
         #Add one of those addStretch to push it all to the top:
         self.dataSelectionPolarityLayout.layout().addItem(QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding), 2,0)
         
