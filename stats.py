@@ -20,10 +20,14 @@ def open_pickle_file(filename):
         print(f"File '{filename}' not found.")
         
         
-filepath = "/home/laura/PhD/Event_Based_Sensor_Project/RAW_Analysis/data/coverslip/AF647_coverslip_FindingResults_20240111_103109.pickle" #"/home/laura/PhD/Event_Based_Sensor_Project/RAW_Analysis/data/coverslip/AF647_coverslip_FindingResults_20231220_092215.pickle"
+# Spectral clustering coverslip: /home/laura/PhD/Event_Based_Sensor_Project/RAW_Analysis/data/coverslip/AF647_coverslip_FindingResults_20240115_095139.pickle
+# DBSCAN coverslip: /home/laura/PhD/Event_Based_Sensor_Project/RAW_Analysis/data/coverslip/AF647_coverslip_FindingResults_20240115_095045.pickle
+# Frame based coverslip: /home/laura/PhD/Event_Based_Sensor_Project/RAW_Analysis/data/coverslip/AF647_coverslip_FindingResults_20240112_144137.pickle
+
+filepath = "/home/laura/PhD/Event_Based_Sensor_Project/RAW_Analysis/data/coverslip/AF647_coverslip_FindingResults_20240115_095045.pickle"
 candidate_dic = open_pickle_file(filepath)
 nr_candidates = len(candidate_dic)
-method = "/home/laura/PhD/Event_Based_Sensor_Project/RAW_Analysis/CandidateFinding_Stats/FrameBased"
+method = "/home/laura/PhD/Event_Based_Sensor_Project/RAW_Analysis/CandidateFinding_Stats/DBSCAN"
 
 candidate_dims = np.ndarray(nr_candidates, dtype={'names':['x','y','t'], 'formats':['int','int', 'int']})
 print(nr_candidates)
