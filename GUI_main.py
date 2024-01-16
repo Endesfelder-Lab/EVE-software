@@ -419,7 +419,7 @@ class MyGUI(QMainWindow):
             candidateFindingDropdown.setObjectName(candidateFindingDropdown_name)
             candidateFindingDropdown.addItems(displaynames)
             #Add the candidateFindingDropdown to the layout
-            groupbox.layout().addWidget(candidateFindingDropdown,1,0,1,2)
+            groupbox.layout().addWidget(candidateFindingDropdown,1,0,1,6)
             
             setattr(self, Finding_functionNameToDisplayNameMapping_name, Finding_functionNameToDisplayNameMapping)
             
@@ -468,7 +468,7 @@ class MyGUI(QMainWindow):
             candidateFittingDropdown.setObjectName(candidateFittingDropdown_name)
             candidateFittingDropdown.addItems(displaynames)
             #Add the candidateFindingDropdown to the layout
-            groupbox.layout().addWidget(candidateFittingDropdown,1,0,1,2)
+            groupbox.layout().addWidget(candidateFittingDropdown,1,0,1,6)
             
             setattr(self, Fitting_functionNameToDisplayNameMapping_name, Fitting_functionNameToDisplayNameMapping)
             
@@ -1410,19 +1410,6 @@ class MyGUI(QMainWindow):
         #Classname should always end in pos/neg/mix!
         wantedPolarity = className[-3:].lower()
         
-        # #If the newly-chosen polarity option is different from teh current selected finding/fitting, change the finding/fitting to the routine with the proper polarity option
-        # if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[0]:
-        #     wantedPolarity = 'mix'
-        # elif self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[1]:
-        #     wantedPolarity = 'pos'
-        # elif self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[2]:
-        #     wantedPolarity = 'neg'
-        # elif self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[3]:
-        #     #TODO: LOGIC with options different for pos/neg
-        #     wantedPolarity = 'mix'
-        # else:
-        #     wantedPolarity = 'mix'
-        
         #Hide dropdown entries that are not part of the current_selected property
         model = curr_dropdown.model()
         totalNrRows = model.rowCount()
@@ -1438,10 +1425,9 @@ class MyGUI(QMainWindow):
                 item = model.item(rowId)
                 item.setFlags(item.flags() & ~Qt.ItemIsEnabled)
                 curr_dropdown.view().setRowHidden(rowId, True)
-            
-            
-        if current_selected_function == None:
-            t=1
+        
+        #Visual max number of rows before a 2nd column is started.
+        maxNrRows = 4
         
         reqKwargs = utils.reqKwargsFromFunction(current_selected_function)
         #Add a widget-pair for every kw-arg
@@ -1453,7 +1439,7 @@ class MyGUI(QMainWindow):
                 label.setObjectName(f"Label#{current_selected_function}#{reqKwargs[k]}#{current_selected_polarity}")
                 if self.checkAndShowWidget(curr_layout,label.objectName()) == False:
                     label.setToolTip(utils.infoFromMetadata(current_selected_function,specificKwarg=reqKwargs[k]))
-                    curr_layout.addWidget(label,2+(k)+labelposoffset,0)
+                    curr_layout.addWidget(label,2+((k+labelposoffset))%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+0)
                 line_edit = QLineEdit()
                 line_edit.setObjectName(f"LineEdit#{current_selected_function}#{reqKwargs[k]}#{current_selected_polarity}")
                 defaultValue = utils.defaultValueFromKwarg(current_selected_function,reqKwargs[k])
@@ -1461,7 +1447,7 @@ class MyGUI(QMainWindow):
                     line_edit.setToolTip(utils.infoFromMetadata(current_selected_function,specificKwarg=reqKwargs[k]))
                     if defaultValue is not None:
                         line_edit.setText(str(defaultValue))
-                    curr_layout.addWidget(line_edit,2+k+labelposoffset,1)
+                    curr_layout.addWidget(line_edit,2+((k+labelposoffset))%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+1)
                     #Add a on-change listener:
                     line_edit.textChanged.connect(lambda text,line_edit=line_edit: self.kwargValueInputChanged(line_edit))
             else:
@@ -1475,7 +1461,7 @@ class MyGUI(QMainWindow):
             label.setObjectName(f"Label#{current_selected_function}#{optKwargs[k]}#{current_selected_polarity}")
             if self.checkAndShowWidget(curr_layout,label.objectName()) == False:
                 label.setToolTip(utils.infoFromMetadata(current_selected_function,specificKwarg=optKwargs[k]))
-                curr_layout.addWidget(label,2+(k)+len(reqKwargs)+labelposoffset,0)
+                curr_layout.addWidget(label,2+((k+labelposoffset+len(reqKwargs)))%maxNrRows,(((k+labelposoffset+len(reqKwargs)))//maxNrRows)*2+0)
             line_edit = QLineEdit()
             line_edit.setObjectName(f"LineEdit#{current_selected_function}#{optKwargs[k]}#{current_selected_polarity}")
             defaultValue = utils.defaultValueFromKwarg(current_selected_function,optKwargs[k])
@@ -1483,7 +1469,7 @@ class MyGUI(QMainWindow):
                 line_edit.setToolTip(utils.infoFromMetadata(current_selected_function,specificKwarg=optKwargs[k]))
                 if defaultValue is not None:
                     line_edit.setText(str(defaultValue))
-                curr_layout.addWidget(line_edit,2+(k)+len(reqKwargs)+labelposoffset,1)
+                curr_layout.addWidget(line_edit,2+((k+labelposoffset+len(reqKwargs)))%maxNrRows,(((k+labelposoffset+len(reqKwargs)))//maxNrRows)*2+1)
                 #Add a on-change listener:
                 line_edit.textChanged.connect(lambda text,line_edit=line_edit: self.kwargValueInputChanged(line_edit))
     
