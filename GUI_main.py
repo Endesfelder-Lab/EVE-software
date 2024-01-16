@@ -15,7 +15,7 @@ import time
 #Imports for PyQt5 (GUI)
 from PyQt5 import QtWidgets, QtGui
 from PyQt5.QtGui import QCursor, QTextCursor, QIntValidator
-from PyQt5.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QTableWidget, QTableWidgetItem, QLayout, QMainWindow, QLabel, QPushButton, QSizePolicy, QGroupBox, QTabWidget, QGridLayout, QWidget, QComboBox, QLineEdit, QFileDialog, QToolBar, QCheckBox,QDesktopWidget, QMessageBox, QTextEdit, QSlider
+from PyQt5.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QTableWidget, QTableWidgetItem, QLayout, QMainWindow, QLabel, QPushButton, QSizePolicy, QGroupBox, QTabWidget, QGridLayout, QWidget, QComboBox, QLineEdit, QFileDialog, QToolBar, QCheckBox,QDesktopWidget, QMessageBox, QTextEdit, QSlider, QSpacerItem
 from PyQt5.QtCore import Qt, QPoint, QProcess, QCoreApplication, QTimer, QFileSystemWatcher, QFile
 
 #Custom imports
@@ -105,6 +105,9 @@ class MyGUI(QMainWindow):
         self.setCentralWidget(self.central_widget)
         self.layout = QGridLayout()
         self.central_widget.setLayout(self.layout)
+        
+        self.polarityDropdownNames = ['All events treated equal','Positive only','Negative only','Pos and neg seperately']
+        self.polarityDropdownOrder = [0,1,2,3]
 
         """
         Global settings group box
@@ -332,6 +335,20 @@ class MyGUI(QMainWindow):
         self.dataSelectionLayout.layout().addWidget(self.dataSelectionTimeLayout,0,1)
         self.dataSelectionLayout.layout().addWidget(self.dataSelectionPositionLayout,0,2)
         
+        #Populate Polarity layout with a dropdown:
+        self.dataSelectionPolarityLayout.layout().addWidget(QLabel("Polarity:"), 0,0)
+        self.dataSelectionPolarityDropdown = QComboBox()
+        self.dataSelectionPolarityDropdown.addItem(self.polarityDropdownNames[self.polarityDropdownOrder[0]])
+        self.dataSelectionPolarityDropdown.addItem(self.polarityDropdownNames[self.polarityDropdownOrder[1]])
+        self.dataSelectionPolarityDropdown.addItem(self.polarityDropdownNames[self.polarityDropdownOrder[2]])
+        self.dataSelectionPolarityDropdown.addItem(self.polarityDropdownNames[self.polarityDropdownOrder[3]])
+        self.dataSelectionPolarityLayout.layout().addWidget(self.dataSelectionPolarityDropdown, 1,0)
+        #Add a lambda function to this dropdown:
+        self.dataSelectionPolarityDropdown.currentIndexChanged.connect(lambda: self.polarityDropdownChanged())
+        #Add one of those addStretch to push it all to the top:
+        self.dataSelectionPolarityLayout.layout().addItem(QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding), 2,0)
+        
+        
         #Populate with a start time and end time inputs:
         self.dataSelectionTimeLayout.layout().addWidget(QLabel("Start time (ms):"), 0,0)
         self.dataSelectionTimeLayout.layout().addWidget(QLabel("Duration (ms):"), 2,0)
@@ -382,6 +399,8 @@ class MyGUI(QMainWindow):
         
         # Create a QComboBox and add options - this is the FINDING dropdown
         self.candidateFindingDropdown = QComboBox(self)
+        #Increase the maximum visible items since we're always hiding 2/3rds of it (pos/neg/mix)
+        self.candidateFindingDropdown.setMaxVisibleItems(30)
         options = utils.functionNamesFromDir('CandidateFinding')
         displaynames, self.Finding_functionNameToDisplayNameMapping = utils.displayNamesFromFunctionNames(options)
         self.candidateFindingDropdown.setObjectName("CandidateFinding_candidateFindingDropdown")
@@ -405,6 +424,8 @@ class MyGUI(QMainWindow):
         
         # Create a QComboBox and add options - this is the FITTING dropdown
         self.candidateFittingDropdown = QComboBox(self)
+        #Increase the maximum visible items since we're always hiding 2/3rds of it (pos/neg/mix)
+        self.candidateFittingDropdown.setMaxVisibleItems(30)
         options = utils.functionNamesFromDir('CandidateFitting')
         self.candidateFittingDropdown.setObjectName("CandidateFitting_candidateFittingDropdown")
         displaynames, self.Fitting_functionNameToDisplayNameMapping = utils.displayNamesFromFunctionNames(options)
@@ -496,6 +517,33 @@ class MyGUI(QMainWindow):
         #Add the button to the layout:
         self.previewLayout.layout().addWidget(self.buttonPreview, 4, 0)
 
+    def polarityDropdownChanged(self):
+        """
+        Lambda function that's called when the polarity dropdown is changed
+        """
+        oldPolarity = utils.polaritySelectedFromDisplayName(self.candidateFindingDropdown.currentText())
+        if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[0]:
+            newPolarity = 'mix'
+        elif self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[1]:
+            newPolarity = 'pos'
+        elif self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[2]:
+            newPolarity = 'neg'
+        elif self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[3]:
+            #TODO: handle old+new side-by-side
+            newPolarity = 'mix'
+            
+        #Finding changing...
+        currentlySelectedFinding = self.candidateFindingDropdown.currentText()
+        newSelectedFinding = currentlySelectedFinding.replace('('+oldPolarity+')','('+newPolarity+')')
+        self.candidateFindingDropdown.setCurrentText(newSelectedFinding)
+        #Fitting changing...
+        currentlySelectedFitting = self.candidateFittingDropdown.currentText()
+        newSelectedFitting = currentlySelectedFitting.replace('('+oldPolarity+')','('+newPolarity+')')
+        self.candidateFittingDropdown.setCurrentText(newSelectedFitting)
+        
+        self.changeLayout_choice(self.groupboxFinding.layout(),"CandidateFinding_candidateFindingDropdown",self.Finding_functionNameToDisplayNameMapping)
+        self.changeLayout_choice(self.groupboxFitting.layout(),"CandidateFitting_candidateFittingDropdown",self.Fitting_functionNameToDisplayNameMapping)
+        
     def previewRun(self,timeStretch=(0,1000),xyStretch=(0,0,0,0)):
         """
         Generates the preview of a run analysis.
@@ -562,6 +610,32 @@ class MyGUI(QMainWindow):
         self.previewEvents = events
         self.previewEvents = self.filterEvents_xy(self.previewEvents,xyStretch)
         
+        self.previewEventsDict = []
+        
+        #filter on polarity:
+        if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[3]:
+            #Run everything twice
+            #Get positive events only:
+            npyevents_pos = self.filterEvents_npy_p(self.previewEvents,pValue=1)
+            self.previewEventsDict.append(npyevents_pos)
+            #Get negative events only:
+            npyevents_neg = self.filterEvents_npy_p(self.previewEvents,pValue=0)
+            self.previewEventsDict.append(npyevents_neg)
+        #Only positive
+        elif self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[1]:
+            #Run everything once
+            npyevents_pos = self.filterEvents_npy_p(self.previewEvents,pValue=1)
+            self.previewEventsDict.append(npyevents_pos)
+        #Only negative
+        elif self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[2]:
+            #Run everything once
+            npyevents_neg = self.filterEvents_npy_p(self.previewEvents,pValue=0)
+            self.previewEventsDict.append(npyevents_neg)
+        #No discrimination
+        elif self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[0]:
+            #Don't do any filtering
+            self.previewEventsDict.append(self.previewEvents)
+            
         #Change global values so nothing is stored - we just want a preview run. This is later set back to orig values (globalSettingsOrig):
         globalSettingsOrig = copy.deepcopy(self.globalSettings)
         self.globalSettings['StoreConvertedRawData']['value'] = False
@@ -569,14 +643,60 @@ class MyGUI(QMainWindow):
         self.globalSettings['StoreFinalOutput']['value'] = False
         self.globalSettings['StoreFindingOutput']['value'] = False
         
-        #Run the current finding and fitting routine only on these events:
-        self.runFindingAndFitting(events)
+        events_id = 0
+        partialFinding = {}
+        partialFitting = {}
+        for events in self.previewEventsDict:
+            if self.dataSelectionPolarityDropdown.currentText() != self.polarityDropdownNames[3]:
+                #Run the current finding and fitting routine only on these events:
+                self.runFindingAndFitting(events,runFitting=True,storeFinding=False)
+            else:
+                #Run the current finding and fitting routine only on these events:
+                self.runFindingAndFitting(events,runFitting=True,storeFinding=False)
+                #we store our finding and fitting results like this:
+                partialFinding[events_id] = self.data['FindingResult']
+                partialFitting[events_id] = self.data['FittingResult']
+            
+            events_id+=1
+            
+        #If the data was split in two parts... (or more)
+        if events_id > 1:
+            updated_partialFinding = []
+            updated_partialFindingMetadatastring = ''
+            updated_partialFitting = []
+            updated_partialFittingMetadatastring = ''
+            totNrFindingIncrease = 0
+            for i in range(events_id):
+                updated_partialFindingMetadatastring = updated_partialFindingMetadatastring+partialFinding[i][1]+'\n'
+                updated_partialFittingMetadatastring = updated_partialFittingMetadatastring+partialFitting[i][1]+'\n'
+                for eachEntry in partialFinding[i][0].items():
+                    updated_partialFinding.append(eachEntry[1])
+                for index,row in partialFitting[i][0].iterrows():
+                    row.candidate_id+=totNrFindingIncrease
+                    updated_partialFitting.append(row)
+                
+                #increase the total number of findings
+                totNrFindingIncrease+=eachEntry[0]+1
+                
+            #Store them again in the self.data['FindingResult']
+            self.data['FindingResult']={}
+            self.data['FindingResult'][0] = dict(zip(range(len(updated_partialFinding)), updated_partialFinding))
+            self.data['FindingResult'][1] = updated_partialFindingMetadatastring
+            #Fitting should be changed to pd df
+            res_dict_fitting = pd.DataFrame(updated_partialFitting)
+            #Store them again in the self.data['FindingResult']
+            self.data['FittingResult']={}
+            self.data['FittingResult'][0] = res_dict_fitting
+            self.data['FittingResult'][1] = updated_partialFittingMetadatastring
+            
+            #To test: np.shape(self.data['FittingResult'][0])[0]
         
         #Reset global settings
         self.globalSettings = globalSettingsOrig
         
         #Update the preview panel and localization list:
-        self.updateShowPreview(previewEvents=events)
+        #Note that self.previewEvents is XYT cut, but NOT p-cut
+        self.updateShowPreview(previewEvents=self.previewEvents)
         self.updateLocList()
     
     def filterEvents_npy_t(self,events,tStretch=(-np.Inf,np.Inf)):
@@ -593,6 +713,21 @@ class MyGUI(QMainWindow):
             logging.warning("No events found in the chosen time frame.")
         
         return events
+    
+    def filterEvents_npy_p(self,events,pValue=0):
+        """
+        Filter events that are in a numpy array to a certain polarity
+        """
+        #tStretch is (start, duration)
+        indices = np.where((events['p'] == pValue))
+        # Access the partial data using the indices
+        eventsFiltered = events[indices]
+        
+        #Warning if no events are found
+        if len(eventsFiltered) == 0:
+            logging.warning("No events found with the chosen polarity: "+str(pValue))
+        
+        return eventsFiltered
     
     def filterEvents_xy(self,events,xyStretch=(-np.Inf,-np.Inf,np.Inf,np.Inf)):
         """
@@ -843,7 +978,6 @@ class MyGUI(QMainWindow):
         else:
             logging.error('Tried to visualise but no data found!')
 
-
     def setup_canPreviewTab(self):
         """
         Function to setup the Candidate Preview tab
@@ -1004,7 +1138,6 @@ class MyGUI(QMainWindow):
             self.candidate_info.setText('Tried to visualise candidate but no data found!')
             logging.error('Tried to visualise candidate but no data found!')
 
-    
     def setup_previewTab(self):
         """
         Function that creates the preview tab
@@ -1169,6 +1302,54 @@ class MyGUI(QMainWindow):
         curr_dropdown = self.getMethodDropdownInfo(curr_layout,className)
         #Get the kw-arguments from the current dropdown.
         current_selected_function = utils.functionNameFromDisplayName(curr_dropdown.currentText(),displayNameToFunctionNameMap)
+        current_selected_polarity = utils.polaritySelectedFromDisplayName(curr_dropdown.currentText())
+        
+        #If the newly-chosen polarity option is different from teh current selected finding/fitting, change the finding/fitting to the routine with the proper polarity option
+        
+        if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[0]:
+            wantedPolarity = 'mix'
+        elif self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[1]:
+            wantedPolarity = 'pos'
+        elif self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[2]:
+            wantedPolarity = 'neg'
+        elif self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[3]:
+            #TODO: LOGIC with options different for pos/neg
+            wantedPolarity = 'mix'
+        else:
+            wantedPolarity = 'mix'
+        
+        #Hide dropdown entries that are not part of the current_selected property
+        
+        model = curr_dropdown.model()
+        totalNrRows = model.rowCount()
+        for rowId in range(totalNrRows):
+            #First show all rows:
+            curr_dropdown.view().setRowHidden(rowId, False)
+            item = model.item(rowId)
+            item.setFlags(item.flags() | Qt.ItemIsEnabled)
+            
+            #Then hide based on the row name
+            rowName = model.item(rowId,0).text()
+            if utils.polaritySelectedFromDisplayName(rowName) != wantedPolarity:
+                item = model.item(rowId)
+                item.setFlags(item.flags() & ~Qt.ItemIsEnabled)
+                curr_dropdown.view().setRowHidden(rowId, True)
+            
+            
+        
+        # rowIDToBeHidden = 0 
+        # model = curr_dropdown.model()
+        # item = model.item(rowIDToBeHidden)
+        # item.setFlags(item.flags() & ~Qt.ItemIsEnabled)
+        # curr_dropdown.view().setRowHidden(rowIDToBeHidden, True)
+        
+        # #Show row again
+        # rowIDToBeShown = 0 
+        # curr_dropdown.view().setRowHidden(rowIDToBeShown, False)
+        # model = curr_dropdown.model()
+        # item = model.item(rowIDToBeShown)
+        # item.setFlags(item.flags() | Qt.ItemIsEnabled)
+        
         reqKwargs = utils.reqKwargsFromFunction(current_selected_function)
         #Add a widget-pair for every kw-arg
         labelposoffset = 0
@@ -1176,12 +1357,12 @@ class MyGUI(QMainWindow):
             #Value is used for scoring, and takes the output of the method
             if reqKwargs[k] != 'methodValue':
                 label = QLabel(f"<b>{reqKwargs[k]}</b>")
-                label.setObjectName(f"Label#{current_selected_function}#{reqKwargs[k]}")
+                label.setObjectName(f"Label#{current_selected_function}#{reqKwargs[k]}#{current_selected_polarity}")
                 if self.checkAndShowWidget(curr_layout,label.objectName()) == False:
                     label.setToolTip(utils.infoFromMetadata(current_selected_function,specificKwarg=reqKwargs[k]))
                     curr_layout.addWidget(label,2+(k)+labelposoffset,0)
                 line_edit = QLineEdit()
-                line_edit.setObjectName(f"LineEdit#{current_selected_function}#{reqKwargs[k]}")
+                line_edit.setObjectName(f"LineEdit#{current_selected_function}#{reqKwargs[k]}#{current_selected_polarity}")
                 defaultValue = utils.defaultValueFromKwarg(current_selected_function,reqKwargs[k])
                 if self.checkAndShowWidget(curr_layout,line_edit.objectName()) == False:
                     line_edit.setToolTip(utils.infoFromMetadata(current_selected_function,specificKwarg=reqKwargs[k]))
@@ -1198,12 +1379,12 @@ class MyGUI(QMainWindow):
         #Add a widget-pair for every kwarg
         for k in range(len(optKwargs)):
             label = QLabel(f"<i>{optKwargs[k]}</i>")
-            label.setObjectName(f"Label#{current_selected_function}#{optKwargs[k]}")
+            label.setObjectName(f"Label#{current_selected_function}#{optKwargs[k]}#{current_selected_polarity}")
             if self.checkAndShowWidget(curr_layout,label.objectName()) == False:
                 label.setToolTip(utils.infoFromMetadata(current_selected_function,specificKwarg=optKwargs[k]))
                 curr_layout.addWidget(label,2+(k)+len(reqKwargs)+labelposoffset,0)
             line_edit = QLineEdit()
-            line_edit.setObjectName(f"LineEdit#{current_selected_function}#{optKwargs[k]}")
+            line_edit.setObjectName(f"LineEdit#{current_selected_function}#{optKwargs[k]}#{current_selected_polarity}")
             defaultValue = utils.defaultValueFromKwarg(current_selected_function,optKwargs[k])
             if self.checkAndShowWidget(curr_layout,line_edit.objectName()) == False:
                 line_edit.setToolTip(utils.infoFromMetadata(current_selected_function,specificKwarg=optKwargs[k]))
@@ -1309,19 +1490,46 @@ class MyGUI(QMainWindow):
             return None
             #Load the data: 
         if dataLocation.endswith('.npy'):
+            eventsDict = []
             npyevents = np.load(dataLocation, mmap_mode='r')
-            #Select xytp area specified:
+            
+            #First filter all events on xy,t:
             npyevents = self.filterEvents_npy_t(npyevents,tStretch=(float(self.run_startTLineEdit.text()),float(self.run_durationTLineEdit.text())))
             npyevents = self.filterEvents_xy(npyevents,xyStretch=(float(self.run_minXLineEdit.text()),float(self.run_maxXLineEdit.text()),float(self.run_minYLineEdit.text()),float(self.run_maxYLineEdit.text())))
                 
-            return npyevents
+            #Determine whether two or one outputs needs to be returned - based on polarity option
+            if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[3]:
+                #Run everything twice
+                #Get positive events only:
+                npyevents_pos = self.filterEvents_npy_p(npyevents,pValue=1)
+                eventsDict.append(npyevents_pos)
+                #Get negative events only:
+                npyevents_neg = self.filterEvents_npy_p(npyevents,pValue=0)
+                eventsDict.append(npyevents_neg)
+            elif self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[1]:
+                #Run everything once
+                npyevents_pos = self.filterEvents_npy_p(npyevents,pValue=1)
+                eventsDict.append(npyevents_pos)
+            elif self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[2]:
+                #Run everything once
+                npyevents_neg = self.filterEvents_npy_p(npyevents,pValue=0)
+                eventsDict.append(npyevents_neg)
+            elif self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[0]:
+                #Don't do any filtering
+                eventsDict.append(npyevents)
+            
+            return eventsDict
         elif dataLocation.endswith('.raw'):
+            eventsDict = []
             events = self.RawToNpy(dataLocation)
             #Select xytp area specified:
             events = self.filterEvents_npy_t(events,tStretch=(float(self.run_startTLineEdit.text()),float(self.run_durationTLineEdit.text())))
             events = self.filterEvents_xy(events,xyStretch=(float(self.run_minXLineEdit.text()),float(self.run_maxXLineEdit.text()),float(self.run_minYLineEdit.text()),float(self.run_maxYLineEdit.text())))
             
-            return events
+            #append events to eventsDict:
+            eventsDict.append(events)
+            
+            return eventsDict
     
     def RawToNpy(self,filepath,buffer_size = 1e8,time_batches = 50e3):        
         if(os.path.exists(filepath[:-4]+'.npy')):
@@ -1461,18 +1669,62 @@ class MyGUI(QMainWindow):
             #Run the analysis on a single file
             self.currentFileInfo['CurrentFileLoc'] = FileName
             if self.globalSettings['FindingBatching']['value']== False:
-                npyData = self.loadRawData(FileName)
-                if npyData is None:
-                    return
-                
-                #Check polarity
-                self.checkPolarity(npyData)
-                
-                #Sort event list on time
-                npyData = npyData[np.argsort(npyData,order='t')]
-                
-                #Run finding/fitting
-                self.runFindingAndFitting(npyData)
+                npyDataCell = self.loadRawData(FileName)
+                #Note that npyDataCell has 2 entries if pos/neg are treated seperately, otherwise just one entry:
+                #Logic for if there are multiple entires in npyDataCell
+                events_id = 0
+                partialFinding = {}
+                partialFitting = {}
+                for npyData in npyDataCell:
+                    if npyData is None:
+                        return
+                    
+                    #Sort event list on time
+                    npyData = npyData[np.argsort(npyData,order='t')]
+                    
+                    if self.dataSelectionPolarityDropdown.currentText() != self.polarityDropdownNames[3]:
+                        #Run the current finding and fitting routine only on these events:
+                        self.runFindingAndFitting(npyData,runFitting=True,storeFinding=True)
+                    else:
+                        #Run the current finding and fitting routine only on these events:
+                        self.runFindingAndFitting(npyData,runFitting=True,storeFinding=False)
+                        #we store our finding and fitting results like this:
+                        partialFinding[events_id] = self.data['FindingResult']
+                        partialFitting[events_id] = self.data['FittingResult']
+                    
+                    events_id+=1
+            
+                #If the data was split in two parts... (or more)
+                if events_id > 1:
+                    updated_partialFinding = []
+                    updated_partialFindingMetadatastring = ''
+                    updated_partialFitting = []
+                    updated_partialFittingMetadatastring = ''
+                    totNrFindingIncrease = 0
+                    for i in range(events_id):
+                        updated_partialFindingMetadatastring = updated_partialFindingMetadatastring+partialFinding[i][1]+'\n'
+                        updated_partialFittingMetadatastring = updated_partialFittingMetadatastring+partialFitting[i][1]+'\n'
+                        for eachEntry in partialFinding[i][0].items():
+                            updated_partialFinding.append(eachEntry[1])
+                        for index,row in partialFitting[i][0].iterrows():
+                            row.candidate_id+=totNrFindingIncrease
+                            updated_partialFitting.append(row)
+                        
+                        #increase the total number of findings
+                        totNrFindingIncrease+=eachEntry[0]+1
+                        
+                    #Store them again in the self.data['FindingResult']
+                    self.data['FindingResult']={}
+                    self.data['FindingResult'][0] = dict(zip(range(len(updated_partialFinding)), updated_partialFinding))
+                    self.data['FindingResult'][1] = updated_partialFindingMetadatastring
+                    #Fitting should be changed to pd df
+                    res_dict_fitting = pd.DataFrame(updated_partialFitting)
+                    #Store them again in the self.data['FindingResult']
+                    self.data['FittingResult']={}
+                    self.data['FittingResult'][0] = res_dict_fitting
+                    self.data['FittingResult'][1] = updated_partialFittingMetadatastring
+    
+    
             elif self.globalSettings['FindingBatching']['value']== True or self.globalSettings['FindingBatching']['value']== 2:
                 self.runFindingBatching()
             
@@ -1673,10 +1925,8 @@ class MyGUI(QMainWindow):
         #         events = events[(events['y'] >= int(xyStretch[2])) & (events['y'] <= int(xyStretch[3]))]
         # except:
         #      logging.info("No XY cutting in preview due to not all entries being integers-.")
-             
     
-    
-    def runFindingAndFitting(self,npyData):
+    def runFindingAndFitting(self,npyData,runFitting=True,storeFinding=True):
         #Run the finding function!
         FindingEvalText = self.getFunctionEvalText('Finding',"npyData","self.globalSettings")
         if FindingEvalText is not None:
@@ -1688,12 +1938,15 @@ class MyGUI(QMainWindow):
             logging.info('Candidate finding took '+str(self.currentFileInfo['FindingTime'])+' seconds.')
             logging.info('Candidate finding done!')
             logging.debug(self.data['FindingResult'])
-            if self.globalSettings['StoreFindingOutput']['value']:
-                self.storeFindingOutput()
+            if storeFinding:
+                if self.globalSettings['StoreFindingOutput']['value']:
+                    self.storeFindingOutput()
             #And run the fitting
-            self.runFitting()
+            if runFitting:
+                self.runFitting()
         else:
             logging.error('Candidate finding NOT performed')
+
             
     def runFitting(self):
         if self.data['FindingResult'][0] is not None:
@@ -1765,27 +2018,27 @@ class MyGUI(QMainWindow):
         logging.debug('Attempting to create and store file metadata')
         try:
             metadatastring = f"""Metadata information for file {self.currentFileInfo['CurrentFileLoc']}
-Analysis routine finished at {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+            Analysis routine finished at {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 
----- Finding metadata output: ----
-Methodology used:
-{self.data['FindingMethod']}
+            ---- Finding metadata output: ----
+            Methodology used:
+            {self.data['FindingMethod']}
 
-Number of candidates found: {len(self.data['FindingResult'][0])}
-Candidate finding took {self.currentFileInfo['FindingTime']} seconds.
+            Number of candidates found: {len(self.data['FindingResult'][0])}
+            Candidate finding took {self.currentFileInfo['FindingTime']} seconds.
 
-Custom output from finding function:
-{self.data['FindingResult'][1]}
+            Custom output from finding function:
+            {self.data['FindingResult'][1]}
 
----- Fitting metadata output: ----
-Methodology used:
-{self.data['FittingMethod']}
+            ---- Fitting metadata output: ----
+            Methodology used:
+            {self.data['FittingMethod']}
 
-Number of localizations found: {len(self.data['FittingResult'][0])}
-Candidate fitting took {self.currentFileInfo['FittingTime']} seconds.
+            Number of localizations found: {len(self.data['FittingResult'][0])}
+            Candidate fitting took {self.currentFileInfo['FittingTime']} seconds.
 
-Custom output from fitting function:
-{self.data['FittingResult'][1]}
+            Custom output from fitting function:
+            {self.data['FittingResult'][1]}
             """
             #Store this metadatastring:
             with open(self.getStoreLocationPartial()+'_RunInfo_'+datetime.datetime.now().strftime("%Y%m%d_%H%M%S")+'.txt', 'w') as f:
