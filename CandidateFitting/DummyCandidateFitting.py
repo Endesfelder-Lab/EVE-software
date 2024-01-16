@@ -34,6 +34,7 @@ def FunctionOne(candidate_dic,settings,**kwargs):
     # generate the localizations from a candidate dictionary
     localizations = pd.DataFrame()
     for i in np.unique(list(candidate_dic)):
+        localizations['candidate_id'] = i
         localizations['x'] = candidate_dic[i]['events']['x']
         localizations['y'] = candidate_dic[i]['events']['y']
         localizations['t'] = candidate_dic[i]['events']['t']

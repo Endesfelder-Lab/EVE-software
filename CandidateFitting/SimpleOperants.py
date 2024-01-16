@@ -26,6 +26,7 @@ def AverageXYTpos(candidate_dic,settings,**kwargs):
     localizations = {}
     for i in np.unique(list(candidate_dic)):
         localizations[i]={}
+        localizations['candidate_id'] = i
         localizations[i]['x'] = np.mean(candidate_dic[i]['events']['x'])*float(settings['PixelSize_nm']['value']) #X position in nm
         localizations[i]['y'] = np.mean(candidate_dic[i]['events']['y'])*float(settings['PixelSize_nm']['value']) #Y position in nm
         mean_polarity = np.mean(candidate_dic[i]['events']['p'])

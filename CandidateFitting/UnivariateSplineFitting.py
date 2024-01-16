@@ -77,7 +77,7 @@ def candidate_spline(candidate, candidate_id, smoothing_factor, localization_sam
         localization_id = np.arange(0, len(t), 1)
         mean_polarity = candidate['events']['p'].mean()
         p = np.ones(len(t))*(int(mean_polarity == 1) + int(mean_polarity == 0) * 0 + int(mean_polarity > 0 and mean_polarity < 1) * 2)
-        loc_df = pd.DataFrame({'candidate_id': candidate_id, 'localization_id': localization_id, 'x': locx, 'y': locy, 'residual_x': residual_x, 'residual_y': residual_y, 'p': p, 't': t})
+        loc_df = pd.DataFrame({'candidate_id': candidate_id, 'localization_id': localization_id, 'x': locx, 'y': locy, 'residual_x': residual_x, 'residual_y': residual_y, 'p': p, 't': t/1000.})
     except UserWarning as warning:
         spline_fit_info = 'Candidate cluster ' + str(candidate_id) + ' could not be fitted, a warning occurred:'
         spline_fit_info += str(warning)
