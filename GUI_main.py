@@ -2194,9 +2194,9 @@ class MyGUI(QMainWindow):
                 widget = item.widget()
                 if isinstance(widget,QComboBox) and widget.isVisibleTo(self.tab_processing) and className in widget.objectName():
                     if className == 'Finding':
-                        methodName_method = utils.functionNameFromDisplayName(widget.currentText(),self.Finding_functionNameToDisplayNameMapping)
+                        methodName_method = utils.functionNameFromDisplayName(widget.currentText(),getattr(self,f"Finding_functionNameToDisplayNameMapping{polarity}"))
                     elif className == 'Fitting':
-                        methodName_method = utils.functionNameFromDisplayName(widget.currentText(),self.Fitting_functionNameToDisplayNameMapping)
+                        methodName_method = utils.functionNameFromDisplayName(widget.currentText(),getattr(self,f"Fitting_functionNameToDisplayNameMapping{polarity}"))
         
         #Function call: get the to-be-evaluated text out, giving the methodName, method KwargNames, methodKwargValues, and 'function Type (i.e. cellSegmentScripts, etc)' - do the same with scoring as with method
         if methodName_method != '':
