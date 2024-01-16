@@ -903,7 +903,6 @@ class MyGUI(QMainWindow):
         #Add the canvas to the tab
         canPreviewtab_vertical_container.addWidget(self.data['figureCanvasProjection'])
 
-
     def updateCandidatePreview(self):
         """
         Function that's called when the button to show the candidate is clicked
@@ -931,6 +930,10 @@ class MyGUI(QMainWindow):
             self.data['CandidatePreviewID'] = int(self.entryCanPreview.text())
             logging.debug(f"Attempting to show candidate {self.data['CandidatePreviewID']}.")
 
+            # Get all localizations that belong to the candidate
+            self.data['CandidatePreviewLocs'] = self.data['FittingResult'][0][self.data['FittingResult'][0]['candidate_id'] == self.data['CandidatePreviewID']]
+            pixel_size = self.globalSettings['PixelSize_nm']['value']
+
             # Get some info about the candidate
             N_events = self.data['FindingResult'][0][self.data['CandidatePreviewID']]['N_events']
             cluster_size = self.data['FindingResult'][0][self.data['CandidatePreviewID']]['cluster_size']
@@ -941,6 +944,9 @@ class MyGUI(QMainWindow):
             self.data['figureAx3D'].set_xlabel('x [px]')
             self.data['figureAx3D'].set_ylabel('y [px]')
             self.data['figureAx3D'].set_zlabel('t [ms]')
+
+            # Plot the localization(s) of the candidate
+            self.data['figureAx3D'].plot(self.data['CandidatePreviewLocs']['x']/pixel_size, self.data['CandidatePreviewLocs']['y']/pixel_size, self.data['CandidatePreviewLocs']['t'], marker='x', c='red')
 
             # Give it a nice layout
             self.data['figurePlot3D'].tight_layout()
@@ -976,7 +982,10 @@ class MyGUI(QMainWindow):
             self.data['figureAxProjectionXY'].imshow(hist_xy.T, extent=[x_edges[0], x_edges[-1], y_edges[0], y_edges[-1]], origin='lower', aspect='equal', interpolation='none')
             self.data['figureAxProjectionXT'].imshow(hist_tx.T, extent=[t_edges[0], t_edges[-1], x_edges[0], x_edges[-1]], origin='lower', aspect=aspecttx, interpolation='none')
             self.data['figureAxProjectionYT'].imshow(hist_ty.T, extent=[t_edges[0], t_edges[-1], y_edges[0], y_edges[-1]], origin='lower', aspect=aspectty, interpolation='none')
-            
+            self.data['figureAxProjectionXY'].plot(self.data['CandidatePreviewLocs']['x']/pixel_size, self.data['CandidatePreviewLocs']['y']/pixel_size, marker='x', c='red')
+            self.data['figureAxProjectionXT'].plot(self.data['CandidatePreviewLocs']['t'], self.data['CandidatePreviewLocs']['x']/pixel_size, marker='x', c='red')
+            self.data['figureAxProjectionYT'].plot(self.data['CandidatePreviewLocs']['t'], self.data['CandidatePreviewLocs']['y']/pixel_size, marker='x', c='red')
+
             # Add and set labels
             self.data['figureAxProjectionXY'].set_xlabel('x [px]')
             self.data['figureAxProjectionXY'].set_ylabel('y [px]')
@@ -987,7 +996,7 @@ class MyGUI(QMainWindow):
             # Give it a nice layout
             self.data['figurePlotProjection'].tight_layout()
 
-            #U pdate drawing of the canvas
+            # Update drawing of the canvas
             self.data['figureCanvasProjection'].draw()
             logging.info(f"2D event-projections of candidate {self.data['CandidatePreviewID']} drawn.")
 
@@ -1698,6 +1707,8 @@ class MyGUI(QMainWindow):
                 logging.info('Number of localizations found: '+str(len(self.data['FittingResult'][0])))
                 logging.info('Candidate fitting took '+str(self.currentFileInfo['FittingTime'])+' seconds.')
                 logging.info('Candidate fitting done!')
+                # Update Candidate preview with new finding/fitting results
+                self.updateCandidatePreview()
                 logging.debug(self.data['FittingResult'])
                 if len(self.data['FittingResult'][0]) == 0:
                     logging.error('No localizations found after fitting!')
