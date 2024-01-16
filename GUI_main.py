@@ -391,53 +391,125 @@ class MyGUI(QMainWindow):
         """
         Candidate Finding Grid Layout
         """
-        #Add a group box on candiddate finding
-        self.groupboxFinding = QGroupBox("Candidate finding")
-        self.groupboxFinding.setObjectName("groupboxFinding")
-        self.groupboxFinding.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.groupboxFinding.setLayout(QGridLayout())
-        tab_layout.addWidget(self.groupboxFinding, 2, 0)
         
-        # Create a QComboBox and add options - this is the FINDING dropdown
-        self.candidateFindingDropdown = QComboBox(self)
-        #Increase the maximum visible items since we're always hiding 2/3rds of it (pos/neg/mix)
-        self.candidateFindingDropdown.setMaxVisibleItems(30)
-        options = utils.functionNamesFromDir('CandidateFinding')
-        displaynames, self.Finding_functionNameToDisplayNameMapping = utils.displayNamesFromFunctionNames(options)
-        self.candidateFindingDropdown.setObjectName("CandidateFinding_candidateFindingDropdown")
-        self.candidateFindingDropdown.addItems(displaynames)
-        #Add the candidateFindingDropdown to the layout
-        self.groupboxFinding.layout().addWidget(self.candidateFindingDropdown,1,0,1,2)
+        self.mainCandidateFindingGroupbox = QGroupBox("Candidate Finding")
+        self.mainCandidateFindingGroupbox.setLayout(QGridLayout())
+        tab_layout.addWidget(self.mainCandidateFindingGroupbox, 2, 0)
+        
+        names = ['Pos', 'Neg', 'Mix']
+        ii = 0
+        import functools
+        for name in names:
+            groupbox_name = f"groupboxFinding{name}"
+            candidateFindingDropdown_name = f"CandidateFindingDropdown{name}"
+            layout_name = f"layoutFinding{name}"
+            Finding_functionNameToDisplayNameMapping_name = f"Finding_functionNameToDisplayNameMapping{name}"
+            
+            groupbox = QGroupBox(f"Candidate finding {name}")
+            groupbox.setObjectName(groupbox_name)
+            groupbox.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+            groupbox.setLayout(QGridLayout())
+            
+            # Create a QComboBox and add options - this is the FINDING dropdown
+            candidateFindingDropdown = QComboBox(self)
+            #Increase the maximum visible items since we're always hiding 2/3rds of it (pos/neg/mix)
+            candidateFindingDropdown.setMaxVisibleItems(30)
+            options = utils.functionNamesFromDir('CandidateFinding')
+            displaynames, Finding_functionNameToDisplayNameMapping = utils.displayNamesFromFunctionNames(options,name.lower())
+            candidateFindingDropdown.setObjectName(candidateFindingDropdown_name)
+            candidateFindingDropdown.addItems(displaynames)
+            #Add the candidateFindingDropdown to the layout
+            groupbox.layout().addWidget(candidateFindingDropdown,1,0,1,2)
+            
+            setattr(self, Finding_functionNameToDisplayNameMapping_name, Finding_functionNameToDisplayNameMapping)
+            
+            #On startup/initiatlisation: also do changeLayout_choice
+            self.changeLayout_choice(groupbox.layout(),candidateFindingDropdown_name,getattr(self, Finding_functionNameToDisplayNameMapping_name))
+        
+            setattr(self, groupbox_name, groupbox)
+            setattr(self, candidateFindingDropdown_name, candidateFindingDropdown)
+            setattr(self, layout_name, functools.partial(self.mainCandidateFindingGroupbox.layout().addWidget, groupbox, 0,ii))
+            getattr(self, layout_name)()
+            ii+=1
+            
+        #Can't get this part to work dynamically so eh
         #Activation for candidateFindingDropdown.activated
-        self.candidateFindingDropdown.activated.connect(lambda: self.changeLayout_choice(self.groupboxFinding.layout(),"CandidateFinding_candidateFindingDropdown",self.Finding_functionNameToDisplayNameMapping))
-        
-        #On startup/initiatlisation: also do changeLayout_choice
-        self.changeLayout_choice(self.groupboxFinding.layout(),"CandidateFinding_candidateFindingDropdown",self.Finding_functionNameToDisplayNameMapping)
-        
+        self.CandidateFindingDropdownPos.activated.connect(lambda: self.changeLayout_choice(self.groupboxFindingPos.layout(),'CandidateFindingDropdownPos', self.Finding_functionNameToDisplayNameMappingPos))
+        self.CandidateFindingDropdownNeg.activated.connect(lambda: self.changeLayout_choice(self.groupboxFindingNeg.layout(),'CandidateFindingDropdownNeg', self.Finding_functionNameToDisplayNameMappingNeg))
+        self.CandidateFindingDropdownMix.activated.connect(lambda: self.changeLayout_choice(self.groupboxFindingMix.layout(),'CandidateFindingDropdownMix', self.Finding_functionNameToDisplayNameMappingMix))
+            
         """
         Candidate Fitting Grid Layout
         """
-        self.groupboxFitting = QGroupBox("Candidate fitting")
-        self.groupboxFitting.setObjectName("groupboxFitting")
-        self.groupboxFitting.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.groupboxFitting.setLayout(QGridLayout())
-        tab_layout.addWidget(self.groupboxFitting, 3, 0)
+        self.mainCandidateFittingGroupbox = QGroupBox("Candidate Fitting")
+        self.mainCandidateFittingGroupbox.setLayout(QGridLayout())
+        tab_layout.addWidget(self.mainCandidateFittingGroupbox, 3, 0)
         
-        # Create a QComboBox and add options - this is the FITTING dropdown
-        self.candidateFittingDropdown = QComboBox(self)
-        #Increase the maximum visible items since we're always hiding 2/3rds of it (pos/neg/mix)
-        self.candidateFittingDropdown.setMaxVisibleItems(30)
-        options = utils.functionNamesFromDir('CandidateFitting')
-        self.candidateFittingDropdown.setObjectName("CandidateFitting_candidateFittingDropdown")
-        displaynames, self.Fitting_functionNameToDisplayNameMapping = utils.displayNamesFromFunctionNames(options)
-        self.candidateFittingDropdown.addItems(displaynames)
-        #Add the candidateFindingDropdown to the layout
-        self.groupboxFitting.layout().addWidget(self.candidateFittingDropdown,1,0,1,2)
+        names = ['Pos', 'Neg', 'Mix']
+        ii = 0
+        import functools
+        for name in names:
+            groupbox_name = f"groupboxFitting{name}"
+            candidateFittingDropdown_name = f"CandidateFittingDropdown{name}"
+            layout_name = f"layoutFitting{name}"
+            Fitting_functionNameToDisplayNameMapping_name = f"Fitting_functionNameToDisplayNameMapping{name}"
+            
+            groupbox = QGroupBox(f"Candidate fitting {name}")
+            groupbox.setObjectName(groupbox_name)
+            groupbox.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+            groupbox.setLayout(QGridLayout())
+            
+            # Create a QComboBox and add options - this is the FINDING dropdown
+            candidateFittingDropdown = QComboBox(self)
+            #Increase the maximum visible items since we're always hiding 2/3rds of it (pos/neg/mix)
+            candidateFittingDropdown.setMaxVisibleItems(30)
+            options = utils.functionNamesFromDir('CandidateFitting')
+            displaynames, Fitting_functionNameToDisplayNameMapping = utils.displayNamesFromFunctionNames(options,name.lower())
+            candidateFittingDropdown.setObjectName(candidateFittingDropdown_name)
+            candidateFittingDropdown.addItems(displaynames)
+            #Add the candidateFindingDropdown to the layout
+            groupbox.layout().addWidget(candidateFittingDropdown,1,0,1,2)
+            
+            setattr(self, Fitting_functionNameToDisplayNameMapping_name, Fitting_functionNameToDisplayNameMapping)
+            
+            #On startup/initiatlisation: also do changeLayout_choice
+            self.changeLayout_choice(groupbox.layout(),candidateFittingDropdown_name, getattr(self, Fitting_functionNameToDisplayNameMapping_name))
+            
+            setattr(self, groupbox_name, groupbox)
+            setattr(self, layout_name, functools.partial(self.mainCandidateFittingGroupbox.layout().addWidget, groupbox, 0,ii))
+            getattr(self, layout_name)()
+            setattr(self, candidateFittingDropdown_name, candidateFittingDropdown)
+            ii+=1
+        
+        #Can't get this part to work dynamically so eh
         #Activation for candidateFindingDropdown.activated
-        self.candidateFittingDropdown.activated.connect(lambda: self.changeLayout_choice(self.groupboxFitting.layout(),"CandidateFitting_candidateFittingDropdown",self.Fitting_functionNameToDisplayNameMapping))
-        
-        #On startup/initiatlisation: also do changeLayout_choice
-        self.changeLayout_choice(self.groupboxFitting.layout(),"CandidateFitting_candidateFittingDropdown",self.Fitting_functionNameToDisplayNameMapping)
+        self.CandidateFittingDropdownPos.activated.connect(lambda: self.changeLayout_choice(self.groupboxFittingPos.layout(),'CandidateFittingDropdownPos', self.Fitting_functionNameToDisplayNameMappingPos))
+        self.CandidateFittingDropdownNeg.activated.connect(lambda: self.changeLayout_choice(self.groupboxFittingNeg.layout(),'CandidateFittingDropdownNeg', self.Fitting_functionNameToDisplayNameMappingNeg))
+        self.CandidateFittingDropdownMix.activated.connect(lambda: self.changeLayout_choice(self.groupboxFittingMix.layout(),'CandidateFittingDropdownMix', self.Fitting_functionNameToDisplayNameMappingMix))
+            
+            
+            
+            # self.groupboxFitting = QGroupBox("Candidate fitting")
+            # self.groupboxFitting.setObjectName("groupboxFitting")
+            # self.groupboxFitting.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+            # self.groupboxFitting.setLayout(QGridLayout())
+            # tab_layout.addWidget(self.groupboxFitting, 3, 0)
+            
+            # # Create a QComboBox and add options - this is the FITTING dropdown
+            # self.candidateFittingDropdown = QComboBox(self)
+            # #Increase the maximum visible items since we're always hiding 2/3rds of it (pos/neg/mix)
+            # self.candidateFittingDropdown.setMaxVisibleItems(30)
+            # options = utils.functionNamesFromDir('CandidateFitting')
+            # self.candidateFittingDropdown.setObjectName("CandidateFitting_candidateFittingDropdown")
+            # displaynames, self.Fitting_functionNameToDisplayNameMapping = utils.displayNamesFromFunctionNames(options)
+            # self.candidateFittingDropdown.addItems(displaynames)
+            # #Add the candidateFindingDropdown to the layout
+            # self.groupboxFitting.layout().addWidget(self.candidateFittingDropdown,1,0,1,2)
+            # #Activation for candidateFindingDropdown.activated
+            # self.candidateFittingDropdown.activated.connect(lambda: self.changeLayout_choice(self.groupboxFitting.layout(),"CandidateFitting_candidateFittingDropdown",self.Fitting_functionNameToDisplayNameMapping))
+            
+            # #On startup/initiatlisation: also do changeLayout_choice
+            # self.changeLayout_choice(self.groupboxFitting.layout(),"CandidateFitting_candidateFittingDropdown",self.Fitting_functionNameToDisplayNameMapping)
                
         """
         "Run" Group Box
@@ -512,17 +584,31 @@ class MyGUI(QMainWindow):
         self.buttonPreview = QPushButton("Preview")
         #Add a button press event:
         self.buttonPreview.clicked.connect(lambda: self.previewRun((self.preview_startTLineEdit.text(), 
-                                                                    self.preview_durationTLineEdit.text()),
-                                                                   (self.preview_minXLineEdit.text(),self.preview_maxXLineEdit.text(),
-                                                                    self.preview_minYLineEdit.text(),self.preview_maxYLineEdit.text())))
+                self.preview_durationTLineEdit.text()),
+                (self.preview_minXLineEdit.text(),self.preview_maxXLineEdit.text(),
+                self.preview_minYLineEdit.text(),self.preview_maxYLineEdit.text())))
         #Add the button to the layout:
         self.previewLayout.layout().addWidget(self.buttonPreview, 4, 0)
 
     def polarityDropdownChanged(self):
-        """
-        Lambda function that's called when the polarity dropdown is changed
-        """
-        oldPolarity = utils.polaritySelectedFromDisplayName(self.candidateFindingDropdown.currentText())
+        # """
+        # Lambda function that's called when the polarity dropdown is changed
+        # """
+        # oldPolarity = utils.polaritySelectedFromDisplayName(self.candidateFindingDropdown.currentText())
+            
+        # #Finding changing...
+        # currentlySelectedFinding = self.candidateFindingDropdown.currentText()
+        # newSelectedFinding = currentlySelectedFinding.replace('('+oldPolarity+')','('+newPolarity+')')
+        # self.candidateFindingDropdown.setCurrentText(newSelectedFinding)
+        # #Fitting changing...
+        # currentlySelectedFitting = self.candidateFittingDropdown.currentText()
+        # newSelectedFitting = currentlySelectedFitting.replace('('+oldPolarity+')','('+newPolarity+')')
+        # self.candidateFittingDropdown.setCurrentText(newSelectedFitting)
+        
+        # self.changeLayout_choice(self.groupboxFinding.layout(),"CandidateFinding_candidateFindingDropdown",self.Finding_functionNameToDisplayNameMapping)
+        # self.changeLayout_choice(self.groupboxFitting.layout(),"CandidateFitting_candidateFittingDropdown",self.Fitting_functionNameToDisplayNameMapping)
+        
+        #We get the currently chosen polarity:
         if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[0]:
             newPolarity = 'mix'
         elif self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[1]:
@@ -532,18 +618,31 @@ class MyGUI(QMainWindow):
         elif self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[3]:
             #TODO: handle old+new side-by-side
             newPolarity = 'mix'
-            
-        #Finding changing...
-        currentlySelectedFinding = self.candidateFindingDropdown.currentText()
-        newSelectedFinding = currentlySelectedFinding.replace('('+oldPolarity+')','('+newPolarity+')')
-        self.candidateFindingDropdown.setCurrentText(newSelectedFinding)
-        #Fitting changing...
-        currentlySelectedFitting = self.candidateFittingDropdown.currentText()
-        newSelectedFitting = currentlySelectedFitting.replace('('+oldPolarity+')','('+newPolarity+')')
-        self.candidateFittingDropdown.setCurrentText(newSelectedFitting)
         
-        self.changeLayout_choice(self.groupboxFinding.layout(),"CandidateFinding_candidateFindingDropdown",self.Finding_functionNameToDisplayNameMapping)
-        self.changeLayout_choice(self.groupboxFitting.layout(),"CandidateFitting_candidateFittingDropdown",self.Fitting_functionNameToDisplayNameMapping)
+        #And we show/hide the required groupboxes:
+        if newPolarity == 'pos':
+            self.groupboxFindingPos.show()
+            self.groupboxFindingNeg.hide()
+            self.groupboxFindingMix.hide()
+            self.groupboxFittingPos.show()
+            self.groupboxFittingNeg.hide()
+            self.groupboxFittingMix.hide()
+        elif newPolarity == 'neg':
+            self.groupboxFindingPos.hide()
+            self.groupboxFindingNeg.show()
+            self.groupboxFindingMix.hide()
+            self.groupboxFittingPos.hide()
+            self.groupboxFittingNeg.show()
+            self.groupboxFittingMix.hide()
+        elif newPolarity == 'mix':
+            self.groupboxFindingPos.hide()
+            self.groupboxFindingNeg.hide()
+            self.groupboxFindingMix.show()
+            self.groupboxFittingPos.hide()
+            self.groupboxFittingNeg.hide()
+            self.groupboxFittingMix.show()
+        
+        return
         
     def previewRun(self,timeStretch=(0,1000),xyStretch=(0,0,0,0)):
         """
@@ -1296,31 +1395,35 @@ class MyGUI(QMainWindow):
         fig.text(max(data['x']),max(data['y']),str(strv),color=col)
                 
     def changeLayout_choice(self,curr_layout,className,displayNameToFunctionNameMap):
-        logging.debug('Changing layout'+curr_layout.parent().objectName())
+        logging.info('Changing layout '+curr_layout.parent().objectName())
         #This removes everything except the first entry (i.e. the drop-down menu)
         self.resetLayout(curr_layout,className)
         #Get the dropdown info
         curr_dropdown = self.getMethodDropdownInfo(curr_layout,className)
+        if len(curr_dropdown) == 0:
+            pass
         #Get the kw-arguments from the current dropdown.
         current_selected_function = utils.functionNameFromDisplayName(curr_dropdown.currentText(),displayNameToFunctionNameMap)
+        logging.info('current selected function: '+current_selected_function)
         current_selected_polarity = utils.polaritySelectedFromDisplayName(curr_dropdown.currentText())
         
-        #If the newly-chosen polarity option is different from teh current selected finding/fitting, change the finding/fitting to the routine with the proper polarity option
+        #Classname should always end in pos/neg/mix!
+        wantedPolarity = className[-3:].lower()
         
-        if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[0]:
-            wantedPolarity = 'mix'
-        elif self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[1]:
-            wantedPolarity = 'pos'
-        elif self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[2]:
-            wantedPolarity = 'neg'
-        elif self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[3]:
-            #TODO: LOGIC with options different for pos/neg
-            wantedPolarity = 'mix'
-        else:
-            wantedPolarity = 'mix'
+        # #If the newly-chosen polarity option is different from teh current selected finding/fitting, change the finding/fitting to the routine with the proper polarity option
+        # if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[0]:
+        #     wantedPolarity = 'mix'
+        # elif self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[1]:
+        #     wantedPolarity = 'pos'
+        # elif self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[2]:
+        #     wantedPolarity = 'neg'
+        # elif self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[3]:
+        #     #TODO: LOGIC with options different for pos/neg
+        #     wantedPolarity = 'mix'
+        # else:
+        #     wantedPolarity = 'mix'
         
         #Hide dropdown entries that are not part of the current_selected property
-        
         model = curr_dropdown.model()
         totalNrRows = model.rowCount()
         for rowId in range(totalNrRows):
@@ -1337,19 +1440,8 @@ class MyGUI(QMainWindow):
                 curr_dropdown.view().setRowHidden(rowId, True)
             
             
-        
-        # rowIDToBeHidden = 0 
-        # model = curr_dropdown.model()
-        # item = model.item(rowIDToBeHidden)
-        # item.setFlags(item.flags() & ~Qt.ItemIsEnabled)
-        # curr_dropdown.view().setRowHidden(rowIDToBeHidden, True)
-        
-        # #Show row again
-        # rowIDToBeShown = 0 
-        # curr_dropdown.view().setRowHidden(rowIDToBeShown, False)
-        # model = curr_dropdown.model()
-        # item = model.item(rowIDToBeShown)
-        # item.setFlags(item.flags() | Qt.ItemIsEnabled)
+        if current_selected_function == None:
+            t=1
         
         reqKwargs = utils.reqKwargsFromFunction(current_selected_function)
         #Add a widget-pair for every kw-arg
@@ -1453,7 +1545,7 @@ class MyGUI(QMainWindow):
             if widget_item.widget() is not None:
                 widget = widget_item.widget()
                 #If it's the dropdown segment, label it as such
-                if not ("candidateFindingDropdown" in widget.objectName()) and not ("candidateFittingDropdown" in widget.objectName()) and widget.objectName() != f"titleLabel_{className}" and not ("KEEP" in widget.objectName()):
+                if not ("CandidateFindingDropdown" in widget.objectName()) and not ("CandidateFittingDropdown" in widget.objectName()) and widget.objectName() != f"titleLabel_{className}" and not ("KEEP" in widget.objectName()):
                     logging.debug(f"Hiding {widget.objectName()}")
                     widget.hide()
     
@@ -1601,8 +1693,19 @@ class MyGUI(QMainWindow):
                     logging.error('Error in processing file '+file)
         #If it's a file...
         elif os.path.isfile(self.dataLocationInput.text()):
+            #Find polarity:
+            #Get the polarity:
+            if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[0]:
+                polarityVal = 'Mix'
+            if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[1]:
+                polarityVal = 'Pos'
+            if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[2]:
+                polarityVal = 'Neg'
+            if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[3]:
+                #TODO: BOTH OF THEM AFTER ONE ANOTHER
+                polarityVal = 'Mix'
             #Check if we are loading existing finding
-            if 'ExistingFinding' in self.candidateFindingDropdown.currentText():
+            if 'ExistingFinding' in getattr(self,f"CandidateFindingDropdown{polarityVal}").currentText():
                 logging.info('Skipping finding processing, going to fitting')
                 
                 #Ensure that we don't store the finding result
@@ -1742,6 +1845,8 @@ class MyGUI(QMainWindow):
         logging.info(self.chunckloading_currentLimits)
         logging.info('Start time: '+str(npyData[0]['t']))
         logging.info('End time: '+str(npyData[-1]['t']))
+        
+        #Get polarity info and do this:
         
         FindingEvalText = self.getFunctionEvalText('Finding',"npyData","self.globalSettings")
         if FindingEvalText is not None:
@@ -1929,7 +2034,17 @@ class MyGUI(QMainWindow):
     
     def runFindingAndFitting(self,npyData,runFitting=True,storeFinding=True):
         #Run the finding function!
-        FindingEvalText = self.getFunctionEvalText('Finding',"npyData","self.globalSettings")
+        #Get the polarity:
+        if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[0]:
+            polarityVal = 'Mix'
+        if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[1]:
+            polarityVal = 'Pos'
+        if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[2]:
+            polarityVal = 'Neg'
+        if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[3]:
+            #TODO: BOTH OF THEM AFTER ONE ANOTHER
+            polarityVal = 'Mix'
+        FindingEvalText = self.getFunctionEvalText('Finding',"npyData","self.globalSettings",polarityVal)
         if FindingEvalText is not None:
             self.currentFileInfo['FindingTime'] = time.time()
             self.data['FindingMethod'] = str(FindingEvalText)
@@ -1944,15 +2059,15 @@ class MyGUI(QMainWindow):
                     self.storeFindingOutput()
             #And run the fitting
             if runFitting:
-                self.runFitting()
+                self.runFitting(polarityVal)
         else:
             logging.error('Candidate finding NOT performed')
 
             
-    def runFitting(self):
+    def runFitting(self,polarityVal):
         if self.data['FindingResult'][0] is not None:
             #Run the finding function!
-            FittingEvalText = self.getFunctionEvalText('Fitting',"self.data['FindingResult'][0]","self.globalSettings")
+            FittingEvalText = self.getFunctionEvalText('Fitting',"self.data['FindingResult'][0]","self.globalSettings",polarityVal)
             if FittingEvalText is not None:
                 self.currentFileInfo['FittingTime'] = time.time()
                 self.data['FittingMethod'] = str(FittingEvalText)
@@ -2048,10 +2163,10 @@ class MyGUI(QMainWindow):
         except:
             logging.error('Error in creating file metadata, not stored')
     
-    def getFunctionEvalText(self,className,p1,p2):
+    def getFunctionEvalText(self,className,p1,p2,polarity):
         #Get the dropdown info
         moduleMethodEvalTexts = []
-        all_layouts = self.findChild(QWidget, "groupbox"+className).findChildren(QLayout)[0]
+        all_layouts = self.findChild(QWidget, "groupbox"+className+polarity).findChildren(QLayout)[0]
         
         
         methodKwargNames_method = []
@@ -2197,24 +2312,27 @@ class MyGUI(QMainWindow):
             with open(json_file_path, "r") as json_file:
                 self.entries = json.load(json_file)
 
-            # Set the values of the editable fields from the loaded entries
-            for field_name, field_widget in self.get_editable_fields().items():
-                if field_name in self.entries:
-                    if isinstance(field_widget, QLineEdit):
-                        if 'QLineEdit' in runParams:
-                            field_widget.setText(self.entries[field_name])
-                            logging.debug('Set text of field_widget '+field_name+' to '+self.entries[field_name])
-                    elif isinstance(field_widget, QComboBox):
-                        if 'QComboBox' in runParams:
-                            index = field_widget.findText(self.entries[field_name])
-                            if index >= 0:
+            for polVal in ["Pos","Neg","Mix"]:
+                # Set the values of the editable fields from the loaded entries
+                for field_name, field_widget in self.get_editable_fields().items():
+                    if field_name in self.entries:
+                        if isinstance(field_widget, QLineEdit):
+                            if 'QLineEdit' in runParams:
+                                field_widget.setText(self.entries[field_name])
                                 logging.debug('Set text of field_widget '+field_name+' to '+self.entries[field_name])
-                                field_widget.setCurrentIndex(index)
-                                #Also change the lineedits and such:
-                                if 'Finding' in field_widget.objectName():
-                                    self.changeLayout_choice(self.groupboxFinding.layout(),field_widget.objectName(),self.Finding_functionNameToDisplayNameMapping)
-                                elif 'Fitting' in field_widget.objectName():
-                                    self.changeLayout_choice(self.groupboxFitting.layout(),field_widget.objectName(),self.Fitting_functionNameToDisplayNameMapping)
+                        elif isinstance(field_widget, QComboBox):
+                            if 'QComboBox' in runParams:
+                                index = field_widget.findText(self.entries[field_name])
+                                if index >= 0:
+                                    logging.debug('Set text of field_widget '+field_name+' to '+self.entries[field_name])
+                                    field_widget.setCurrentIndex(index)
+                                    #Also change the lineedits and such:
+                                    if 'Finding' in field_widget.objectName():
+                                        polVal2 = field_widget.objectName()[-3:]
+                                        self.changeLayout_choice(getattr(self, f"groupboxFinding{polVal2}").layout(),field_widget.objectName(),getattr(self, f"Finding_functionNameToDisplayNameMapping{polVal2}"))
+                                    elif 'Fitting' in field_widget.objectName():
+                                        polVal2 = field_widget.objectName()[-3:]
+                                        self.changeLayout_choice(getattr(self, f"groupboxFitting{polVal2}").layout(),field_widget.objectName(),getattr(self, f"Fitting_functionNameToDisplayNameMapping{polVal2}"))
         
 
         except FileNotFoundError:
@@ -2241,29 +2359,34 @@ class MyGUI(QMainWindow):
     def set_all_combobox_states(self):
         original_states = {}
         # try:
-        def set_combobox_states(widget):
+        def set_combobox_states(widget,polVal):
             if isinstance(widget, QComboBox):
-                original_states[widget] = widget.currentIndex()
-                for i in range(widget.count()):
-                    logging.debug('Set text of combobox '+widget.objectName()+' to '+widget.itemText(i))
-                    widget.setCurrentIndex(i)
-                    #Update all line edits and such
-                    if 'Finding' in widget.objectName():
-                        self.changeLayout_choice(self.groupboxFinding.layout(),widget.objectName(),self.Finding_functionNameToDisplayNameMapping)
-                    elif 'Fitting' in widget.objectName():
-                        self.changeLayout_choice(self.groupboxFitting.layout(),widget.objectName(),self.Fitting_functionNameToDisplayNameMapping)
+                if widget.objectName()[:-3] == polVal.lower():
+                    original_states[widget] = widget.currentIndex()
+                    for i in range(widget.count()):
+                        logging.info('Set text of combobox '+widget.objectName()+' to '+widget.itemText(i))
+                        widget.setCurrentIndex(i)
+                        #Update all line edits and such
+                        if 'Finding' in widget.objectName():
+                            logging.info('Line 2299')
+                            logging.info(getattr(self, f"groupboxFinding{polVal}").objectName())
+                            self.changeLayout_choice(getattr(self, f"groupboxFinding{polVal}").layout(),widget.objectName(),getattr(self, f"Finding_functionNameToDisplayNameMapping{polVal}"))
+                        elif 'Fitting' in widget.objectName():
+                            logging.info('Line 2299+2')
+                            self.changeLayout_choice(getattr(self, f"groupboxFitting{polVal}").layout(),widget.objectName(),getattr(self, f"Fitting_functionNameToDisplayNameMapping{polVal}"))
             elif isinstance(widget, QWidget):
                 for child_widget in widget.children():
-                    set_combobox_states(child_widget)
+                    set_combobox_states(child_widget,polVal)
 
-        set_combobox_states(self)
         # Reset to orig states
-        for combobox, original_state in original_states.items():
-            combobox.setCurrentIndex(original_state)
-            if 'Finding' in combobox.objectName():
-                self.changeLayout_choice(self.groupboxFinding.layout(),combobox.objectName(),self.Finding_functionNameToDisplayNameMapping)
-            elif 'Fitting' in combobox.objectName():
-                self.changeLayout_choice(self.groupboxFitting.layout(),combobox.objectName(),self.Fitting_functionNameToDisplayNameMapping)
+        for polVal in ['Pos','Neg','Mix']:
+            set_combobox_states(self,polVal)
+            for combobox, original_state in original_states.items():
+                combobox.setCurrentIndex(original_state)
+                if 'Finding' in combobox.objectName():
+                    self.changeLayout_choice(getattr(self, f"groupboxFinding{polVal}").layout(),combobox.objectName(),getattr(self, f"Finding_functionNameToDisplayNameMapping{polVal}"))
+                elif 'Fitting' in combobox.objectName():
+                    self.changeLayout_choice(getattr(self, f"groupboxFitting{polVal}").layout(),combobox.objectName(),getattr(self, f"Fitting_functionNameToDisplayNameMapping{polVal}"))
         # except:
         #     pass
 

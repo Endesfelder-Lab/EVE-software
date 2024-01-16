@@ -12,7 +12,8 @@ def __function_metadata__():
             ],
             "optional_kwargs": [
              ],
-            "help_string": "Loads a previously created FindingResults and only runs fitting routine on this."
+            "help_string": "Loads a previously created FindingResults and only runs fitting routine on this.",
+            "display_name": "Load an existing Finding Result"
         }
     }
 

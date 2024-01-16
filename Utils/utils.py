@@ -303,22 +303,21 @@ def defaultValueFromKwarg(functionname,kwargname):
     return defaultEntry
 
 
-def displayNamesFromFunctionNames(functionName):
+def displayNamesFromFunctionNames(functionName, polval):
     displaynames = []
     functionName_to_displayName_map = []
     for function in functionName:
-        for polval in ['pos','neg','mix']:
-            #Extract the mother function name - before the period:
-            subroutineName = function.split('.')[0]
-            singlefunctiondata = function.split('.')[1]
-            #Check if the subroutine has a display name - if so, use that, otherwise use the subroutineName
-            functionMetadata = eval(f'{str(subroutineName)}.__function_metadata__()')
-            if 'display_name' in functionMetadata[singlefunctiondata]:
-                displayName = functionMetadata[singlefunctiondata]['display_name']+" ("+polval+")"
-            else:
-                displayName = subroutineName+': '+singlefunctiondata+" ("+polval+")"
-            displaynames.append(displayName)
-            functionName_to_displayName_map.append((displayName,function))
+        #Extract the mother function name - before the period:
+        subroutineName = function.split('.')[0]
+        singlefunctiondata = function.split('.')[1]
+        #Check if the subroutine has a display name - if so, use that, otherwise use the subroutineName
+        functionMetadata = eval(f'{str(subroutineName)}.__function_metadata__()')
+        if 'display_name' in functionMetadata[singlefunctiondata]:
+            displayName = functionMetadata[singlefunctiondata]['display_name']+" ("+polval+")"
+        else:
+            displayName = subroutineName+': '+singlefunctiondata+" ("+polval+")"
+        displaynames.append(displayName)
+        functionName_to_displayName_map.append((displayName,function))
     #Check for ambiguity in both columns:
     
     # if not len(np.unique(list(set(functionName_to_displayName_map)))) == len(list(itertools.chain.from_iterable(functionName_to_displayName_map))):
