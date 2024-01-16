@@ -343,6 +343,8 @@ class MyGUI(QMainWindow):
         self.dataSelectionPolarityDropdown.addItem(self.polarityDropdownNames[self.polarityDropdownOrder[2]])
         self.dataSelectionPolarityDropdown.addItem(self.polarityDropdownNames[self.polarityDropdownOrder[3]])
         self.dataSelectionPolarityLayout.layout().addWidget(self.dataSelectionPolarityDropdown, 1,0)
+        #Add a lambda function to this dropdown:
+        self.dataSelectionPolarityDropdown.currentIndexChanged.connect(lambda: self.polarityDropdownChanged())
         #Add one of those addStretch to push it all to the top:
         self.dataSelectionPolarityLayout.layout().addItem(QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding), 2,0)
         
@@ -397,6 +399,8 @@ class MyGUI(QMainWindow):
         
         # Create a QComboBox and add options - this is the FINDING dropdown
         self.candidateFindingDropdown = QComboBox(self)
+        #Increase the maximum visible items since we're always hiding 2/3rds of it (pos/neg/mix)
+        self.candidateFindingDropdown.setMaxVisibleItems(30)
         options = utils.functionNamesFromDir('CandidateFinding')
         displaynames, self.Finding_functionNameToDisplayNameMapping = utils.displayNamesFromFunctionNames(options)
         self.candidateFindingDropdown.setObjectName("CandidateFinding_candidateFindingDropdown")
@@ -420,6 +424,8 @@ class MyGUI(QMainWindow):
         
         # Create a QComboBox and add options - this is the FITTING dropdown
         self.candidateFittingDropdown = QComboBox(self)
+        #Increase the maximum visible items since we're always hiding 2/3rds of it (pos/neg/mix)
+        self.candidateFittingDropdown.setMaxVisibleItems(30)
         options = utils.functionNamesFromDir('CandidateFitting')
         self.candidateFittingDropdown.setObjectName("CandidateFitting_candidateFittingDropdown")
         displaynames, self.Fitting_functionNameToDisplayNameMapping = utils.displayNamesFromFunctionNames(options)
@@ -511,6 +517,33 @@ class MyGUI(QMainWindow):
         #Add the button to the layout:
         self.previewLayout.layout().addWidget(self.buttonPreview, 4, 0)
 
+    def polarityDropdownChanged(self):
+        """
+        Lambda function that's called when the polarity dropdown is changed
+        """
+        oldPolarity = utils.polaritySelectedFromDisplayName(self.candidateFindingDropdown.currentText())
+        if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[0]:
+            newPolarity = 'mix'
+        elif self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[1]:
+            newPolarity = 'pos'
+        elif self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[2]:
+            newPolarity = 'neg'
+        elif self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[3]:
+            #TODO: handle old+new side-by-side
+            newPolarity = 'mix'
+            
+        #Finding changing...
+        currentlySelectedFinding = self.candidateFindingDropdown.currentText()
+        newSelectedFinding = currentlySelectedFinding.replace('('+oldPolarity+')','('+newPolarity+')')
+        self.candidateFindingDropdown.setCurrentText(newSelectedFinding)
+        #Fitting changing...
+        currentlySelectedFitting = self.candidateFittingDropdown.currentText()
+        newSelectedFitting = currentlySelectedFitting.replace('('+oldPolarity+')','('+newPolarity+')')
+        self.candidateFittingDropdown.setCurrentText(newSelectedFitting)
+        
+        self.changeLayout_choice(self.groupboxFinding.layout(),"CandidateFinding_candidateFindingDropdown",self.Finding_functionNameToDisplayNameMapping)
+        self.changeLayout_choice(self.groupboxFitting.layout(),"CandidateFitting_candidateFittingDropdown",self.Fitting_functionNameToDisplayNameMapping)
+        
     def previewRun(self,timeStretch=(0,1000),xyStretch=(0,0,0,0)):
         """
         Generates the preview of a run analysis.
@@ -1260,6 +1293,53 @@ class MyGUI(QMainWindow):
         #Get the kw-arguments from the current dropdown.
         current_selected_function = utils.functionNameFromDisplayName(curr_dropdown.currentText(),displayNameToFunctionNameMap)
         current_selected_polarity = utils.polaritySelectedFromDisplayName(curr_dropdown.currentText())
+        
+        #If the newly-chosen polarity option is different from teh current selected finding/fitting, change the finding/fitting to the routine with the proper polarity option
+        
+        if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[0]:
+            wantedPolarity = 'mix'
+        elif self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[1]:
+            wantedPolarity = 'pos'
+        elif self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[2]:
+            wantedPolarity = 'neg'
+        elif self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[3]:
+            #TODO: LOGIC with options different for pos/neg
+            wantedPolarity = 'mix'
+        else:
+            wantedPolarity = 'mix'
+        
+        #Hide dropdown entries that are not part of the current_selected property
+        
+        model = curr_dropdown.model()
+        totalNrRows = model.rowCount()
+        for rowId in range(totalNrRows):
+            #First show all rows:
+            curr_dropdown.view().setRowHidden(rowId, False)
+            item = model.item(rowId)
+            item.setFlags(item.flags() | Qt.ItemIsEnabled)
+            
+            #Then hide based on the row name
+            rowName = model.item(rowId,0).text()
+            if utils.polaritySelectedFromDisplayName(rowName) != wantedPolarity:
+                item = model.item(rowId)
+                item.setFlags(item.flags() & ~Qt.ItemIsEnabled)
+                curr_dropdown.view().setRowHidden(rowId, True)
+            
+            
+        
+        # rowIDToBeHidden = 0 
+        # model = curr_dropdown.model()
+        # item = model.item(rowIDToBeHidden)
+        # item.setFlags(item.flags() & ~Qt.ItemIsEnabled)
+        # curr_dropdown.view().setRowHidden(rowIDToBeHidden, True)
+        
+        # #Show row again
+        # rowIDToBeShown = 0 
+        # curr_dropdown.view().setRowHidden(rowIDToBeShown, False)
+        # model = curr_dropdown.model()
+        # item = model.item(rowIDToBeShown)
+        # item.setFlags(item.flags() | Qt.ItemIsEnabled)
+        
         reqKwargs = utils.reqKwargsFromFunction(current_selected_function)
         #Add a widget-pair for every kw-arg
         labelposoffset = 0
