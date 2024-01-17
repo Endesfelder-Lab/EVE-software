@@ -25,7 +25,6 @@ def __function_metadata__():
                 {"name": "candidate_radius", "description": "Radius of the area around the localization (in px)","default":4.},
             ],
             "optional_kwargs": [
-                {"name": "polarity","description": "Polarity of the events","default":1},
                 {"name": "multithread","description": "True to use multithread parallelization; False not to.","default":True},
             ],
             "help_string": "Convert event data to frames and do finding via wavelet detection",
@@ -210,7 +209,6 @@ def FrameBased_finding(npy_array,settings,**kwargs):
     candidate_radius = float(kwargs['candidate_radius'])
 
     # Load the optional kwargs
-    polarity = int(kwargs['polarity'])
     multithread = utilsHelper.strtobool(kwargs['multithread'])
 
     # Initializations - general
@@ -227,45 +225,14 @@ def FrameBased_finding(npy_array,settings,**kwargs):
     candidates = {}
     index = 0
     candidates_info = ''
-    if polarity==0 or polarity==1:
-        events = npy_array[npy_array['p']==polarity]
-        frame_size=[np.max(events['y'])+1,np.max(events['x'])+1]
-        events_split, njobs, num_cores = slice_data(events, num_cores, frame_time)
-        print("Candidate fitting split in "+str(njobs)+" job(s) and divided on "+str(num_cores)+" core(s).")
-        RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(compute_thread)(i, events_split[i], frame_time, candidate_radius, min_diameter, max_diameter, exclusion_radius, kernel1, kernel2, kernel, threshold_detection, frame_size) for i in range(len(events_split)))
-        for i in range(len(RES)):
-            for candidate in RES[i].items():
-                candidates[index] = candidate[1]
-                index+=1
-
-    elif polarity==2:
-        # Do first negative events...
-        events = npy_array[npy_array['p']==0]
-        frame_size=[np.max(events['y'])+1,np.max(events['x'])+1]
-        events_split, njobs, num_cores = slice_data(events, num_cores, frame_time)
-        print("Candidate fitting split in "+str(njobs)+" job(s) and divided on "+str(num_cores)+" core(s).")
-        RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(compute_thread)(i, events_split[i], frame_time, candidate_radius, min_diameter, max_diameter, exclusion_radius, kernel1, kernel2, kernel, threshold_detection, frame_size) for i in range(len(events_split)))
-        for i in range(len(RES)):
-            for candidate in RES[i].items():
-                candidates[index] = candidate[1]
-                index+=1
-        Nb_neg_candidates = len(candidates)
-        candidates_info = f'Number of negative candidates found: {Nb_neg_candidates}\n'
-
-        # ... and then positive events.
-        events = npy_array[npy_array['p']==1]
-        frame_size=[np.max(events['y'])+1,np.max(events['x'])+1]
-        events_split, njobs, num_cores = slice_data(events, num_cores, frame_time)
-        print("Candidate fitting split in "+str(njobs)+" job(s) and divided on "+str(num_cores)+" core(s).")
-        RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(compute_thread)(i, events_split[i], frame_time, candidate_radius, min_diameter, max_diameter, exclusion_radius, kernel1, kernel2, kernel, threshold_detection, frame_size) for i in range(len(events_split)))
-        for i in range(len(RES)):
-            for candidate in RES[i].items():
-                candidates[index] = candidate[1]
-                index+=1
-        Nb_pos_candidates = len(candidates)-Nb_neg_candidates
-        candidates_info += f'Number of positive candidates found: {Nb_pos_candidates}'
-                
-    else: logging.error('Polarity must be 0, 1 or 2.')
+    frame_size=[np.max(npy_array['y'])+1,np.max(npy_array['x'])+1]
+    events_split, njobs, num_cores = slice_data(npy_array, num_cores, frame_time)
+    print("Candidate fitting split in "+str(njobs)+" job(s) and divided on "+str(num_cores)+" core(s).")
+    RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(compute_thread)(i, events_split[i], frame_time, candidate_radius, min_diameter, max_diameter, exclusion_radius, kernel1, kernel2, kernel, threshold_detection, frame_size) for i in range(len(events_split)))
+    for i in range(len(RES)):
+        for candidate in RES[i].items():
+            candidates[index] = candidate[1]
+            index+=1
     
     performance_metadata = candidates_info
     return candidates, performance_metadata
