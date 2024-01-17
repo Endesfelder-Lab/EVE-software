@@ -172,11 +172,17 @@ class MyGUI(QMainWindow):
         self.setup_tab('Preview visualisation')
         self.setup_tab('Candidate preview')
 
+
         #Loop through all combobox states briefly to initialise them (and hide them)
         self.set_all_combobox_states()
         
         #Load the GUI settings from last time:
         self.load_entries_from_json()
+        
+        #Initialise polarity value thing (only affects very first run I believe):
+        self.polarityDropdownChanged()
+        
+        logging.info('Initialisation complete.')
     
     def setup_tab(self, tab_name):
     #Generic function to set up tabs - basically a look-up to other functions

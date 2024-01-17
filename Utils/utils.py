@@ -337,7 +337,6 @@ def polaritySelectedFromDisplayName(displayname):
 def functionNameFromDisplayName(displayname,map):
     for pair in map:
         if pair[0] == displayname:
-            print(pair[1])
             return pair[1]
         
 
