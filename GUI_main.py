@@ -67,6 +67,9 @@ class MyGUI(QMainWindow):
         
         #Create a dictionary that stores data and passes it between finding,fitting,saving, etc
         self.data = {}
+        self.data['prevFindingMethod'] = 'None'
+        self.data['prevNrEvents'] = 0
+        self.data['prevNrCandidates'] = 0
         
         """
         Logger creation, both text output and stored to .log file
@@ -1097,6 +1100,7 @@ class MyGUI(QMainWindow):
         onlyInt = QIntValidator()
         self.entryCanPreview.setValidator(onlyInt)
         canPreviewtab_horizontal_container.addWidget(self.entryCanPreview)
+        self.entryCanPreview.returnPressed.connect(lambda: self.updateCandidatePreview())
         
         self.buttonCanPreview = QPushButton("Show candidate")
         canPreviewtab_horizontal_container.addWidget(self.buttonCanPreview)
@@ -1137,7 +1141,7 @@ class MyGUI(QMainWindow):
         #Add the canvas to the tab
         canPreviewtab_vertical_container.addWidget(self.data['figureCanvasProjection'])
 
-    def updateCandidatePreview(self):
+    def updateCandidatePreview(self, reset=False):
         """
         Function that's called when the button to show the candidate is clicked
         """
@@ -1154,89 +1158,91 @@ class MyGUI(QMainWindow):
         self.data['figureAxProjectionXT'].set_aspect('auto')
         self.data['figureAxProjectionYT'].set_aspect('auto')
         self.data['figureCanvasProjection'].draw()
+        if reset==False:
+            # Check the candidate entry field
+            if self.entryCanPreview.text()=='':
+                self.candidate_info.setText('Tried to visualise candidate, but no ID was given!')
+                logging.error('Tried to visualise candidate, but no ID was given!')
 
-        # Check the candidate entry field
-        if self.entryCanPreview.text()=='':
-            self.candidate_info.setText('Tried to visualise candidate, but no ID was given!')
-            logging.error('Tried to visualise candidate, but no ID was given!')
+            elif 'FindingMethod' in self.data and int(self.entryCanPreview.text()) < len(self.data['FindingResult'][0]):
+                self.data['CandidatePreviewID'] = int(self.entryCanPreview.text())
+                logging.debug(f"Attempting to show candidate {self.data['CandidatePreviewID']}.")
 
-        elif 'FindingMethod' in self.data and int(self.entryCanPreview.text()) < len(self.data['FindingResult'][0]):
-            self.data['CandidatePreviewID'] = int(self.entryCanPreview.text())
-            logging.debug(f"Attempting to show candidate {self.data['CandidatePreviewID']}.")
+                # Get all localizations that belong to the candidate
+                self.data['CandidatePreviewLocs'] = self.data['FittingResult'][0][self.data['FittingResult'][0]['candidate_id'] == self.data['CandidatePreviewID']]
+                pixel_size = self.globalSettings['PixelSize_nm']['value']
 
-            # Get all localizations that belong to the candidate
-            self.data['CandidatePreviewLocs'] = self.data['FittingResult'][0][self.data['FittingResult'][0]['candidate_id'] == self.data['CandidatePreviewID']]
-            pixel_size = self.globalSettings['PixelSize_nm']['value']
+                # Get some info about the candidate
+                N_events = self.data['FindingResult'][0][self.data['CandidatePreviewID']]['N_events']
+                cluster_size = self.data['FindingResult'][0][self.data['CandidatePreviewID']]['cluster_size']
+                self.candidate_info.setText(f"This candidate cluster contains {N_events} events and has dimensions ({cluster_size[0]}, {cluster_size[1]}, {cluster_size[2]}).")
 
-            # Get some info about the candidate
-            N_events = self.data['FindingResult'][0][self.data['CandidatePreviewID']]['N_events']
-            cluster_size = self.data['FindingResult'][0][self.data['CandidatePreviewID']]['cluster_size']
-            self.candidate_info.setText(f"This candidate cluster contains {N_events} events and has dimensions ({cluster_size[0]}, {cluster_size[1]}, {cluster_size[2]}).")
+                # Do a 3d scatterplot of the event data
+                self.data['figureAx3D'].scatter(self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['x'], self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['y'], self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['t']*1e-3)
+                self.data['figureAx3D'].set_xlabel('x [px]')
+                self.data['figureAx3D'].set_ylabel('y [px]')
+                self.data['figureAx3D'].set_zlabel('t [ms]')
 
-            # Do a 3d scatterplot of the event data
-            self.data['figureAx3D'].scatter(self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['x'], self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['y'], self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['t']*1e-3)
-            self.data['figureAx3D'].set_xlabel('x [px]')
-            self.data['figureAx3D'].set_ylabel('y [px]')
-            self.data['figureAx3D'].set_zlabel('t [ms]')
+                # Plot the localization(s) of the candidate
+                self.data['figureAx3D'].plot(self.data['CandidatePreviewLocs']['x']/pixel_size, self.data['CandidatePreviewLocs']['y']/pixel_size, self.data['CandidatePreviewLocs']['t'], marker='x', c='red')
 
-            # Plot the localization(s) of the candidate
-            self.data['figureAx3D'].plot(self.data['CandidatePreviewLocs']['x']/pixel_size, self.data['CandidatePreviewLocs']['y']/pixel_size, self.data['CandidatePreviewLocs']['t'], marker='x', c='red')
+                # Give it a nice layout
+                self.data['figurePlot3D'].tight_layout()
+                self.data['figurePlot3D'].subplots_adjust(top=0.95)
 
-            # Give it a nice layout
-            self.data['figurePlot3D'].tight_layout()
-            self.data['figurePlot3D'].subplots_adjust(top=0.95)
+                # Update drawing of the canvas
+                self.data['figureCanvas3D'].draw()
+                logging.info(f"3D scatter plot of candidate {self.data['CandidatePreviewID']} drawn.")
 
-            # Update drawing of the canvas
-            self.data['figureCanvas3D'].draw()
-            logging.info(f"3D scatter plot of candidate {self.data['CandidatePreviewID']} drawn.")
+                # Get xyt-limits of candidate events
+                self.xlim = [np.min(self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['x']), np.max(self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['x'])]
+                self.ylim = [np.min(self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['y']), np.max(self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['y'])]
+                self.tlim = [np.min(self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['t']*1e-3), np.max(self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['t']*1e-3)]
 
-            # Get xyt-limits of candidate events
-            self.xlim = [np.min(self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['x']), np.max(self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['x'])]
-            self.ylim = [np.min(self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['y']), np.max(self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['y'])]
-            self.tlim = [np.min(self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['t']*1e-3), np.max(self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['t']*1e-3)]
+                xy_bin_width = 1 # in px
+                t_bin_width = 10. # in ms
 
-            xy_bin_width = 1 # in px
-            t_bin_width = 10. # in ms
+                # calculate number of bins
+                x_bins = int((self.xlim[1]-self.xlim[0])/xy_bin_width)
+                y_bins = int((self.ylim[1]-self.ylim[0])/xy_bin_width)
+                t_bins = int((self.tlim[1]-self.tlim[0])/t_bin_width)
 
-            # calculate number of bins
-            x_bins = int((self.xlim[1]-self.xlim[0])/xy_bin_width)
-            y_bins = int((self.ylim[1]-self.ylim[0])/xy_bin_width)
-            t_bins = int((self.tlim[1]-self.tlim[0])/t_bin_width)
+                # Compute the 2D histograms
+                hist_xy, x_edges, y_edges = np.histogram2d(self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['x'], self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['y'], bins=(x_bins, y_bins))
+                hist_tx, t_edges, x_edges = np.histogram2d(self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['t']*1e-3, self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['x'], bins=(t_bins, x_bins))
+                hist_ty, t_edges, y_edges = np.histogram2d(self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['t']*1e-3, self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['y'], bins=(t_bins, y_bins))
 
-            # Compute the 2D histograms
-            hist_xy, x_edges, y_edges = np.histogram2d(self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['x'], self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['y'], bins=(x_bins, y_bins))
-            hist_tx, t_edges, x_edges = np.histogram2d(self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['t']*1e-3, self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['x'], bins=(t_bins, x_bins))
-            hist_ty, t_edges, y_edges = np.histogram2d(self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['t']*1e-3, self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['y'], bins=(t_bins, y_bins))
+                # Set goodlooking aspect ratio depending on nr of xyt-bins
+                aspectty = 3. * (len(t_edges)-1) / (len(y_edges)-1)
+                aspecttx = 3. * (len(t_edges)-1) / (len(x_edges)-1)
 
-            # Set goodlooking aspect ratio depending on nr of xyt-bins
-            aspectty = 3. * (len(t_edges)-1) / (len(y_edges)-1)
-            aspecttx = 3. * (len(t_edges)-1) / (len(x_edges)-1)
+                # Plot the 2D histograms
+                self.data['figureAxProjectionXY'].imshow(hist_xy.T, extent=[x_edges[0], x_edges[-1], y_edges[0], y_edges[-1]], origin='lower', aspect='equal', interpolation='none')
+                self.data['figureAxProjectionXT'].imshow(hist_tx.T, extent=[t_edges[0], t_edges[-1], x_edges[0], x_edges[-1]], origin='lower', aspect=aspecttx, interpolation='none')
+                self.data['figureAxProjectionYT'].imshow(hist_ty.T, extent=[t_edges[0], t_edges[-1], y_edges[0], y_edges[-1]], origin='lower', aspect=aspectty, interpolation='none')
+                self.data['figureAxProjectionXY'].plot(self.data['CandidatePreviewLocs']['x']/pixel_size, self.data['CandidatePreviewLocs']['y']/pixel_size, marker='x', c='red')
+                self.data['figureAxProjectionXT'].plot(self.data['CandidatePreviewLocs']['t'], self.data['CandidatePreviewLocs']['x']/pixel_size, marker='x', c='red')
+                self.data['figureAxProjectionYT'].plot(self.data['CandidatePreviewLocs']['t'], self.data['CandidatePreviewLocs']['y']/pixel_size, marker='x', c='red')
 
-            # Plot the 2D histograms
-            self.data['figureAxProjectionXY'].imshow(hist_xy.T, extent=[x_edges[0], x_edges[-1], y_edges[0], y_edges[-1]], origin='lower', aspect='equal', interpolation='none')
-            self.data['figureAxProjectionXT'].imshow(hist_tx.T, extent=[t_edges[0], t_edges[-1], x_edges[0], x_edges[-1]], origin='lower', aspect=aspecttx, interpolation='none')
-            self.data['figureAxProjectionYT'].imshow(hist_ty.T, extent=[t_edges[0], t_edges[-1], y_edges[0], y_edges[-1]], origin='lower', aspect=aspectty, interpolation='none')
-            self.data['figureAxProjectionXY'].plot(self.data['CandidatePreviewLocs']['x']/pixel_size, self.data['CandidatePreviewLocs']['y']/pixel_size, marker='x', c='red')
-            self.data['figureAxProjectionXT'].plot(self.data['CandidatePreviewLocs']['t'], self.data['CandidatePreviewLocs']['x']/pixel_size, marker='x', c='red')
-            self.data['figureAxProjectionYT'].plot(self.data['CandidatePreviewLocs']['t'], self.data['CandidatePreviewLocs']['y']/pixel_size, marker='x', c='red')
+                # Add and set labels
+                self.data['figureAxProjectionXY'].set_xlabel('x [px]')
+                self.data['figureAxProjectionXY'].set_ylabel('y [px]')
+                self.data['figureAxProjectionXT'].set_ylabel('x [px]')
+                self.data['figureAxProjectionYT'].set_ylabel('y [px]')
+                self.data['figureAxProjectionYT'].set_xlabel('t [ms]')
+                
+                # Give it a nice layout
+                self.data['figurePlotProjection'].tight_layout()
 
-            # Add and set labels
-            self.data['figureAxProjectionXY'].set_xlabel('x [px]')
-            self.data['figureAxProjectionXY'].set_ylabel('y [px]')
-            self.data['figureAxProjectionXT'].set_ylabel('x [px]')
-            self.data['figureAxProjectionYT'].set_ylabel('y [px]')
-            self.data['figureAxProjectionYT'].set_xlabel('t [ms]')
-            
-            # Give it a nice layout
-            self.data['figurePlotProjection'].tight_layout()
+                # Update drawing of the canvas
+                self.data['figureCanvasProjection'].draw()
+                logging.info(f"2D event-projections of candidate {self.data['CandidatePreviewID']} drawn.")
 
-            # Update drawing of the canvas
-            self.data['figureCanvasProjection'].draw()
-            logging.info(f"2D event-projections of candidate {self.data['CandidatePreviewID']} drawn.")
-
-        else: 
-            self.candidate_info.setText('Tried to visualise candidate but no data found!')
-            logging.error('Tried to visualise candidate but no data found!')
+            else: 
+                self.candidate_info.setText('Tried to visualise candidate but no data found!')
+                logging.error('Tried to visualise candidate but no data found!')
+        else:
+            logging.info('Candidate preview is reset.')
 
     def setup_previewTab(self):
         """
@@ -2076,8 +2082,25 @@ class MyGUI(QMainWindow):
                 logging.info('Number of localizations found: '+str(len(self.data['FittingResult'][0])))
                 logging.info('Candidate fitting took '+str(self.currentFileInfo['FittingTime'])+' seconds.')
                 logging.info('Candidate fitting done!')
-                # Update Candidate preview with new finding/fitting results
-                self.updateCandidatePreview()
+                self.data['NrEvents'] = 0
+                for candidateID, candidate in self.data['FindingResult'][0].items():
+                        self.data['NrEvents'] += len(candidate['events'])
+                # Update Candidate preview with new finding/fitting results only if found candidates are unchanged
+                if self.data['prevFindingMethod']=='None' and self.data['prevNrEvents']==0 and self.data['prevNrCandidates']==0:
+                    # Finding routine ran for the first time -> don't update preview
+                    self.data['prevFindingMethod'] = self.data['FindingMethod']
+                    self.data['prevNrCandidates'] = len(self.data['FindingResult'][0])
+                    self.data['prevNrEvents'] = self.data['NrEvents']
+                elif self.data['prevNrEvents'] == self.data['NrEvents'] and self.data['prevNrCandidates'] == len(self.data['FindingResult'][0]) and self.data['prevFindingMethod'] == self.data['FindingMethod']:
+                    # same finding routine ran compared to previous run -> Candidates are unchanged
+                    logging.info("Candidate preview was updated!")
+                    self.updateCandidatePreview()
+                else: 
+                    # found candidates have changed -> don't update preview, but update previous run data
+                    self.data['prevFindingMethod'] = self.data['FindingMethod']
+                    self.data['prevNrCandidates'] = len(self.data['FindingResult'][0])
+                    self.data['prevNrEvents'] = self.data['NrEvents']
+                    self.updateCandidatePreview(reset=True)
                 logging.debug(self.data['FittingResult'])
                 if len(self.data['FittingResult'][0]) == 0:
                     logging.error('No localizations found after fitting!')
