@@ -640,11 +640,11 @@ class MyGUI(QMainWindow):
         Generates the preview of a run analysis.
 
         Parameters:
-             timeStretch (tuple): A tuple containing the start and end times for the preview.
-             xyStretch (tuple): A tuple containing the minimum and maximum x and y coordinates for the preview.
+            timeStretch (tuple): A tuple containing the start and end times for the preview.
+            xyStretch (tuple): A tuple containing the minimum and maximum x and y coordinates for the preview.
 
         Returns:
-             None
+            None
         """
         #Checking if a file is selected rather than a folder:
         if not os.path.isfile(self.dataLocationInput.text()):
@@ -774,6 +774,7 @@ class MyGUI(QMainWindow):
                 for index,row in partialFitting[i][0].iterrows():
                     row.candidate_id+=totNrFindingIncrease
                     updated_partialFitting.append(row)
+                        
                 
                 #increase the total number of findings
                 totNrFindingIncrease+=eachEntry[0]+1
@@ -895,7 +896,19 @@ class MyGUI(QMainWindow):
         if QFile.exists(self.log_file_path):
             with open(self.log_file_path, 'r') as file:
                 log_contents = file.read()
-                self.text_edit.setPlainText(log_contents)
+                
+                #check every line, and if it contains 'ERROR', change it to red font:
+                lines = log_contents.split('\n')
+                for i, line in enumerate(lines):
+                    if '[ERROR]' in line:
+                        lines[i] = f'<font color="red">{line}</font>'
+                    elif '[WARNING]' in line:
+                        lines[i] = f'<font color="orange">{line}</font>'
+                    lines[i]+='<br>'
+
+                updated_log = '\n'.join(lines)
+                self.text_edit.setHtml(updated_log)
+                
                 self.text_edit.moveCursor(QTextCursor.End)
                 self.text_edit.ensureCursorVisible()
         
@@ -1440,7 +1453,7 @@ class MyGUI(QMainWindow):
         fig.text(max(data['x']),max(data['y']),str(strv),color=col)
                 
     def changeLayout_choice(self,curr_layout,className,displayNameToFunctionNameMap):
-        logging.info('Changing layout '+curr_layout.parent().objectName())
+        logging.debug('Changing layout '+curr_layout.parent().objectName())
         #This removes everything except the first entry (i.e. the drop-down menu)
         self.resetLayout(curr_layout,className)
         #Get the dropdown info
@@ -1449,7 +1462,7 @@ class MyGUI(QMainWindow):
             pass
         #Get the kw-arguments from the current dropdown.
         current_selected_function = utils.functionNameFromDisplayName(curr_dropdown.currentText(),displayNameToFunctionNameMap)
-        logging.info('current selected function: '+current_selected_function)
+        logging.debug('current selected function: '+current_selected_function)
         current_selected_polarity = utils.polaritySelectedFromDisplayName(curr_dropdown.currentText())
         
         #Classname should always end in pos/neg/mix!
