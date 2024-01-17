@@ -1114,6 +1114,7 @@ class MyGUI(QMainWindow):
         canPreviewtab_horizontal_container.addWidget(QLabel("Candidate ID: "))
         self.entryCanPreview = QLineEdit()
         onlyInt = QIntValidator()
+        onlyInt.setBottom(0)
         self.entryCanPreview.setValidator(onlyInt)
         canPreviewtab_horizontal_container.addWidget(self.entryCanPreview)
         self.entryCanPreview.returnPressed.connect(lambda: self.updateCandidatePreview())
@@ -1123,6 +1124,15 @@ class MyGUI(QMainWindow):
 
         #Give it a function on click:
         self.buttonCanPreview.clicked.connect(lambda: self.updateCandidatePreview())
+
+        self.prev_buttonCan = QPushButton("Previous")
+        self.prev_buttonCan.clicked.connect(lambda: self.prev_candidate())
+
+        self.next_buttonCan = QPushButton("Next")
+        self.next_buttonCan.clicked.connect(lambda: self.next_candidate())
+
+        canPreviewtab_horizontal_container.addWidget(self.prev_buttonCan)
+        canPreviewtab_horizontal_container.addWidget(self.next_buttonCan)
 
         #Add a horizontal layout to display info about the cluster
         self.canPreviewtab_horizontal_container2 = QHBoxLayout()
@@ -1156,6 +1166,37 @@ class MyGUI(QMainWindow):
         canPreviewtab_vertical_container.addWidget(NavigationToolbar(self.data['figureCanvasProjection'], self))
         #Add the canvas to the tab
         canPreviewtab_vertical_container.addWidget(self.data['figureCanvasProjection'])
+
+    def prev_candidate(self):
+        if not self.entryCanPreview.text()=='':
+            if 'FindingMethod' in self.data and int(self.entryCanPreview.text())-1 < len(self.data['FindingResult'][0]):
+                if int(self.entryCanPreview.text())-1 == -1:
+                    max_candidate = len(self.data['FindingResult'][0])-1
+                    self.entryCanPreview.setText(str(max_candidate))
+                else:
+                    self.entryCanPreview.setText(str(int(self.entryCanPreview.text())-1))
+                self.updateCandidatePreview()
+            else:
+                self.candidate_info.setText('Tried to visualise candidate but no data found!')
+                logging.error('Tried to visualise candidate but no data found!')
+        else:
+            self.candidate_info.setText('Tried to visualise candidate, but no ID was given!')
+            logging.error('Tried to visualise candidate, but no ID was given!')
+
+    def next_candidate(self):
+        if not self.entryCanPreview.text()=='':
+            if 'FindingMethod' in self.data and int(self.entryCanPreview.text())+1 <= len(self.data['FindingResult'][0]):
+                if int(self.entryCanPreview.text())+1 == len(self.data['FindingResult'][0]):
+                    self.entryCanPreview.setText('0')
+                else:
+                    self.entryCanPreview.setText(str(int(self.entryCanPreview.text())+1))
+                self.updateCandidatePreview()
+            else:
+                self.candidate_info.setText('Tried to visualise candidate but no data found!')
+                logging.error('Tried to visualise candidate but no data found!')
+        else:
+            self.candidate_info.setText('Tried to visualise candidate, but no ID was given!')
+            logging.error('Tried to visualise candidate, but no ID was given!')
 
     def updateCandidatePreview(self, reset=False):
         """
@@ -1259,6 +1300,7 @@ class MyGUI(QMainWindow):
                 logging.error('Tried to visualise candidate but no data found!')
         else:
             logging.info('Candidate preview is reset.')
+
 
     def setup_previewTab(self):
         """
