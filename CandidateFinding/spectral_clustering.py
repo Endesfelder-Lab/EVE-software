@@ -200,7 +200,7 @@ def determineEigenValueCutoffComputationally(maxeigenval,kwargs):
 
 def clusterPoints_to_candidates(clusterpoints,cluster_labels,ms_to_px):
     # generate the candidates in from of a dictionary
-    headers = ['x', 'y', 't']
+    headers = ['x', 'y', 't', 'p']
     #time back to micros:
     clusterpoints[:,2] *=1000*ms_to_px
     #Integerise the data:
@@ -208,8 +208,7 @@ def clusterPoints_to_candidates(clusterpoints,cluster_labels,ms_to_px):
     new_arr['x'] = new_arr['x'].astype(int)
     new_arr['y'] = new_arr['y'].astype(int)
     new_arr['t'] = new_arr['t'].astype(int)
-    #add a 'p' header and fill with zeros, should be fixed later:
-    new_arr['p'] = 0
+    new_arr['p'] = new_arr['p'].astype(int)
     
     starttime = time.time()
     new_arr['Cluster_Labels'] = cluster_labels
@@ -325,9 +324,13 @@ def spectral_clustering(npy_array,settings,**kwargs):
     #If set to zero, we do it computationally:
     if maxeigenvalcutoff == 0:
         maxeigenvalcutoff = determineEigenValueCutoffComputationally(maxeigenval,kwargs)
-        
-    clusterpoints = np.asarray(point_cloud.points)[(np.max(normeigenval, axis=1) < normeigenvalcutoff) & (maxeigenval < maxeigenvalcutoff), :]
-    noisepoints = np.asarray(point_cloud.points)[(np.max(normeigenval, axis=1) >= normeigenvalcutoff) | (maxeigenval >= maxeigenvalcutoff), :]
+    
+    points = np.asarray(point_cloud.points)
+    #Add polarity back to points
+    points = np.concatenate((points, polarities.reshape(-1,1)), axis=1)
+    
+    clusterpoints = points[(np.max(normeigenval, axis=1) < normeigenvalcutoff) & (maxeigenval < maxeigenvalcutoff), :]
+    noisepoints = points[(np.max(normeigenval, axis=1) >= normeigenvalcutoff) | (maxeigenval >= maxeigenvalcutoff), :]
 
     if len(clusterpoints) > 0:
         logging.info("DBSCANning started")
@@ -373,9 +376,13 @@ def spectral_clustering_and_bbox_finding(npy_array,settings,**kwargs):
     #If set to zero, we do it computationally:
     if maxeigenvalcutoff == 0:
         maxeigenvalcutoff = determineEigenValueCutoffComputationally(maxeigenval,kwargs)
-        
-    clusterpoints = np.asarray(point_cloud.points)[(np.max(normeigenval, axis=1) < normeigenvalcutoff) & (maxeigenval < maxeigenvalcutoff), :]
-    noisepoints = np.asarray(point_cloud.points)[(np.max(normeigenval, axis=1) >= normeigenvalcutoff) | (maxeigenval >= maxeigenvalcutoff), :]
+    
+    points = np.asarray(point_cloud.points)
+    #Add polarity back to points
+    points = np.concatenate((points, polarities.reshape(-1,1)), axis=1)
+    
+    clusterpoints = points[(np.max(normeigenval, axis=1) < normeigenvalcutoff) & (maxeigenval < maxeigenvalcutoff), :]
+    noisepoints = points[(np.max(normeigenval, axis=1) >= normeigenvalcutoff) | (maxeigenval >= maxeigenvalcutoff), :]
 
     logging.info("DBSCANning started")
     #Throw DBSCAN on the 'pre-clustered' data:
@@ -386,13 +393,13 @@ def spectral_clustering_and_bbox_finding(npy_array,settings,**kwargs):
     bboxes = get_cluster_bounding_boxes(clusterpoints, cluster_labels,padding_xy=float(kwargs['bbox_padding']),padding_t=float(kwargs['bbox_padding']))
     
     #adapt noHotPixelPoints array so that the columns are 'named' again:
-    noHotPixelPoints = np.asarray(point_cloud.points)[(np.max(normeigenval, axis=1) < normeigenvalcutoff), :]
-    noHotPixelPoints_rec = pd.DataFrame(noHotPixelPoints,columns=['x','y','t'])
+    noHotPixelPoints = points[(np.max(normeigenval, axis=1) < normeigenvalcutoff), :]
+    noHotPixelPoints_rec = pd.DataFrame(noHotPixelPoints,columns=['x','y','t','p'])
     noHotPixelPoints_rec['x'] = noHotPixelPoints_rec['x'].astype(int)
     noHotPixelPoints_rec['y'] = noHotPixelPoints_rec['y'].astype(int)
     noHotPixelPoints_rec['t'] *= ms_to_px*1000
     noHotPixelPoints_rec['t'] = noHotPixelPoints_rec['t'].astype(int)
-    noHotPixelPoints_rec['p'] = np.zeros(len(noHotPixelPoints_rec['x'])) #TODO TO BE IMPLEMENTED
+    noHotPixelPoints_rec['p'] = noHotPixelPoints_rec['p'].astype(int)
     
     candidates = get_events_in_bbox_NE(noHotPixelPoints_rec,bboxes,float(kwargs['ratio_ms_to_px']))
     
