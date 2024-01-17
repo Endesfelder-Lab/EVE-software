@@ -42,7 +42,7 @@ def __function_metadata__():
                 {"name": "debug", "description": "Get some debug info.","default":False},
             ],
             "help_string": "Pseudo-spectral clustering.",
-            "display_name": "Pseudo-spectra clustering"
+            "display_name": "Pseudo-spectral clustering"
         },
         "spectral_clustering_and_bbox_finding": {
             "required_kwargs": [
@@ -58,7 +58,7 @@ def __function_metadata__():
                 {"name": "debug", "description": "Get some debug info.","default":False},
             ],
             "help_string": "Pseudo-spectral clustering.",
-            "display_name": "Pseudo-spectra clustering with bbox finding"
+            "display_name": "Pseudo-spectral clustering with bbox finding"
         }
     }
 
