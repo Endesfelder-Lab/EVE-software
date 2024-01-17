@@ -1217,15 +1217,21 @@ class MyGUI(QMainWindow):
                 N_events = self.data['FindingResult'][0][self.data['CandidatePreviewID']]['N_events']
                 cluster_size = self.data['FindingResult'][0][self.data['CandidatePreviewID']]['cluster_size']
                 self.candidate_info.setText(f"This candidate cluster contains {N_events} events and has dimensions ({cluster_size[0]}, {cluster_size[1]}, {cluster_size[2]}).")
+                pos_events = self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events'][self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['p']==1]
+                neg_events = self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events'][self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['p']==0]
 
                 # Do a 3d scatterplot of the event data
-                self.data['figureAx3D'].scatter(self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['x'], self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['y'], self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['t']*1e-3)
+                if not len(pos_events)==0:
+                    self.data['figureAx3D'].scatter(pos_events['x'], pos_events['y'], pos_events['t']*1e-3, label='Positive events', color='C0')
+                if not len(neg_events)==0:
+                    self.data['figureAx3D'].scatter(neg_events['x'], neg_events['y'], neg_events['t']*1e-3, label='Negative events', color='C1')
                 self.data['figureAx3D'].set_xlabel('x [px]')
                 self.data['figureAx3D'].set_ylabel('y [px]')
                 self.data['figureAx3D'].set_zlabel('t [ms]')
 
                 # Plot the localization(s) of the candidate
-                self.data['figureAx3D'].plot(self.data['CandidatePreviewLocs']['x']/pixel_size, self.data['CandidatePreviewLocs']['y']/pixel_size, self.data['CandidatePreviewLocs']['t'], marker='x', c='red')
+                self.data['figureAx3D'].plot(self.data['CandidatePreviewLocs']['x']/pixel_size, self.data['CandidatePreviewLocs']['y']/pixel_size, self.data['CandidatePreviewLocs']['t'], marker='x', c='red', label='Localization(s)')
+                self.data['figureAx3D'].legend(loc='upper right', bbox_to_anchor=(1.6, 1))
 
                 # Give it a nice layout
                 self.data['figurePlot3D'].tight_layout()
@@ -1240,27 +1246,45 @@ class MyGUI(QMainWindow):
                 self.ylim = [np.min(self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['y']), np.max(self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['y'])]
                 self.tlim = [np.min(self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['t']*1e-3), np.max(self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['t']*1e-3)]
 
-                xy_bin_width = 1 # in px
+                # Set bin width
+                xy_bin_width = 1. # in px
                 t_bin_width = 10. # in ms
 
-                # calculate number of bins
-                x_bins = int((self.xlim[1]-self.xlim[0])/xy_bin_width)
-                y_bins = int((self.ylim[1]-self.ylim[0])/xy_bin_width)
-                t_bins = int((self.tlim[1]-self.tlim[0])/t_bin_width)
+                # Calculate number of bins
+                x_bins = int((self.xlim[1]-self.xlim[0]+1)/xy_bin_width)
+                y_bins = int((self.ylim[1]-self.ylim[0]+1)/xy_bin_width)
+                t_bins = int(np.ceil((self.tlim[1]-self.tlim[0])/t_bin_width))
+                self.tlim[1] = self.tlim[0]+t_bins*t_bin_width
 
-                # Compute the 2D histograms
-                hist_xy, x_edges, y_edges = np.histogram2d(self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['x'], self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['y'], bins=(x_bins, y_bins))
-                hist_tx, t_edges, x_edges = np.histogram2d(self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['t']*1e-3, self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['x'], bins=(t_bins, x_bins))
-                hist_ty, t_edges, y_edges = np.histogram2d(self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['t']*1e-3, self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['y'], bins=(t_bins, y_bins))
+                # Compute the 2D histograms (pos)
+                hist_xy_pos, x_edges, y_edges = np.histogram2d(pos_events['x'], pos_events['y'], bins=(x_bins, y_bins), range=[[self.xlim[0]-0.5, self.xlim[1]+0.5], [self.ylim[0]-0.5, self.ylim[1]+0.5]])
+                hist_tx_pos, t_edges, x_edges = np.histogram2d(pos_events['t']*1e-3, pos_events['x'], bins=(t_bins, x_bins), range=[self.tlim, [self.xlim[0]-0.5, self.xlim[1]+0.5]])
+                hist_ty_pos, t_edges, y_edges = np.histogram2d(pos_events['t']*1e-3, pos_events['y'], bins=(t_bins, y_bins), range=[self.tlim, [self.ylim[0]-0.5, self.ylim[1]+0.5]])
+
+                # Compute the 2D histograms (neg)
+                hist_xy_neg, x_edges, y_edges = np.histogram2d(neg_events['x'], neg_events['y'], bins=(x_bins, y_bins), range=[[self.xlim[0]-0.5, self.xlim[1]+0.5], [self.ylim[0]-0.5, self.ylim[1]+0.5]])
+                hist_tx_neg, t_edges, x_edges = np.histogram2d(neg_events['t']*1e-3, neg_events['x'], bins=(t_bins, x_bins), range=[self.tlim, [self.xlim[0]-0.5, self.xlim[1]+0.5]])
+                hist_ty_neg, t_edges, y_edges = np.histogram2d(neg_events['t']*1e-3, neg_events['y'], bins=(t_bins, y_bins), range=[self.tlim, [self.ylim[0]-0.5, self.ylim[1]+0.5]])
+
+                # Compute the 2d histograms (all) 
+                hist_xy = hist_xy_pos + hist_xy_neg
+                hist_tx = hist_tx_pos + hist_tx_neg
+                hist_ty = hist_ty_pos + hist_ty_neg
 
                 # Set goodlooking aspect ratio depending on nr of xyt-bins
                 aspectty = 3. * (len(t_edges)-1) / (len(y_edges)-1)
                 aspecttx = 3. * (len(t_edges)-1) / (len(x_edges)-1)
 
                 # Plot the 2D histograms
-                self.data['figureAxProjectionXY'].imshow(hist_xy.T, extent=[x_edges[0], x_edges[-1], y_edges[0], y_edges[-1]], origin='lower', aspect='equal', interpolation='none')
-                self.data['figureAxProjectionXT'].imshow(hist_tx.T, extent=[t_edges[0], t_edges[-1], x_edges[0], x_edges[-1]], origin='lower', aspect=aspecttx, interpolation='none')
-                self.data['figureAxProjectionYT'].imshow(hist_ty.T, extent=[t_edges[0], t_edges[-1], y_edges[0], y_edges[-1]], origin='lower', aspect=aspectty, interpolation='none')
+                self.data['figureAxProjectionXY'].pcolormesh(x_edges, y_edges, hist_xy.T)
+                self.data['figureAxProjectionXY'].set_aspect('equal')
+                self.data['figureAxProjectionXY'].format_coord = lambda x,y:self.format_coord_projectionxy(x,y,hist_xy_pos, hist_xy_neg, x_edges, y_edges)
+                self.data['figureAxProjectionXT'].pcolormesh(t_edges, x_edges, hist_tx.T)
+                self.data['figureAxProjectionXT'].set_aspect(aspecttx)
+                self.data['figureAxProjectionXT'].format_coord = lambda x,y:self.format_coord_projectiontx(x,y,hist_tx_pos, hist_tx_neg, t_edges, x_edges)
+                self.data['figureAxProjectionYT'].pcolormesh(t_edges, y_edges, hist_ty.T)
+                self.data['figureAxProjectionYT'].set_aspect(aspectty)
+                self.data['figureAxProjectionYT'].format_coord = lambda x,y:self.format_coord_projectionty(x,y,hist_ty_pos, hist_ty_neg, t_edges, y_edges)
                 self.data['figureAxProjectionXY'].plot(self.data['CandidatePreviewLocs']['x']/pixel_size, self.data['CandidatePreviewLocs']['y']/pixel_size, marker='x', c='red')
                 self.data['figureAxProjectionXT'].plot(self.data['CandidatePreviewLocs']['t'], self.data['CandidatePreviewLocs']['x']/pixel_size, marker='x', c='red')
                 self.data['figureAxProjectionYT'].plot(self.data['CandidatePreviewLocs']['t'], self.data['CandidatePreviewLocs']['y']/pixel_size, marker='x', c='red')
@@ -1285,6 +1309,48 @@ class MyGUI(QMainWindow):
         else:
             logging.info('Candidate preview is reset.')
 
+    def format_coord_projectionxy(self, x, y, pos_hist, neg_hist, x_edges, y_edges):
+        """
+        Function that formats the coordinates of the mouse cursor in candidate preview xy projection
+        """
+        x_pix = round(x)
+        y_pix = round(y)
+        x_bin = np.digitize(x, x_edges) - 1
+        y_bin = np.digitize(y, y_edges) - 1
+        pos = int(pos_hist[x_bin, y_bin])
+        neg = int(neg_hist[x_bin, y_bin])
+
+        display = f'x={x_pix}, y={y_pix}, events[pos,neg]=[{pos}, {neg}]'
+        return display
+
+    def format_coord_projectiontx(self, x, y, pos_hist, neg_hist, t_edges, x_edges):
+        """
+        Function that formats the coordinates of the mouse cursor in candidate preview xt projection
+        """
+        time = round(x)
+        x_pix = round(y)
+        x_bin = np.digitize(x, t_edges) - 1
+        y_bin = np.digitize(y, x_edges) - 1
+        pos = int(pos_hist[x_bin, y_bin])
+        neg = int(neg_hist[x_bin, y_bin])
+
+        display = f't={time} ms, x={x_pix}, events[pos,neg]=[{pos}, {neg}]'
+        return display
+
+    def format_coord_projectionty(self, x, y, pos_hist, neg_hist, t_edges, y_edges):
+        """
+        Function that formats the coordinates of the mouse cursor in candidate preview yt projection
+        """
+        time = round(x)
+        y_pix = round(y)
+        x_bin = np.digitize(x, t_edges) - 1
+        y_bin = np.digitize(y, y_edges) - 1
+        pos = int(pos_hist[x_bin, y_bin])
+        neg = int(neg_hist[x_bin, y_bin])
+
+        display = f't={time} ms, y={y_pix}, events[pos,neg]=[{pos}, {neg}]'
+        return display
+        
 
     def setup_previewTab(self):
         """
