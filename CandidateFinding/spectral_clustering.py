@@ -162,22 +162,32 @@ def determineEigenValueCutoffComputationally(maxeigenval,kwargs):
     # Concatenate initial_noise, initial_signal, and initial_bg into a single array
     initial_params = np.concatenate((initial_noise, initial_signal, initial_bg)).flatten()
     # Fit the histogram with two Gaussian curves
-    params, _ = curve_fit(three_gaussians, bin_centers, hist, p0=initial_params)
+    try:
+        params, _ = curve_fit(three_gaussians, bin_centers, hist, p0=initial_params)
+        # Use scipy.optimize.root to find the x-position where the two Gaussians cross
+        #Find the cross of the lowest with second-lowest gaussian:
+        param_order = np.argsort(params[[1,4,7]])
+        
+        #Get the crossings:
+        result1 = find_gaussian_cross(a1=params[param_order[0]*3],b1=params[param_order[0]*3+1],c1=params[param_order[0]*3+2],a2=params[param_order[1]*3],b2=params[param_order[1]*3+1],c2=params[param_order[1]*3+2],minp = 0,maxp=max(bin_centers),accuracy = 0.01)
+        
+        result2 = find_gaussian_cross(a1=params[param_order[0]*3],b1=params[param_order[0]*3+1],c1=params[param_order[0]*3+2],a2=params[param_order[2]*3],b2=params[param_order[2]*3+1],c2=params[param_order[2]*3+2],minp = 0,maxp=max(bin_centers),accuracy = 0.01)
+        
+        #Find the lowest crossing:
+        lowest_crossing = min(min(result1), min(result2))
+        maxeigenvalcutoff = lowest_crossing
+        
+        if maxeigenvalcutoff < 1:
+            logging.info(f'Max eigenval thought to be {maxeigenvalcutoff}')
+            logging.error('Eigenvalue is very very low! Changed to a sensible value but should be investigated further')
+            maxeigenvalcutoff = 7
+        
+        logging.info(f'Max eigenval determined to be {maxeigenvalcutoff}')
+    except Exception as e:
+        logging.error('Automatical eigenvalue determination failed with error: ', e)
+        logging.error('Eigenvalue set to a logical value but should be investigated further')
+        maxeigenvalcutoff = 7;
 
-    # Use scipy.optimize.root to find the x-position where the two Gaussians cross
-    #Find the cross of the lowest with second-lowest gaussian:
-    param_order = np.argsort(params[[1,4,7]])
-    
-    #Get the crossings:
-    result1 = find_gaussian_cross(a1=params[param_order[0]*3],b1=params[param_order[0]*3+1],c1=params[param_order[0]*3+2],a2=params[param_order[1]*3],b2=params[param_order[1]*3+1],c2=params[param_order[1]*3+2],minp = 0,maxp=max(bin_centers),accuracy = 0.01)
-    
-    result2 = find_gaussian_cross(a1=params[param_order[0]*3],b1=params[param_order[0]*3+1],c1=params[param_order[0]*3+2],a2=params[param_order[2]*3],b2=params[param_order[2]*3+1],c2=params[param_order[2]*3+2],minp = 0,maxp=max(bin_centers),accuracy = 0.01)
-    
-    
-    #Find the lowest crossing:
-    lowest_crossing = min(min(result1), min(result2))
-    maxeigenvalcutoff = lowest_crossing
-    logging.info(f'Max eigenval determined to be {maxeigenvalcutoff}')
         
     if utilsHelper.strtobool(kwargs['debug']):
         try:
