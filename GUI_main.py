@@ -619,8 +619,7 @@ class MyGUI(QMainWindow):
         elif self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[2]:
             newPolarity = 'neg'
         elif self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[3]:
-            #TODO: handle old+new side-by-side
-            newPolarity = 'mix'
+            newPolarity = 'posneg'
         
         #And we show/hide the required groupboxes:
         if newPolarity == 'pos':
@@ -644,6 +643,14 @@ class MyGUI(QMainWindow):
             self.groupboxFittingPos.hide()
             self.groupboxFittingNeg.hide()
             self.groupboxFittingMix.show()
+        elif newPolarity == 'posneg':
+            self.groupboxFindingPos.show()
+            self.groupboxFindingNeg.show()
+            self.groupboxFindingMix.hide()
+            self.groupboxFittingPos.show()
+            self.groupboxFittingNeg.show()
+            self.groupboxFittingMix.hide()
+        
         
         return
         
@@ -729,15 +736,18 @@ class MyGUI(QMainWindow):
             #Run everything once
             npyevents_pos = self.filterEvents_npy_p(self.previewEvents,pValue=1)
             self.previewEventsDict.append(npyevents_pos)
+            polarityVal = 'Pos'
         #Only negative
         elif self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[2]:
             #Run everything once
             npyevents_neg = self.filterEvents_npy_p(self.previewEvents,pValue=0)
             self.previewEventsDict.append(npyevents_neg)
+            polarityVal = 'Neg'
         #No discrimination
         elif self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[0]:
             #Don't do any filtering
             self.previewEventsDict.append(self.previewEvents)
+            polarityVal = 'Mix'
             
         #Change global values so nothing is stored - we just want a preview run. This is later set back to orig values (globalSettingsOrig):
         globalSettingsOrig = copy.deepcopy(self.globalSettings)
@@ -752,10 +762,16 @@ class MyGUI(QMainWindow):
         for events in self.previewEventsDict:
             if self.dataSelectionPolarityDropdown.currentText() != self.polarityDropdownNames[3]:
                 #Run the current finding and fitting routine only on these events:
-                self.runFindingAndFitting(events,runFitting=True,storeFinding=False)
+                self.runFindingAndFitting(events,runFitting=True,storeFinding=False,polarityVal=polarityVal)
             else:
                 #Run the current finding and fitting routine only on these events:
-                self.runFindingAndFitting(events,runFitting=True,storeFinding=False)
+                #Should be once positive, once negative
+                if all(events['p'] == 1):
+                    polarityVal = 'Pos'
+                elif all(events['p'] == 0):
+                    polarityVal = 'Neg'
+                #run the finding/fitting
+                self.runFindingAndFitting(events,runFitting=True,storeFinding=False,polarityVal=polarityVal)
                 #we store our finding and fitting results like this:
                 partialFinding[events_id] = self.data['FindingResult']
                 partialFitting[events_id] = self.data['FittingResult']
@@ -1665,11 +1681,17 @@ class MyGUI(QMainWindow):
 
         return unique_files
     
-    def run_processing(self):
-        thread = threading.Thread(target=self.run_processing_i)
-        thread.start()
-    
     def run_processing_i(self):
+        #Get the polarity:
+        if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[0]:
+            polarityVal = 'Mix'
+        if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[1]:
+            polarityVal = 'Pos'
+        if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[2]:
+            polarityVal = 'Neg'
+        if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[3]:
+            #TODO: BOTH OF THEM AFTER ONE ANOTHER
+            polarityVal = 'Mix'
         #Check if a folder or file is selected:
         if os.path.isdir(self.dataLocationInput.text()):
             #Find all .raw or .npy files that have unique names except for the extension (and prefer .npy):
@@ -1679,23 +1701,13 @@ class MyGUI(QMainWindow):
             for file in allFiles:
                 try:
                     logging.info('Starting to process file '+file)
-                    self.processSingleFile(file)
+                    self.processSingleFile(file,polarityVal=polarityVal)
                     logging.info('Successfully processed file '+file)
                 except:
                     logging.error('Error in processing file '+file)
         #If it's a file...
         elif os.path.isfile(self.dataLocationInput.text()):
             #Find polarity:
-            #Get the polarity:
-            if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[0]:
-                polarityVal = 'Mix'
-            if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[1]:
-                polarityVal = 'Pos'
-            if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[2]:
-                polarityVal = 'Neg'
-            if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[3]:
-                #TODO: BOTH OF THEM AFTER ONE ANOTHER
-                polarityVal = 'Mix'
             #Check if we are loading existing finding
             if 'ExistingFinding' in getattr(self,f"CandidateFindingDropdown{polarityVal}").currentText():
                 logging.info('Skipping finding processing, going to fitting')
@@ -1704,17 +1716,20 @@ class MyGUI(QMainWindow):
                 origStoreFindingSetting=self.globalSettings['StoreFindingOutput']['value']
                 self.globalSettings['StoreFindingOutput']['value'] = False
                 
-                self.processSingleFile(self.dataLocationInput.text(),onlyFitting=True)
+                self.processSingleFile(self.dataLocationInput.text(),onlyFitting=True,polarityVal=polarityVal)
                 
                 #Reset the global setting:
                 self.globalSettings['StoreFindingOutput']['value']=origStoreFindingSetting
             else:
                 #Otherwise normally process a single file
-                self.processSingleFile(self.dataLocationInput.text())
-         
+                self.processSingleFile(self.dataLocationInput.text(),polarityVal=polarityVal)
         self.updateGUIafterNewResults()       
         return
         
+    def run_processing(self):
+        thread = threading.Thread(target=self.run_processing_i)
+        thread.start()
+    
     def updateGUIafterNewResults(self):
         self.updateLocList()
     
@@ -1755,7 +1770,7 @@ class MyGUI(QMainWindow):
         
         return npyData
     
-    def processSingleFile(self,FileName,onlyFitting=False):
+    def processSingleFile(self,FileName,onlyFitting=False,polarityVal='Mix'):
 
         #Runtime of finding and fitting
         self.currentFileInfo['FindingTime'] = 0
@@ -1780,10 +1795,14 @@ class MyGUI(QMainWindow):
                     
                     if self.dataSelectionPolarityDropdown.currentText() != self.polarityDropdownNames[3]:
                         #Run the current finding and fitting routine only on these events:
-                        self.runFindingAndFitting(npyData,runFitting=True,storeFinding=True)
+                        self.runFindingAndFitting(npyData,runFitting=True,storeFinding=True,polarityVal=polarityVal)
                     else:
                         #Run the current finding and fitting routine only on these events:
-                        self.runFindingAndFitting(npyData,runFitting=True,storeFinding=False)
+                        if np.all(npyData['p'] == 1):
+                            polarityVal = 'Pos'
+                        elif np.all(npyData['p'] == 0):
+                            polarityVal = 'Neg'
+                        self.runFindingAndFitting(npyData,runFitting=True,storeFinding=False,polarityVal=polarityVal)
                         #we store our finding and fitting results like this:
                         partialFinding[events_id] = self.data['FindingResult']
                         partialFitting[events_id] = self.data['FittingResult']
@@ -1829,7 +1848,7 @@ class MyGUI(QMainWindow):
             self.currentFileInfo['CurrentFileLoc'] = FileName
             logging.info('Candidate finding NOT performed')
             npyData = None
-            self.runFindingAndFitting(npyData)
+            self.runFindingAndFitting(npyData,polarityVal=polarityVal)
         
     
     def FindingBatching(self,npyData):
@@ -2024,18 +2043,18 @@ class MyGUI(QMainWindow):
         # except:
         #      logging.info("No XY cutting in preview due to not all entries being integers-.")
     
-    def runFindingAndFitting(self,npyData,runFitting=True,storeFinding=True):
+    def runFindingAndFitting(self,npyData,runFitting=True,storeFinding=True,polarityVal='Mix'):
         #Run the finding function!
         #Get the polarity:
-        if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[0]:
-            polarityVal = 'Mix'
-        if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[1]:
-            polarityVal = 'Pos'
-        if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[2]:
-            polarityVal = 'Neg'
-        if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[3]:
-            #TODO: BOTH OF THEM AFTER ONE ANOTHER
-            polarityVal = 'Mix'
+        # if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[0]:
+        #     polarityVal = 'Mix'
+        # if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[1]:
+        #     polarityVal = 'Pos'
+        # if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[2]:
+        #     polarityVal = 'Neg'
+        # if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[3]:
+        #     #TODO: BOTH OF THEM AFTER ONE ANOTHER
+        #     polarityVal = 'Mix'
         FindingEvalText = self.getFunctionEvalText('Finding',"npyData","self.globalSettings",polarityVal)
         if FindingEvalText is not None:
             self.currentFileInfo['FindingTime'] = time.time()
@@ -2580,7 +2599,6 @@ class AdvancedSettingsWindow(QMainWindow):
             logging.info('No global settings storage found, new one created.')
 
 
-
 class ImageSlider(QWidget):
     def __init__(self, figures=None, parent=None):
         super().__init__()
@@ -2708,3 +2726,22 @@ class ClickableGroupBox(QGroupBox):
                     widget.setVisible(checked)
             layout.invalidate()
             self.adjustSize()
+
+
+from PyQt5.QtCore import QThread, pyqtSignal
+#Testing QThread threading
+# Create a custom thread class
+class ComputationThread(QThread):
+    def __init__(self, GUIclass):
+        super().__init__()
+        self.GUIclass = GUIclass
+        
+    # Signal to indicate that the computation is finished
+    computation_finished = pyqtSignal()
+
+    def run(self):
+        # Your computation code here
+        self.GUIclass.run_processing_i()
+
+        # Emit the signal to indicate that the computation is finished
+        self.computation_finished.emit()

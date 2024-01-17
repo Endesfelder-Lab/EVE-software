@@ -329,16 +329,20 @@ def spectral_clustering(npy_array,settings,**kwargs):
     clusterpoints = np.asarray(point_cloud.points)[(np.max(normeigenval, axis=1) < normeigenvalcutoff) & (maxeigenval < maxeigenvalcutoff), :]
     noisepoints = np.asarray(point_cloud.points)[(np.max(normeigenval, axis=1) >= normeigenvalcutoff) | (maxeigenval >= maxeigenvalcutoff), :]
 
-    logging.info("DBSCANning started")
-    #Throw DBSCAN on the 'pre-clustered' data:
-    dbscan = DBSCAN(eps=int(kwargs['DBSCAN_eps']), n_jobs=-1, min_samples=int(kwargs['DBSCAN_n_neighbours']))
-    cluster_labels = dbscan.fit_predict(clusterpoints)
-    
-    # Print how many clusters are found
-    logging.info("Number of clusters found:"+ str(max(cluster_labels)))
-    
-    candidates = clusterPoints_to_candidates(clusterpoints,cluster_labels,ms_to_px)
-    
+    if len(clusterpoints) > 0:
+        logging.info("DBSCANning started")
+        #Throw DBSCAN on the 'pre-clustered' data:
+        dbscan = DBSCAN(eps=int(kwargs['DBSCAN_eps']), n_jobs=-1, min_samples=int(kwargs['DBSCAN_n_neighbours']))
+        cluster_labels = dbscan.fit_predict(clusterpoints)
+        
+        # Print how many clusters are found
+        logging.info("Number of clusters found:"+ str(max(cluster_labels)))
+        
+        candidates = clusterPoints_to_candidates(clusterpoints,cluster_labels,ms_to_px)
+    else:
+        logging.error("No clusterpoints found via spectral clustering - maximum eigenval probably wrong!")
+        candidates = {}
+        
     performance_metadata = f"SpectralClustering Finding ran for {time.time() - starttime} seconds."
     
     return candidates, performance_metadata
