@@ -198,6 +198,11 @@ class MyGUI(QMainWindow):
         #Function that opens the advanced settings window
         self.advancedSettingsWindow.show()
     
+    def open_critical_warning(self, text):
+        #Function that creates and opens the critical warning window
+        self.criticalWarningWindow = CriticalWarningWindow(self, text)
+        self.criticalWarningWindow.show()
+    
     def initGlobalSettings(self):
         #Initialisation of the global settings - runs on startup to get all these values, then these can be changed later
         globalSettings = {}
@@ -489,31 +494,7 @@ class MyGUI(QMainWindow):
         self.CandidateFittingDropdownPos.activated.connect(lambda: self.changeLayout_choice(self.groupboxFittingPos.layout(),'CandidateFittingDropdownPos', self.Fitting_functionNameToDisplayNameMappingPos))
         self.CandidateFittingDropdownNeg.activated.connect(lambda: self.changeLayout_choice(self.groupboxFittingNeg.layout(),'CandidateFittingDropdownNeg', self.Fitting_functionNameToDisplayNameMappingNeg))
         self.CandidateFittingDropdownMix.activated.connect(lambda: self.changeLayout_choice(self.groupboxFittingMix.layout(),'CandidateFittingDropdownMix', self.Fitting_functionNameToDisplayNameMappingMix))
-            
-            
-            
-            # self.groupboxFitting = QGroupBox("Candidate fitting")
-            # self.groupboxFitting.setObjectName("groupboxFitting")
-            # self.groupboxFitting.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-            # self.groupboxFitting.setLayout(QGridLayout())
-            # tab_layout.addWidget(self.groupboxFitting, 3, 0)
-            
-            # # Create a QComboBox and add options - this is the FITTING dropdown
-            # self.candidateFittingDropdown = QComboBox(self)
-            # #Increase the maximum visible items since we're always hiding 2/3rds of it (pos/neg/mix)
-            # self.candidateFittingDropdown.setMaxVisibleItems(30)
-            # options = utils.functionNamesFromDir('CandidateFitting')
-            # self.candidateFittingDropdown.setObjectName("CandidateFitting_candidateFittingDropdown")
-            # displaynames, self.Fitting_functionNameToDisplayNameMapping = utils.displayNamesFromFunctionNames(options)
-            # self.candidateFittingDropdown.addItems(displaynames)
-            # #Add the candidateFindingDropdown to the layout
-            # self.groupboxFitting.layout().addWidget(self.candidateFittingDropdown,1,0,1,2)
-            # #Activation for candidateFindingDropdown.activated
-            # self.candidateFittingDropdown.activated.connect(lambda: self.changeLayout_choice(self.groupboxFitting.layout(),"CandidateFitting_candidateFittingDropdown",self.Fitting_functionNameToDisplayNameMapping))
-            
-            # #On startup/initiatlisation: also do changeLayout_choice
-            # self.changeLayout_choice(self.groupboxFitting.layout(),"CandidateFitting_candidateFittingDropdown",self.Fitting_functionNameToDisplayNameMapping)
-               
+
         """
         "Run" Group Box
         """
@@ -2787,3 +2768,50 @@ class ComputationThread(QThread):
 
         # Emit the signal to indicate that the computation is finished
         self.computation_finished.emit()
+        
+        
+
+class CriticalWarningWindow(QMainWindow):
+    def __init__(self, parent, text):
+        super().__init__(parent)
+        self.setWindowTitle("Eve - Critical warning!")
+        self.resize(300, 100)
+
+        # Add a warning text and an OK button:
+        self.warning_text = QLabel(text)
+
+        # Add the label to the window's layout:
+        self.layout = QVBoxLayout()
+        self.layout.addWidget(self.warning_text)
+
+        self.ok_button = QPushButton("OK")
+        self.ok_button.clicked.connect(self.close)
+
+        # Add the OK button to the layout:
+        self.layout.addWidget(self.ok_button)
+
+        self.parent = parent
+        # Set the window icon to the parent's icon
+        self.setWindowIcon(self.parent.windowIcon())
+
+        # Set the main layout
+        central_widget = QWidget()
+        central_widget.setLayout(self.layout)
+        self.setCentralWidget(central_widget)
+    
+    def show(self):
+        super().show()
+        # Set the position of the window
+        cursor_pos = QCursor.pos()
+        screen_geometry = QApplication.desktop().screenGeometry()
+        window_geometry = self.frameGeometry()
+        x = cursor_pos.x() - window_geometry.width() / 2
+        y = cursor_pos.y()
+        if x < screen_geometry.left():
+            x = screen_geometry.left()
+        elif x + window_geometry.width() > screen_geometry.right():
+            x = screen_geometry.right() - window_geometry.width()
+        if y + window_geometry.height() > screen_geometry.bottom():
+            y = screen_geometry.bottom() - window_geometry.height()
+        self.move(QPoint(x, y))
+
