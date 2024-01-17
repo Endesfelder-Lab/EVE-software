@@ -42,7 +42,7 @@ def __function_metadata__():
                 {"name": "debug", "description": "Get some debug info.","default":False},
             ],
             "help_string": "Pseudo-spectral clustering.",
-            "display_name": "Pseudo-spectra clustering"
+            "display_name": "Pseudo-spectral clustering"
         },
         "spectral_clustering_and_bbox_finding": {
             "required_kwargs": [
@@ -58,7 +58,7 @@ def __function_metadata__():
                 {"name": "debug", "description": "Get some debug info.","default":False},
             ],
             "help_string": "Pseudo-spectral clustering.",
-            "display_name": "Pseudo-spectra clustering with bbox finding"
+            "display_name": "Pseudo-spectral clustering with bbox finding"
         }
     }
 
@@ -162,22 +162,32 @@ def determineEigenValueCutoffComputationally(maxeigenval,kwargs):
     # Concatenate initial_noise, initial_signal, and initial_bg into a single array
     initial_params = np.concatenate((initial_noise, initial_signal, initial_bg)).flatten()
     # Fit the histogram with two Gaussian curves
-    params, _ = curve_fit(three_gaussians, bin_centers, hist, p0=initial_params)
+    try:
+        params, _ = curve_fit(three_gaussians, bin_centers, hist, p0=initial_params)
+        # Use scipy.optimize.root to find the x-position where the two Gaussians cross
+        #Find the cross of the lowest with second-lowest gaussian:
+        param_order = np.argsort(params[[1,4,7]])
+        
+        #Get the crossings:
+        result1 = find_gaussian_cross(a1=params[param_order[0]*3],b1=params[param_order[0]*3+1],c1=params[param_order[0]*3+2],a2=params[param_order[1]*3],b2=params[param_order[1]*3+1],c2=params[param_order[1]*3+2],minp = 0,maxp=max(bin_centers),accuracy = 0.01)
+        
+        result2 = find_gaussian_cross(a1=params[param_order[0]*3],b1=params[param_order[0]*3+1],c1=params[param_order[0]*3+2],a2=params[param_order[2]*3],b2=params[param_order[2]*3+1],c2=params[param_order[2]*3+2],minp = 0,maxp=max(bin_centers),accuracy = 0.01)
+        
+        #Find the lowest crossing:
+        lowest_crossing = min(min(result1), min(result2))
+        maxeigenvalcutoff = lowest_crossing
+        
+        if maxeigenvalcutoff < 1:
+            logging.info(f'Max eigenval thought to be {maxeigenvalcutoff}')
+            logging.error('Eigenvalue is very very low! Changed to a sensible value but should be investigated further')
+            maxeigenvalcutoff = 7
+        
+        logging.info(f'Max eigenval determined to be {maxeigenvalcutoff}')
+    except Exception as e:
+        logging.error('Automatical eigenvalue determination failed with error: ', e)
+        logging.error('Eigenvalue set to a logical value but should be investigated further')
+        maxeigenvalcutoff = 7;
 
-    # Use scipy.optimize.root to find the x-position where the two Gaussians cross
-    #Find the cross of the lowest with second-lowest gaussian:
-    param_order = np.argsort(params[[1,4,7]])
-    
-    #Get the crossings:
-    result1 = find_gaussian_cross(a1=params[param_order[0]*3],b1=params[param_order[0]*3+1],c1=params[param_order[0]*3+2],a2=params[param_order[1]*3],b2=params[param_order[1]*3+1],c2=params[param_order[1]*3+2],minp = 0,maxp=max(bin_centers),accuracy = 0.01)
-    
-    result2 = find_gaussian_cross(a1=params[param_order[0]*3],b1=params[param_order[0]*3+1],c1=params[param_order[0]*3+2],a2=params[param_order[2]*3],b2=params[param_order[2]*3+1],c2=params[param_order[2]*3+2],minp = 0,maxp=max(bin_centers),accuracy = 0.01)
-    
-    
-    #Find the lowest crossing:
-    lowest_crossing = min(min(result1), min(result2))
-    maxeigenvalcutoff = lowest_crossing
-    logging.info(f'Max eigenval determined to be {maxeigenvalcutoff}')
         
     if utilsHelper.strtobool(kwargs['debug']):
         try:
@@ -200,7 +210,7 @@ def determineEigenValueCutoffComputationally(maxeigenval,kwargs):
 
 def clusterPoints_to_candidates(clusterpoints,cluster_labels,ms_to_px):
     # generate the candidates in from of a dictionary
-    headers = ['x', 'y', 't']
+    headers = ['x', 'y', 't', 'p']
     #time back to micros:
     clusterpoints[:,2] *=1000*ms_to_px
     #Integerise the data:
@@ -208,8 +218,7 @@ def clusterPoints_to_candidates(clusterpoints,cluster_labels,ms_to_px):
     new_arr['x'] = new_arr['x'].astype(int)
     new_arr['y'] = new_arr['y'].astype(int)
     new_arr['t'] = new_arr['t'].astype(int)
-    #add a 'p' header and fill with zeros, should be fixed later:
-    new_arr['p'] = 0
+    new_arr['p'] = new_arr['p'].astype(int)
     
     starttime = time.time()
     new_arr['Cluster_Labels'] = cluster_labels
@@ -325,20 +334,28 @@ def spectral_clustering(npy_array,settings,**kwargs):
     #If set to zero, we do it computationally:
     if maxeigenvalcutoff == 0:
         maxeigenvalcutoff = determineEigenValueCutoffComputationally(maxeigenval,kwargs)
-        
-    clusterpoints = np.asarray(point_cloud.points)[(np.max(normeigenval, axis=1) < normeigenvalcutoff) & (maxeigenval < maxeigenvalcutoff), :]
-    noisepoints = np.asarray(point_cloud.points)[(np.max(normeigenval, axis=1) >= normeigenvalcutoff) | (maxeigenval >= maxeigenvalcutoff), :]
+    
+    points = np.asarray(point_cloud.points)
+    #Add polarity back to points
+    points = np.concatenate((points, polarities.reshape(-1,1)), axis=1)
+    
+    clusterpoints = points[(np.max(normeigenval, axis=1) < normeigenvalcutoff) & (maxeigenval < maxeigenvalcutoff), :]
+    noisepoints = points[(np.max(normeigenval, axis=1) >= normeigenvalcutoff) | (maxeigenval >= maxeigenvalcutoff), :]
 
-    logging.info("DBSCANning started")
-    #Throw DBSCAN on the 'pre-clustered' data:
-    dbscan = DBSCAN(eps=int(kwargs['DBSCAN_eps']), n_jobs=-1, min_samples=int(kwargs['DBSCAN_n_neighbours']))
-    cluster_labels = dbscan.fit_predict(clusterpoints)
-    
-    # Print how many clusters are found
-    logging.info("Number of clusters found:"+ str(max(cluster_labels)))
-    
-    candidates = clusterPoints_to_candidates(clusterpoints,cluster_labels,ms_to_px)
-    
+    if len(clusterpoints) > 0:
+        logging.info("DBSCANning started")
+        #Throw DBSCAN on the 'pre-clustered' data:
+        dbscan = DBSCAN(eps=int(kwargs['DBSCAN_eps']), n_jobs=-1, min_samples=int(kwargs['DBSCAN_n_neighbours']))
+        cluster_labels = dbscan.fit_predict(clusterpoints)
+        
+        # Print how many clusters are found
+        logging.info("Number of clusters found:"+ str(max(cluster_labels)))
+        
+        candidates = clusterPoints_to_candidates(clusterpoints,cluster_labels,ms_to_px)
+    else:
+        logging.error("No clusterpoints found via spectral clustering - maximum eigenval probably wrong!")
+        candidates = {}
+        
     performance_metadata = f"SpectralClustering Finding ran for {time.time() - starttime} seconds."
     
     return candidates, performance_metadata
@@ -369,9 +386,13 @@ def spectral_clustering_and_bbox_finding(npy_array,settings,**kwargs):
     #If set to zero, we do it computationally:
     if maxeigenvalcutoff == 0:
         maxeigenvalcutoff = determineEigenValueCutoffComputationally(maxeigenval,kwargs)
-        
-    clusterpoints = np.asarray(point_cloud.points)[(np.max(normeigenval, axis=1) < normeigenvalcutoff) & (maxeigenval < maxeigenvalcutoff), :]
-    noisepoints = np.asarray(point_cloud.points)[(np.max(normeigenval, axis=1) >= normeigenvalcutoff) | (maxeigenval >= maxeigenvalcutoff), :]
+    
+    points = np.asarray(point_cloud.points)
+    #Add polarity back to points
+    points = np.concatenate((points, polarities.reshape(-1,1)), axis=1)
+    
+    clusterpoints = points[(np.max(normeigenval, axis=1) < normeigenvalcutoff) & (maxeigenval < maxeigenvalcutoff), :]
+    noisepoints = points[(np.max(normeigenval, axis=1) >= normeigenvalcutoff) | (maxeigenval >= maxeigenvalcutoff), :]
 
     logging.info("DBSCANning started")
     #Throw DBSCAN on the 'pre-clustered' data:
@@ -382,13 +403,13 @@ def spectral_clustering_and_bbox_finding(npy_array,settings,**kwargs):
     bboxes = get_cluster_bounding_boxes(clusterpoints, cluster_labels,padding_xy=float(kwargs['bbox_padding']),padding_t=float(kwargs['bbox_padding']))
     
     #adapt noHotPixelPoints array so that the columns are 'named' again:
-    noHotPixelPoints = np.asarray(point_cloud.points)[(np.max(normeigenval, axis=1) < normeigenvalcutoff), :]
-    noHotPixelPoints_rec = pd.DataFrame(noHotPixelPoints,columns=['x','y','t'])
+    noHotPixelPoints = points[(np.max(normeigenval, axis=1) < normeigenvalcutoff), :]
+    noHotPixelPoints_rec = pd.DataFrame(noHotPixelPoints,columns=['x','y','t','p'])
     noHotPixelPoints_rec['x'] = noHotPixelPoints_rec['x'].astype(int)
     noHotPixelPoints_rec['y'] = noHotPixelPoints_rec['y'].astype(int)
     noHotPixelPoints_rec['t'] *= ms_to_px*1000
     noHotPixelPoints_rec['t'] = noHotPixelPoints_rec['t'].astype(int)
-    noHotPixelPoints_rec['p'] = np.zeros(len(noHotPixelPoints_rec['x'])) #TODO TO BE IMPLEMENTED
+    noHotPixelPoints_rec['p'] = noHotPixelPoints_rec['p'].astype(int)
     
     candidates = get_events_in_bbox_NE(noHotPixelPoints_rec,bboxes,float(kwargs['ratio_ms_to_px']))
     
