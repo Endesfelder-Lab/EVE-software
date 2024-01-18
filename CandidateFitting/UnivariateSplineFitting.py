@@ -27,7 +27,7 @@ def __function_metadata__():
                 {"name": "multithread","description": "True to use multithread parallelization; False not to.","default":True},
             ],
             "help_string": "Makes a 1D spline fit to determin the localization parameters.",
-            "display_name": "1D Spline"
+            "display_name": "Tracking: 1D Spline"
         }
     }
 
@@ -69,6 +69,8 @@ def candidate_spline(candidate, candidate_id, smoothing_factor, localization_sam
         spx = UnivariateSpline(candidate['events']['t'], candidate['events']['x'], s=s, **kwargs)
         spy = UnivariateSpline(candidate['events']['t'], candidate['events']['y'], s=s, **kwargs)
         t = np.arange(np.min(candidate['events']['t']), np.max(candidate['events']['t']), localization_sampling*1000.)
+        if t[-1] < np.max(candidate['events']['t']):
+            t = np.append(t, np.max(candidate['events']['t']))
         locx = spx(t) * pixel_size # in nm
         locy = spy(t) * pixel_size # in nm
         residual_x = spx.get_residual() * pixel_size # in nm
@@ -76,7 +78,7 @@ def candidate_spline(candidate, candidate_id, smoothing_factor, localization_sam
         spline_fit_info = ''
         localization_id = np.arange(0, len(t), 1)
         mean_polarity = candidate['events']['p'].mean()
-        p = np.ones(len(t))*(int(mean_polarity == 1) + int(mean_polarity == 0) * 0 + int(mean_polarity > 0 and mean_polarity < 1) * 2)
+        p = int(mean_polarity == 1) + int(mean_polarity == 0) * 0 + int(mean_polarity > 0 and mean_polarity < 1) * 2
         loc_df = pd.DataFrame({'candidate_id': candidate_id, 'localization_id': localization_id, 'x': locx, 'y': locy, 'residual_x': residual_x, 'residual_y': residual_y, 'p': p, 't': t/1000.})
     except UserWarning as warning:
         spline_fit_info = 'Candidate cluster ' + str(candidate_id) + ' could not be fitted, a warning occurred:'
@@ -106,7 +108,7 @@ def spline_fit_candidates(i, candidate_dic, smoothing_factor, localization_sampl
 #Callable functions
 #-------------------------------------------------------------------------------------------------------------------------------
 
-# 2D Gaussian
+# 1D Spline fit of event "snake" (left by a moving particle)
 def Spline1D(candidate_dic,settings,**kwargs):
     # Check if we have the required kwargs
     [provided_optional_args, missing_optional_args] = utilsHelper.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
