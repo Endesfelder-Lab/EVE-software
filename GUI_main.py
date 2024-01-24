@@ -217,7 +217,7 @@ class MyGUI(QMainWindow):
         globalSettings['MaxFindingBoundingBoxXY']['input'] = float
         globalSettings['MaxFindingBoundingBoxXY']['displayName'] = 'Maximum size of a bounding box in px units'
         globalSettings['MaxFindingBoundingBoxT'] = {}
-        globalSettings['MaxFindingBoundingBoxT']['value'] = 100000
+        globalSettings['MaxFindingBoundingBoxT']['value'] = 1000000
         globalSettings['MaxFindingBoundingBoxT']['input'] = float
         globalSettings['MaxFindingBoundingBoxT']['displayName'] = 'Maximum size of a bounding box in us units'
         globalSettings['PixelSize_nm'] = {}

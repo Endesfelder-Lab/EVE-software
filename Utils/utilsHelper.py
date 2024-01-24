@@ -191,5 +191,7 @@ def removeCandidatesWithLargeBoundingBox(candidates,xymax,tmax):
     for candidate in sorted(candidates, reverse=True):
         if candidates[candidate]['cluster_size'][0] > float(xymax) or candidates[candidate]['cluster_size'][1] > float(xymax) or candidates[candidate]['cluster_size'][2] > float(tmax):
             candidates.pop(candidate)
+            #set correct numbering of remaining candidates
+            candidates = {index: value for index, value in enumerate(candidates.values(), start=0)}
             npopped += 1
     return candidates, npopped
