@@ -28,37 +28,53 @@ from mpl_toolkits.mplot3d import Axes3D
 # Should have an entry for every function in this file
 def __function_metadata__():
     return {
-        "spectral_clustering": {
+        "eigenFeature_analysis": {
             "required_kwargs": [
-                {"name": "norm_eigenval_cutoff", "description": "Cutoff of normalized eigenvalues","default":0.6,"type":float},
+                {"name": "linearity_cutoff", "description": "Linearity (0-1) cutoff","default":0.7,"type":float},
                 {"name": "max_eigenval_cutoff", "description": "Cutoff of maximum eigenvalue. Set to zero to auto-determine this!","default":0.0,"type":float},
                 {"name": "search_n_neighbours", "description": "Number of (closest) neighbours for the covariance determination","default":50,"type":int},
-                {"name": "ratio_ms_to_px", "description": "Ratio of milliseconds to pixels.","default":35.0,"type":float},
-                {"name": "DBSCAN_eps", "description": "Eps of DBSCAN.","default":3,"type":int},
-                {"name": "DBSCAN_n_neighbours", "description": "Minimum nr of points for DBSCAN cluster.","default":17,"type":int},
+                {"name": "ratio_ms_to_px", "description": "Ratio of milliseconds to pixels.","default":20.0,"type":float},
+                {"name": "DBSCAN_eps", "description": "Eps of DBSCAN.","default":4,"type":int},
+                {"name": "DBSCAN_n_neighbours", "description": "Minimum nr of points for DBSCAN cluster.","default":20,"type":int},
                 
             ],
             "optional_kwargs": [
                 {"name": "debug", "description": "Get some debug info.","default":False},
             ],
-            "help_string": "Pseudo-spectral clustering.",
-            "display_name": "Pseudo-spectral clustering"
+            "help_string": "Eigen-feature analysis",
+            "display_name": "Eigen-feature analysis"
         },
-        "spectral_clustering_and_bbox_finding": {
+        "eigen_feature_analysis_autoRadiusSelect": {
             "required_kwargs": [
                 {"name": "norm_eigenval_cutoff", "description": "Cutoff of normalized eigenvalues","default":0.6,"type":float},
                 {"name": "max_eigenval_cutoff", "description": "Cutoff of maximum eigenvalue. Set to zero to auto-determine this!","default":0.0,"type":float},
-                {"name": "search_n_neighbours", "description": "Number of (closest) neighbours for the covariance determination","default":50,"type":int},
+                {"name": "min_radius", "description": "Minimal radius","default":4,"type":float},
+                {"name": "max_radius", "description": "Maximum radius","default":10,"type":float},
                 {"name": "ratio_ms_to_px", "description": "Ratio of milliseconds to pixels.","default":35.0,"type":float},
                 {"name": "DBSCAN_eps", "description": "Eps of DBSCAN.","default":3,"type":int},
                 {"name": "DBSCAN_n_neighbours", "description": "Minimum nr of points for DBSCAN cluster.","default":17,"type":int},
+            ],
+            "optional_kwargs": [
+                {"name": "debug", "description": "Get some debug info.","default":False},
+            ],
+            "help_string": "Eigen-feature analysis with entropy-baed radius finding.",
+            "display_name": "Eigen-feature analysis, automatic radius finding"
+        },
+        "eigenFeature_analysis_and_bbox_finding": {
+            "required_kwargs": [
+                {"name": "norm_eigenval_cutoff", "description": "Cutoff of normalized eigenvalues","default":0.7,"type":float},
+                {"name": "max_eigenval_cutoff", "description": "Cutoff of maximum eigenvalue. Set to zero to auto-determine this!","default":0.0,"type":float},
+                {"name": "search_n_neighbours", "description": "Number of (closest) neighbours for the covariance determination","default":50,"type":int},
+                {"name": "ratio_ms_to_px", "description": "Ratio of milliseconds to pixels.","default":20.0,"type":float},
+                {"name": "DBSCAN_eps", "description": "Eps of DBSCAN.","default":3,"type":int},
+                {"name": "DBSCAN_n_neighbours", "description": "Minimum nr of points for DBSCAN cluster.","default":20,"type":int},
                 {"name": "bbox_padding", "description": "Padding of the bounding box (in px equivalents).","default":1,"type":int},
             ],
             "optional_kwargs": [
                 {"name": "debug", "description": "Get some debug info.","default":False},
             ],
-            "help_string": "Pseudo-spectral clustering.",
-            "display_name": "Pseudo-spectral clustering with bbox finding"
+            "help_string": "Eigen-feature analysis with bbox finding.",
+            "display_name": "Eigen-feature analysis with bbox finding"
         }
     }
 
@@ -145,6 +161,48 @@ def EigenValueCalculation(npyarr,kwargs):
         print('Eigenvalue calculation time2: ', end_time - start_time)
     
     return eig_valso3d, point_cloud
+
+def EigenValueCalculation_radius(npyarr,radius,kwargs):
+    ms_to_px=float(kwargs['ratio_ms_to_px'])
+    data_for_o3d = npyarr
+    multiCore = False
+    if multiCore == True:
+        start_time = time.time()
+        point_cloud = o3d.geometry.PointCloud()
+        point_cloud.points = o3d.utility.Vector3dVector(zip(data_for_o3d['x'],data_for_o3d['y'],data_for_o3d['t']/(1000*ms_to_px)))
+        
+        print('point cloud created')
+        point_cloud.estimate_covariances(search_param=o3d.geometry.KDTreeSearchParamRadius(radius=float(radius)))
+
+        N = 150  # Number of chunks
+        pcc_chunks = np.array_split(pcc, N)
+
+        results = Parallel(n_jobs=-1)(delayed(compute_eig)(pcc_chunk) for pcc_chunk in pcc_chunks)
+        
+        eig_valso3d_list = []
+        eig_valso3d_list.extend([res[0] for res in results])
+        eig_valso3d = np.concatenate(eig_valso3d_list, axis=0)
+        
+        
+        print('eigv calculated')
+        end_time = time.time()
+        print('Eigenvalue calculation time1: ', end_time - start_time)
+    
+    else:
+        start_time = time.time()
+        point_cloud = o3d.geometry.PointCloud()
+        point_cloud.points = o3d.utility.Vector3dVector(zip(data_for_o3d['x'],data_for_o3d['y'],data_for_o3d['t']/(1000*ms_to_px)))
+        print('point cloud created')
+        point_cloud.estimate_covariances(search_param=o3d.geometry.KDTreeSearchParamRadius(radius=float(radius)))
+        print('pcc estimated')
+        pcc = np.asarray(point_cloud.covariances)        
+        eig_valso3d = np.linalg.svd(pcc,compute_uv=False,hermitian=True)
+        print('eigv calculated')
+        end_time = time.time()
+        print('Eigenvalue calculation time2: ', end_time - start_time)
+    
+    return eig_valso3d, point_cloud
+
 
 def determineEigenValueCutoffComputationally(maxeigenval,kwargs):
     #Fit this histogram with three gaussians:
@@ -308,7 +366,7 @@ def get_events_in_bbox_NE(npyarr,bboxes,ms_to_px):
     
     return candidates
 
-def spectral_clustering(npy_array,settings,**kwargs):
+def eigenFeature_analysis(npy_array,settings,**kwargs):
     #Check if we have the required kwargs
     [provided_optional_args, missing_optional_args] = utilsHelper.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
     starttime = time.time()
@@ -317,6 +375,9 @@ def spectral_clustering(npy_array,settings,**kwargs):
     ms_to_px=float(kwargs['ratio_ms_to_px'])
     
     eig_valso3d, point_cloud = EigenValueCalculation(npyarr,kwargs)
+    
+    #Calculate linearity
+    linearity = (eig_valso3d[:,0]-eig_valso3d[:,1])/eig_valso3d[:,0]
     
     maxeigenval = np.max(eig_valso3d,axis=1)
     mideigenval = np.median(eig_valso3d, axis=1)
@@ -328,7 +389,7 @@ def spectral_clustering(npy_array,settings,**kwargs):
     
     # highstdeigenval = normeigenval[stdeigenval>0.45]
     
-    normeigenvalcutoff = float(kwargs['norm_eigenval_cutoff']) #0.6
+    linearity_cutoff = float(kwargs['linearity_cutoff']) #0.6
     maxeigenvalcutoff = float(kwargs['max_eigenval_cutoff']) #6
     
     #If set to zero, we do it computationally:
@@ -339,8 +400,8 @@ def spectral_clustering(npy_array,settings,**kwargs):
     #Add polarity back to points
     points = np.concatenate((points, polarities.reshape(-1,1)), axis=1)
     
-    clusterpoints = points[(np.max(normeigenval, axis=1) < normeigenvalcutoff) & (maxeigenval < maxeigenvalcutoff), :]
-    noisepoints = points[(np.max(normeigenval, axis=1) >= normeigenvalcutoff) | (maxeigenval >= maxeigenvalcutoff), :]
+    clusterpoints = points[(linearity < linearity_cutoff) & (maxeigenval < maxeigenvalcutoff), :]
+    noisepoints = points[(linearity >= linearity_cutoff) | (maxeigenval >= maxeigenvalcutoff), :]
 
     if len(clusterpoints) > 0:
         logging.info("DBSCANning started")
@@ -355,12 +416,17 @@ def spectral_clustering(npy_array,settings,**kwargs):
     else:
         logging.error("No clusterpoints found via spectral clustering - maximum eigenval probably wrong!")
         candidates = {}
-        
+    
+    
+    candidates, npopped = utilsHelper.removeCandidatesWithLargeBoundingBox(candidates,settings['MaxFindingBoundingBoxXY']['value'],settings['MaxFindingBoundingBoxT']['value'])
+    if npopped > 0:
+        logging.warning(f"Removed {npopped}/{len(candidates)+npopped} ({npopped/(len(candidates)+npopped)*100}%) candidates due to large bounding boxes")
+    
     performance_metadata = f"SpectralClustering Finding ran for {time.time() - starttime} seconds."
     
     return candidates, performance_metadata
 
-def spectral_clustering_and_bbox_finding(npy_array,settings,**kwargs):
+def eigenFeature_analysis_and_bbox_finding(npy_array,settings,**kwargs):
         #Check if we have the required kwargs
     [provided_optional_args, missing_optional_args] = utilsHelper.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
     starttime = time.time()
@@ -369,6 +435,9 @@ def spectral_clustering_and_bbox_finding(npy_array,settings,**kwargs):
     ms_to_px=float(kwargs['ratio_ms_to_px'])
     
     eig_valso3d, point_cloud = EigenValueCalculation(npyarr,kwargs)
+    
+    #Calculate linearity
+    linearity = (eig_valso3d[:,0]-eig_valso3d[:,1])/eig_valso3d[:,0]
     
     maxeigenval = np.max(eig_valso3d,axis=1)
     mideigenval = np.median(eig_valso3d, axis=1)
@@ -380,7 +449,7 @@ def spectral_clustering_and_bbox_finding(npy_array,settings,**kwargs):
     
     # highstdeigenval = normeigenval[stdeigenval>0.45]
     
-    normeigenvalcutoff = float(kwargs['norm_eigenval_cutoff']) #0.6
+    linearity_cutoff = float(kwargs['linearity_cutoff']) #0.6
     maxeigenvalcutoff = float(kwargs['max_eigenval_cutoff']) #6
     
     #If set to zero, we do it computationally:
@@ -391,8 +460,8 @@ def spectral_clustering_and_bbox_finding(npy_array,settings,**kwargs):
     #Add polarity back to points
     points = np.concatenate((points, polarities.reshape(-1,1)), axis=1)
     
-    clusterpoints = points[(np.max(normeigenval, axis=1) < normeigenvalcutoff) & (maxeigenval < maxeigenvalcutoff), :]
-    noisepoints = points[(np.max(normeigenval, axis=1) >= normeigenvalcutoff) | (maxeigenval >= maxeigenvalcutoff), :]
+    clusterpoints = points[(linearity < linearity_cutoff) & (maxeigenval < maxeigenvalcutoff), :]
+    noisepoints = points[(linearity >= linearity_cutoff) | (maxeigenval >= maxeigenvalcutoff), :]
 
     logging.info("DBSCANning started")
     #Throw DBSCAN on the 'pre-clustered' data:
@@ -417,6 +486,223 @@ def spectral_clustering_and_bbox_finding(npy_array,settings,**kwargs):
     
     return candidates, performance_metadata
     
+def eigen_feature_analysis_autoRadiusSelect(npy_array,settings,**kwargs):
+    #Check if we have the required kwargs
+    [provided_optional_args, missing_optional_args] = utilsHelper.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
+    
+    # starttime = time.time()
+    # npyarr=npy_array
+    # polarities = npyarr['p']
+    # ms_to_px=float(kwargs['ratio_ms_to_px'])
+    # kwargs['search_n_neighbours'] = 100
+    
+    # eig_valso3d, point_cloud = EigenValueCalculation_radius(npyarr,20,kwargs)
+    
+    # #First sort the eigenvalues large to small:
+    # eig_valso3d = np.sort(eig_valso3d, axis=1)[:, ::-1]
+    # #Normalise them to sum to one?
+    # eig_valso3d = eig_valso3d/np.sum(eig_valso3d,axis=1).reshape(-1, 1)
+    
+    # linearity = (eig_valso3d[:,0]-eig_valso3d[:,1])/eig_valso3d[:,0]
+    # planarity = (eig_valso3d[:,1]-eig_valso3d[:,2])/eig_valso3d[:,0]
+    # sphericity = (eig_valso3d[:,2])/eig_valso3d[:,0]
+    
+    # #Make a histogram or 3:
+    
+    # fig = plt.figure()
+    # ax = fig.add_subplot(331)
+    # #Add polarity back to points
+    # ax.hist(eig_valso3d[:,0],bins=50)
+    # ax.set_title('MaxEig')
+    # ax = fig.add_subplot(332)
+    # ax.hist(eig_valso3d[:,1],bins=50)
+    # ax.set_title('MidEig')
+    # ax = fig.add_subplot(333)
+    # ax.hist(eig_valso3d[:,2],bins=50)
+    # ax.set_title('MinEig')
+    # ax = fig.add_subplot(334)
+    # ax.hist(linearity,bins=50)
+    # ax.set_title('Linearity')
+    # ax = fig.add_subplot(335)
+    # ax.hist(planarity,bins=50)
+    # ax.set_title('Planarity')
+    # ax = fig.add_subplot(336)
+    # ax.hist(sphericity,bins=50)
+    # ax.set_title('Sphericity')
+    # ax = fig.add_subplot(337)
+    # ax.hist(np.sum(eig_valso3d,axis=1),bins=50)
+    # ax.set_title('Sum eigenvals')
+    # plt.show()
+        
+    
+    # maxeigenval = np.max(eig_valso3d,axis=1)
+    # mideigenval = np.median(eig_valso3d, axis=1)
+    # mineigenval = np.min(eig_valso3d,axis=1)
+    # sumeigenval = np.sum(eig_valso3d,axis=1)
+    
+    
+    
+    # normeigenval = eig_valso3d/sumeigenval.reshape(-1, 1)
+    # stdeigenval =np.std(normeigenval,axis=1)
+    
+    # # highstdeigenval = normeigenval[stdeigenval>0.45]
+    
+    # normeigenvalcutoff = float(kwargs['norm_eigenval_cutoff']) #0.6
+    # maxeigenvalcutoff = float(kwargs['max_eigenval_cutoff']) #6
+    
+    # #If set to zero, we do it computationally:
+    # if maxeigenvalcutoff == 0:
+    #     maxeigenvalcutoff = determineEigenValueCutoffComputationally(maxeigenval,kwargs)
+    
+    # points = np.asarray(point_cloud.points)
+    # #Add polarity back to points
+    # points = np.concatenate((points, polarities.reshape(-1,1)), axis=1)
+    
+    # clusterpoints = points[(np.max(normeigenval, axis=1) < normeigenvalcutoff) & (maxeigenval < maxeigenvalcutoff), :]
+    # noisepoints = points[(np.max(normeigenval, axis=1) >= normeigenvalcutoff) | (maxeigenval >= maxeigenvalcutoff), :]
+
+    # if len(clusterpoints) > 0:
+    #     logging.info("DBSCANning started")
+    #     #Throw DBSCAN on the 'pre-clustered' data:
+    #     dbscan = DBSCAN(eps=int(kwargs['DBSCAN_eps']), n_jobs=-1, min_samples=int(kwargs['DBSCAN_n_neighbours']))
+    #     cluster_labels = dbscan.fit_predict(clusterpoints)
+        
+    #     # Print how many clusters are found
+    #     logging.info("Number of clusters found:"+ str(max(cluster_labels)))
+        
+    #     candidates = clusterPoints_to_candidates(clusterpoints,cluster_labels,ms_to_px)
+    # else:
+    #     logging.error("No clusterpoints found via spectral clustering - maximum eigenval probably wrong!")
+    #     candidates = {}
+        
+    # performance_metadata = f"SpectralClustering Finding ran for {time.time() - starttime} seconds."
+    
+    # return candidates, performance_metadata
+
+
+    starttime = time.time()
+    npyarr=npy_array
+    polarities = npyarr['p']
+    ms_to_px=float(kwargs['ratio_ms_to_px'])
+    
+    
+    radoptions = np.linspace(float(kwargs['min_radius']),float(kwargs['max_radius']),10,dtype=float)
+    
+    lin = np.zeros((len(npyarr),radoptions.shape[0]))
+    eigval1 = np.zeros((len(npyarr),radoptions.shape[0]))
+    eigval2 = np.zeros((len(npyarr),radoptions.shape[0]))
+    eigval3 = np.zeros((len(npyarr),radoptions.shape[0]))
+    plan = np.zeros((len(npyarr),radoptions.shape[0]))
+    spher = np.zeros((len(npyarr),radoptions.shape[0]))
+    shannentr = np.zeros((len(npyarr),radoptions.shape[0]))
+    
+    for rad in range(len(radoptions)):
+        radval = radoptions[rad]
+        eig_valso3d, point_cloud = EigenValueCalculation_radius(npyarr,radval,kwargs)
+        
+        #Determination of linearlity/planarity/sphericity
+        #First sort the eigenvalues large to small:
+        eig_valso3d = np.sort(eig_valso3d, axis=1)[:, ::-1]
+        linearity = (eig_valso3d[:,0]-eig_valso3d[:,1])/eig_valso3d[:,0]
+        planarity = (eig_valso3d[:,1]-eig_valso3d[:,2])/eig_valso3d[:,0]
+        sphericity = (eig_valso3d[:,2])/eig_valso3d[:,0]
+        
+        shannonEntropy = -linearity*np.log2(linearity)-planarity*np.log2(planarity)-sphericity*np.log2(sphericity)
+        
+        eigval1[:,rad] = eig_valso3d[:,0]
+        eigval2[:,rad] = eig_valso3d[:,1]
+        eigval3[:,rad] = eig_valso3d[:,2]
+        lin[:,rad] = linearity
+        plan[:,rad] = planarity
+        spher[:,rad] = sphericity
+        shannentr[:,rad] = shannonEntropy
+    
+    #Find the index of the minimal shannentr, setting nans to high values:
+    minshannentr = np.nanargmin(shannentr,axis=1)
+    finallin = lin[np.arange(len(lin)), minshannentr]
+    finalplan = plan[np.arange(len(lin)), minshannentr]
+    finalspher = spher[np.arange(len(lin)), minshannentr]
+    
+    
+    
+    # if kwargs['debug']:
+    #     #Show this data as a point cloud for now
+    #     dataToShow = npyarr
+    #     minx = 0
+    #     maxx = 200
+    #     miny = 0
+    #     maxy = 200
+    #     sel = (dataToShow['x'] > minx) & (dataToShow['x'] < maxx) & (dataToShow['y'] > miny) & (dataToShow['y'] < maxy)
+    #     dataToShow = dataToShow[sel]
+    #     l_show = finallin[sel]
+    #     p_show = finalplan[sel]
+    #     s_show = finalspher[sel]
+    #     #create figure
+    #     fig = plt.figure()
+    #     ax = fig.add_subplot(331, projection='3d')
+    #     #Add polarity back to points
+    #     ax.scatter(dataToShow['x'],dataToShow['y'],dataToShow['t'],c=l_show,cmap='plasma',alpha=0.5,s=1,vmin=0,vmax=1)
+    #     ax.set_title('Linearity')
+    #     ax = fig.add_subplot(332, projection='3d')
+    #     #Add polarity back to points
+    #     ax.scatter(dataToShow['x'],dataToShow['y'],dataToShow['t'],c=p_show,cmap='plasma',alpha=0.5,s=1,vmin=0,vmax=1)
+    #     ax.set_title('Planarity')
+    #     ax = fig.add_subplot(333, projection='3d')
+    #     #Add polarity back to points
+    #     ax.scatter(dataToShow['x'],dataToShow['y'],dataToShow['t'],c=s_show,cmap='plasma',alpha=0.5,s=1,vmin=0,vmax=1)
+    #     ax.set_title('Sphericity')
+        
+    #     ax = fig.add_subplot(334, projection='3d')
+    #     #Add polarity back to points
+    #     sel = (l_show>p_show)&(l_show>s_show)
+    #     ax.scatter(dataToShow[~sel]['x'],dataToShow[~sel]['y'],dataToShow[~sel]['t'],c='black',alpha=0.1,s=1)
+    #     ax.scatter(dataToShow[sel]['x'],dataToShow[sel]['y'],dataToShow[sel]['t'],c='red',s=1)
+    #     ax.set_title('Mostly-linear-points')
+    #     ax = fig.add_subplot(335, projection='3d')
+    #     #Add polarity back to points
+    #     sel = (p_show>l_show)&(p_show>s_show)
+    #     ax.scatter(dataToShow[~sel]['x'],dataToShow[~sel]['y'],dataToShow[~sel]['t'],c='black',alpha=0.1,s=1)
+    #     ax.scatter(dataToShow[sel]['x'],dataToShow[sel]['y'],dataToShow[sel]['t'],c='red',s=1)
+    #     ax.set_title('Mostly-planar-points')
+    #     ax = fig.add_subplot(336, projection='3d')
+    #     #Add polarity back to points
+    #     sel = (s_show>p_show)&(s_show>l_show)
+    #     ax.scatter(dataToShow[~sel]['x'],dataToShow[~sel]['y'],dataToShow[~sel]['t'],c='black',alpha=0.1,s=1)
+    #     ax.scatter(dataToShow[sel]['x'],dataToShow[sel]['y'],dataToShow[sel]['t'],c='red',s=1)
+    #     ax.set_title('Mostly-spherical-points')
+        
+    #     ax = fig.add_subplot(337, projection='3d')
+    #     #Add polarity back to points
+    #     sel = (full_data_labels>-1)
+    #     ax.scatter(npyarr[~sel]['x'],npyarr[~sel]['y'],npyarr[~sel]['t'],c='black',alpha=0.1,s=1)
+    #     ax.scatter(npyarr[sel]['x'],npyarr[sel]['y'],npyarr[sel]['t'],c='red',s=1)
+    #     ax.set_title('DBSCANNED Mostly-spherical-points')
+        
+    #     plt.show()
+    
+    points = np.asarray(point_cloud.points)
+    #Add polarity back to points
+    points = np.concatenate((points, polarities.reshape(-1,1)), axis=1)
+    
+    
+    points_mostly_spher = points[(finalspher>finallin)&(finalspher>finalplan)]
+    sphere_indeces = np.where((finalspher>finallin)&(finalspher>finalplan))[0]
+    
+    #Run DBSCAN on the mostly-sphere points:
+    dbscan = DBSCAN(eps=int(kwargs['DBSCAN_eps']), n_jobs=-1, min_samples=int(kwargs['DBSCAN_n_neighbours']))
+    labels = dbscan.fit_predict(points_mostly_spher)
+    full_data_labels=  np.ones(len(npyarr))*-1
+    full_data_labels[sphere_indeces] = labels
+    
+    # Print how many clusters are found
+    logging.info("Number of clusters found:"+ str(max(labels)))
+    
+    candidates = clusterPoints_to_candidates(points_mostly_spher,labels,ms_to_px)
+        
+    performance_metadata = f"SpectralClustering Finding ran for {time.time() - starttime} seconds."
+    
+    return candidates, performance_metadata
+
 #This entire function (below) is basically a 'I'm figuring things out' and can be safely ignored.
 def spectral_clustering_showcase(npy_array,settings,**kwargs):
     #Check if we have the required kwargs
