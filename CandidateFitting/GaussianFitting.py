@@ -88,16 +88,22 @@ class fit:
             popt, pcov = optimize.curve_fit(func, self.mesh, self.image, **kwargs) #, gtol=1e-4,ftol=1e-4
             perr = np.sqrt(np.diag(pcov))
             mse = mean_squared_error(self.image, func(self.mesh, *popt))
-        except RuntimeError:
+        except RuntimeError as warning:
             self.fit_info += f'RuntimeError encountered during fit. No localization generated for candidate cluster {self.candidateID}.\n'
+            self.fit_info += str(warning)
+            self.fit_info += '\n'
             popt = np.zeros(6)
             perr = np.zeros(6)
-        except ValueError:
-            self.fit_info += f'ValueError encountered during fit. No localization generated for candidate cluster {self.candidateID}.\n'
+        except ValueError as warning:
+            self.fit_info += f'ValueError encountered during fit. No localization generated for candidate cluster {self.candidateID}.'
+            self.fit_info += str(warning)
+            self.fit_info += '\n'
             popt = np.zeros(6)
             perr = np.zeros(6)
-        except OptimizeWarning:
+        except OptimizeWarning as warning:
             self.fit_info += f'OptimizeWarning encountered during fit. No localization generated for candidate cluster {self.candidateID}.\n'
+            self.fit_info += str(warning)
+            self.fit_info += '\n'
             popt = np.zeros(6)
             perr = np.zeros(6)
         return popt, perr, mse
@@ -113,7 +119,7 @@ class gauss2D(fit):
         self.pixel_size = pixel_size
 
     def bounds(self):
-        bounds = ([0., 0., 0., 0., 0., 0.], [self.xlim[1]-self.xlim[0], self.ylim[1]-self.ylim[0], np.inf, np.inf, np.inf, np.inf])
+        bounds = ([0., 0., 0., 0., 0., 0.], [self.xlim[1]-self.xlim[0]+1, self.ylim[1]-self.ylim[0]+1, np.inf, np.inf, np.inf, np.inf])
         return bounds
     
     def p0(self, width):
