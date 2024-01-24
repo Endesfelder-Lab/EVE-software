@@ -30,7 +30,7 @@ def strtobool(val):
         return 0
     else:
         raise ValueError("invalid truth value %r" % (val,))
-    
+
 class Hist2d_tx():
     def __init__(self, candidate, **kwargs):
         self.xlim = [np.min(candidate['events']['x']), np.max(candidate['events']['x'])]
@@ -185,3 +185,11 @@ class AverageTimeDiff(Dist2d):
         # dist2d[y_indices, x_indices] = averageTimeDiff['t']
         return dist2d
 
+
+def removeCandidatesWithLargeBoundingBox(candidates,xymax,tmax):
+    npopped = 0
+    for candidate in sorted(candidates, reverse=True):
+        if candidates[candidate]['cluster_size'][0] > float(xymax) or candidates[candidate]['cluster_size'][1] > float(xymax) or candidates[candidate]['cluster_size'][2] > float(tmax):
+            candidates.pop(candidate)
+            npopped += 1
+    return candidates, npopped

@@ -212,6 +212,14 @@ class MyGUI(QMainWindow):
     def initGlobalSettings(self):
         #Initialisation of the global settings - runs on startup to get all these values, then these can be changed later
         globalSettings = {}
+        globalSettings['MaxFindingBoundingBoxXY'] = {}
+        globalSettings['MaxFindingBoundingBoxXY']['value'] = 20
+        globalSettings['MaxFindingBoundingBoxXY']['input'] = float
+        globalSettings['MaxFindingBoundingBoxXY']['displayName'] = 'Maximum size of a bounding box in px units'
+        globalSettings['MaxFindingBoundingBoxT'] = {}
+        globalSettings['MaxFindingBoundingBoxT']['value'] = 100000
+        globalSettings['MaxFindingBoundingBoxT']['input'] = float
+        globalSettings['MaxFindingBoundingBoxT']['displayName'] = 'Maximum size of a bounding box in us units'
         globalSettings['PixelSize_nm'] = {}
         globalSettings['PixelSize_nm']['value'] = 80
         globalSettings['PixelSize_nm']['input'] = float
