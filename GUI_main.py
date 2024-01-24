@@ -1558,10 +1558,33 @@ class MyGUI(QMainWindow):
         
         #Visual max number of rows before a 2nd column is started.
         maxNrRows = 4
-        
+        labelposoffset = 0
+
+        #Add a widget-pair for the distribution
+        distKwargValues = utils.distKwargValuesFromFittingFunction(current_selected_function)
+        if len(distKwargValues) != 0:
+            # Add a combobox containing all the possible kw-args
+            label = QLabel("<b>distribution</b>")
+            label.setObjectName(f"Label#{current_selected_function}#dist_kwarg#{current_selected_polarity}")
+            if self.checkAndShowWidget(curr_layout,label.objectName()) == False:
+                label.setToolTip(utils.infoFromMetadata(current_selected_function,specificKwarg='dist_kwarg'))
+                curr_layout.addWidget(label,2,0)
+            combobox = QComboBox()
+            combobox.addItems(distKwargValues)
+            combobox.setObjectName(f"ComboBox#{current_selected_function}#dist_kwarg#{current_selected_polarity}")
+            defaultOption = utils.defaultOptionFromDistKwarg(current_selected_function)
+            if defaultOption != None:
+                combobox.setCurrentText(defaultOption)
+            test = combobox.currentText()
+            combobox.setToolTip(utils.getInfoFromDistribution(combobox.currentText()))
+            combobox.currentTextChanged.connect(lambda text: combobox.setToolTip(utils.getInfoFromDistribution(text)))
+            if self.checkAndShowWidget(curr_layout,combobox.objectName()) == False:
+                curr_layout.addWidget(combobox,2,1)
+            labelposoffset += 1
+            
         reqKwargs = utils.reqKwargsFromFunction(current_selected_function)
         #Add a widget-pair for every kw-arg
-        labelposoffset = 0
+        
         for k in range(len(reqKwargs)):
             #Value is used for scoring, and takes the output of the method
             if reqKwargs[k] != 'methodValue':
@@ -2322,7 +2345,12 @@ class MyGUI(QMainWindow):
                 
                 #Widget.text() could contain a file location. Thus, we need to swap out all \ for /:
                 methodKwargValues_method.append(widget.text().replace('\\','/'))
-
+            
+            # add distKwarg choice to Kwargs if given
+            if ("ComboBox" in widget.objectName()) and widget.isVisibleTo(self.tab_processing) and 'dist_kwarg' in widget.objectName():
+                methodKwargNames_method.append('dist_kwarg')
+                methodKwargValues_method.append(widget.currentText())                
+               
         #If at this point there is no methodName_method, it means that the method has exactly 0 req or opt kwargs. Thus, we simply find the value of the QComboBox which should be the methodName:
         if methodName_method == '':
             for index in range(all_layouts.count()):
@@ -2371,7 +2399,7 @@ class MyGUI(QMainWindow):
             if all(elem in set(methodKwargNames) for elem in reqKwargs):
                 allreqKwargsHaveValue = True
                 for id in range(0,len(reqKwargs)):
-                    #First find the index of the function-based reqKwargs in the GUI-based methodKwargNames. They should be the same, but you never know
+                    #First find the index of the function-based reqKwargs in the GUI-based methodKwargNames. 
                     GUIbasedIndex = methodKwargNames.index(reqKwargs[id])
                     #Get the value of the kwarg - we know the name already now due to reqKwargs.
                     kwargvalue = methodKwargValues[GUIbasedIndex]
@@ -2386,7 +2414,7 @@ class MyGUI(QMainWindow):
                     else:
                         partialString = ''
                     for id in range(0,len(reqKwargs)):
-                        #First find the index of the function-based reqKwargs in the GUI-based methodKwargNames. They should be the same, but you never know
+                        #First find the index of the function-based reqKwargs in the GUI-based methodKwargNames. 
                         GUIbasedIndex = methodKwargNames.index(reqKwargs[id])
                         #Get the value of the kwarg - we know the name already now due to reqKwargs.
                         kwargvalue = methodKwargValues[GUIbasedIndex]
@@ -2407,7 +2435,10 @@ class MyGUI(QMainWindow):
                         if methodKwargValues[id+len(reqKwargs)] != '':
                             if partialString != '':
                                 partialString+=","
-                            partialString+=optKwargs[id]+"=\""+methodKwargValues[id+len(reqKwargs)]+"\""
+                            partialString+=optKwargs[id]+"=\""+methodKwargValues[methodKwargNames.index(optKwargs[id])]+"\""
+                    #Add the distribution kwarg if it exists
+                    if 'dist_kwarg' in methodKwargNames:
+                        partialString += ",dist_kwarg=\""+methodKwargValues[methodKwargNames.index('dist_kwarg')]+"\""
                     segmentEval = methodName+"("+partialString+")"
                     return segmentEval
                 else:
@@ -2468,7 +2499,10 @@ class MyGUI(QMainWindow):
                                         self.changeLayout_choice(getattr(self, f"groupboxFinding{polVal2}").layout(),field_widget.objectName(),getattr(self, f"Finding_functionNameToDisplayNameMapping{polVal2}"))
                                     elif 'Fitting' in field_widget.objectName():
                                         polVal2 = field_widget.objectName()[-3:]
-                                        self.changeLayout_choice(getattr(self, f"groupboxFitting{polVal2}").layout(),field_widget.objectName(),getattr(self, f"Fitting_functionNameToDisplayNameMapping{polVal2}"))
+                                        if 'dist_kwarg' in field_widget.objectName():
+                                            field_widget.setCurrentText(self.entries[field_name])
+                                        else:
+                                            self.changeLayout_choice(getattr(self, f"groupboxFitting{polVal2}").layout(),field_widget.objectName(),getattr(self, f"Fitting_functionNameToDisplayNameMapping{polVal2}"))
         
 
         except FileNotFoundError:

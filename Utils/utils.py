@@ -94,6 +94,47 @@ def optKwargsFromFunction(functionname):
     names = re.findall(name_pattern, allkwarginfo[1][0])
     return names
 
+def distKwargValuesFromFittingFunction(functionname):
+    #Get all kwarg info
+    allkwarginfo = kwargsFromFunction(functionname)
+    derivedClasses = []
+    if allkwarginfo[2] != []:
+        base_pattern = r"base:\s*(\S+)"
+        base_name = re.findall(base_pattern, allkwarginfo[2][0])[0]
+        # get base class
+        baseClass = getattr(utilsHelper, base_name, None)
+        if not baseClass == None:
+            # get all derived classes that share common base
+            for name, obj in inspect.getmembers(utilsHelper):
+                if inspect.isclass(obj) and issubclass(obj, baseClass) and obj != baseClass:
+                    derivedClasses.append(name)
+    return derivedClasses
+
+def defaultOptionFromDistKwarg(functionname):
+    #Check if the function has a 'default' option for the distribution kwarg. 
+    defaultOption=None
+    functionparent = functionname.split('.')[0]
+    #Get the full function metadata
+    functionMetadata = eval(f'{str(functionparent)}.__function_metadata__()')[functionname.split('.')[1]]
+    if "dist_kwarg" in functionMetadata:
+        if "default_option" in functionMetadata["dist_kwarg"]:
+            defaultOption = functionMetadata["dist_kwarg"]["default_option"]
+            # check if defaultOption is a valid option
+            defaultOption = getattr(utilsHelper, defaultOption, None)
+            if defaultOption != None:
+                defaultOption = defaultOption.__name__
+    return defaultOption
+
+def getInfoFromDistribution(distribution):
+    description = None
+    distClass = getattr(utilsHelper, distribution, None)
+    if not distClass == None:
+        try:
+            description = distClass.description
+        except AttributeError:
+            pass
+    return description
+
 #Obtain the kwargs from a function. Results in an array with entries
 def kwargsFromFunction(functionname):
     try:
@@ -113,6 +154,7 @@ def kwargsFromFunction(functionname):
         help_arr = []
         rkwarr_arr = []
         okwarr_arr = []
+        dist_kwarg = []
         loopindex = 0
         for i in looprange:
             #Get name text for all entries
@@ -135,13 +177,20 @@ def kwargsFromFunction(functionname):
                 for key, value in functionMetadata[list(functionMetadata.keys())[i]]["optional_kwargs"][k].items():
                     txt += f"{key}: {value}\n"
             okwarr_arr.append(txt)
+            #Get text for distribution kwargs
+            txt = ""
+            if "dist_kwarg" in functionMetadata[list(functionMetadata.keys())[i]]:
+                for key, value in functionMetadata[list(functionMetadata.keys())[i]]["dist_kwarg"].items():
+                    txt += f"{key}: {value}\n"
+                dist_kwarg.append(txt)
     #Error handling if __function_metadata__ doesn't exist
     except AttributeError:
         rkwarr_arr = []
         okwarr_arr = []
+        dist_kwarg = []
         return f"No __function_metadata__ in {functionname}"
             
-    return [rkwarr_arr, okwarr_arr]
+    return [rkwarr_arr, okwarr_arr, dist_kwarg]
 
 #Obtain the help-file and info on kwargs on a specific function
 #Optional: Boolean kwarg showKwargs & Boolean kwarg showHelp
@@ -188,6 +237,9 @@ def infoFromMetadata(functionname,**kwargs):
                 for k in range(0,len(functionMetadata[functionname.split('.')[1]]["required_kwargs"])):
                     if functionMetadata[functionname.split('.')[1]]["required_kwargs"][k]['name'] == specificKwarg:
                         helptext = functionMetadata[functionname.split('.')[1]]["required_kwargs"][k]['description']
+                # for distribution kwarg
+                if specificKwarg == 'dist_kwarg':
+                    helptext = functionMetadata[functionname.split('.')[1]]["dist_kwarg"]['description']
                 finaltext = helptext
                 skipfinalline = True
                 looprange = range(0,0)
