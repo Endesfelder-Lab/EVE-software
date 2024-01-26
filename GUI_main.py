@@ -2133,10 +2133,8 @@ class MyGUI(QMainWindow):
             except Exception as e:
                 self.open_critical_warning(f"Critical error in Fitting routine! Breaking off!\nError information:\n{e}")
                 self.data['FittingResult'] = {}
-            else:
-                self.open_critical_warning(f"No Fitting evaluation text provided/found")
         else:
-            logging.error('No Finding Result obtained! Fitting is not run succesfully!')
+            self.open_critical_warning(f"No Fitting evaluation text provided/found")
                       
     def getStoreLocationPartial(self):   
         if 'ExistingFinding' in self.data['FindingMethod']:
