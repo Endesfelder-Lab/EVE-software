@@ -7,7 +7,6 @@ from scipy import optimize
 import warnings
 from scipy.optimize import OptimizeWarning
 warnings.simplefilter("error", OptimizeWarning)
-from sklearn.metrics import mean_squared_error
 
 from joblib import Parallel, delayed
 import multiprocessing
@@ -62,7 +61,7 @@ class fit:
     def __init__(self, dist, candidateID):
         self.candidateID = candidateID
         self.ylim, self.xlim = dist.dist2D.shape
-        self.xmean = np.average(np.arange(1,self.xlim+1), weights=np.nansum(dist.dist2D, axis=0))-1. # ToDO: Check if this is correct
+        self.xmean = np.average(np.arange(1,self.xlim+1), weights=np.nansum(dist.dist2D, axis=0))-1. 
         self.ymean = np.average(np.arange(1,self.ylim+1), weights=np.nansum(dist.dist2D, axis=1))-1.
         self.image = dist.dist2D.ravel()
         self.imstats = [np.nanmax(self.image), np.nanmedian(self.image)]
@@ -73,14 +72,12 @@ class fit:
         x = np.arange(self.xlim)
         y = np.arange(self.ylim)
         X,Y = np.meshgrid(x,y)
-        return X,Y
+        return X.ravel(),Y.ravel()
     
     def __call__(self, func, **kwargs):
-        mse = 0
         try:
-            popt, pcov = optimize.curve_fit(func, self.mesh, self.image, nan_policy = 'omit', **kwargs) #, gtol=1e-4,ftol=1e-4
+            popt, pcov = optimize.curve_fit(func, self.mesh, self.image, nan_policy='omit', **kwargs) #, gtol=1e-4,ftol=1e-4
             perr = np.sqrt(np.diag(pcov))
-            mse = mean_squared_error(self.image, func(self.mesh, *popt))
         except RuntimeError as warning:
             self.fit_info += f'RuntimeError encountered during fit. No localization generated for candidate cluster {self.candidateID}.\n'
             self.fit_info += str(warning)
@@ -99,7 +96,7 @@ class fit:
             self.fit_info += '\n'
             popt = np.zeros(6)
             perr = np.zeros(6)
-        return popt, perr, mse
+        return popt, perr
 
 # 2D gaussian fit
 class gauss2D(fit):
@@ -122,10 +119,10 @@ class gauss2D(fit):
     def func(self, XY, x0, y0, sigma_x, sigma_y, amplitude, offset):
         X, Y = XY
         g = offset + amplitude * np.exp( - ((X-x0)**2/(2*sigma_x**2) + (Y-y0)**2/(2*sigma_y**2)))
-        return g.ravel()
+        return g
     
     def __call__(self, events, **kwargs):
-        opt, err, mse = super().__call__(self.func, bounds=self.bounds, p0=self.p0, **kwargs)
+        opt, err = super().__call__(self.func, bounds=self.bounds, p0=self.p0, **kwargs)
         x = (opt[0]+np.min(events['x']))*self.pixel_size # in nm
         y = (opt[1]+np.min(events['y']))*self.pixel_size # in nm
         del_x = err[0]*self.pixel_size # in nm
@@ -135,7 +132,7 @@ class gauss2D(fit):
         t = np.mean(events['t'])/1000. # in ms
         mean_polarity = events['p'].mean()
         p = int(mean_polarity == 1) + int(mean_polarity == 0) * 0 + int(mean_polarity > 0 and mean_polarity < 1) * 2
-        loc_df = pd.DataFrame({'candidate_id': self.candidateID, 'x': x, 'y': y, 'mse': mse, 'del_x': del_x, 'del_y': del_y, 'p': p, 't': t}, index=[0]) #return np.array([self.candidateID, x, y, mse, del_x, del_y, p, t]), self.fit_info
+        loc_df = pd.DataFrame({'candidate_id': self.candidateID, 'x': x, 'y': y, 'del_x': del_x, 'del_y': del_y, 'p': p, 't': t}, index=[0])
         return loc_df, self.fit_info
 
 # 2d log gaussian fit
@@ -154,7 +151,7 @@ class loggauss2D(gauss2D):
     def func(self, XY, x0, y0, sigma_x, sigma_y, amplitude, offset):
         X, Y = XY
         g = np.log(offset + amplitude * np.exp( - ((X-x0)**2/(2*sigma_x**2) + (Y-y0)**2/(2*sigma_y**2))))
-        return g.ravel()
+        return g
     
 # 3d gaussian fit
 class gauss3D(gauss2D):
@@ -171,7 +168,7 @@ class gauss3D(gauss2D):
         c = (np.sin(self.theta)**2)/(2*sigma_x**2) + (np.cos(self.theta)**2)/(2*sigma_y**2)
         g = offset + amplitude * np.exp( - (a*((X-x0)**2) + 2*b*(X-x0)*(Y-y0) 
                                 + c*((Y-y0)**2)))
-        return g.ravel()
+        return g
 
 
 # perform localization for part of candidate dictionary
@@ -182,7 +179,7 @@ def localize_canditates2D(i, candidate_dic, func, distfunc, *args, **kwargs):
     nb_fails = 0
     info = ''
     for candidate_id in list(candidate_dic):
-        dist = distfunc(candidate_dic[candidate_id])
+        dist = distfunc(candidate_dic[candidate_id]['events'])
         fitting = func(dist, candidate_id, *args)
         localization, fitting_info = fitting(candidate_dic[candidate_id]['events'], **kwargs)
         if fitting_info != '':
