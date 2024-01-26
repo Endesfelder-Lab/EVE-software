@@ -1693,7 +1693,7 @@ class MyGUI(QMainWindow):
 
         return unique_files
     
-    def run_processing_i(self):
+    def run_processing_i(self,error=None):
         #Get the polarity:
         if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[0]:
             polarityVal = 'Mix'
@@ -1716,7 +1716,7 @@ class MyGUI(QMainWindow):
                     self.processSingleFile(file,polarityVal=polarityVal)
                     logging.info('Successfully processed file '+file)
                 except:
-                    logging.error('Error in processing file '+file)
+                    logging.error('Error in processing file '+file)  
         #If it's a file...
         elif os.path.isfile(self.dataLocationInput.text()):
             #Find polarity:
@@ -1735,15 +1735,23 @@ class MyGUI(QMainWindow):
             else:
                 #Otherwise normally process a single file
                 self.processSingleFile(self.dataLocationInput.text(),polarityVal=polarityVal)
-        self.updateGUIafterNewResults()       
+        #if it's neither a file nor a folder
+        else:
+            logging.error('Input file/folder is not correct! Please check.')
+            error = 'Input file/folder is not correct! Please check.'
+        self.updateGUIafterNewResults(error)     
         return
         
     def run_processing(self):
         thread = threading.Thread(target=self.run_processing_i)
+        # thread = threading.Thread(target=lambda: self.run_processing_i))
         thread.start()
     
-    def updateGUIafterNewResults(self):
-        self.updateLocList()
+    def updateGUIafterNewResults(self,error=None):
+        if error == None:
+            self.updateLocList()
+        # else:
+        #     self.open_critical_warning(error)
     
     def updateLocList(self):
         #data is stored in self.data['FittingResult'][0]
