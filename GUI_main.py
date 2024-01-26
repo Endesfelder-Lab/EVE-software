@@ -1142,6 +1142,14 @@ class MyGUI(QMainWindow):
         canPreviewtab_horizontal_container.addWidget(self.prev_buttonCan)
         canPreviewtab_horizontal_container.addWidget(self.next_buttonCan)
 
+        # Add an advanced settings button that opens a new window when clicked
+        # First initialise (but not show!) advanced window:
+        self.advancedOptionsWindowCanPrev = AdvancedOptionsWindowCanPrev(self)
+        
+        self.advanced_options_button = QPushButton("Advanced Options")
+        canPreviewtab_horizontal_container.addWidget(self.advanced_options_button)
+        self.advanced_options_button.clicked.connect(self.open_advanced_options_CanPreview)
+
         #Add a horizontal layout to display info about the cluster
         self.canPreviewtab_horizontal_container2 = QHBoxLayout()
         canPreviewtab_vertical_container.addLayout(self.canPreviewtab_horizontal_container2)
@@ -1149,31 +1157,20 @@ class MyGUI(QMainWindow):
         self.canPreviewtab_horizontal_container2.addWidget(self.candidate_info)
 
         #Create an empty figure and store it as self.data:
-        self.data['figurePlot3D'] = plt.figure(figsize=(6.8, 4))
-        self.data['figurePlot3D'].suptitle('3D pointcloud of candidate cluster')
-        self.data['figureAx3D'] = self.data['figurePlot3D'].add_subplot(111, projection='3d')
-        self.data['figureCanvas3D'] = FigureCanvas(self.data['figurePlot3D'])
-        self.data['figurePlot3D'].tight_layout()
-        self.data['figurePlot3D'].subplots_adjust(top=0.95)
+        self.data['firstCandidatePlot'] = ThreeDPointCloud()
         
         #Add a navigation toolbar (zoom, pan etc)
-        canPreviewtab_vertical_container.addWidget(NavigationToolbar(self.data['figureCanvas3D'], self))
+        canPreviewtab_vertical_container.addWidget(NavigationToolbar(self.data['firstCandidatePlot'].canvas, self))
         #Add the canvas to the tab
-        canPreviewtab_vertical_container.addWidget(self.data['figureCanvas3D'])
+        canPreviewtab_vertical_container.addWidget(self.data['firstCandidatePlot'].canvas)
 
         #Create a second empty figure and store it as self.data:
-        self.data['figurePlotProjection'] = plt.figure(figsize=(6.8, 4))
-        self.data['figurePlotProjection'].suptitle('2D projections of candidate cluster')
-        self.data['figureAxProjectionXY'] = self.data['figurePlotProjection'].add_subplot(121)
-        self.data['figureAxProjectionXT'] = self.data['figurePlotProjection'].add_subplot(222)
-        self.data['figureAxProjectionYT'] = self.data['figurePlotProjection'].add_subplot(224)
-        self.data['figureCanvasProjection'] = FigureCanvas(self.data['figurePlotProjection'])
-        self.data['figurePlotProjection'].tight_layout()
+        self.data['secondCandidatePlot'] = TwoDProjection()
         
         #Add a navigation toolbar (zoom, pan etc)
-        canPreviewtab_vertical_container.addWidget(NavigationToolbar(self.data['figureCanvasProjection'], self))
+        canPreviewtab_vertical_container.addWidget(NavigationToolbar(self.data['secondCandidatePlot'].canvas, self))
         #Add the canvas to the tab
-        canPreviewtab_vertical_container.addWidget(self.data['figureCanvasProjection'])
+        canPreviewtab_vertical_container.addWidget(self.data['secondCandidatePlot'].canvas)
 
     def prev_candidate(self):
         if not self.entryCanPreview.text()=='':
@@ -1206,6 +1203,9 @@ class MyGUI(QMainWindow):
             self.candidate_info.setText('Tried to visualise candidate, but no ID was given!')
             logging.error('Tried to visualise candidate, but no ID was given!')
 
+    def open_advanced_options_CanPreview(self):
+        self.advancedOptionsWindowCanPrev.show()
+
     def updateCandidatePreview(self, reset=False):
         """
         Function that's called when the button to show the candidate is clicked
@@ -1213,16 +1213,9 @@ class MyGUI(QMainWindow):
 
         # Clear all plots
         self.candidate_info.setText('')
+        self.data['firstCandidatePlot'].reset()
+        self.data['secondCandidatePlot'].reset()
 
-        self.data['figureAx3D'].clear()
-        self.data['figureCanvas3D'].draw()
-
-        self.data['figureAxProjectionXY'].clear()
-        self.data['figureAxProjectionXT'].clear()
-        self.data['figureAxProjectionYT'].clear()
-        self.data['figureAxProjectionXT'].set_aspect('auto')
-        self.data['figureAxProjectionYT'].set_aspect('auto')
-        self.data['figureCanvasProjection'].draw()
         if reset==False:
             # Check the candidate entry field
             if self.entryCanPreview.text()=='':
@@ -1241,90 +1234,12 @@ class MyGUI(QMainWindow):
                 N_events = self.data['FindingResult'][0][self.data['CandidatePreviewID']]['N_events']
                 cluster_size = self.data['FindingResult'][0][self.data['CandidatePreviewID']]['cluster_size']
                 self.candidate_info.setText(f"This candidate cluster contains {N_events} events and has dimensions ({cluster_size[0]}, {cluster_size[1]}, {cluster_size[2]}).")
-                pos_events = self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events'][self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['p']==1]
-                neg_events = self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events'][self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['p']==0]
-
-                # Do a 3d scatterplot of the event data
-                if not len(pos_events)==0:
-                    self.data['figureAx3D'].scatter(pos_events['x'], pos_events['y'], pos_events['t']*1e-3, label='Positive events', color='C0')
-                if not len(neg_events)==0:
-                    self.data['figureAx3D'].scatter(neg_events['x'], neg_events['y'], neg_events['t']*1e-3, label='Negative events', color='C1')
-                self.data['figureAx3D'].set_xlabel('x [px]')
-                self.data['figureAx3D'].set_ylabel('y [px]')
-                self.data['figureAx3D'].set_zlabel('t [ms]')
-
-                # Plot the localization(s) of the candidate
-                self.data['figureAx3D'].plot(self.data['CandidatePreviewLocs']['x']/pixel_size, self.data['CandidatePreviewLocs']['y']/pixel_size, self.data['CandidatePreviewLocs']['t'], marker='x', c='red', label='Localization(s)')
-                self.data['figureAx3D'].legend(loc='upper right', bbox_to_anchor=(1.6, 1))
-
-                # Give it a nice layout
-                self.data['figurePlot3D'].tight_layout()
-                self.data['figurePlot3D'].subplots_adjust(top=0.95)
-
-                # Update drawing of the canvas
-                self.data['figureCanvas3D'].draw()
+                
+                self.data['firstCandidatePlot'].plot(self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events'], self.data['CandidatePreviewLocs'], pixel_size)
                 logging.info(f"3D scatter plot of candidate {self.data['CandidatePreviewID']} drawn.")
 
                 # Get xyt-limits of candidate events
-                self.xlim = [np.min(self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['x']), np.max(self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['x'])]
-                self.ylim = [np.min(self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['y']), np.max(self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['y'])]
-                self.tlim = [np.min(self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['t']*1e-3), np.max(self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events']['t']*1e-3)]
-
-                # Set bin width
-                xy_bin_width = 1. # in px
-                t_bin_width = 10. # in ms
-
-                # Calculate number of bins
-                x_bins = int((self.xlim[1]-self.xlim[0]+1)/xy_bin_width)
-                y_bins = int((self.ylim[1]-self.ylim[0]+1)/xy_bin_width)
-                t_bins = int(np.ceil((self.tlim[1]-self.tlim[0])/t_bin_width))
-                self.tlim[1] = self.tlim[0]+t_bins*t_bin_width
-
-                # Compute the 2D histograms (pos)
-                hist_xy_pos, x_edges, y_edges = np.histogram2d(pos_events['x'], pos_events['y'], bins=(x_bins, y_bins), range=[[self.xlim[0]-0.5, self.xlim[1]+0.5], [self.ylim[0]-0.5, self.ylim[1]+0.5]])
-                hist_tx_pos, t_edges, x_edges = np.histogram2d(pos_events['t']*1e-3, pos_events['x'], bins=(t_bins, x_bins), range=[self.tlim, [self.xlim[0]-0.5, self.xlim[1]+0.5]])
-                hist_ty_pos, t_edges, y_edges = np.histogram2d(pos_events['t']*1e-3, pos_events['y'], bins=(t_bins, y_bins), range=[self.tlim, [self.ylim[0]-0.5, self.ylim[1]+0.5]])
-
-                # Compute the 2D histograms (neg)
-                hist_xy_neg, x_edges, y_edges = np.histogram2d(neg_events['x'], neg_events['y'], bins=(x_bins, y_bins), range=[[self.xlim[0]-0.5, self.xlim[1]+0.5], [self.ylim[0]-0.5, self.ylim[1]+0.5]])
-                hist_tx_neg, t_edges, x_edges = np.histogram2d(neg_events['t']*1e-3, neg_events['x'], bins=(t_bins, x_bins), range=[self.tlim, [self.xlim[0]-0.5, self.xlim[1]+0.5]])
-                hist_ty_neg, t_edges, y_edges = np.histogram2d(neg_events['t']*1e-3, neg_events['y'], bins=(t_bins, y_bins), range=[self.tlim, [self.ylim[0]-0.5, self.ylim[1]+0.5]])
-
-                # Compute the 2d histograms (all) 
-                hist_xy = hist_xy_pos + hist_xy_neg
-                hist_tx = hist_tx_pos + hist_tx_neg
-                hist_ty = hist_ty_pos + hist_ty_neg
-
-                # Set goodlooking aspect ratio depending on nr of xyt-bins
-                aspectty = 3. * (len(t_edges)-1) / (len(y_edges)-1)
-                aspecttx = 3. * (len(t_edges)-1) / (len(x_edges)-1)
-
-                # Plot the 2D histograms
-                self.data['figureAxProjectionXY'].pcolormesh(x_edges, y_edges, hist_xy.T)
-                self.data['figureAxProjectionXY'].set_aspect('equal')
-                self.data['figureAxProjectionXY'].format_coord = lambda x,y:self.format_coord_projectionxy(x,y,hist_xy_pos, hist_xy_neg, x_edges, y_edges)
-                self.data['figureAxProjectionXT'].pcolormesh(t_edges, x_edges, hist_tx.T)
-                self.data['figureAxProjectionXT'].set_aspect(aspecttx)
-                self.data['figureAxProjectionXT'].format_coord = lambda x,y:self.format_coord_projectiontx(x,y,hist_tx_pos, hist_tx_neg, t_edges, x_edges)
-                self.data['figureAxProjectionYT'].pcolormesh(t_edges, y_edges, hist_ty.T)
-                self.data['figureAxProjectionYT'].set_aspect(aspectty)
-                self.data['figureAxProjectionYT'].format_coord = lambda x,y:self.format_coord_projectionty(x,y,hist_ty_pos, hist_ty_neg, t_edges, y_edges)
-                self.data['figureAxProjectionXY'].plot(self.data['CandidatePreviewLocs']['x']/pixel_size, self.data['CandidatePreviewLocs']['y']/pixel_size, marker='x', c='red')
-                self.data['figureAxProjectionXT'].plot(self.data['CandidatePreviewLocs']['t'], self.data['CandidatePreviewLocs']['x']/pixel_size, marker='x', c='red')
-                self.data['figureAxProjectionYT'].plot(self.data['CandidatePreviewLocs']['t'], self.data['CandidatePreviewLocs']['y']/pixel_size, marker='x', c='red')
-
-                # Add and set labels
-                self.data['figureAxProjectionXY'].set_xlabel('x [px]')
-                self.data['figureAxProjectionXY'].set_ylabel('y [px]')
-                self.data['figureAxProjectionXT'].set_ylabel('x [px]')
-                self.data['figureAxProjectionYT'].set_ylabel('y [px]')
-                self.data['figureAxProjectionYT'].set_xlabel('t [ms]')
-                
-                # Give it a nice layout
-                self.data['figurePlotProjection'].tight_layout()
-
-                # Update drawing of the canvas
-                self.data['figureCanvasProjection'].draw()
+                self.data['secondCandidatePlot'].plot(self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events'], self.data['CandidatePreviewLocs'], pixel_size)
                 logging.info(f"2D event-projections of candidate {self.data['CandidatePreviewID']} drawn.")
 
             else: 
@@ -1332,48 +1247,6 @@ class MyGUI(QMainWindow):
                 logging.error('Tried to visualise candidate but no data found!')
         else:
             logging.info('Candidate preview is reset.')
-
-    def format_coord_projectionxy(self, x, y, pos_hist, neg_hist, x_edges, y_edges):
-        """
-        Function that formats the coordinates of the mouse cursor in candidate preview xy projection
-        """
-        x_pix = round(x)
-        y_pix = round(y)
-        x_bin = np.digitize(x, x_edges) - 1
-        y_bin = np.digitize(y, y_edges) - 1
-        pos = int(pos_hist[x_bin, y_bin])
-        neg = int(neg_hist[x_bin, y_bin])
-
-        display = f'x={x_pix}, y={y_pix}, events[pos,neg]=[{pos}, {neg}]'
-        return display
-
-    def format_coord_projectiontx(self, x, y, pos_hist, neg_hist, t_edges, x_edges):
-        """
-        Function that formats the coordinates of the mouse cursor in candidate preview xt projection
-        """
-        time = round(x)
-        x_pix = round(y)
-        x_bin = np.digitize(x, t_edges) - 1
-        y_bin = np.digitize(y, x_edges) - 1
-        pos = int(pos_hist[x_bin, y_bin])
-        neg = int(neg_hist[x_bin, y_bin])
-
-        display = f't={time} ms, x={x_pix}, events[pos,neg]=[{pos}, {neg}]'
-        return display
-
-    def format_coord_projectionty(self, x, y, pos_hist, neg_hist, t_edges, y_edges):
-        """
-        Function that formats the coordinates of the mouse cursor in candidate preview yt projection
-        """
-        time = round(x)
-        y_pix = round(y)
-        x_bin = np.digitize(x, t_edges) - 1
-        y_bin = np.digitize(y, y_edges) - 1
-        pos = int(pos_hist[x_bin, y_bin])
-        neg = int(neg_hist[x_bin, y_bin])
-
-        display = f't={time} ms, y={y_pix}, events[pos,neg]=[{pos}, {neg}]'
-        return display
         
 
     def setup_previewTab(self):
@@ -2460,10 +2333,14 @@ class MyGUI(QMainWindow):
         self.entries = {}
         # Iterate over all editable fields and store their values in the entries dictionary
         for field_name, field_widget in self.get_editable_fields().items():
-            if isinstance(field_widget, QLineEdit):
-                self.entries[field_name] = field_widget.text()
-            elif isinstance(field_widget, QComboBox):
-                self.entries[field_name] = field_widget.currentText()
+            # only store editable fields that have a name
+            if not field_name=="":
+                if isinstance(field_widget, QLineEdit):
+                    self.entries[field_name] = field_widget.text()
+                if isinstance(field_widget, QCheckBox):
+                    self.entries[field_name] = field_widget.isChecked()
+                elif isinstance(field_widget, QComboBox):
+                    self.entries[field_name] = field_widget.currentText()
 
         # Specify the path and filename for the JSON file
         json_file_path = self.globalSettings['JSONGUIstorePath']['value']
@@ -2477,8 +2354,10 @@ class MyGUI(QMainWindow):
         self.load_entries_from_json_single(runParams=['QComboBox'])
         #Then set all line edits
         self.load_entries_from_json_single(runParams=['QLineEdit'])
+        #Then set all checkboxes
+        self.load_entries_from_json_single(runParams=['QCheckBox'])
     
-    def load_entries_from_json_single(self,runParams=['QLineEdit','QComboBox']):
+    def load_entries_from_json_single(self,runParams=['QLineEdit','QComboBox','QCheckBox']):
         # Specify the path and filename for the JSON file
         json_file_path = self.globalSettings['JSONGUIstorePath']['value']
 
@@ -2495,6 +2374,10 @@ class MyGUI(QMainWindow):
                             if 'QLineEdit' in runParams:
                                 field_widget.setText(self.entries[field_name])
                                 logging.debug('Set text of field_widget '+field_name+' to '+self.entries[field_name])
+                        elif isinstance(field_widget, QCheckBox):
+                            if 'QCheckBox' in runParams:
+                                field_widget.setChecked(self.entries[field_name])
+                                logging.debug('Set text of field_widget '+field_name+' to '+str(self.entries[field_name]))
                         elif isinstance(field_widget, QComboBox):
                             if 'QComboBox' in runParams:
                                 index = field_widget.findText(self.entries[field_name])
@@ -2523,7 +2406,7 @@ class MyGUI(QMainWindow):
         fields = {}
 
         def find_editable_fields(widget):
-            if isinstance(widget, QLineEdit) or isinstance(widget, QComboBox):
+            if isinstance(widget, QLineEdit) or isinstance(widget, QComboBox) or isinstance(widget, QCheckBox):
                 fields[widget.objectName()] = widget
             elif isinstance(widget, QWidget):
                 # for child_widget in widget.children():
@@ -2876,6 +2759,261 @@ class ClickableGroupBox(QGroupBox):
                     widget.setVisible(checked)
             layout.invalidate()
             self.adjustSize()
+
+class AdvancedOptionsWindowCanPrev(QMainWindow):
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.setWindowTitle("Advanced options")
+        self.resize(300, 200)
+
+        self.parent = parent
+        # Set the window icon to the parent's icon
+        self.setWindowIcon(self.parent.windowIcon())
+
+        #Create a vertical layout
+        layout = QVBoxLayout()
+
+        # Add a QGroupBox for "Plots to show"
+        self.plotOptionsGroupBox = QGroupBox("Plots to show")
+        plotOptionsLayout = QGridLayout()
+        
+        # Create and add QCheckboxes for plot options to the grid layout
+        self.plotOptionCheckboxes = []
+        self.currentSelection = []
+        self.plotOptions = {1: {"name": "3D pointcloud", "description": "3D pointcloud of candidate cluster."},
+                            2: {"name": "3D pointcloud + first events", "description": "3D pointcloud of candidate cluster, first events per pixel are labeled."},
+                            3: {"name": "2D projections", "description": "2D projections of candidate cluster."},
+                            4: {"name": "2D timestamps", "description": "2D timestamps (first, median, mean event) per pixel in candidate cluster."},
+                            5: {"name": "2D event delays", "description": "2D event delays (min, mean, max) per pixel in candidate cluster."}}
+        currentRow=0
+        rowMax = 3
+        curruntCol=0
+        for option_id, option_data in self.plotOptions.items():
+            checkbox = QCheckBox(option_data["name"])
+            checkbox.setToolTip(option_data["description"])  # Set tooltip with description
+            checkbox.setObjectName(f"PlotOption_{option_id}")  # Set object name for identification
+            checkbox.stateChanged.connect(self.handlePlotOptionCheckboxChange)
+            plotOptionsLayout.addWidget(checkbox, currentRow, curruntCol)
+            currentRow += 1
+            if currentRow == rowMax:
+                currentRow = 0
+                curruntCol += 1
+            self.plotOptionCheckboxes.append(checkbox)
+
+        self.plotOptionsGroupBox.setLayout(plotOptionsLayout)
+        layout.addWidget(self.plotOptionsGroupBox)
+
+        #Add a grid layout
+        grid = QGridLayout()
+        layout.addLayout(grid)
+        currentRow = 0
+
+        # show surrounding tick box
+        self.showSurroundingCheckBox = QCheckBox("Show surrounding")
+        self.showSurroundingCheckBox.setObjectName("CanPreview_showSurrounding")
+        self.showSurroundingCheckBox.stateChanged.connect(lambda state: self.showSurrounding_checked(state))
+        grid.addWidget(self.showSurroundingCheckBox, currentRow, 0)
+        # show x,y,t padding line edits if show surrounding is checked make them gray if not checked and unwritable
+        self.xPaddingQLabel = QLabel("x-padding:")
+        self.yPaddingQLabel = QLabel("y-padding:")
+        self.tPaddingQLabel = QLabel("t-padding:")
+        self.xPaddingLineEdit = QLineEdit("10")
+        self.yPaddingLineEdit = QLineEdit("10")
+        self.tPaddingLineEdit = QLineEdit("10")
+        self.xPaddingLineEdit.setObjectName("CanPreview_xPadding")
+        self.yPaddingLineEdit.setObjectName("CanPreview_yPadding")
+        self.tPaddingLineEdit.setObjectName("CanPreview_tPadding")
+        grid.addWidget(self.xPaddingQLabel, currentRow, 1)
+        grid.addWidget(self.xPaddingLineEdit, currentRow, 2)
+        grid.addWidget(self.yPaddingQLabel, currentRow, 3)
+        grid.addWidget(self.yPaddingLineEdit, currentRow, 4)
+        grid.addWidget(self.tPaddingQLabel, currentRow, 5)
+        grid.addWidget(self.tPaddingLineEdit, currentRow, 6)
+        self.showSurrounding_checked(self.showSurroundingCheckBox.checkState())
+
+        # Create a widget and set and add layouts
+        widget = QWidget()
+        widget.setLayout(layout)
+
+        # Set the central widget of the main window
+        self.setCentralWidget(widget)
+
+    def showSurrounding_checked(self, state):
+        if state == 2:  # 2 is Qt.Checked
+            self.xPaddingQLabel.setStyleSheet("")
+            self.yPaddingQLabel.setStyleSheet("")
+            self.tPaddingQLabel.setStyleSheet("")
+            self.xPaddingLineEdit.setStyleSheet("")
+            self.yPaddingLineEdit.setStyleSheet("")
+            self.tPaddingLineEdit.setStyleSheet("")
+            self.xPaddingLineEdit.setReadOnly(False)
+            self.yPaddingLineEdit.setReadOnly(False)
+            self.tPaddingLineEdit.setReadOnly(False)
+        else:
+            self.xPaddingQLabel.setStyleSheet("color: #808080;")
+            self.yPaddingQLabel.setStyleSheet("color: #808080;")
+            self.tPaddingQLabel.setStyleSheet("color: #808080;")
+            self.xPaddingLineEdit.setStyleSheet("color: #808080; background-color: #ECECEC;")
+            self.yPaddingLineEdit.setStyleSheet("color: #808080; background-color: #ECECEC;")
+            self.tPaddingLineEdit.setStyleSheet("color: #808080; background-color: #ECECEC;")
+            self.xPaddingLineEdit.setReadOnly(True)
+            self.yPaddingLineEdit.setReadOnly(True)
+            self.tPaddingLineEdit.setReadOnly(True)
+
+    def handlePlotOptionCheckboxChange(self, state):
+        sender = self.sender()
+        if sender.isChecked():
+            if len(self.currentSelection) < 2:
+                self.currentSelection.append(sender)
+            else:
+                self.currentSelection[0].setChecked(False)
+                self.currentSelection.append(sender)
+        else:
+            if sender in self.currentSelection:
+                self.currentSelection.remove(sender)
+
+class ThreeDPointCloud:
+    def __init__(self):
+        self.figure = plt.figure(figsize=(6.8, 4))
+        self.figure.suptitle("3D pointcloud of candidate cluster")
+        self.ax = self.figure.add_subplot(111, projection='3d')
+        self.canvas = FigureCanvas(self.figure)
+        self.figure.tight_layout()
+        self.figure.subplots_adjust(top=0.95)
+
+    def reset(self):
+        self.ax.cla()
+
+    def plot(self, events, localizations, pixel_size):
+        pos_events = events[events['p'] == 1]
+        neg_events = events[events['p'] == 0]
+        # Do a 3d scatterplot of the event data
+        if not len(pos_events)==0:
+            self.ax.scatter(pos_events['x'], pos_events['y'], pos_events['t']*1e-3, label='Positive events', color='C0')
+        if not len(neg_events)==0:
+            self.ax.scatter(neg_events['x'], neg_events['y'], neg_events['t']*1e-3, label='Negative events', color='C1')
+        self.ax.set_xlabel('x [px]')
+        self.ax.set_ylabel('y [px]')
+        self.ax.set_zlabel('t [ms]')
+        self.ax.invert_zaxis()
+
+        # Plot the localization(s) of the candidate
+        self.ax.plot(localizations['x']/pixel_size, localizations['y']/pixel_size, localizations['t'], marker='x', c='red', label='Localization(s)')
+        self.ax.legend(loc='upper right', bbox_to_anchor=(1.6, 1))
+
+        # Give it a nice layout
+        self.figure.tight_layout()
+        self.figure.subplots_adjust(top=0.95)
+
+        # Update drawing of the canvas
+        self.canvas.draw()
+
+class TwoDProjection:
+    def __init__(self):
+        self.figure = plt.figure(figsize=(6.8, 4))
+        self.figure.suptitle("2D projections of candidate cluster")
+        self.ax_xy = self.figure.add_subplot(121)
+        self.ax_xt = self.figure.add_subplot(222)
+        self.ax_yt = self.figure.add_subplot(224)
+        self.canvas = FigureCanvas(self.figure)
+        self.figure.tight_layout()
+
+    def reset(self):
+        self.ax_xy.cla()
+        self.ax_xt.cla()
+        self.ax_yt.cla()
+        # self.ax_xt.set_aspect('auto') # not sure if I need those
+        # self.ax_yt.set_aspect('auto')
+
+    def plot(self, events, localizations, pixel_size):
+        hist_xy = utilsHelper.Hist2d_xy(events)
+        hist_tx = utilsHelper.Hist2d_tx(events)
+        hist_ty = utilsHelper.Hist2d_ty(events)
+
+        x_edges, y_edges, t_edges = hist_xy.x_edges, hist_xy.y_edges, hist_tx.x_edges
+
+        # Compute the 2D histograms (pos)
+        hist_xy_pos = hist_xy(events[events['p'] == 1])[0]
+        hist_tx_pos = hist_tx(events[events['p'] == 1])[0]
+        hist_ty_pos = hist_ty(events[events['p'] == 1])[0]
+        # Compute the 2D histograms (neg)
+        hist_xy_neg = hist_xy(events[events['p'] == 0])[0]
+        hist_tx_neg = hist_tx(events[events['p'] == 0])[0]
+        hist_ty_neg = hist_ty(events[events['p'] == 0])[0]
+
+        # Set goodlooking aspect ratio depending on nr of xyt-bins
+        aspectty = 3. * (len(t_edges)-1) / (len(y_edges)-1)
+        aspecttx = 3. * (len(t_edges)-1) / (len(x_edges)-1)
+
+        # Plot the 2D histograms
+        self.ax_xy.pcolormesh(x_edges, y_edges, hist_xy.dist2D)
+        self.ax_xy.set_aspect('equal')
+        self.ax_xy.format_coord = lambda x,y:self.format_coord_projectionxy(x,y,hist_xy_pos.T, hist_xy_neg.T, x_edges, y_edges)
+        self.ax_xt.pcolormesh(t_edges, x_edges, hist_tx.dist2D)
+        self.ax_xt.set_aspect(aspecttx)
+        self.ax_xt.format_coord = lambda x,y:self.format_coord_projectiontx(x,y,hist_tx_pos.T, hist_tx_neg.T, t_edges, x_edges)
+        self.ax_yt.pcolormesh(t_edges, y_edges, hist_ty.dist2D)
+        self.ax_yt.set_aspect(aspectty)
+        self.ax_yt.format_coord = lambda x,y:self.format_coord_projectionty(x,y,hist_ty_pos.T, hist_ty_neg.T, t_edges, y_edges)
+        self.ax_xy.plot(localizations['x']/pixel_size, localizations['y']/pixel_size, marker='x', c='red')
+        self.ax_xt.plot(localizations['t'], localizations['x']/pixel_size, marker='x', c='red')
+        self.ax_yt.plot(localizations['t'], localizations['y']/pixel_size, marker='x', c='red')
+
+        # Add and set labels
+        self.ax_xy.set_xlabel('x [px]')
+        self.ax_xy.set_ylabel('y [px]')
+        self.ax_xt.set_ylabel('x [px]')
+        self.ax_yt.set_ylabel('y [px]')
+        self.ax_yt.set_xlabel('t [ms]')
+        
+        # Give it a nice layout
+        self.figure.tight_layout()
+
+        # Update drawing of the canvas
+        self.canvas.draw()
+
+    def format_coord_projectionxy(self, x, y, pos_hist, neg_hist, x_edges, y_edges):
+        """
+        Function that formats the coordinates of the mouse cursor in candidate preview xy projection
+        """
+        x_pix = round(x)
+        y_pix = round(y)
+        x_bin = np.digitize(x, x_edges) - 1
+        y_bin = np.digitize(y, y_edges) - 1
+        pos = int(pos_hist[x_bin, y_bin])
+        neg = int(neg_hist[x_bin, y_bin])
+
+        display = f'x={x_pix}, y={y_pix}, events[pos,neg]=[{pos}, {neg}]'
+        return display
+
+    def format_coord_projectiontx(self, x, y, pos_hist, neg_hist, t_edges, x_edges):
+        """
+        Function that formats the coordinates of the mouse cursor in candidate preview xt projection
+        """
+        time = round(x)
+        x_pix = round(y)
+        x_bin = np.digitize(x, t_edges) - 1
+        y_bin = np.digitize(y, x_edges) - 1
+        pos = int(pos_hist[x_bin, y_bin])
+        neg = int(neg_hist[x_bin, y_bin])
+
+        display = f't={time} ms, x={x_pix}, events[pos,neg]=[{pos}, {neg}]'
+        return display
+
+    def format_coord_projectionty(self, x, y, pos_hist, neg_hist, t_edges, y_edges):
+        """
+        Function that formats the coordinates of the mouse cursor in candidate preview yt projection
+        """
+        time = round(x)
+        y_pix = round(y)
+        x_bin = np.digitize(x, t_edges) - 1
+        y_bin = np.digitize(y, y_edges) - 1
+        pos = int(pos_hist[x_bin, y_bin])
+        neg = int(neg_hist[x_bin, y_bin])
+
+        display = f't={time} ms, y={y_pix}, events[pos,neg]=[{pos}, {neg}]'
+        return display
+                
 
 
 from PyQt5.QtCore import QThread, pyqtSignal
