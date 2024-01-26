@@ -1941,7 +1941,7 @@ class MyGUI(QMainWindow):
                             polarityVal = 'Pos'
                         elif np.all(npyData['p'] == 0):
                             polarityVal = 'Neg'
-                        self.runFindingAndFitting(npyData,runFitting=True,storeFinding=False,polarityVal=polarityVal)
+                        self.runFindingAndFitting(npyData,runFitting=True,storeFinding=True,polarityVal=polarityVal)
                         #we store our finding and fitting results like this:
                         partialFinding[events_id] = self.data['FindingResult']
                         partialFitting[events_id] = self.data['FittingResult']
@@ -1989,7 +1989,6 @@ class MyGUI(QMainWindow):
             npyData = None
             self.runFindingAndFitting(npyData,polarityVal=polarityVal)
         
-    
     def FindingBatching(self,npyData):
         #For now, print start and final time:
         logging.info(self.chunckloading_currentLimits)
@@ -2015,7 +2014,6 @@ class MyGUI(QMainWindow):
                         self.data['FindingResult'][0][len(self.data['FindingResult'][0])] = BatchFindingResult[0][k]
                 except:
                     print('issues with index '+str(k))
-        
         
     def filter_finding_on_chunking(self,candidate,chunking_limits):
         #Return true if it should be in this chunk, false if not
@@ -2059,7 +2057,6 @@ class MyGUI(QMainWindow):
                 logging.error('This candidate is never assigned! Should not happen!')
                 return False
         
-    
     def runFindingBatching(self):
         logging.info('Batching-dependant finding starting!')
         fileToRun = self.currentFileInfo['CurrentFileLoc']
@@ -2196,67 +2193,75 @@ class MyGUI(QMainWindow):
         #     polarityVal = 'Mix'
         FindingEvalText = self.getFunctionEvalText('Finding',"npyData","self.globalSettings",polarityVal)
         if FindingEvalText is not None:
-            self.currentFileInfo['FindingTime'] = time.time()
-            self.data['FindingMethod'] = str(FindingEvalText)
-            self.data['FindingResult'] = eval(str(FindingEvalText))
-            self.currentFileInfo['FindingTime'] = time.time() - self.currentFileInfo['FindingTime']
-            logging.info('Number of candidates found: '+str(len(self.data['FindingResult'][0])))
-            logging.info('Candidate finding took '+str(self.currentFileInfo['FindingTime'])+' seconds.')
-            logging.info('Candidate finding done!')
-            logging.debug(self.data['FindingResult'])
-            if storeFinding:
-                if self.globalSettings['StoreFindingOutput']['value']:
-                    self.storeFindingOutput()
-            #And run the fitting
-            if runFitting:
-                self.runFitting(polarityVal)
+            #Here we run the finding method:
+            try:
+                self.currentFileInfo['FindingTime'] = time.time()
+                self.data['FindingMethod'] = str(FindingEvalText)
+                self.data['FindingResult'] = eval(str(FindingEvalText))
+                self.currentFileInfo['FindingTime'] = time.time() - self.currentFileInfo['FindingTime']
+                logging.info('Number of candidates found: '+str(len(self.data['FindingResult'][0])))
+                logging.info('Candidate finding took '+str(self.currentFileInfo['FindingTime'])+' seconds.')
+                logging.info('Candidate finding done!')
+                logging.debug(self.data['FindingResult'])
+                if storeFinding:
+                    if self.globalSettings['StoreFindingOutput']['value']:
+                        self.storeFindingOutput()
+                #And run the fitting
+                if runFitting:
+                    self.runFitting(polarityVal)
+            except Exception as e:
+                self.open_critical_warning(f"Critical error in Finding routine! Breaking off!\nError information:\n{e}")
+                self.data['FindingResult'] = {}
         else:
-            logging.error('Candidate finding NOT performed')
+            self.open_critical_warning(f"No Finding evaluation text provided/found")
 
-            
     def runFitting(self,polarityVal):
         if self.data['FindingResult'][0] is not None:
             #Run the finding function!
-            FittingEvalText = self.getFunctionEvalText('Fitting',"self.data['FindingResult'][0]","self.globalSettings",polarityVal)
-            if FittingEvalText is not None:
-                self.currentFileInfo['FittingTime'] = time.time()
-                self.data['FittingMethod'] = str(FittingEvalText)
-                self.data['FittingResult'] = eval(str(FittingEvalText))
-                self.currentFileInfo['FittingTime'] = time.time() - self.currentFileInfo['FittingTime']
-                logging.info('Number of localizations found: '+str(len(self.data['FittingResult'][0])))
-                logging.info('Candidate fitting took '+str(self.currentFileInfo['FittingTime'])+' seconds.')
-                logging.info('Candidate fitting done!')
-                self.data['NrEvents'] = 0
-                for candidateID, candidate in self.data['FindingResult'][0].items():
-                        self.data['NrEvents'] += len(candidate['events'])
-                # Update Candidate preview with new finding/fitting results only if found candidates are unchanged
-                if self.data['prevFindingMethod']=='None' and self.data['prevNrEvents']==0 and self.data['prevNrCandidates']==0:
-                    # Finding routine ran for the first time -> don't update preview
-                    self.data['prevFindingMethod'] = self.data['FindingMethod']
-                    self.data['prevNrCandidates'] = len(self.data['FindingResult'][0])
-                    self.data['prevNrEvents'] = self.data['NrEvents']
-                elif self.data['prevNrEvents'] == self.data['NrEvents'] and self.data['prevNrCandidates'] == len(self.data['FindingResult'][0]) and self.data['prevFindingMethod'] == self.data['FindingMethod']:
-                    # same finding routine ran compared to previous run -> Candidates are unchanged
-                    logging.info("Candidate preview was updated!")
-                    self.updateCandidatePreview()
-                else: 
-                    # found candidates have changed -> don't update preview, but update previous run data
-                    self.data['prevFindingMethod'] = self.data['FindingMethod']
-                    self.data['prevNrCandidates'] = len(self.data['FindingResult'][0])
-                    self.data['prevNrEvents'] = self.data['NrEvents']
-                    self.updateCandidatePreview(reset=True)
-                logging.debug(self.data['FittingResult'])
-                if len(self.data['FittingResult'][0]) == 0:
-                    logging.error('No localizations found after fitting!')
-                    return
-                #Create and store the metadata
-                if self.globalSettings['StoreFileMetadata']['value']:
-                    self.createAndStoreFileMetadata()
-                
-                if self.globalSettings['StoreFinalOutput']['value']:
+            try:
+                FittingEvalText = self.getFunctionEvalText('Fitting',"self.data['FindingResult'][0]","self.globalSettings",polarityVal)
+                if FittingEvalText is not None:
+                    self.currentFileInfo['FittingTime'] = time.time()
+                    self.data['FittingMethod'] = str(FittingEvalText)
+                    self.data['FittingResult'] = eval(str(FittingEvalText))
+                    self.currentFileInfo['FittingTime'] = time.time() - self.currentFileInfo['FittingTime']
+                    logging.info('Number of localizations found: '+str(len(self.data['FittingResult'][0])))
+                    logging.info('Candidate fitting took '+str(self.currentFileInfo['FittingTime'])+' seconds.')
+                    logging.info('Candidate fitting done!')
+                    self.data['NrEvents'] = 0
+                    for candidateID, candidate in self.data['FindingResult'][0].items():
+                            self.data['NrEvents'] += len(candidate['events'])
+                    # Update Candidate preview with new finding/fitting results only if found candidates are unchanged
+                    if self.data['prevFindingMethod']=='None' and self.data['prevNrEvents']==0 and self.data['prevNrCandidates']==0:
+                        # Finding routine ran for the first time -> don't update preview
+                        self.data['prevFindingMethod'] = self.data['FindingMethod']
+                        self.data['prevNrCandidates'] = len(self.data['FindingResult'][0])
+                        self.data['prevNrEvents'] = self.data['NrEvents']
+                    elif self.data['prevNrEvents'] == self.data['NrEvents'] and self.data['prevNrCandidates'] == len(self.data['FindingResult'][0]) and self.data['prevFindingMethod'] == self.data['FindingMethod']:
+                        # same finding routine ran compared to previous run -> Candidates are unchanged
+                        logging.info("Candidate preview was updated!")
+                        self.updateCandidatePreview()
+                    else: 
+                        # found candidates have changed -> don't update preview, but update previous run data
+                        self.data['prevFindingMethod'] = self.data['FindingMethod']
+                        self.data['prevNrCandidates'] = len(self.data['FindingResult'][0])
+                        self.data['prevNrEvents'] = self.data['NrEvents']
+                        self.updateCandidatePreview(reset=True)
+                    logging.debug(self.data['FittingResult'])
+                    if len(self.data['FittingResult'][0]) == 0:
+                        logging.error('No localizations found after fitting!')
+                        return
+                    #Create and store the metadata
+                    if self.globalSettings['StoreFileMetadata']['value']:
+                        self.createAndStoreFileMetadata()
+                    
+                    if self.globalSettings['StoreFinalOutput']['value']:
                     self.storeLocalizationOutput()
+            except Exception as e:
+                self.open_critical_warning(f"Critical error in Fitting routine! Breaking off!\nError information:\n{e}")
+                self.data['FittingResult'] = {}
             else:
-                logging.error('Candidate fitting NOT performed')
+                self.open_critical_warning(f"No Fitting evaluation text provided/found")
         else:
             logging.error('No Finding Result obtained! Fitting is not run succesfully!')
                       

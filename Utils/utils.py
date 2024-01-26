@@ -391,7 +391,6 @@ def functionNameFromDisplayName(displayname,map):
         if pair[0] == displayname:
             return pair[1]
         
-
 def typeFromKwarg(functionname,kwargname):
     #Check if the function has a 'type' entry for the specific kwarg. If not, return None. Otherwise, return the type value.
     typing=None
