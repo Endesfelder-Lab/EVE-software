@@ -2129,7 +2129,7 @@ class MyGUI(QMainWindow):
                         self.createAndStoreFileMetadata()
                     
                     if self.globalSettings['StoreFinalOutput']['value']:
-                    self.storeLocalizationOutput()
+                        self.storeLocalizationOutput()
             except Exception as e:
                 self.open_critical_warning(f"Critical error in Fitting routine! Breaking off!\nError information:\n{e}")
                 self.data['FittingResult'] = {}
