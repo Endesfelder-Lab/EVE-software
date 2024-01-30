@@ -2145,8 +2145,10 @@ class MyGUI(QMainWindow):
                             #limit to requested xy
                             events = self.filterEvents_xy(events,xyStretch=(float(self.run_minXLineEdit.text()),float(self.run_maxXLineEdit.text()),float(self.run_minYLineEdit.text()),float(self.run_maxYLineEdit.text())))
                             #limit to requested t
-                            maxT = (float(self.run_startTLineEdit.text())+float(self.run_durationTLineEdit.text()))*1000
-                            events = events[events['t']<maxT]
+                            # maxT = (float(self.run_startTLineEdit.text())+float(self.run_durationTLineEdit.text()))*1000
+                            # events = events[events['t']<maxT]
+                            
+                            # logging.warning('RAW2 Current event min/max time:'+str(min(events['t'])/1000)+"/"+str(max(events['t'])/1000))
                             
                             #self.chunckloading_currentLimits is later used to check which PSFs are in the current chunk
                             self.chunckloading_currentLimits = [[(self.chunckloading_number_chuck)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000,(self.chunckloading_number_chuck+1)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000],[(self.chunckloading_number_chuck)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000-float(self.globalSettings['FindingBatchingTimeOverlapMs']['value'])*1000,(self.chunckloading_number_chuck+1)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000+float(self.globalSettings['FindingBatchingTimeOverlapMs']['value'])*1000]]
@@ -2154,6 +2156,12 @@ class MyGUI(QMainWindow):
                             self.chunckloading_currentLimits = [[float(self.run_startTLineEdit.text())*1000 + x for x in sublist] for sublist in self.chunckloading_currentLimits]
                             #Add events_prev before these events:
                             events = np.concatenate((events_prev,events))
+                            #Limit to the wanted minimum time
+                            # maxT = (float(self.run_startTLineEdit.text())+float(self.run_durationTLineEdit.text()))*1000
+                            # events = events[events['t']<maxT]
+                            
+                            
+                            logging.warning('RAW1 Current event min/max time:'+str(min(events['t'])/1000)+"/"+str(max(events['t'])/1000))
                             
                             if len(events)>0:
                                 #Filter on correct polarity
@@ -2166,9 +2174,10 @@ class MyGUI(QMainWindow):
                                 
                                 if (len(eventsPol) > 0):
                                     self.FindingBatching(eventsPol,polarityVal)
+                                    self.chunckloading_number_chuck += 1
                                     
-                                    events_prev = events[events['t']>((self.chunckloading_number_chuck+1)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000-float(self.globalSettings['FindingBatchingTimeOverlapMs']['value'])*1000)]
-                            self.chunckloading_number_chuck += 1
+                                    #Keep the previous 'overlap-events' for next round
+                                    events_prev = events[events['t']>self.chunckloading_currentLimits[0][1]]
                         else:
                             logging.info('Finished chunking!')
                             self.number_finding_found_polarity[polarityVal] = len(self.data['FindingResult'][0])
@@ -2212,15 +2221,18 @@ class MyGUI(QMainWindow):
                 self.chunckloading_currentLimits = [[0,0],[0,0]]
                 #Loop over the chunks:
                 while self.chunckloading_finished_chunking == False:
+                    #Find the current time limits (inner, outer time)
                     self.chunckloading_currentLimits = [[(self.chunckloading_number_chuck)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000,(self.chunckloading_number_chuck+1)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000],[(self.chunckloading_number_chuck)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000-float(self.globalSettings['FindingBatchingTimeOverlapMs']['value'])*1000,(self.chunckloading_number_chuck+1)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000+float(self.globalSettings['FindingBatchingTimeOverlapMs']['value'])*1000]]
                     #Add the starting time
                     self.chunckloading_currentLimits = [[float(self.run_startTLineEdit.text())*1000 + x for x in sublist] for sublist in self.chunckloading_currentLimits]
-                    
+                    #Check which are within the limits
                     indices = np.logical_and((data_pol['t'] >= self.chunckloading_currentLimits[1][0]), (data_pol['t'] <= self.chunckloading_currentLimits[1][1]))
                     
                     
                     #Filter to xy
                     events = self.filterEvents_xy(data_pol,xyStretch=(dataset_minx+float(self.run_minXLineEdit.text()),dataset_minx+float(self.run_maxXLineEdit.text()),dataset_miny+float(self.run_minYLineEdit.text()),dataset_miny+float(self.run_maxYLineEdit.text())))
+                    #and filter to time
+                    events = self.filterEvents_npy_t(events,tStretch=(self.chunckloading_currentLimits[1][0]/1000,self.chunckloading_currentLimits[1][1]/1000))
                             
                     if len(events) > 0:
                         #Check if any events are still within the range of time we want to assess
