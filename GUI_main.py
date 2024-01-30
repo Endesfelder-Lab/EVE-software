@@ -1785,7 +1785,7 @@ class MyGUI(QMainWindow):
             
             return eventsDict
     
-    def RawToNpy(self,filepath,buffer_size = 1e8,time_batches = 50e3):        
+    def RawToNpy(self,filepath,buffer_size = 5e9, n_batches=5e9):        
         if(os.path.exists(filepath[:-4]+'.npy')):
             events = np.load(filepath[:-4]+'.npy')
             logging.info('NPY file from RAW was already present, loading this instead of RAW!')
@@ -1793,15 +1793,14 @@ class MyGUI(QMainWindow):
             logging.info('Starting to convert NPY to RAW...')
             sys.path.append(self.globalSettings['MetaVisionPath']['value']) 
             from metavision_core.event_io.raw_reader import RawReader
-            record_raw = RawReader(filepath)
+            record_raw = RawReader(filepath,max_events=int(buffer_size))
             sums = 0
             time = 0
             events=np.empty
             while not record_raw.is_done() and record_raw.current_event_index() < buffer_size:
                 #Load a batch of events
-                events_temp = record_raw.load_delta_t(time_batches)
+                events_temp = record_raw.load_n_events(n_batches)
                 sums += events_temp.size
-                time += time_batches/1e6
                 #Add the events in this batch to the big array
                 if sums == events_temp.size:
                     events = events_temp
@@ -1809,9 +1808,9 @@ class MyGUI(QMainWindow):
                     events = np.concatenate((events,events_temp))
             record_raw.reset()
             # correct the coordinates and time stamps
-            events['x']-=np.min(events['x'])
-            events['y']-=np.min(events['y'])
-            events['t']-=np.min(events['t'])
+            # events['x']-=np.min(events['x'])
+            # events['y']-=np.min(events['y'])
+            # events['t']-=np.min(events['t'])
             if self.globalSettings['StoreConvertedRawData']['value']:
                 np.save(filepath[:-4]+'.npy',events)
                 logging.debug('NPY file created')
