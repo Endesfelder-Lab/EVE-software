@@ -119,7 +119,7 @@ def compute_eig(pcc):
 def EigenValueCalculation(npyarr,kwargs):
     ms_to_px=float(kwargs['ratio_ms_to_px'])
     data_for_o3d = npyarr
-    multiCore = False
+    multiCore = True
     if multiCore == True:
         start_time = time.time()
         point_cloud = o3d.geometry.PointCloud()
@@ -131,7 +131,7 @@ def EigenValueCalculation(npyarr,kwargs):
         pcc = np.asarray(point_cloud.covariances)
         point_cloud.estimate_normals(fast_normal_computation=True,search_param=o3d.geometry.KDTreeSearchParamKNN(knn=int(kwargs['search_n_neighbours'])))
         
-        N = 150  # Number of chunks
+        N = multiprocessing.cpu_count()  # Number of chunks
         pcc_chunks = np.array_split(pcc, N)
 
         results = Parallel(n_jobs=-1)(delayed(compute_eig)(pcc_chunk) for pcc_chunk in pcc_chunks)
@@ -139,10 +139,6 @@ def EigenValueCalculation(npyarr,kwargs):
         eig_valso3d_list = []
         eig_valso3d_list.extend([res[0] for res in results])
         eig_valso3d = np.concatenate(eig_valso3d_list, axis=0)
-        
-        # eig_vecso3d_list = []
-        # eig_vecso3d_list.extend([res[1] for res in results])    
-        
         print('eigv calculated')
         end_time = time.time()
         print('Eigenvalue calculation time1: ', end_time - start_time)
@@ -156,6 +152,7 @@ def EigenValueCalculation(npyarr,kwargs):
         print('pcc estimated')
         pcc = np.asarray(point_cloud.covariances)        
         eig_valso3d = np.linalg.svd(pcc,compute_uv=False,hermitian=True)
+        #svdres = np.linalg.svd(pcc,compute_uv=True,hermitian=True) #eigenvals == svdres.S == singular values
         print('eigv calculated')
         end_time = time.time()
         print('Eigenvalue calculation time2: ', end_time - start_time)
