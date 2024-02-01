@@ -1191,12 +1191,12 @@ class MyGUI(QMainWindow):
         """
 
         #Add a vertical layout
-        canPreviewtab_vertical_container = QVBoxLayout()
-        self.tab_canPreview.setLayout(canPreviewtab_vertical_container)
+        self.canPreviewtab_vertical_container = QVBoxLayout()
+        self.tab_canPreview.setLayout(self.canPreviewtab_vertical_container)
         
         #Add a horizontal layout to the first row of the vertical layout - this contains the entry fields and the buttons
         canPreviewtab_horizontal_container = QHBoxLayout()
-        canPreviewtab_vertical_container.addLayout(canPreviewtab_horizontal_container)
+        self.canPreviewtab_vertical_container.addLayout(canPreviewtab_horizontal_container)
         
         #Add a entry field to type the number of candidate and button to show it
         canPreviewtab_horizontal_container.addWidget(QLabel("Candidate ID: "))
@@ -1232,25 +1232,29 @@ class MyGUI(QMainWindow):
 
         #Add a horizontal layout to display info about the cluster
         self.canPreviewtab_horizontal_container2 = QHBoxLayout()
-        canPreviewtab_vertical_container.addLayout(self.canPreviewtab_horizontal_container2)
+        self.canPreviewtab_vertical_container.addLayout(self.canPreviewtab_horizontal_container2)
         self.candidate_info = QLabel('')
         self.canPreviewtab_horizontal_container2.addWidget(self.candidate_info)
 
         #Create an empty figure and store it as self.data:
-        self.data['firstCandidatePlot'] = ThreeDPointCloud()
+        self.data['firstCandidateFigure'] = plt.figure(figsize=(6.8,4))
+        self.data['firstCandidateCanvas'] = FigureCanvas(self.data['firstCandidateFigure'])
+        self.data['firstCandidatePlot'] = ThreeDPointCloud(self.data['firstCandidateFigure'])
         
-        #Add a navigation toolbar (zoom, pan etc)
-        canPreviewtab_vertical_container.addWidget(NavigationToolbar(self.data['firstCandidatePlot'].canvas, self))
-        #Add the canvas to the tab
-        canPreviewtab_vertical_container.addWidget(self.data['firstCandidatePlot'].canvas)
+        #Add a navigation toolbar (zoom, pan etc) and canvas to tab
+        self.canPreviewtab_vertical_container.addWidget(NavigationToolbar(self.data['firstCandidateCanvas'], self))
+        self.canPreviewtab_vertical_container.addWidget(self.data['firstCandidateCanvas'])
 
         #Create a second empty figure and store it as self.data:
-        self.data['secondCandidatePlot'] = TwoDProjection()
+        self.data['secondCandidateFigure'] = plt.figure(figsize=(6.8,4))
+        self.data['secondCandidateCanvas'] = FigureCanvas(self.data['secondCandidateFigure'])
+        self.data['secondCandidatePlot'] = TwoDProjection(self.data['secondCandidateFigure'])
+
+        self.clear_index = [0,0]
         
-        #Add a navigation toolbar (zoom, pan etc)
-        canPreviewtab_vertical_container.addWidget(NavigationToolbar(self.data['secondCandidatePlot'].canvas, self))
-        #Add the canvas to the tab
-        canPreviewtab_vertical_container.addWidget(self.data['secondCandidatePlot'].canvas)
+        #Add a navigation toolbar (zoom, pan etc) and canvas to tab
+        self.canPreviewtab_vertical_container.addWidget(NavigationToolbar(self.data['secondCandidateCanvas'], self))
+        self.canPreviewtab_vertical_container.addWidget(self.data['secondCandidateCanvas'])
 
     def prev_candidate(self):
         if not self.entryCanPreview.text()=='':
@@ -1290,46 +1294,76 @@ class MyGUI(QMainWindow):
         """
         Function that's called when the button to show the candidate is clicked
         """
-        # Check Advanced Options
-        print(self.advancedOptionsWindowCanPrev.currentSelection)
-        print(self.advancedOptionsWindowCanPrev.getCheckedPlotOptionClasses())
-        self.data['firstCandidatePlot'] = self.advancedOptionsWindowCanPrev.getCheckedPlotOptionClasses()[0]()
-        self.data['secondCandidatePlot'] = self.advancedOptionsWindowCanPrev.getCheckedPlotOptionClasses()[1]()
-        
-        # Clear all plots
+        # Clear text and plots
         self.candidate_info.setText('')
         self.data['firstCandidatePlot'].reset()
         self.data['secondCandidatePlot'].reset()
-
+        self.data['firstCandidateCanvas'].draw()
+        self.data['secondCandidateCanvas'].draw()
+        
         if reset==False:
-            # Check the candidate entry field
-            if self.entryCanPreview.text()=='':
-                self.candidate_info.setText('Tried to visualise candidate, but no ID was given!')
-                logging.error('Tried to visualise candidate, but no ID was given!')
+            # Check advanced options
+            if self.advancedOptionsWindowCanPrev.getCheckedPlotOptionClasses() == []:
+                self.candidate_info.setText('Tried to visualise candidate, but no plot options were selected!')
+                self.data['firstCandidateFigure'].clf()
+                self.data['firstCandidateCanvas'].draw()
+                self.data['secondCandidateFigure'].clf()
+                self.data['secondCandidateCanvas'].draw()
+                self.clear_index = [1,1]
+                logging.error('Tried to visualise candidate, but no plot options were selected!')
+            elif len(self.advancedOptionsWindowCanPrev.getCheckedPlotOptionClasses()) <= 2:
+                plot_prefix = ['first', 'second']
+                for i in range(len(self.advancedOptionsWindowCanPrev.getCheckedPlotOptionClasses())):
+                    if self.advancedOptionsWindowCanPrev.getCheckedPlotOptionClasses()[i] != self.data[plot_prefix[i]+'CandidatePlot'].__class__:
+                        self.data[plot_prefix[i]+'CandidateFigure'].clf()
+                        self.data[plot_prefix[i]+'CandidatePlot'] = self.advancedOptionsWindowCanPrev.getCheckedPlotOptionClasses()[i](self.data[plot_prefix[i]+'CandidateFigure'])    
+                        self.clear_index[i] = 0
+                # Check the candidate entry field
+                if self.entryCanPreview.text()=='':
+                    self.candidate_info.setText('Tried to visualise candidate, but no ID was given!')
+                    logging.error('Tried to visualise candidate, but no ID was given!')
+                elif 'FindingMethod' in self.data and int(self.entryCanPreview.text()) < len(self.data['FindingResult'][0]):
+                    self.data['CandidatePreviewID'] = int(self.entryCanPreview.text())
+                    logging.debug(f"Attempting to show candidate {self.data['CandidatePreviewID']}.")
 
-            elif 'FindingMethod' in self.data and int(self.entryCanPreview.text()) < len(self.data['FindingResult'][0]):
-                self.data['CandidatePreviewID'] = int(self.entryCanPreview.text())
-                logging.debug(f"Attempting to show candidate {self.data['CandidatePreviewID']}.")
+                    # Get all localizations that belong to the candidate
+                    self.data['CandidatePreviewLocs'] = self.data['FittingResult'][0][self.data['FittingResult'][0]['candidate_id'] == self.data['CandidatePreviewID']]
+                    pixel_size = self.globalSettings['PixelSize_nm']['value']
 
-                # Get all localizations that belong to the candidate
-                self.data['CandidatePreviewLocs'] = self.data['FittingResult'][0][self.data['FittingResult'][0]['candidate_id'] == self.data['CandidatePreviewID']]
-                pixel_size = self.globalSettings['PixelSize_nm']['value']
+                    # Get some info about the candidate
+                    N_events = self.data['FindingResult'][0][self.data['CandidatePreviewID']]['N_events']
+                    cluster_size = self.data['FindingResult'][0][self.data['CandidatePreviewID']]['cluster_size']
+                    self.candidate_info.setText(f"This candidate cluster contains {N_events} events and has dimensions ({cluster_size[0]}, {cluster_size[1]}, {cluster_size[2]}).")
+                    if self.clear_index[0] == 1:
+                        self.data[plot_prefix[0]+'CandidatePlot'] = self.advancedOptionsWindowCanPrev.getCheckedPlotOptionClasses()[0](self.data[plot_prefix[0]+'CandidateFigure'])
+                        self.clear_index[0] = 0
+                    self.data['firstCandidatePlot'].plot(self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events'], self.data['CandidatePreviewLocs'], pixel_size)
+                    # Update the first canvas
+                    self.data['firstCandidateFigure'].tight_layout()
+                    self.data['firstCandidateCanvas'].draw()
+                    logging.info(f"3D scatter plot of candidate {self.data['CandidatePreviewID']} drawn.")
+                    if len(self.advancedOptionsWindowCanPrev.getCheckedPlotOptionClasses()) == 1:
+                        # Clear second plot
+                        self.data['secondCandidateFigure'].clf()
+                        self.data['secondCandidateCanvas'].draw()
+                        self.clear_index[1]=1
+                        logging.info('Clearing second plot.')
+                    if len(self.advancedOptionsWindowCanPrev.getCheckedPlotOptionClasses()) == 2:
+                        if self.clear_index[1] == 1:
+                            self.data[plot_prefix[1]+'CandidatePlot'] = self.advancedOptionsWindowCanPrev.getCheckedPlotOptionClasses()[1](self.data[plot_prefix[1]+'CandidateFigure'])
+                            self.clear_index[1] = 0
+                        self.data['secondCandidatePlot'].plot(self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events'], self.data['CandidatePreviewLocs'], pixel_size)
+                        # Update the second canvas
+                        self.data['secondCandidateFigure'].tight_layout()
+                        self.data['secondCandidateCanvas'].draw()
+                        logging.info(f"2D event-projections of candidate {self.data['CandidatePreviewID']} drawn.")
 
-                # Get some info about the candidate
-                N_events = self.data['FindingResult'][0][self.data['CandidatePreviewID']]['N_events']
-                cluster_size = self.data['FindingResult'][0][self.data['CandidatePreviewID']]['cluster_size']
-                self.candidate_info.setText(f"This candidate cluster contains {N_events} events and has dimensions ({cluster_size[0]}, {cluster_size[1]}, {cluster_size[2]}).")
-                
-                self.data['firstCandidatePlot'].plot(self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events'], self.data['CandidatePreviewLocs'], pixel_size)
-                logging.info(f"3D scatter plot of candidate {self.data['CandidatePreviewID']} drawn.")
-
-                # Get xyt-limits of candidate events
-                self.data['secondCandidatePlot'].plot(self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events'], self.data['CandidatePreviewLocs'], pixel_size)
-                logging.info(f"2D event-projections of candidate {self.data['CandidatePreviewID']} drawn.")
-
-            else: 
-                self.candidate_info.setText('Tried to visualise candidate but no data found!')
-                logging.error('Tried to visualise candidate but no data found!')
+                else: 
+                    self.candidate_info.setText('Tried to visualise candidate but no data found!')
+                    logging.error('Tried to visualise candidate but no data found!')
+            else:
+                self.candidate_info.setText('Tried to visualise candidate, but no plot options were selected!')
+                logging.error('Tried to visualise candidate, but too many plot options were selected!')
         else:
             logging.info('Candidate preview is reset.')
         
@@ -3076,6 +3110,8 @@ class AdvancedOptionsWindowCanPrev(QMainWindow):
 
         self.plotOptionsGroupBox.setLayout(plotOptionsLayout)
         layout.addWidget(self.plotOptionsGroupBox)
+        # check first checkbox
+        self.plotOptionCheckboxes[3].setChecked(True)
 
         #Add a grid layout
         grid = QGridLayout()
@@ -3158,18 +3194,15 @@ class AdvancedOptionsWindowCanPrev(QMainWindow):
         for checkbox in self.plotOptionCheckboxes:
             if checkbox.isChecked():
                 option_id = int(checkbox.objectName().split("_")[1])
-                print(option_id)
                 checked_plot_classes.append(self.plotOptions[option_id]["plotclass"])
         return checked_plot_classes
 
 class ThreeDPointCloud:
-    def __init__(self):
-        self.figure = plt.figure(figsize=(6.8, 4))
-        self.figure.suptitle("3D pointcloud of candidate cluster")
-        self.ax = self.figure.add_subplot(111, projection='3d')
-        self.canvas = FigureCanvas(self.figure)
-        self.figure.tight_layout()
-        self.figure.subplots_adjust(top=0.95)
+    def __init__(self, figure):
+        figure.suptitle("3D pointcloud of candidate cluster")
+        self.ax = figure.add_subplot(111, projection='3d')
+        figure.tight_layout()
+        figure.subplots_adjust(top=0.95)
 
     def reset(self):
         self.ax.cla()
@@ -3191,22 +3224,14 @@ class ThreeDPointCloud:
         self.ax.plot(localizations['x']/pixel_size, localizations['y']/pixel_size, localizations['t'], marker='x', c='red', label='Localization(s)')
         self.ax.legend(loc='upper right', bbox_to_anchor=(1.6, 1))
 
-        # Give it a nice layout
-        self.figure.tight_layout()
-        self.figure.subplots_adjust(top=0.95)
-
-        # Update drawing of the canvas
-        self.canvas.draw()
 
 class TwoDProjection:
-    def __init__(self):
-        self.figure = plt.figure(figsize=(6.8, 4))
-        self.figure.suptitle("2D projections of candidate cluster")
-        self.ax_xy = self.figure.add_subplot(121)
-        self.ax_xt = self.figure.add_subplot(222)
-        self.ax_yt = self.figure.add_subplot(224)
-        self.canvas = FigureCanvas(self.figure)
-        self.figure.tight_layout()
+    def __init__(self, figure):
+        figure.suptitle("2D projections of candidate cluster")
+        self.ax_xy = figure.add_subplot(121)
+        self.ax_xt = figure.add_subplot(222)
+        self.ax_yt = figure.add_subplot(224)
+        figure.tight_layout()
 
     def reset(self):
         self.ax_xy.cla()
@@ -3255,12 +3280,6 @@ class TwoDProjection:
         self.ax_xt.set_ylabel('x [px]')
         self.ax_yt.set_ylabel('y [px]')
         self.ax_yt.set_xlabel('t [ms]')
-        
-        # Give it a nice layout
-        self.figure.tight_layout()
-
-        # Update drawing of the canvas
-        self.canvas.draw()
 
     def format_coord_projectionxy(self, x, y, pos_hist, neg_hist, x_edges, y_edges):
         """
