@@ -203,7 +203,6 @@ def EigenValueCalculation_radius(npyarr,radius,kwargs):
     
     return eig_valso3d, point_cloud
 
-
 def determineEigenValueCutoffComputationally(maxeigenval,kwargs):
     #Fit this histogram with three gaussians:
     #create a normalized histogram:
@@ -221,19 +220,31 @@ def determineEigenValueCutoffComputationally(maxeigenval,kwargs):
     initial_params = np.concatenate((initial_noise, initial_signal, initial_bg)).flatten()
     # Fit the histogram with two Gaussian curves
     try:
-        params, _ = curve_fit(three_gaussians, bin_centers, hist, p0=initial_params)
-        # Use scipy.optimize.root to find the x-position where the two Gaussians cross
-        #Find the cross of the lowest with second-lowest gaussian:
-        param_order = np.argsort(params[[1,4,7]])
         
-        #Get the crossings:
-        result1 = find_gaussian_cross(a1=params[param_order[0]*3],b1=params[param_order[0]*3+1],c1=params[param_order[0]*3+2],a2=params[param_order[1]*3],b2=params[param_order[1]*3+1],c2=params[param_order[1]*3+2],minp = 0,maxp=max(bin_centers),accuracy = 0.01)
         
-        result2 = find_gaussian_cross(a1=params[param_order[0]*3],b1=params[param_order[0]*3+1],c1=params[param_order[0]*3+2],a2=params[param_order[2]*3],b2=params[param_order[2]*3+1],c2=params[param_order[2]*3+2],minp = 0,maxp=max(bin_centers),accuracy = 0.01)
+        # Old, cumbersome method:
+        # params, _ = curve_fit(three_gaussians, bin_centers, hist, p0=initial_params)
+        # # Use scipy.optimize.root to find the x-position where the two Gaussians cross
+        # #Find the cross of the lowest with second-lowest gaussian:
+        # param_order = np.argsort(params[[1,4,7]])
         
-        #Find the lowest crossing:
-        lowest_crossing = min(min(result1), min(result2))
-        maxeigenvalcutoff = lowest_crossing
+        # #Get the crossings:
+        # result1 = find_gaussian_cross(a1=params[param_order[0]*3],b1=params[param_order[0]*3+1],c1=params[param_order[0]*3+2],a2=params[param_order[1]*3],b2=params[param_order[1]*3+1],c2=params[param_order[1]*3+2],minp = 0,maxp=max(bin_centers),accuracy = 0.01)
+        
+        # result2 = find_gaussian_cross(a1=params[param_order[0]*3],b1=params[param_order[0]*3+1],c1=params[param_order[0]*3+2],a2=params[param_order[2]*3],b2=params[param_order[2]*3+1],c2=params[param_order[2]*3+2],minp = 0,maxp=max(bin_centers),accuracy = 0.01)
+        
+        # #Find the lowest crossing:
+        # lowest_crossing = min(min(result1), min(result2))
+        # maxeigenvalcutoff = lowest_crossing
+        
+        #Better method:
+        
+        from scipy import signal
+        nbins=100
+        hist, bin_edges = np.histogram(maxeigenval, np.linspace(0,max(maxeigenval),nbins))  # Adjust the number of bins as needed
+        peakind = signal.find_peaks_cwt(max(hist)-hist, np.arange(1,nbins/4))
+        maxeigenvalcutoff = min(bin_edges[peakind]+bin_edges[1])
+            
         
         if maxeigenvalcutoff < 1:
             logging.info(f'Max eigenval thought to be {maxeigenvalcutoff}')
@@ -249,18 +260,30 @@ def determineEigenValueCutoffComputationally(maxeigenval,kwargs):
         
     if utilsHelper.strtobool(kwargs['debug']):
         try:
-            plt.figure(1)
-            #If debugging,w e plot this information:
-            plt.hist(maxeigenval, bins=100, alpha=0.5, label='Histogram', density=True)
-            plt.plot(bin_centers, three_gaussians(bin_centers, *params), 'r-', label='Three Gaussians')
-            #Plot the individual gaussians:
-            plt.plot(bin_centers, single_gaussian(bin_centers, *params[0:3]), 'r--')
-            plt.plot(bin_centers, single_gaussian(bin_centers, *params[3:6]), 'r--')
-            plt.plot(bin_centers, single_gaussian(bin_centers, *params[6:9]), 'r--')
+            from scipy import signal
+            nbins=100
+            hist, bin_edges = np.histogram(maxeigenval, np.linspace(0,max(maxeigenval),nbins))  # Adjust the number of bins as needed
+            peakind = signal.find_peaks_cwt(max(hist)-hist, np.arange(1,nbins/4))
+            print(bin_edges[peakind]+bin_edges[1])
             
-            plt.plot(bin_centers, three_gaussians(bin_centers, *initial_params), 'k--', label='Three Gaussians Initial')
-            plt.legend()
+            
+            
+            
+            fig, ax1 = plt.subplots()
+
+            # Plot the histogram on the first y-axis
+            ax1.hist(maxeigenval, np.linspace(0,max(maxeigenval),nbins), alpha=0.5, label='Histogram', density=True, color='tab:blue')
+            ax1.set_xlabel('X data')
+            ax1.set_ylabel('Histogram', color='tab:blue')
+
+            # Create a second y-axis
+            ax2 = ax1.twinx()
+
+
+            # Display the plot
             plt.show()
+            
+            
         except:
             pass
         

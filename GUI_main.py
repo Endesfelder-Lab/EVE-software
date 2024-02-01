@@ -1886,7 +1886,6 @@ class MyGUI(QMainWindow):
     def run_processing(self):
         # self.run_processing_i()
         thread = threading.Thread(target=self.run_processing_i)
-        # # thread = threading.Thread(target=lambda: self.run_processing_i))
         thread.start()
     
     def updateGUIafterNewResults(self,error=None):
@@ -2134,13 +2133,12 @@ class MyGUI(QMainWindow):
                         events = record_raw.load_delta_t(float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000+float(self.globalSettings['FindingBatchingTimeOverlapMs']['value'])*1000)
                     else:
                         events = record_raw.load_delta_t(float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000)
-                    
                     #Check if any events are still within the range of time we want to assess
-                    if min(events['t']) < (float(self.run_startTLineEdit.text())+float(self.run_durationTLineEdit.text()))*1000:
-                        if len(events) > 0:
-                            logging.info('New chunk analysis starting')
-                            
-                            
+                    if len(events) > 0:
+                        
+                        logging.info('New chunk analysis starting')
+                        
+                        if (min(events['t']) < (float(self.run_startTLineEdit.text())+float(self.run_durationTLineEdit.text()))*1000):
                             #limit to requested xy
                             events = self.filterEvents_xy(events,xyStretch=(float(self.run_minXLineEdit.text()),float(self.run_maxXLineEdit.text()),float(self.run_minYLineEdit.text()),float(self.run_maxYLineEdit.text())))
                             #limit to requested t
