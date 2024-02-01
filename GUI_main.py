@@ -1290,7 +1290,12 @@ class MyGUI(QMainWindow):
         """
         Function that's called when the button to show the candidate is clicked
         """
-
+        # Check Advanced Options
+        print(self.advancedOptionsWindowCanPrev.currentSelection)
+        print(self.advancedOptionsWindowCanPrev.getCheckedPlotOptionClasses())
+        self.data['firstCandidatePlot'] = self.advancedOptionsWindowCanPrev.getCheckedPlotOptionClasses()[0]()
+        self.data['secondCandidatePlot'] = self.advancedOptionsWindowCanPrev.getCheckedPlotOptionClasses()[1]()
+        
         # Clear all plots
         self.candidate_info.setText('')
         self.data['firstCandidatePlot'].reset()
@@ -3047,11 +3052,11 @@ class AdvancedOptionsWindowCanPrev(QMainWindow):
         # Create and add QCheckboxes for plot options to the grid layout
         self.plotOptionCheckboxes = []
         self.currentSelection = []
-        self.plotOptions = {1: {"name": "3D pointcloud", "description": "3D pointcloud of candidate cluster."},
-                            2: {"name": "3D pointcloud + first events", "description": "3D pointcloud of candidate cluster, first events per pixel are labeled."},
-                            3: {"name": "2D projections", "description": "2D projections of candidate cluster."},
-                            4: {"name": "2D timestamps", "description": "2D timestamps (first, median, mean event) per pixel in candidate cluster."},
-                            5: {"name": "2D event delays", "description": "2D event delays (min, mean, max) per pixel in candidate cluster."}}
+        self.plotOptions = {1: {"name": "3D pointcloud", "description": "3D pointcloud of candidate cluster.", "plotclass": ThreeDPointCloud},
+                            2: {"name": "3D pointcloud + first events", "description": "3D pointcloud of candidate cluster, first events per pixel are labeled.", "plotclass": ThreeDPointCloud},
+                            3: {"name": "2D projections", "description": "2D projections of candidate cluster.", "plotclass": TwoDProjection},
+                            4: {"name": "2D timestamps", "description": "2D timestamps (first, median, mean event) per pixel in candidate cluster.", "plotclass": TwoDProjection},
+                            5: {"name": "2D event delays", "description": "2D event delays (min, mean, max) per pixel in candidate cluster.", "plotclass": TwoDProjection}}
         currentRow=0
         rowMax = 3
         curruntCol=0
@@ -3138,6 +3143,22 @@ class AdvancedOptionsWindowCanPrev(QMainWindow):
         else:
             if sender in self.currentSelection:
                 self.currentSelection.remove(sender)
+     
+    def getSurroundingAndPaddingValues(self):
+        surrounding_checked = self.showSurroundingCheckBox.isChecked()
+        x_padding_value = int(self.xPaddingLineEdit.text())
+        y_padding_value = int(self.yPaddingLineEdit.text())
+        t_padding_value = int(self.tPaddingLineEdit.text())
+        return surrounding_checked, x_padding_value, y_padding_value, t_padding_value
+
+    def getCheckedPlotOptionClasses(self):
+        checked_plot_classes = []
+        for checkbox in self.plotOptionCheckboxes:
+            if checkbox.isChecked():
+                option_id = int(checkbox.objectName().split("_")[1])
+                print(option_id)
+                checked_plot_classes.append(self.plotOptions[option_id]["plotclass"])
+        return checked_plot_classes
 
 class ThreeDPointCloud:
     def __init__(self):
