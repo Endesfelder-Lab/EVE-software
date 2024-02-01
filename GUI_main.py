@@ -929,6 +929,7 @@ class MyGUI(QMainWindow):
         #Edit values for x,y coordinates:
         #First check if all entries in array are numbers:
         try:
+            xyStretch = (float(xyStretch[0]), float(xyStretch[1]), float(xyStretch[2]), float(xyStretch[3]))
             #Check if they all are floats:
             if not all(isinstance(x, float) for x in [float(xyStretch[0]),float(xyStretch[1]),float(xyStretch[2]),float(xyStretch[3])]):
                 logging.info("No XY cutting due to not all entries being floats.")
@@ -2121,7 +2122,7 @@ class MyGUI(QMainWindow):
             
             for polarityVal in polarityValArray:
                 logging.info('Starting Batching with polarity: '+polarityVal)
-                record_raw = RawReader(fileToRun)
+                record_raw = RawReader(fileToRun,max_events=int(5e9)) #TODO: maybe the 5e9 should be user-defined? I think this is memory-based.
                 
                 #Seek to start time according to specifications
                 record_raw.seek_time(float(self.run_startTLineEdit.text())*1000)
