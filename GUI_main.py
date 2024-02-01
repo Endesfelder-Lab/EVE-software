@@ -929,6 +929,7 @@ class MyGUI(QMainWindow):
         #Edit values for x,y coordinates:
         #First check if all entries in array are numbers:
         try:
+            xyStretch = (float(xyStretch[0]), float(xyStretch[1]), float(xyStretch[2]), float(xyStretch[3]))
             #Check if they all are floats:
             if not all(isinstance(x, float) for x in [float(xyStretch[0]),float(xyStretch[1]),float(xyStretch[2]),float(xyStretch[3])]):
                 logging.info("No XY cutting due to not all entries being floats.")
@@ -1925,7 +1926,6 @@ class MyGUI(QMainWindow):
     def run_processing(self):
         # self.run_processing_i()
         thread = threading.Thread(target=self.run_processing_i)
-        # # thread = threading.Thread(target=lambda: self.run_processing_i))
         thread.start()
     
     def updateGUIafterNewResults(self,error=None):
@@ -2156,7 +2156,7 @@ class MyGUI(QMainWindow):
             
             for polarityVal in polarityValArray:
                 logging.info('Starting Batching with polarity: '+polarityVal)
-                record_raw = RawReader(fileToRun)
+                record_raw = RawReader(fileToRun,max_events=int(5e9)) #TODO: maybe the 5e9 should be user-defined? I think this is memory-based.
                 
                 #Seek to start time according to specifications
                 record_raw.seek_time(float(self.run_startTLineEdit.text())*1000)
@@ -2173,13 +2173,12 @@ class MyGUI(QMainWindow):
                         events = record_raw.load_delta_t(float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000+float(self.globalSettings['FindingBatchingTimeOverlapMs']['value'])*1000)
                     else:
                         events = record_raw.load_delta_t(float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000)
-                    
                     #Check if any events are still within the range of time we want to assess
-                    if min(events['t']) < (float(self.run_startTLineEdit.text())+float(self.run_durationTLineEdit.text()))*1000:
-                        if len(events) > 0:
-                            logging.info('New chunk analysis starting')
-                            
-                            
+                    if len(events) > 0:
+                        
+                        logging.info('New chunk analysis starting')
+                        
+                        if (min(events['t']) < (float(self.run_startTLineEdit.text())+float(self.run_durationTLineEdit.text()))*1000):
                             #limit to requested xy
                             events = self.filterEvents_xy(events,xyStretch=(float(self.run_minXLineEdit.text()),float(self.run_maxXLineEdit.text()),float(self.run_minYLineEdit.text()),float(self.run_maxYLineEdit.text())))
                             #limit to requested t
