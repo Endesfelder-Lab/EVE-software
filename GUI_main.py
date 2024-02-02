@@ -5,6 +5,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 import matplotlib.patches as patches
 from mpl_toolkits.mplot3d import Axes3D
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 import pandas as pd
 import numpy as np
 import copy
@@ -125,6 +126,8 @@ class MyGUI(QMainWindow):
         self.data['prevFindingMethod'] = 'None'
         self.data['prevNrEvents'] = 0
         self.data['prevNrCandidates'] = 0
+        #intialise preview events
+        self.previewEvents = []
         
         """
         Logger creation, both text output and stored to .log file
@@ -236,6 +239,9 @@ class MyGUI(QMainWindow):
         
         #Initialise polarity value thing (only affects very first run I believe):
         self.polarityDropdownChanged()
+
+        #Update the candidate preview to GUI settings
+        self.updateCandidatePreview()
         
         #Set up worker information:
         # self.worker = Worker()
@@ -738,6 +744,9 @@ class MyGUI(QMainWindow):
         Returns:
             None
         """
+        # Empty the event preview list
+        self.previewEvents = []
+
         #Checking if a file is selected rather than a folder:
         if not os.path.isfile(self.dataLocationInput.text()):
             logging.error("Please choose a file rather than a folder for previews.")
@@ -1335,25 +1344,40 @@ class MyGUI(QMainWindow):
                     N_events = self.data['FindingResult'][0][self.data['CandidatePreviewID']]['N_events']
                     cluster_size = self.data['FindingResult'][0][self.data['CandidatePreviewID']]['cluster_size']
                     self.candidate_info.setText(f"This candidate cluster contains {N_events} events and has dimensions ({cluster_size[0]}, {cluster_size[1]}, {cluster_size[2]}).")
+                    
+                    # Check surrounding option
+                    surrounding = pd.DataFrame()
+                    surroundingOptions = self.advancedOptionsWindowCanPrev.getSurroundingAndPaddingValues()
+                    if self.previewEvents != [] and surroundingOptions[0]==True:
+                        surrounding = self.get_surrounding(self.previewEvents, self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events'], surroundingOptions[1], surroundingOptions[2], surroundingOptions[3])
+                    
+                    # Check if plot was cleared before
                     if self.clear_index[0] == 1:
                         self.data[plot_prefix[0]+'CandidatePlot'] = self.advancedOptionsWindowCanPrev.getCheckedPlotOptionClasses()[0](self.data[plot_prefix[0]+'CandidateFigure'])
                         self.clear_index[0] = 0
-                    self.data['firstCandidatePlot'].plot(self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events'], self.data['CandidatePreviewLocs'], pixel_size)
+                    
+                    # Plot the first candidate plot
+                    self.data['firstCandidatePlot'].plot(self.data['firstCandidateFigure'], self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events'], surrounding, self.data['CandidatePreviewLocs'], pixel_size)
+                    
                     # Update the first canvas
                     self.data['firstCandidateFigure'].tight_layout()
                     self.data['firstCandidateCanvas'].draw()
                     logging.info(f"3D scatter plot of candidate {self.data['CandidatePreviewID']} drawn.")
+                    
+                    # Clear second plot if needed
                     if len(self.advancedOptionsWindowCanPrev.getCheckedPlotOptionClasses()) == 1:
                         # Clear second plot
                         self.data['secondCandidateFigure'].clf()
                         self.data['secondCandidateCanvas'].draw()
                         self.clear_index[1]=1
                         logging.info('Clearing second plot.')
+                    
+                    # Plot the second candidate plot
                     if len(self.advancedOptionsWindowCanPrev.getCheckedPlotOptionClasses()) == 2:
                         if self.clear_index[1] == 1:
                             self.data[plot_prefix[1]+'CandidatePlot'] = self.advancedOptionsWindowCanPrev.getCheckedPlotOptionClasses()[1](self.data[plot_prefix[1]+'CandidateFigure'])
                             self.clear_index[1] = 0
-                        self.data['secondCandidatePlot'].plot(self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events'], self.data['CandidatePreviewLocs'], pixel_size)
+                        self.data['secondCandidatePlot'].plot(self.data['firstCandidateFigure'], self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events'], surrounding, self.data['CandidatePreviewLocs'], pixel_size)
                         # Update the second canvas
                         self.data['secondCandidateFigure'].tight_layout()
                         self.data['secondCandidateCanvas'].draw()
@@ -1367,7 +1391,15 @@ class MyGUI(QMainWindow):
                 logging.error('Tried to visualise candidate, but too many plot options were selected!')
         else:
             logging.info('Candidate preview is reset.')
-        
+
+    def get_surrounding(self, events, candidate_events, x_padding, y_padding, t_padding):
+        xlim = [np.min(candidate_events['x'])-x_padding, np.max(candidate_events['x'])+x_padding]
+        ylim = [np.min(candidate_events['y'])-y_padding, np.max(candidate_events['y'])+y_padding]
+        tlim = [np.min(candidate_events['t'])-t_padding*1e3, np.max(candidate_events['t'])+t_padding*1e3]
+        mask = ((events['x'] >= xlim[0]) & (events['x'] <= xlim[1]) & (events['y'] >= ylim[0]) & (events['y'] <= ylim[1]) & (events['t'] >= tlim[0]) & (events['t'] <= tlim[1]))
+        all_events = pd.DataFrame(events[mask])
+        surrounding = all_events.merge(candidate_events, indicator=True, how='outer').query('_merge=="left_only"').drop('_merge', axis=1)
+        return surrounding
 
     def setup_previewTab(self):
         """
@@ -1925,6 +1957,8 @@ class MyGUI(QMainWindow):
         
     def run_processing(self):
         # self.run_processing_i()
+        # reset previewEvents array, every time run is pressed
+        self.previewEvents = []
         thread = threading.Thread(target=self.run_processing_i)
         thread.start()
     
@@ -3088,10 +3122,10 @@ class AdvancedOptionsWindowCanPrev(QMainWindow):
         self.plotOptionCheckboxes = []
         self.currentSelection = []
         self.plotOptions = {1: {"name": "3D pointcloud", "description": "3D pointcloud of candidate cluster.", "plotclass": ThreeDPointCloud},
-                            2: {"name": "3D pointcloud + first events", "description": "3D pointcloud of candidate cluster, first events per pixel are labeled.", "plotclass": ThreeDPointCloud},
+                            2: {"name": "3D pointcloud + first events", "description": "3D pointcloud of candidate cluster, first events per pixel are labeled.", "plotclass": ThreeDPointCloudwFirst},
                             3: {"name": "2D projections", "description": "2D projections of candidate cluster.", "plotclass": TwoDProjection},
-                            4: {"name": "2D timestamps", "description": "2D timestamps (first, median, mean event) per pixel in candidate cluster.", "plotclass": TwoDProjection},
-                            5: {"name": "2D event delays", "description": "2D event delays (min, mean, max) per pixel in candidate cluster.", "plotclass": TwoDProjection}}
+                            4: {"name": "2D timestamps", "description": "2D timestamps (first, median, mean event) per pixel in candidate cluster.", "plotclass": TwoDTimestamps},
+                            5: {"name": "2D event delays", "description": "2D event delays (min, max, mean) per pixel in candidate cluster.", "plotclass": TwoDDelays}}
         currentRow=0
         rowMax = 3
         curruntCol=0
@@ -3206,7 +3240,7 @@ class ThreeDPointCloud:
     def reset(self):
         self.ax.cla()
 
-    def plot(self, events, localizations, pixel_size):
+    def plot(self, figure, events, surrounding, localizations, pixel_size):
         pos_events = events[events['p'] == 1]
         neg_events = events[events['p'] == 0]
         # Do a 3d scatterplot of the event data
@@ -3214,6 +3248,8 @@ class ThreeDPointCloud:
             self.ax.scatter(pos_events['x'], pos_events['y'], pos_events['t']*1e-3, label='Positive events', color='C0')
         if not len(neg_events)==0:
             self.ax.scatter(neg_events['x'], neg_events['y'], neg_events['t']*1e-3, label='Negative events', color='C1')
+        if not len(surrounding)==0:
+            self.ax.scatter(surrounding['x'], surrounding['y'], surrounding['t']*1e-3, label='Surrounding events', color='black')
         self.ax.set_xlabel('x [px]')
         self.ax.set_ylabel('y [px]')
         self.ax.set_zlabel('t [ms]')
@@ -3223,6 +3259,38 @@ class ThreeDPointCloud:
         self.ax.plot(localizations['x']/pixel_size, localizations['y']/pixel_size, localizations['t'], marker='x', c='red', label='Localization(s)')
         self.ax.legend(loc='upper right', bbox_to_anchor=(1.6, 1))
 
+class ThreeDPointCloudwFirst:
+    def __init__(self, figure):
+        figure.suptitle("3D pointcloud of candidate cluster")
+        self.ax = figure.add_subplot(111, projection='3d')
+        figure.tight_layout()
+        figure.subplots_adjust(top=0.95)
+
+    def reset(self):
+        self.ax.cla()
+
+    def plot(self, figure, events, surrounding, localizations, pixel_size):
+        first_events = utilsHelper.FirstTimestamp(events).get_smallest_t(events)
+        eventsFiltered = events.merge(first_events, indicator=True, how='outer').query('_merge=="left_only"').drop('_merge', axis=1)
+        pos_events = eventsFiltered[eventsFiltered['p'] == 1]
+        neg_events = eventsFiltered[eventsFiltered['p'] == 0]
+        # Do a 3d scatterplot of the event data
+        if not len(first_events)==0:
+            self.ax.scatter(first_events['x'], first_events['y'], first_events['t']*1e-3, label='First events', color='C2')
+        if not len(pos_events)==0:
+            self.ax.scatter(pos_events['x'], pos_events['y'], pos_events['t']*1e-3, label='Positive events', color='C0')
+        if not len(neg_events)==0:
+            self.ax.scatter(neg_events['x'], neg_events['y'], neg_events['t']*1e-3, label='Negative events', color='C1')
+        if not len(surrounding)==0:
+            self.ax.scatter(surrounding['x'], surrounding['y'], surrounding['t']*1e-3, label='Surrounding events', color='black')
+        self.ax.set_xlabel('x [px]')
+        self.ax.set_ylabel('y [px]')
+        self.ax.set_zlabel('t [ms]')
+        self.ax.invert_zaxis()
+
+        # Plot the localization(s) of the candidate
+        self.ax.plot(localizations['x']/pixel_size, localizations['y']/pixel_size, localizations['t'], marker='x', c='red', label='Localization(s)')
+        self.ax.legend(loc='upper right', bbox_to_anchor=(1.6, 1))
 
 class TwoDProjection:
     def __init__(self, figure):
@@ -3236,10 +3304,10 @@ class TwoDProjection:
         self.ax_xy.cla()
         self.ax_xt.cla()
         self.ax_yt.cla()
-        # self.ax_xt.set_aspect('auto') # not sure if I need those
-        # self.ax_yt.set_aspect('auto')
+        self.ax_xt.set_aspect('auto')
+        self.ax_yt.set_aspect('auto')
 
-    def plot(self, events, localizations, pixel_size):
+    def plot(self, figure, events, surrounding, localizations, pixel_size):
         hist_xy = utilsHelper.Hist2d_xy(events)
         hist_tx = utilsHelper.Hist2d_tx(events)
         hist_ty = utilsHelper.Hist2d_ty(events)
@@ -3321,7 +3389,118 @@ class TwoDProjection:
 
         display = f't={time} ms, y={y_pix}, events[pos,neg]=[{pos}, {neg}]'
         return display
-                
+
+class TwoDTimestamps:
+    def __init__(self, figure):
+        figure.suptitle("2D timestamps of first, median, mean event per pixel")
+        self.ax_first = figure.add_subplot(131)
+        self.ax_median = figure.add_subplot(132)
+        self.ax_mean = figure.add_subplot(133)
+        figure.tight_layout()
+        self.cb = None
+
+    def reset(self):
+        self.ax_first.cla()
+        self.ax_median.cla()
+        self.ax_mean.cla()
+        self.ax_first.set_aspect('equal')
+        self.ax_median.set_aspect('equal')
+        self.ax_mean.set_aspect('equal')
+
+    def plot(self, figure, events, surrounding, localizations, pixel_size):
+
+        first = utilsHelper.FirstTimestamp(events).dist2D
+        median = utilsHelper.MedianTimestamp(events).dist2D
+        mean = utilsHelper.AverageTimestamp(events).dist2D
+
+        x_edges, y_edges = utilsHelper.Hist2d_xy(events).x_edges, utilsHelper.Hist2d_xy(events).y_edges
+
+        # Plot the 2D histograms
+        first_mesh = self.ax_first.pcolormesh(x_edges, y_edges, first*1e-3)
+        self.ax_first.set_aspect('equal')
+        self.ax_first.format_coord = lambda x,y:self.format_coord_timestamp(x,y,first, x_edges, y_edges)
+        self.ax_median.pcolormesh(x_edges, y_edges, median*1e-3)
+        self.ax_median.set_aspect('equal')
+        self.ax_mean.pcolormesh(x_edges, y_edges, mean*1e-3)
+        self.ax_mean.set_aspect('equal')
+        self.ax_first.plot(localizations['x']/pixel_size, localizations['y']/pixel_size, marker='x', c='red')
+        self.ax_mean.plot(localizations['x']/pixel_size, localizations['y']/pixel_size, marker='x', c='red')
+        self.ax_median.plot(localizations['x']/pixel_size, localizations['y']/pixel_size, marker='x', c='red')
+
+        # Add and set labels
+        self.ax_first.set_xlabel('x [px]')
+        self.ax_first.set_ylabel('y [px]')
+        self.ax_median.set_xlabel('x [px]')
+        self.ax_median.set_ylabel('y [px]')
+        self.ax_mean.set_xlabel('x [px]')
+        self.ax_mean.set_ylabel('y [px]')
+
+        # Add or update colorbar
+        if self.cb is None:
+            divider = make_axes_locatable(self.ax_first)
+            cax = divider.append_axes("right", size="5%", pad=0.05)
+            self.cb = figure.colorbar(first_mesh, cax=cax)
+            self.cb.set_label('time [ms]')
+        else: 
+            self.cb.update_normal(first_mesh)
+
+    def format_coord_timestamp(self, x, y, timedist, x_edges, y_edges):
+        """
+        Function that formats the coordinates of the mouse cursor in candidate preview xy timeplot
+        """
+        x_pix = round(x)
+        y_pix = round(y)
+        x_bin = np.digitize(x, x_edges) - 1
+        y_bin = np.digitize(y, y_edges) - 1
+        time = timedist[y_bin, x_bin]*1e-3
+
+        if time == np.nan:
+            display = f'x={x_pix}, y={y_pix}'
+        else:
+            display = f'x={x_pix}, y={y_pix}, time={time:.2f} ms'
+        return display
+
+class TwoDDelays:
+    def __init__(self, figure):
+        figure.suptitle("2D event delays min, max, mean per pixel in candidate cluster")
+        self.ax_min = figure.add_subplot(131)
+        self.ax_max = figure.add_subplot(132)
+        self.ax_mean = figure.add_subplot(133)
+        figure.tight_layout()
+
+    def reset(self):
+        self.ax_min.cla()
+        self.ax_max.cla()
+        self.ax_mean.cla()
+        self.ax_min.set_aspect('equal')
+        self.ax_max.set_aspect('equal')
+        self.ax_mean.set_aspect('equal')
+
+    def plot(self, figure, events, surrounding, localizations, pixel_size):
+        min = utilsHelper.MinTimeDiff(events).dist2D
+        max = utilsHelper.MaxTimeDiff(events).dist2D
+        mean = utilsHelper.AverageTimeDiff(events).dist2D
+
+        x_edges, y_edges = utilsHelper.Hist2d_xy(events).x_edges, utilsHelper.Hist2d_xy(events).y_edges
+
+        # Plot the 2D histograms
+        self.ax_min.pcolormesh(x_edges, y_edges, min)
+        self.ax_min.set_aspect('equal')
+        self.ax_max.pcolormesh(x_edges, y_edges, max)
+        self.ax_max.set_aspect('equal')
+        self.ax_mean.pcolormesh(x_edges, y_edges, mean)
+        self.ax_mean.set_aspect('equal')
+        self.ax_min.plot(localizations['x']/pixel_size, localizations['y']/pixel_size, marker='x', c='red')
+        self.ax_mean.plot(localizations['x']/pixel_size, localizations['y']/pixel_size, marker='x', c='red')
+        self.ax_max.plot(localizations['x']/pixel_size, localizations['y']/pixel_size, marker='x', c='red')
+
+        # Add and set labels
+        self.ax_min.set_xlabel('x [px]')
+        self.ax_min.set_ylabel('y [px]')
+        self.ax_max.set_xlabel('x [px]')
+        self.ax_max.set_ylabel('y [px]')
+        self.ax_mean.set_xlabel('x [px]')
+        self.ax_mean.set_ylabel('y [px]')
 
 
 class CriticalWarningWindow(QMainWindow):

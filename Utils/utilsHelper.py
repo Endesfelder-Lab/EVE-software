@@ -166,7 +166,7 @@ class MedianTimestamp(Dist2d):
         return dist2d
     
 class AverageTimeDiff(Dist2d):
-    description = "The average time difference between all events for each pixel."
+    description = "The average time difference between events for each pixel."
     def __init__(self, events):
         super().__init__(events)
         self.dist2D = self(events)
@@ -187,7 +187,7 @@ class AverageTimeDiff(Dist2d):
         return dist2d
     
 class MinTimeDiff(Dist2d):
-    description = "The minimum time difference between all events for each pixel."
+    description = "The minimum time difference between events for each pixel."
     def __init__(self, events):
         super().__init__(events)
         self.dist2D = self(events)
@@ -204,6 +204,27 @@ class MinTimeDiff(Dist2d):
         # The timestamp of pixels missing in the cluster is set to np.nan
         dist2d=np.ones((self.ylim[1]-self.ylim[0]+1,self.xlim[1]-self.xlim[0]+1))*np.nan
         for index, event in minTimeDiff.iterrows():
+            dist2d[int(event['y']-self.ylim[0]),int(event['x']-self.xlim[0])]=event['t']
+        return dist2d
+    
+class MaxTimeDiff(Dist2d):
+    description = "The maximum time difference between events for each pixel."
+    def __init__(self, events):
+        super().__init__(events)
+        self.dist2D = self(events)
+    
+    def get_maxTimeDiff(self, events):
+        TimeDiff = events.groupby(['x', 'y'])['t'].diff().to_frame()
+        TimeDiff['x'] = events['x']
+        TimeDiff['y'] = events['y']
+        maxTimeDiff = TimeDiff.groupby(['x', 'y'])['t'].max().reset_index()
+        return maxTimeDiff
+    
+    def __call__(self, events):
+        maxTimeDiff = self.get_maxTimeDiff(events)
+        # The timestamp of pixels missing in the cluster is set to np.nan
+        dist2d=np.ones((self.ylim[1]-self.ylim[0]+1,self.xlim[1]-self.xlim[0]+1))*np.nan
+        for index, event in maxTimeDiff.iterrows():
             dist2d[int(event['y']-self.ylim[0]),int(event['x']-self.xlim[0])]=event['t']
         return dist2d
 
