@@ -769,9 +769,9 @@ class MyGUI(QMainWindow):
             #Check if we have at least 1 event:
             if len(events) > 0:
                 # correct the coordinates and time stamps
-                events['x']-=np.min(events['x'])
-                events['y']-=np.min(events['y'])
-                events['t']-=np.min(events['t'])
+                # events['x']-=np.min(events['x'])
+                # events['y']-=np.min(events['y'])
+                # events['t']-=np.min(events['t'])
                 #Log the nr of events found:
                 logging.info(f"Preview - Found {len(events)} events in the chosen time frame.")
             else:
@@ -2190,7 +2190,7 @@ class MyGUI(QMainWindow):
             
             for polarityVal in polarityValArray:
                 logging.info('Starting Batching with polarity: '+polarityVal)
-                record_raw = RawReader(fileToRun,max_events=int(5e9)) #TODO: maybe the 5e9 should be user-defined? I think this is memory-based.
+                record_raw = RawReader(fileToRun,max_events=int(5e7)) #TODO: maybe the 5e9 should be user-defined? I think this is memory-based.
                 
                 #Seek to start time according to specifications
                 record_raw.seek_time(float(self.run_startTLineEdit.text())*1000)
@@ -2232,9 +2232,9 @@ class MyGUI(QMainWindow):
                             # events = events[events['t']<maxT]
                             
                             
-                            logging.warning('RAW1 Current event min/max time:'+str(min(events['t'])/1000)+"/"+str(max(events['t'])/1000))
                             
                             if len(events)>0:
+                                logging.warning('RAW1 Current event min/max time:'+str(min(events['t'])/1000)+"/"+str(max(events['t'])/1000))
                                 #Filter on correct polarity
                                 if polarityVal == "Pos":
                                     eventsPol = self.filterEvents_npy_p(events,1)

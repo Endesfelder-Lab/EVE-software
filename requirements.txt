@@ -23,7 +23,7 @@ Flask==3.0.1
 fonttools==4.44.0
 h5py==3.10.0
 idna==3.6
-imageio==2.26.0
+imageio==2.33.1 #Used to be 2.26.0
 importlib-metadata==7.0.1
 importlib-resources==6.1.1
 ipython==8.18.1
@@ -40,6 +40,7 @@ kiwisolver==1.4.5
 MarkupSafe==2.1.4
 matplotlib==3.7.1
 matplotlib-inline==0.1.6
+napari==0.4.19
 nbformat==5.9.2
 nest-asyncio==1.6.0
 numexpr==2.8.8
