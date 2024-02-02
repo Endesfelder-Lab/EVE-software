@@ -1348,7 +1348,7 @@ class MyGUI(QMainWindow):
                     # Check surrounding option
                     surrounding = pd.DataFrame()
                     surroundingOptions = self.advancedOptionsWindowCanPrev.getSurroundingAndPaddingValues()
-                    if self.previewEvents != [] and surroundingOptions[0]==True:
+                    if len(self.previewEvents) != 0 and surroundingOptions[0]==True:
                         surrounding = self.get_surrounding(self.previewEvents, self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events'], surroundingOptions[1], surroundingOptions[2], surroundingOptions[3])
                     
                     # Check if plot was cleared before
