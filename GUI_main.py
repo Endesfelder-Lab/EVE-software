@@ -12,6 +12,7 @@ import copy
 import appdirs
 import pickle
 import time
+from textwrap import dedent
 
 #Imports for PyQt5 (GUI)
 from PyQt5 import QtWidgets, QtGui
@@ -247,7 +248,7 @@ class MyGUI(QMainWindow):
         self.polarityDropdownChanged()
 
         #Update the candidate preview to GUI settings
-        self.updateCandidatePreview()
+        self.updateCandidatePreview(init=True)
         
         #Set up worker information:
         # self.worker = Worker()
@@ -1247,10 +1248,13 @@ class MyGUI(QMainWindow):
         self.advanced_options_button.clicked.connect(self.open_advanced_options_CanPreview)
 
         #Add a horizontal layout to display info about the cluster
-        self.canPreviewtab_horizontal_container2 = QHBoxLayout()
-        self.canPreviewtab_vertical_container.addLayout(self.canPreviewtab_horizontal_container2)
+        #self.canPreviewtab_horizontal_container2 = QHBoxLayout()
+        #self.canPreviewtab_vertical_container.addLayout(self.canPreviewtab_horizontal_container2)
         self.candidate_info = QLabel('')
-        self.canPreviewtab_horizontal_container2.addWidget(self.candidate_info)
+        self.canPreviewtab_vertical_container.addWidget(self.candidate_info)
+        self.fit_info = QLabel('')
+        self.fit_info.setStyleSheet("color: red;")
+        self.canPreviewtab_vertical_container.addWidget(self.fit_info)
 
         #Create an empty figure and store it as self.data:
         self.data['firstCandidateFigure'] = plt.figure(figsize=(6.8,4))
@@ -1306,18 +1310,26 @@ class MyGUI(QMainWindow):
     def open_advanced_options_CanPreview(self):
         self.advancedOptionsWindowCanPrev.show()
 
-    def updateCandidatePreview(self, reset=False):
+    def updateCandidatePreview(self, reset=False, init=False):
         """
         Function that's called when the button to show the candidate is clicked
         """
         # Clear text and plots
         self.candidate_info.setText('')
+        self.fit_info.setText('')
         self.data['firstCandidatePlot'].reset()
         self.data['secondCandidatePlot'].reset()
         self.data['firstCandidateCanvas'].draw()
         self.data['secondCandidateCanvas'].draw()
-        
-        if reset==False:
+        plot_prefix = ['first', 'second']
+        if init==True:
+            for i in range(len(self.advancedOptionsWindowCanPrev.getCheckedPlotOptionClasses())):
+                if self.advancedOptionsWindowCanPrev.getCheckedPlotOptionClasses()[i] != self.data[plot_prefix[i]+'CandidatePlot'].__class__:
+                    self.data[plot_prefix[i]+'CandidateFigure'].clf()
+                    self.data[plot_prefix[i]+'CandidatePlot'] = self.advancedOptionsWindowCanPrev.getCheckedPlotOptionClasses()[i](self.data[plot_prefix[i]+'CandidateFigure'])    
+                    self.clear_index[i] = 0
+            logging.info('Candidate preview is initialised.')
+        elif reset==False:
             # Check advanced options
             if self.advancedOptionsWindowCanPrev.getCheckedPlotOptionClasses() == []:
                 self.candidate_info.setText('Tried to visualise candidate, but no plot options were selected!')
@@ -1328,7 +1340,6 @@ class MyGUI(QMainWindow):
                 self.clear_index = [1,1]
                 logging.error('Tried to visualise candidate, but no plot options were selected!')
             elif len(self.advancedOptionsWindowCanPrev.getCheckedPlotOptionClasses()) <= 2:
-                plot_prefix = ['first', 'second']
                 for i in range(len(self.advancedOptionsWindowCanPrev.getCheckedPlotOptionClasses())):
                     if self.advancedOptionsWindowCanPrev.getCheckedPlotOptionClasses()[i] != self.data[plot_prefix[i]+'CandidatePlot'].__class__:
                         self.data[plot_prefix[i]+'CandidateFigure'].clf()
@@ -1344,6 +1355,10 @@ class MyGUI(QMainWindow):
 
                     # Get all localizations that belong to the candidate
                     self.data['CandidatePreviewLocs'] = self.data['FittingResult'][0][self.data['FittingResult'][0]['candidate_id'] == self.data['CandidatePreviewID']]
+                    print(self.data['CandidatePreviewLocs']['x'].iloc[0])
+                    if pd.isna(self.data['CandidatePreviewLocs']['x'].iloc[0]):
+                        self.fit_info.setText(f"No localization generated due to {self.data['CandidatePreviewLocs']['fit_info'].iloc[0]}")
+                        print(self.data['CandidatePreviewLocs']['fit_info'].iloc[0])
                     pixel_size = self.globalSettings['PixelSize_nm']['value']
 
                     # Get some info about the candidate
@@ -2425,7 +2440,8 @@ class MyGUI(QMainWindow):
     def createAndStoreFileMetadata(self):
         logging.debug('Attempting to create and store file metadata')
         try:
-            metadatastring = f"""Metadata information for file {self.currentFileInfo['CurrentFileLoc']}
+            metadatastring = dedent(f"""\
+            Metadata information for file {self.currentFileInfo['CurrentFileLoc']}
             Analysis routine finished at {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 
             ---- Finding metadata output: ----
@@ -2435,8 +2451,8 @@ class MyGUI(QMainWindow):
             Number of candidates found: {len(self.data['FindingResult'][0])}
             Candidate finding took {self.currentFileInfo['FindingTime']} seconds.
 
-            Custom output from finding function:
-            {self.data['FindingResult'][1]}
+            Custom output from finding function:""")\
+            + f"""{self.data['FindingResult'][1]}""" + dedent(f"""\
 
             ---- Fitting metadata output: ----
             Methodology used:
@@ -2445,8 +2461,8 @@ class MyGUI(QMainWindow):
             Number of localizations found: {len(self.data['FittingResult'][0].dropna(axis=0))}
             Candidate fitting took {self.currentFileInfo['FittingTime']} seconds.
 
-            Custom output from fitting function:
-            {self.data['FittingResult'][1]}
+            Custom output from fitting function:""")\
+            + f"""{self.data['FittingResult'][1]}
             """
             #Store this metadatastring:
             with open(self.getStoreLocationPartial()+'_RunInfo_'+datetime.datetime.now().strftime("%Y%m%d_%H%M%S")+'.txt', 'w') as f:
