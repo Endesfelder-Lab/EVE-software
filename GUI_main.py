@@ -19,6 +19,12 @@ from PyQt5.QtGui import QCursor, QTextCursor, QIntValidator
 from PyQt5.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QTableWidget, QTableWidgetItem, QLayout, QMainWindow, QLabel, QPushButton, QSizePolicy, QGroupBox, QTabWidget, QGridLayout, QWidget, QComboBox, QLineEdit, QFileDialog, QToolBar, QCheckBox,QDesktopWidget, QMessageBox, QTextEdit, QSlider, QSpacerItem
 from PyQt5.QtCore import Qt, QPoint, QProcess, QCoreApplication, QTimer, QFileSystemWatcher, QFile, QThread, pyqtSignal, QObject
 
+from napari import Viewer
+from napari.qt import QtViewer
+from napari.layers import Image, Shapes
+from napari.utils.events import Event
+from vispy.color import Colormap
+
 #Custom imports
 # Add the folder 2 folders up to the system path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -1410,104 +1416,25 @@ class MyGUI(QMainWindow):
         self.previewtab_layout = QGridLayout()
         self.tab_previewVis.setLayout(self.previewtab_layout)
         
-        #It requires global variables for the color-bar limits (to allow the same limits for all images of the preview)
-        self.PreviewMinCbarVal = 0
-        self.PreviewMaxCbarVal = 0
+        #And I add the previewfindingfitting class (QWidget extension):
+        self.previewtab_widget = PreviewFindingFitting()
+        self.previewtab_layout.addWidget(self.previewtab_widget)
         
-        #It creates the ImageSlider class
-        self.previewImage_slider = ImageSlider([],self)
-        self.previewtab_layout.addWidget(self.previewImage_slider)
+        # #It requires global variables for the color-bar limits (to allow the same limits for all images of the preview)
+        # self.PreviewMinCbarVal = 0
+        # self.PreviewMaxCbarVal = 0
+        
+        # #It creates the ImageSlider class
+        # self.previewImage_slider = ImageSlider([],self)
+        # self.previewtab_layout.addWidget(self.previewImage_slider)
                
     def updateShowPreview(self,previewEvents=None):
         """
         Function that's called to update the preview (or show it). Requires the previewEvents, or uses the self.previewEvents.
-        Hardcoded to show the events as 100-ms-time bins.
         """
-        if previewEvents is None:
-            previewEvents = self.previewEvents
-        #Idea: create some preview image and highlight found clusters and localizations.
-        self.allPreviewFigures = []
-        #For now: create 5 plots:
-        self.PreviewFig = {}
-        self.PreviewFrameTime = 100*1000 #in us - maybe user-definable later?
         
-        #Obtain the numbers of frames that are displayed
-        nrFramesDisplay = int(np.ceil((max(previewEvents['t']))/self.PreviewFrameTime))
+        self.previewtab_widget.displayEvents(previewEvents,frametime_ms=100,findingResult = self.data['FindingResult'][0],fittingResult=self.data['FittingResult'][0],settings=self.globalSettings)
         
-        #Initialise minimum, maximum colorbar values:
-        self.PreviewMinCbarVal = 99
-        self.PreviewMaxCbarVal = -99
-        
-        #Loop over the frames:
-        for i in range(0,nrFramesDisplay):
-            #Create an empty figure
-            self.PreviewFig[i] = plt.figure()
-            #Create an empty array with the sizes of self.previewEvents:
-            frameBasedEvent2dArray = np.zeros((max(previewEvents['y'])+1,max(previewEvents['x'])+1))
-            #Get the events belonging to this frame:
-            eventsInThisFrame = previewEvents[previewEvents['t'] >= i*self.PreviewFrameTime]
-            eventsInThisFrame = eventsInThisFrame[eventsInThisFrame['t'] < (i+1)*self.PreviewFrameTime]
-            
-            #Loop over the events and fill the corresponding pixel in frameBasedEvent2dArray:
-            for j in range(0,len(eventsInThisFrame)):
-                if eventsInThisFrame[j]['p'] == 0:
-                    frameBasedEvent2dArray[eventsInThisFrame[j]['y'],eventsInThisFrame[j]['x']] -= 1
-                else:
-                    frameBasedEvent2dArray[eventsInThisFrame[j]['y'],eventsInThisFrame[j]['x']] += 1
-            
-            #Show this in plt as an imshow - we never call plt.show(), so it never really shows:
-            fig = self.PreviewFig[i].add_subplot(111)
-            fig.imshow(frameBasedEvent2dArray)
-            #Set axis limits correctly:
-            fig.set_xlim(min(previewEvents['x']),max(previewEvents['x']))
-            fig.set_ylim(min(previewEvents['y']),max(previewEvents['y']))
-            
-            #Find the 'finding' results in this time-frame
-            indices = [l for l in range(len(self.data['FindingResult'][0]))]
-            for indexv in indices:
-                try:
-                    #Plot it as a rectangle with a magenta, red, or cyan color, depending on it starting, middling, or ending on this frame.
-                    row = self.data['FindingResult'][0][indexv]
-                    if self.previewEventStartedOnThisFrame(row,i):
-                        # Create a Rectangle object
-                        self.createRectangle(fig,row['events'],'m')
-                        self.showText(fig,row['events'],str(indexv),'m')
-                    elif self.previewEventEndsOnThisFrame(row,i):
-                        self.createRectangle(fig,row['events'],'c')
-                        self.showText(fig,row['events'],str(indexv),'c')
-                    elif self.previewEventHappensOnThisFrame(row,i):
-                        self.createRectangle(fig,row['events'],'r')
-                        self.showText(fig,row['events'],str(indexv),'r')
-                except:
-                    pass
-                
-                try:
-                    #Also add the corresponding fitting result
-                    try:
-                        #Check if the localization is on this frame
-                        localization = self.data['FittingResult'][0].iloc[indexv-1]
-                        if localization['t']*1000 >= i*self.PreviewFrameTime and localization['t']*1000 < (i+1)*self.PreviewFrameTime:
-                            #If so, add a cross
-                            fig.plot(localization['x']/self.globalSettings['PixelSize_nm']['value'],localization['y']/self.globalSettings['PixelSize_nm']['value'],'rx', alpha=0.5)
-                    except:
-                        breakpoint
-                except:
-                    pass
-                           
-            self.allPreviewFigures.append(self.PreviewFig[i])
-            plt.close()
-            
-            #Check cbar values:
-            #Check the 1st percentile:
-            pctile = 1
-            if np.percentile(frameBasedEvent2dArray,pctile) < self.PreviewMinCbarVal:
-                self.PreviewMinCbarVal = np.percentile(frameBasedEvent2dArray,pctile)
-            if np.percentile(frameBasedEvent2dArray,(100-pctile)) > self.PreviewMaxCbarVal:
-                self.PreviewMaxCbarVal = np.percentile(frameBasedEvent2dArray,(100-pctile))
-
-        #Create a new ImageSlider and update the figure
-        self.previewImage_sliderNew = ImageSlider(parent=self,figures=self.allPreviewFigures)
-        self.previewImage_slider.update_figures(self.allPreviewFigures)
         
         logging.info('UpdateShowPreview ran!')
  
@@ -1658,6 +1585,10 @@ class MyGUI(QMainWindow):
                 curr_layout.addWidget(line_edit,2+((k+labelposoffset+len(reqKwargs)))%maxNrRows,(((k+labelposoffset+len(reqKwargs)))//maxNrRows)*2+1)
                 #Add a on-change listener:
                 line_edit.textChanged.connect(lambda text,line_edit=line_edit: self.kwargValueInputChanged(line_edit))
+    
+    
+    
+    
     
     def kwargValueInputChanged(self,line_edit):
         #Get the function name
@@ -3527,3 +3458,205 @@ class CriticalWarningWindow(QMainWindow):
             y = screen_geometry.bottom() - window_geometry.height()
         self.move(QPoint(x, y))
 
+class PreviewFindingFitting(QWidget):
+    """
+    """
+    def __init__(self):
+        super().__init__()
+        # Create a napari viewer
+        self.napariviewer = Viewer(show=False)
+        # Create a layout for the main widget
+        self.mainlayout = QVBoxLayout()
+        # Set the layout for the main widget
+        self.setLayout(self.mainlayout)
+        
+        
+        self.viewer = QtViewer(self.napariviewer)
+        
+        
+        self.viewer.on_mouse_move = lambda event: self.currently_under_cursor(event)
+        #Test
+        # self.viewer.window.add_plugin_dock_widget('napari-1d', 'napari-1d')
+        
+        self.mainlayout.addWidget(self.viewer)
+        self.mainlayout.addWidget(self.viewer.controls)
+        # self.mainlayout.addWidget(self.viewer.layers)
+        
+        # self.mainlayout.addWidget(self.viewer.dockConsole)
+        # self.mainlayout.addWidget(self.viewer.layerButtons)
+        # self.mainlayout.addWidget(self.viewer.viewerButtons)
+        logging.info('PreviewFindingFitting init')
+        self.finding_overlays = {}
+        self.fitting_overlays = {}
+        self.maxFrames = 0
+        self.napariviewer.dims.events.current_step.connect(self.update_visibility)
+
+    
+    
+    def currently_under_cursor(self,event: Event):
+        #Vispy mouse position
+        # print(event._pos)
+        
+        canvas_size_in_px_units = event.source.size/self.napariviewer.camera.zoom
+        
+        camera_coords = [self.napariviewer.camera.center[2]+.5, self.napariviewer.camera.center[1]+.5]
+        
+        canvas_pos = np.vstack([camera_coords-(canvas_size_in_px_units/2),camera_coords+(canvas_size_in_px_units/2)])
+        
+        cursor_unit_norm = event._pos/event.source.size
+        highlighted_px_index=np.zeros((2,))
+        highlighted_px_index[0] = cursor_unit_norm[0]*canvas_size_in_px_units[0]+canvas_pos[0][0]
+        
+        highlighted_px_index[1] = cursor_unit_norm[1]*canvas_size_in_px_units[1]+canvas_pos[0][1]
+        
+        pixel_index = np.floor(highlighted_px_index).astype(int)
+        #TODO: usefull info from mouse-over events
+        # print(np.floor(highlighted_px_index))
+    
+    def displayEvents(self,events,frametime_ms=100,findingResult = None,fittingResult=None,settings=None):
+        #Delete all existing layers:
+        for layer in reversed(self.napariviewer.layers):
+            self.napariviewer.layers.remove(layer)
+        
+        
+        preview_multiD_image = []
+        #Loop over the frames:
+        n_frames = int(np.ceil((events['t'].max()-events['t'].min())/(frametime_ms*1000)))
+        self.maxFrames = n_frames
+        for n in range(0,n_frames):
+            #Get the events on this 'frame'
+            events_this_frame = events[(events['t']>(n*frametime_ms*1000)) & (events['t']<((n+1)*frametime_ms*1000))]
+            #Create a 2d histogram out of this
+            self.hist_xy = utilsHelper.SumPolarity(events_this_frame)
+            #Add it to our image
+            preview_multiD_image.append(self.hist_xy.dist2D)
+            
+
+        
+
+        self.napariviewer.add_image(np.asarray(preview_multiD_image), multiscale=False)
+        
+        self.finding_overlays = {}
+        self.fitting_overlays = []
+        #Create an empty finding and fitting result overlay for each layer:
+        for n in range(0,n_frames):
+            logging.info('Creating overlays ' + str(n/n_frames))
+            #Get the finding result in the current time bin:
+            findingResults_thisbin = {}
+            for findres_id in range(len(findingResult)):
+                findres = findingResult[findres_id]
+                if max(findres['events']['t']) >= (n*frametime_ms*1000) and min(findres['events']['t']) < ((n+1)*frametime_ms*1000):
+                    findingResults_thisbin[findres_id] = findres
+            #Create an overlay from this
+            self.finding_overlays[n] = self.create_finding_overlay(findingResults_thisbin)
+            
+            #Get the fitting result in the current time bin:
+            fittingResults_thisbin = fittingResult[(fittingResult['t']>=(n*frametime_ms))* (fittingResult['t']<((n+1)*frametime_ms))]
+            self.fitting_overlays.append(self.create_fitting_overlay(fittingResults_thisbin,pxsize=settings['PixelSize_nm']['value']))
+        
+        #Select the original image-layer as selected
+        self.napariviewer.layers.selection.active = self.napariviewer.layers[0]
+        self.update_visibility()
+        
+        # hist_xy = utilsHelper.Hist2d_xy(events)
+    
+    
+    def create_finding_overlay(self,findingResults):
+        #Loop over the finding results, and create a polygon for each, then show these:
+        polygons = []
+        candidates_ids = []
+        
+        for f in findingResults:
+            #Get the bounding box in xy:
+            y_min = min(findingResults[f]['events']['x']) - self.hist_xy.xlim[0]
+            y_max = max(findingResults[f]['events']['x']) - self.hist_xy.xlim[0]
+            x_min = min(findingResults[f]['events']['y']) - self.hist_xy.ylim[0]
+            x_max = max(findingResults[f]['events']['y']) - self.hist_xy.ylim[0]
+            candidates_ids.append(f)
+
+            polygons.append(np.array([[x_min, y_min], [x_max, y_min], [x_max, y_max], [x_min, y_max]]))
+            
+        
+        # create features
+        features = {
+            'candidate_ids': candidates_ids,
+        }
+        text = {
+            'string': '{candidate_ids:0.0f}',
+            'anchor': 'upper_left',
+            'translation': [0, 0],
+            'size': 8,
+            'color':'coral'
+        }
+        # Initialize an empty shapes layer for annotations
+        self.shapes_layer = self.napariviewer.add_shapes(polygons, shape_type='rectangle', edge_width=1,edge_color='coral',face_color='transparent',visible=False,name='Finding Results',features=features,text=text)
+        self.shapes_layer.opacity = 1
+        
+        return self.shapes_layer
+        
+    def create_fitting_overlay(self,fittingResults,pxsize=80):
+        
+        polygons = []
+        
+        for f in range(len(fittingResults)):
+            xcoord_pxcoord = fittingResults['x'].iloc[f]/pxsize-self.hist_xy.xlim[0]
+            ycoord_pxcoord = fittingResults['y'].iloc[f]/pxsize-self.hist_xy.ylim[0]
+            
+            polygons.append(np.array([[ycoord_pxcoord-1,xcoord_pxcoord-1],[ycoord_pxcoord+1,xcoord_pxcoord+1]]))
+            polygons.append(np.array([[ycoord_pxcoord-1,xcoord_pxcoord+1],[ycoord_pxcoord+1,xcoord_pxcoord-1]]))
+            
+        
+        
+        # Initialize an empty shapes layer for annotations
+        self.shapes_layer = self.napariviewer.add_shapes(polygons, shape_type='line', edge_width=1,edge_color='red',face_color='transparent',visible=False,name='Fitting Results')
+        self.shapes_layer.opacity = 1
+        
+        return self.shapes_layer
+    
+    
+    
+    def load_multi_page_images(self):
+        self.images = []
+        # Generate synthetic images
+        # for i in range(5):
+        synthetic_image = np.random.rand(5,100,100)
+        self.mask = np.zeros(5,)
+        self.mask[2] = True
+        # Add synthetic images to the viewer
+        self.images = synthetic_image
+        self.napariviewer.add_image(synthetic_image, multiscale=False, colormap='gray')
+        # Connect the update_visibility function to the events
+        
+        triangle = np.array([[11, 13], [111, 113], [22, 246]])
+
+        person = np.array([[505, 60], [402, 71], [383, 42], [251, 95], [212, 59],
+                        [131, 137], [126, 187], [191, 204], [171, 248], [211, 260],
+                        [273, 243], [264, 225], [430, 173], [512, 160]])
+
+        building = np.array([[310, 382], [229, 381], [209, 401], [221, 411],
+                            [258, 411], [300, 412], [306, 435], [268, 434],
+                            [265, 454], [298, 461], [307, 461], [307, 507],
+                            [349, 510], [352, 369], [330, 366], [330, 366]])
+
+        polygons2 = [triangle, person, building]
+                
+        # Initialize an empty shapes layer for annotations
+        self.shapes_layer = self.napariviewer.add_shapes(polygons, shape_type='polygon', edge_width=5,
+                          edge_color='coral', face_color='royalblue')
+        
+        
+    # Function to update visibility based on the current layer
+    def update_visibility(self):
+        #Disable all
+        if not not self.finding_overlays: #worst syntax ever to check if a dictionary is empty or not
+            for n in range(self.maxFrames):
+                if self.finding_overlays[n].visible:
+                    self.finding_overlays[n].visible = False
+                if self.fitting_overlays[n].visible:
+                    self.fitting_overlays[n].visible = False
+            #Set current dim visible
+            self.finding_overlays[self.napariviewer.dims.current_step[0]].visible=True
+            self.fitting_overlays[self.napariviewer.dims.current_step[0]].visible=True
+            
+        
+        # print('wopp'+str(self.napariviewer.dims.current_step[0]))

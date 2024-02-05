@@ -111,6 +111,35 @@ class Hist2d_xy(Dist2d):
         hist_xy, x_edges, y_edges = np.histogram2d(events['x'], events['y'], bins = self.bins(), range = self.range(), **kwargs)
         return hist_xy.T, x_edges, y_edges
     
+class SumPolarity(Dist2d):
+    description = "The sum of the polarities of all events for each pixel."
+    def __init__(self, events):
+        super().__init__(events)
+        self.xy_bin_width = 1. # in px
+        self.dist2D, self.x_edges, self.y_edges = self(events)
+        
+    def range(self):
+        xrange = [self.xlim[0]-0.5, self.xlim[1]+0.5]
+        yrange = [self.ylim[0]-0.5, self.ylim[1]+0.5]
+        return [xrange, yrange]
+    
+    def bins(self): 
+        xbins = int((self.xlim[1]-self.xlim[0]+1)/self.xy_bin_width)
+        ybins = int((self.ylim[1]-self.ylim[0]+1)/self.xy_bin_width)
+        return (xbins, ybins)
+    
+    def __call__(self, events):
+        #Create a histogram of positive events
+        pos_events = events[events['p']==1]
+        histPos_xy, x_edges, y_edges = np.histogram2d(pos_events['x'], pos_events['y'], bins = self.bins(), range = self.range())
+        #Create a histogram of negative events
+        neg_events = events[events['p']==0]
+        histNeg_xy, x_edges, y_edges = np.histogram2d(neg_events['x'], neg_events['y'], bins = self.bins(), range = self.range())
+        #The sum of the polarities of all events for each pixel
+        histxy = histPos_xy-histNeg_xy
+        
+        return histxy.T, x_edges, y_edges
+
 class FirstTimestamp(Dist2d):
     description = "The timestamp of the first event for each pixel."
     def __init__(self, events):
