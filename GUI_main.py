@@ -3486,7 +3486,7 @@ class PreviewFindingFitting(QWidget):
         # Create a napari viewer
         self.napariviewer = Viewer(show=False)
         # Create a layout for the main widget
-        self.mainlayout = QHBoxLayout()
+        self.mainlayout = QVBoxLayout()
         # Set the layout for the main widget
         self.setLayout(self.mainlayout)
         
