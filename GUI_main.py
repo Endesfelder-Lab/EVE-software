@@ -1762,10 +1762,12 @@ class MyGUI(QMainWindow):
     def updateLocList(self):
         #data is stored in self.data['FittingResult'][0]
         #fill the self.LocListTable QTableWidget with the data:
+        localizations = self.data['FittingResult'][0].dropna(axis=0, ignore_index=True)
+        localizations = localizations.drop('fit_info', axis=1)
         
         #Get the shape of the data
-        nrRows = np.shape(self.data['FittingResult'][0])[0]
-        nrColumns = np.shape(self.data['FittingResult'][0])[1]
+        nrRows = np.shape(localizations)[0]
+        nrColumns = np.shape(localizations)[1]
         
         #Give the loclisttable the correct row/column count:
         self.LocListTable.setRowCount(nrRows)
@@ -1775,11 +1777,11 @@ class MyGUI(QMainWindow):
         for r in range(nrRows):
             for c in range(nrColumns):
                 nrDigits = 2
-                item = QTableWidgetItem(f"{round(self.data['FittingResult'][0].iloc[r, c], nrDigits):.{nrDigits}f}")
+                item = QTableWidgetItem(f"{round(localizations.iloc[r, c], nrDigits):.{nrDigits}f}")
                 self.LocListTable.setItem(r, c, item)
         
         #Add headers
-        self.LocListTable.setHorizontalHeaderLabels(self.data['FittingResult'][0].columns.tolist())
+        self.LocListTable.setHorizontalHeaderLabels(localizations.columns.tolist())
         
         return
     
@@ -1967,30 +1969,6 @@ class MyGUI(QMainWindow):
             self.updateLocList()
         # else:
         #     self.open_critical_warning(error)
-    
-    def updateLocList(self):
-        #data is stored in self.data['FittingResult'][0]
-        #fill the self.LocListTable QTableWidget with the data:
-        
-        #Get the shape of the data
-        nrRows = np.shape(self.data['FittingResult'][0])[0]
-        nrColumns = np.shape(self.data['FittingResult'][0])[1]
-        
-        #Give the loclisttable the correct row/column count:
-        self.LocListTable.setRowCount(nrRows)
-        self.LocListTable.setColumnCount(nrColumns)
-        
-        #Fill the loclisttable with the output:
-        for r in range(nrRows):
-            for c in range(nrColumns):
-                nrDigits = 2
-                item = QTableWidgetItem(f"{round(self.data['FittingResult'][0].iloc[r, c], nrDigits):.{nrDigits}f}")
-                self.LocListTable.setItem(r, c, item)
-        
-        #Add headers
-        self.LocListTable.setHorizontalHeaderLabels(self.data['FittingResult'][0].columns.tolist())
-        
-        return
     
     def checkPolarity(self,npyData):
         #Ensure that polarity is 0/1, not -1/1. If it is -1/1, convert to 0/1. Otherwise, give error
@@ -2390,7 +2368,7 @@ class MyGUI(QMainWindow):
             self.open_critical_warning(f"No Finding evaluation text provided/found")
 
     def updateGUIafterNewFitting(self):
-        logging.info('Number of localizations found: '+str(len(self.data['FittingResult'][0])))
+        logging.info('Number of localizations found: '+str(len(self.data['FittingResult'][0].dropna(axis=0))))
         logging.info('Candidate fitting took '+str(self.currentFileInfo['FittingTime'])+' seconds.')
         logging.info('Candidate fitting done!')
         self.data['NrEvents'] = 0
@@ -2487,19 +2465,21 @@ class MyGUI(QMainWindow):
         logging.debug('Attempting to store fitting results output')
         storeLocation = self.getStoreLocationPartial()+'_FitResults_'+datetime.datetime.now().strftime("%Y%m%d_%H%M%S")+'.csv'
         #Store the localization output
+        localizations = self.data['FittingResult'][0].dropna(axis=0, ignore_index=True)
+        localizations = localizations.drop('fit_info', axis=1)
         if self.globalSettings['OutputDataFormat']['value'] == 'minimal':
-            self.data['FittingResult'][0].to_csv(storeLocation)
+            localizations.to_csv(storeLocation)
         elif self.globalSettings['OutputDataFormat']['value'] == 'thunderstorm':
             #Add a frame column to fittingResult:
-            self.data['FittingResult'][0]['frame'] = self.data['FittingResult'][0]['t'].apply(round).astype(int)
-            self.data['FittingResult'][0]['frame'] -= min(self.data['FittingResult'][0]['frame'])-1
+            localizations['frame'] = localizations['t'].apply(round).astype(int)
+            localizations['frame'] -= min(localizations['frame'])-1
             #Create thunderstorm headers
-            headers = list(self.data['FittingResult'][0].columns)
+            headers = list(localizations.columns)
             headers = ['\"x [nm]\"' if header == 'x' else '\"y [nm]\"' if header == 'y' else '\"z [nm]\"' if header == 'z' else '\"t [ms]\"' if header == 't' else header for header in headers]
-            self.data['FittingResult'][0].rename_axis('\"id\"').to_csv(storeLocation, header=headers, quoting=csv.QUOTE_NONE)
+            localizations.rename_axis('\"id\"').to_csv(storeLocation, header=headers, quoting=csv.QUOTE_NONE)
         else:
             #default to minimal
-            self.data['FittingResult'][0].to_csv(storeLocation)
+            localizations.to_csv(storeLocation)
         logging.info('Fitting results output stored')
         
     def storeFindingOutput(self):
@@ -2531,7 +2511,7 @@ class MyGUI(QMainWindow):
             Methodology used:
             {self.data['FittingMethod']}
 
-            Number of localizations found: {len(self.data['FittingResult'][0])}
+            Number of localizations found: {len(self.data['FittingResult'][0].dropna(axis=0))}
             Candidate fitting took {self.currentFileInfo['FittingTime']} seconds.
 
             Custom output from fitting function:
@@ -3387,7 +3367,7 @@ class TwoDProjection:
         pos = int(pos_hist[x_bin, y_bin])
         neg = int(neg_hist[x_bin, y_bin])
 
-        display = f't={time} ms, y={y_pix}, events[pos,neg]=[{pos}, {neg}]'
+        display = f't={time:.2f} ms, y={y_pix}, events[pos,neg]=[{pos}, {neg}]'
         return display
 
 class TwoDTimestamps:

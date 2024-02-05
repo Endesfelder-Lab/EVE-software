@@ -79,23 +79,17 @@ class fit:
             popt, pcov = optimize.curve_fit(func, self.mesh, self.image, nan_policy='omit', **kwargs) #, gtol=1e-4,ftol=1e-4
             perr = np.sqrt(np.diag(pcov))
         except RuntimeError as warning:
-            self.fit_info += f'RuntimeError encountered during fit. No localization generated for candidate cluster {self.candidateID}.\n'
-            self.fit_info += str(warning)
-            self.fit_info += '\n'
-            popt = np.zeros(6)
-            perr = np.zeros(6)
+            self.fit_info += 'RuntimeError: ' + str(warning)
+            popt = np.full(6, np.nan)
+            perr = np.full(6, np.nan)
         except ValueError as warning:
-            self.fit_info += f'ValueError encountered during fit. No localization generated for candidate cluster {self.candidateID}.'
-            self.fit_info += str(warning)
-            self.fit_info += '\n'
-            popt = np.zeros(6)
-            perr = np.zeros(6)
+            self.fit_info += 'ValueError: ' + str(warning)
+            popt = np.full(6, np.nan)
+            perr = np.full(6, np.nan)
         except OptimizeWarning as warning:
-            self.fit_info += f'OptimizeWarning encountered during fit. No localization generated for candidate cluster {self.candidateID}.\n'
-            self.fit_info += str(warning)
-            self.fit_info += '\n'
-            popt = np.zeros(6)
-            perr = np.zeros(6)
+            self.fit_info += 'OptimizeWarning: ' + str(warning)
+            popt = np.full(6, np.nan)
+            perr = np.full(6, np.nan)
         return popt, perr
 
 # 2D gaussian fit
@@ -123,17 +117,32 @@ class gauss2D(fit):
     
     def __call__(self, events, **kwargs):
         opt, err = super().__call__(self.func, bounds=self.bounds, p0=self.p0, **kwargs)
-        x = (opt[0]+np.min(events['x']))*self.pixel_size # in nm
-        y = (opt[1]+np.min(events['y']))*self.pixel_size # in nm
-        del_x = err[0]*self.pixel_size # in nm
-        del_y = err[1]*self.pixel_size # in nm
-        if del_x > self.fitting_tolerance*self.pixel_size or del_y > self.fitting_tolerance*self.pixel_size:
-            self.fit_info = f'Fitting uncertainties exceed the tolerance. No localization generated for candidate cluster {self.candidateID}.\n'
-        t = np.mean(events['t'])/1000. # in ms
-        mean_polarity = events['p'].mean()
-        p = int(mean_polarity == 1) + int(mean_polarity == 0) * 0 + int(mean_polarity > 0 and mean_polarity < 1) * 2
-        loc_df = pd.DataFrame({'candidate_id': self.candidateID, 'x': x, 'y': y, 'del_x': del_x, 'del_y': del_y, 'p': p, 't': t}, index=[0])
-        return loc_df, self.fit_info
+        if self.fit_info != '':
+            x = np.nan
+            y = np.nan
+            del_x = np.nan
+            del_y = np.nan
+            p = np.nan
+            t = np.nan
+        else: 
+            x = (opt[0]+np.min(events['x']))*self.pixel_size # in nm
+            y = (opt[1]+np.min(events['y']))*self.pixel_size # in nm
+            del_x = err[0]*self.pixel_size # in nm
+            del_y = err[1]*self.pixel_size # in nm
+            if del_x > self.fitting_tolerance*self.pixel_size or del_y > self.fitting_tolerance*self.pixel_size:
+                self.fit_info = 'ToleranceWarning: Fitting uncertainties exceed the tolerance.'
+                x = np.nan
+                y = np.nan
+                del_x = np.nan
+                del_y = np.nan
+                p = np.nan
+                t = np.nan
+            else:
+                t = np.mean(events['t'])/1000. # in ms
+                mean_polarity = events['p'].mean()
+                p = int(mean_polarity == 1) + int(mean_polarity == 0) * 0 + int(mean_polarity > 0 and mean_polarity < 1) * 2
+        loc_df = pd.DataFrame({'candidate_id': self.candidateID, 'x': x, 'y': y, 'del_x': del_x, 'del_y': del_y, 'p': p, 't': t, 'fit_info': self.fit_info}, index=[0])
+        return loc_df
 
 # 2d log gaussian fit
 class loggauss2D(gauss2D):
@@ -173,27 +182,39 @@ class gauss3D(gauss2D):
 
 # perform localization for part of candidate dictionary
 def localize_canditates2D(i, candidate_dic, func, distfunc, *args, **kwargs):
-    print('Localizing PSFs (thread '+str(i)+')...')
+    logging.info('Localizing PSFs (thread '+str(i)+')...')
     localizations = []
-    index = 0
-    nb_fails = 0
-    info = ''
+    fails = pd.DataFrame()  # Initialize fails as an empty DataFrame
+    fail = pd.DataFrame()
     for candidate_id in list(candidate_dic):
         dist = distfunc(candidate_dic[candidate_id]['events'])
         fitting = func(dist, candidate_id, *args)
-        localization, fitting_info = fitting(candidate_dic[candidate_id]['events'], **kwargs)
-        if fitting_info != '':
-            info += fitting_info
-            nb_fails +=1
-        else:
-            localizations.append(localization)
-            index += 1
+        localization = fitting(candidate_dic[candidate_id]['events'], **kwargs)
+        localizations.append(localization)
+        if localization['fit_info'][0] != '':
+            fail['candidate_id'] = localization['candidate_id']
+            fail['fit_info'] = localization['fit_info'].str.split(':').str[0][0]
+            fails = pd.concat([fails, fail], ignore_index=True)
     if localizations == []:
         localizations = pd.DataFrame()
     else:
         localizations = pd.concat(localizations, ignore_index=True)
-    print('Localizing PSFs (thread '+str(i)+') done!')
-    return localizations, info
+    logging.info('Localizing PSFs (thread '+str(i)+') done!')
+    return localizations, fails
+
+def info(candidates, fails):
+    nb_candidates = len(candidates)
+    fit_info = ''
+    grouped_fails = fails.groupby('fit_info')
+    for fail_reason, count in grouped_fails.size().items():
+        fail_text = f'Removed {count}/{nb_candidates} ({count/(nb_candidates)*100:.2f}%) candidates due to {fail_reason}.'
+        logging.warning(fail_text)
+        fit_info += fail_text + '\n'
+    fit_info += '\n'
+    for fail_reason, candidate_group in grouped_fails:
+        candidate_list = candidate_group['candidate_id'].tolist()
+        fit_info += f'Candidates discarded by {fail_reason}: {candidate_list}\n'
+    return fit_info
 
 # calculate number of jobs on CPU
 def nb_jobs(candidate_dic, num_cores):
@@ -260,17 +281,13 @@ def Gaussian2D_new(candidate_dic,settings,**kwargs):
     RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(localize_canditates2D)(i, data_split[i], fit_func, dist_func, *params) for i in range(len(data_split)))
     
     localization_list = [res[0] for res in RES]
-    localizations = pd.concat(localization_list)
+    localizations = pd.concat(localization_list, ignore_index=True)
+
+    fail_list = [res[1] for res in RES]
+    fails = pd.concat(fail_list, ignore_index=True)
     
     # Fit performance information
-    nb_fails = len(candidate_dic)-len(localizations)
-    n_fails_info = f'Gaussian fitting failed for {nb_fails} candidate cluster(s).'
-    logging.info(n_fails_info)
-    gaussian_fit_info = ''
-    gaussian_fit_info += ''.join([res[1] for res in RES])
-    logging.info(gaussian_fit_info)
-
-    gaussian_fit_info = n_fails_info + '\n' + gaussian_fit_info
+    gaussian_fit_info = info(localizations, fails)
 
     return localizations, gaussian_fit_info
 
@@ -308,16 +325,12 @@ def LogGaussian2D_new(candidate_dic,settings,**kwargs):
     
     localization_list = [res[0] for res in RES]
     localizations = pd.concat(localization_list)
+
+    fail_list = [res[1] for res in RES]
+    fails = pd.concat(fail_list)
     
     # Fit performance information
-    nb_fails = len(candidate_dic)-len(localizations)
-    n_fails_info = f'Gaussian fitting failed for {nb_fails} candidate cluster(s).'
-    logging.info(n_fails_info)
-    gaussian_fit_info = ''
-    gaussian_fit_info += ''.join([res[1] for res in RES])
-    logging.info(gaussian_fit_info)
-
-    gaussian_fit_info = n_fails_info + '\n' + gaussian_fit_info
+    gaussian_fit_info = info(localizations, fails)
 
     return localizations, gaussian_fit_info
 
@@ -356,15 +369,11 @@ def Gaussian3D_new(candidate_dic,settings,**kwargs):
     
     localization_list = [res[0] for res in RES]
     localizations = pd.concat(localization_list)
+
+    fail_list = [res[1] for res in RES]
+    fails = pd.concat(fail_list)
     
     # Fit performance information
-    nb_fails = len(candidate_dic)-len(localizations)
-    n_fails_info = f'Gaussian fitting failed for {nb_fails} candidate cluster(s).'
-    logging.info(n_fails_info)
-    gaussian_fit_info = ''
-    gaussian_fit_info += ''.join([res[1] for res in RES])
-    logging.info(gaussian_fit_info)
-
-    gaussian_fit_info = n_fails_info + '\n' + gaussian_fit_info
+    gaussian_fit_info = info(localizations, fails)
 
     return localizations, gaussian_fit_info
