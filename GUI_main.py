@@ -2734,6 +2734,8 @@ class MyGUI(QMainWindow):
         except:
             logging.error('Error in creating file metadata, not stored')
     
+
+    
     def getFunctionEvalText(self,className,p1,p2,polarity):
         #Get the dropdown info
         moduleMethodEvalTexts = []
@@ -2747,22 +2749,42 @@ class MyGUI(QMainWindow):
         for index in range(all_layouts.count()):
             item = all_layouts.itemAt(index)
             widget = item.widget()
-                        
-            if ("LineEdit" in widget.objectName()) and widget.isVisibleTo(self.tab_processing):
-                # The objectName will be along the lines of foo#bar#str
-                #Check if the objectname is part of a method or part of a scoring
-                split_list = widget.objectName().split('#')
-                methodName_method = split_list[1]
-                methodKwargNames_method.append(split_list[2])
+            if widget is not None:#Catching layouts rather than widgets....   
+                if ("LineEdit" in widget.objectName()) and widget.isVisibleTo(self.tab_processing):
+                    # The objectName will be along the lines of foo#bar#str
+                    #Check if the objectname is part of a method or part of a scoring
+                    split_list = widget.objectName().split('#')
+                    methodName_method = split_list[1]
+                    methodKwargNames_method.append(split_list[2])
+                    
+                    #Widget.text() could contain a file location. Thus, we need to swap out all \ for /:
+                    methodKwargValues_method.append(widget.text().replace('\\','/'))
                 
-                #Widget.text() could contain a file location. Thus, we need to swap out all \ for /:
-                methodKwargValues_method.append(widget.text().replace('\\','/'))
-            
-            # add distKwarg choice to Kwargs if given
-            if ("ComboBox" in widget.objectName()) and widget.isVisibleTo(self.tab_processing) and 'dist_kwarg' in widget.objectName():
-                methodKwargNames_method.append('dist_kwarg')
-                methodKwargValues_method.append(widget.currentText())                
-               
+                # add distKwarg choice to Kwargs if given
+                if ("ComboBox" in widget.objectName()) and widget.isVisibleTo(self.tab_processing) and 'dist_kwarg' in widget.objectName():
+                    methodKwargNames_method.append('dist_kwarg')
+                    methodKwargValues_method.append(widget.currentText())
+            else:
+                #If the item is a layout instead...
+                if isinstance(item, QLayout):
+                    for index2 in range(item.count()):
+                        item_sub = item.itemAt(index2)
+                        widget_sub = item_sub.widget()
+                        if ("LineEdit" in widget_sub.objectName()) and widget_sub.isVisibleTo(self.tab_processing):
+                            # The objectName will be along the lines of foo#bar#str
+                            #Check if the objectname is part of a method or part of a scoring
+                            split_list = widget_sub.objectName().split('#')
+                            methodName_method = split_list[1]
+                            methodKwargNames_method.append(split_list[2])
+                            
+                            #Widget.text() could contain a file location. Thus, we need to swap out all \ for /:
+                            methodKwargValues_method.append(widget_sub.text().replace('\\','/'))
+                        
+                        # add distKwarg choice to Kwargs if given
+                        if ("ComboBox" in widget_sub.objectName()) and widget_sub.isVisibleTo(self.tab_processing) and 'dist_kwarg' in widget_sub.objectName():
+                            methodKwargNames_method.append('dist_kwarg')
+                            methodKwargValues_method.append(widget_sub.currentText())
+                        
         #If at this point there is no methodName_method, it means that the method has exactly 0 req or opt kwargs. Thus, we simply find the value of the QComboBox which should be the methodName:
         if methodName_method == '':
             for index in range(all_layouts.count()):
@@ -2779,6 +2801,7 @@ class MyGUI(QMainWindow):
             EvalTextMethod = self.getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart=str(p1)+','+str(p2))
             #append this to moduleEvalTexts
             moduleMethodEvalTexts.append(EvalTextMethod)
+            
         if moduleMethodEvalTexts is not None and len(moduleMethodEvalTexts) > 0:
             return moduleMethodEvalTexts[0]
         else:
@@ -2808,6 +2831,7 @@ class MyGUI(QMainWindow):
                         #nothing, but want to make a note of this (log message)
                         reqKwargs = reqKwargs
             #Stupid dummy-check whether we have the reqKwargs in the methodKwargNames, which we should (basically by definition)
+
             if all(elem in set(methodKwargNames) for elem in reqKwargs):
                 allreqKwargsHaveValue = True
                 for id in range(0,len(reqKwargs)):
