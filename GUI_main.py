@@ -1733,7 +1733,6 @@ class MyGUI(QMainWindow):
                 # Check if the widget has the desired name
                 if widget.objectName() == widgetName:
                     # Widget already exists, unhide it
-                    logging.info(f"Showing {widget.objectName()}")
                     widget.show()
                     return
             else:
@@ -1745,7 +1744,6 @@ class MyGUI(QMainWindow):
                         # Check if the widget has the desired name
                         if widget.objectName() == widgetName:
                             # Widget already exists, unhide it
-                            logging.info(f"Showing {widget.objectName()}")
                             widget.show()
                             return
         return False
@@ -2128,19 +2126,25 @@ class MyGUI(QMainWindow):
         
                 elif self.globalSettings['FindingBatching']['value']== True or self.globalSettings['FindingBatching']['value']== 2:
                     self.runFindingBatching()
-                    
-                
             #If we only fit, we still run more or less the same info, butwe don't care about the npyData in the CurrentFileLoc.
             elif onlyFitting:
                 self.currentFileInfo['CurrentFileLoc'] = FileName
                 logging.info('Candidate finding NOT performed')
                 npyData = None
-                self.runFindingAndFitting(npyData,polarityVal=polarityVal)
+                if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[3]:
+                    self.runFindingAndFitting(npyData,polarityVal='Pos')
+                    self.runFindingAndFitting(npyData,polarityVal='Neg')
+                else:
+                    self.runFindingAndFitting(npyData,polarityVal=polarityVal)
         elif noFindingFitting:
             self.currentFileInfo['CurrentFileLoc'] = FileName
             logging.info('Candidate finding and fitting NOT performed')
             npyData = None
-            self.runFindingAndFitting(npyData,polarityVal=polarityVal)
+            if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[3]:
+                self.runFindingAndFitting(npyData,polarityVal='Pos')
+                self.runFindingAndFitting(npyData,polarityVal='Neg')
+            else:
+                self.runFindingAndFitting(npyData,polarityVal=polarityVal)
         
     def FindingBatching(self,npyData,polarityVal):
         #Get polarity info and do this:
