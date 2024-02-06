@@ -138,7 +138,7 @@ class gauss2D(fit):
                 t = np.nan
             else:
                 t = np.mean(events['t'])/1000. # in ms
-                mean_polarity = events['p'].mean()
+            mean_polarity = events['p'].mean()
             p = int(mean_polarity == 1) + int(mean_polarity == 0) * 0 + int(mean_polarity > 0 and mean_polarity < 1) * 2
         loc_df = pd.DataFrame({'candidate_id': self.candidateID, 'x': x, 'y': y, 'del_x': del_x, 'del_y': del_y, 'p': p, 't': t, 'fit_info': self.fit_info}, index=[0])
         return loc_df
