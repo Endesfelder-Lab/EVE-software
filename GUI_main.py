@@ -1596,6 +1596,8 @@ class MyGUI(QMainWindow):
                     hor_boxLayout.addWidget(line_edit_lookup)
                     
                     #Actually placing it in the layout
+                    self.checkAndShowWidget(curr_layout,line_edit.objectName())
+                    self.checkAndShowWidget(curr_layout,line_edit_lookup.objectName())
                     if self.checkAndShowWidget(curr_layout,line_edit.objectName()) == False:
                         line_edit.setToolTip(utils.infoFromMetadata(current_selected_function,specificKwarg=reqKwargs[k]))
                         if defaultValue is not None:
@@ -1648,6 +1650,8 @@ class MyGUI(QMainWindow):
                 hor_boxLayout.addWidget(line_edit_lookup)
                 
                 #Actually placing it in the layout
+                self.checkAndShowWidget(curr_layout,line_edit.objectName())
+                self.checkAndShowWidget(curr_layout,line_edit_lookup.objectName())
                 if self.checkAndShowWidget(curr_layout,line_edit.objectName()) == False:
                     line_edit.setToolTip(utils.infoFromMetadata(current_selected_function,specificKwarg=optKwargs[k]))
                     if defaultValue is not None:
@@ -1729,8 +1733,21 @@ class MyGUI(QMainWindow):
                 # Check if the widget has the desired name
                 if widget.objectName() == widgetName:
                     # Widget already exists, unhide it
+                    logging.info(f"Showing {widget.objectName()}")
                     widget.show()
                     return
+            else:
+                for index2 in range(item.count()):
+                    item_sub = item.itemAt(index2)
+                    # Check if the item is a widget
+                    if item_sub.widget() is not None:
+                        widget = item_sub.widget()
+                        # Check if the widget has the desired name
+                        if widget.objectName() == widgetName:
+                            # Widget already exists, unhide it
+                            logging.info(f"Showing {widget.objectName()}")
+                            widget.show()
+                            return
         return False
                 
     #Remove everythign in this layout except className_dropdown
@@ -1744,6 +1761,16 @@ class MyGUI(QMainWindow):
                 if not ("CandidateFindingDropdown" in widget.objectName()) and not ("CandidateFittingDropdown" in widget.objectName()) and widget.objectName() != f"titleLabel_{className}" and not ("KEEP" in widget.objectName()):
                     logging.debug(f"Hiding {widget.objectName()}")
                     widget.hide()
+            else:
+                for index2 in range(widget_item.count()):
+                    widget_sub_item = widget_item.itemAt(index2)
+                    # Check if the item is a widget (as opposed to a layout)
+                    if widget_sub_item.widget() is not None:
+                        widget = widget_sub_item.widget()
+                        #If it's the dropdown segment, label it as such
+                        if not ("CandidateFindingDropdown" in widget.objectName()) and not ("CandidateFittingDropdown" in widget.objectName()) and widget.objectName() != f"titleLabel_{className}" and not ("KEEP" in widget.objectName()):
+                            logging.debug(f"Hiding {widget.objectName()}")
+                            widget.hide()
     
     def getMethodDropdownInfo(self,curr_layout,className):
         curr_dropdown = []
@@ -2802,6 +2829,7 @@ class MyGUI(QMainWindow):
                         item_sub = item.itemAt(index2)
                         widget_sub = item_sub.widget()
                         if ("LineEdit" in widget_sub.objectName()) and widget_sub.isVisibleTo(self.tab_processing):
+                            print(widget_sub.objectName())
                             # The objectName will be along the lines of foo#bar#str
                             #Check if the objectname is part of a method or part of a scoring
                             split_list = widget_sub.objectName().split('#')
