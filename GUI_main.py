@@ -376,10 +376,18 @@ class MyGUI(QMainWindow):
         globalSettings['IgnoreInOptions'] = ('IgnoreInOptions','StoreFinalOutput', 'JSONGUIstorePath','GlobalOptionsStorePath') 
         return globalSettings
     
+    def generalFileSearchButtonAction(self,text='Select File',filter='*.txt'):
+        file_path, _ = QFileDialog.getOpenFileName(self, text,filter=filter)
+        return file_path
+    
+    def lineEditFileLookup(self,line_edit_objName, text, filter):
+        file_path = self.generalFileSearchButtonAction(text=text,filter=filter)
+        line_edit_objName.setText(file_path)
+    
     def datasetSearchButtonClicked(self):
         # Function that handles the dataset 'File' lookup button
         logging.debug('data lookup search button clicked')
-        file_path, _ = QFileDialog.getOpenFileName(self, "Select File",filter="EBS files (*.raw *.npy);;All Files (*)")
+        file_path = self.generalFileSearchButtonAction(text="Select File",filter="EBS files (*.raw *.npy *hdf5);;All Files (*)")
         if file_path:
             self.dataLocationInput.setText(file_path)
     
@@ -1567,16 +1575,46 @@ class MyGUI(QMainWindow):
                 if self.checkAndShowWidget(curr_layout,label.objectName()) == False:
                     label.setToolTip(utils.infoFromMetadata(current_selected_function,specificKwarg=reqKwargs[k]))
                     curr_layout.addWidget(label,2+((k+labelposoffset))%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+0)
-                line_edit = QLineEdit()
-                line_edit.setObjectName(f"LineEdit#{current_selected_function}#{reqKwargs[k]}#{current_selected_polarity}")
-                defaultValue = utils.defaultValueFromKwarg(current_selected_function,reqKwargs[k])
-                if self.checkAndShowWidget(curr_layout,line_edit.objectName()) == False:
-                    line_edit.setToolTip(utils.infoFromMetadata(current_selected_function,specificKwarg=reqKwargs[k]))
-                    if defaultValue is not None:
-                        line_edit.setText(str(defaultValue))
-                    curr_layout.addWidget(line_edit,2+((k+labelposoffset))%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+1)
-                    #Add a on-change listener:
-                    line_edit.textChanged.connect(lambda text,line_edit=line_edit: self.kwargValueInputChanged(line_edit))
+                #Check if we want to add a fileLoc-input:
+                if utils.typeFromKwarg(current_selected_function,reqKwargs[k]) == 'fileLoc':
+                    #Create a new qhboxlayout:
+                    hor_boxLayout = QHBoxLayout()
+                    #Add a line_edit to this:
+                    line_edit = QLineEdit()
+                    line_edit.setObjectName(f"LineEdit#{current_selected_function}#{reqKwargs[k]}#{current_selected_polarity}")
+                    defaultValue = utils.defaultValueFromKwarg(current_selected_function,reqKwargs[k])
+                    hor_boxLayout.addWidget(line_edit)
+                    #Also add a QButton with ...:
+                    line_edit_lookup = QPushButton()
+                    line_edit_lookup.setText('...')
+                    line_edit_lookup.setObjectName(f"PushButton#{current_selected_function}#{reqKwargs[k]}#{current_selected_polarity}")
+                    hor_boxLayout.addWidget(line_edit_lookup)
+                    
+                    #Actually placing it in the layout
+                    if self.checkAndShowWidget(curr_layout,line_edit.objectName()) == False:
+                        line_edit.setToolTip(utils.infoFromMetadata(current_selected_function,specificKwarg=reqKwargs[k]))
+                        if defaultValue is not None:
+                            line_edit.setText(str(defaultValue))
+                        curr_layout.addLayout(hor_boxLayout,2+((k+labelposoffset))%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+1)
+                        #Add a on-change listener:
+                        line_edit.textChanged.connect(lambda text,line_edit=line_edit: self.kwargValueInputChanged(line_edit))
+                        
+                        #Add an listener when the pushButton is pressed
+                        line_edit_lookup.clicked.connect(lambda text2,line_edit_change_objName = line_edit,text="Select file",filter="*.*": self.lineEditFileLookup(line_edit_change_objName, text, filter))
+                        
+                else: #'normal' type - int, float, string, whatever
+                    #Creating a line-edit...
+                    line_edit = QLineEdit()
+                    line_edit.setObjectName(f"LineEdit#{current_selected_function}#{reqKwargs[k]}#{current_selected_polarity}")
+                    defaultValue = utils.defaultValueFromKwarg(current_selected_function,reqKwargs[k])
+                    #Actually placing it in the layout
+                    if self.checkAndShowWidget(curr_layout,line_edit.objectName()) == False:
+                        line_edit.setToolTip(utils.infoFromMetadata(current_selected_function,specificKwarg=reqKwargs[k]))
+                        if defaultValue is not None:
+                            line_edit.setText(str(defaultValue))
+                        curr_layout.addWidget(line_edit,2+((k+labelposoffset))%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+1)
+                        #Add a on-change listener:
+                        line_edit.textChanged.connect(lambda text,line_edit=line_edit: self.kwargValueInputChanged(line_edit))
             else:
                 labelposoffset -= 1
             
@@ -1589,16 +1627,44 @@ class MyGUI(QMainWindow):
             if self.checkAndShowWidget(curr_layout,label.objectName()) == False:
                 label.setToolTip(utils.infoFromMetadata(current_selected_function,specificKwarg=optKwargs[k]))
                 curr_layout.addWidget(label,2+((k+labelposoffset+len(reqKwargs)))%maxNrRows,(((k+labelposoffset+len(reqKwargs)))//maxNrRows)*2+0)
-            line_edit = QLineEdit()
-            line_edit.setObjectName(f"LineEdit#{current_selected_function}#{optKwargs[k]}#{current_selected_polarity}")
-            defaultValue = utils.defaultValueFromKwarg(current_selected_function,optKwargs[k])
-            if self.checkAndShowWidget(curr_layout,line_edit.objectName()) == False:
-                line_edit.setToolTip(utils.infoFromMetadata(current_selected_function,specificKwarg=optKwargs[k]))
-                if defaultValue is not None:
-                    line_edit.setText(str(defaultValue))
-                curr_layout.addWidget(line_edit,2+((k+labelposoffset+len(reqKwargs)))%maxNrRows,(((k+labelposoffset+len(reqKwargs)))//maxNrRows)*2+1)
-                #Add a on-change listener:
-                line_edit.textChanged.connect(lambda text,line_edit=line_edit: self.kwargValueInputChanged(line_edit))
+            #Check if we want to add a fileLoc-input:
+            if utils.typeFromKwarg(current_selected_function,optKwargs[k]) == 'fileLoc':
+                #Create a new qhboxlayout:
+                hor_boxLayout = QHBoxLayout()
+                #Add a line_edit to this:
+                line_edit = QLineEdit()
+                line_edit.setObjectName(f"LineEdit#{current_selected_function}#{optKwargs[k]}#{current_selected_polarity}")
+                defaultValue = utils.defaultValueFromKwarg(current_selected_function,optKwargs[k])
+                hor_boxLayout.addWidget(line_edit)
+                #Also add a QButton with ...:
+                line_edit_lookup = QPushButton()
+                line_edit_lookup.setText('...')
+                line_edit_lookup.setObjectName(f"PushButton#{current_selected_function}#{optKwargs[k]}#{current_selected_polarity}")
+                hor_boxLayout.addWidget(line_edit_lookup)
+                
+                #Actually placing it in the layout
+                if self.checkAndShowWidget(curr_layout,line_edit.objectName()) == False:
+                    line_edit.setToolTip(utils.infoFromMetadata(current_selected_function,specificKwarg=optKwargs[k]))
+                    if defaultValue is not None:
+                        line_edit.setText(str(defaultValue))
+                    curr_layout.addLayout(hor_boxLayout,2+((k+labelposoffset))%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+1)
+                    #Add a on-change listener:
+                    line_edit.textChanged.connect(lambda text,line_edit=line_edit: self.kwargValueInputChanged(line_edit))
+                    
+                    #Add an listener when the pushButton is pressed
+                    line_edit_lookup.clicked.connect(lambda text2,line_edit_change_objName = line_edit,text="Select file",filter="*.*": self.lineEditFileLookup(line_edit_change_objName, text, filter))
+                        
+            else:
+                line_edit = QLineEdit()
+                line_edit.setObjectName(f"LineEdit#{current_selected_function}#{optKwargs[k]}#{current_selected_polarity}")
+                defaultValue = utils.defaultValueFromKwarg(current_selected_function,optKwargs[k])
+                if self.checkAndShowWidget(curr_layout,line_edit.objectName()) == False:
+                    line_edit.setToolTip(utils.infoFromMetadata(current_selected_function,specificKwarg=optKwargs[k]))
+                    if defaultValue is not None:
+                        line_edit.setText(str(defaultValue))
+                    curr_layout.addWidget(line_edit,2+((k+labelposoffset+len(reqKwargs)))%maxNrRows,(((k+labelposoffset+len(reqKwargs)))//maxNrRows)*2+1)
+                    #Add a on-change listener:
+                    line_edit.textChanged.connect(lambda text,line_edit=line_edit: self.kwargValueInputChanged(line_edit))
     
     
     
