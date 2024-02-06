@@ -14,6 +14,7 @@ import pickle
 import time
 from textwrap import dedent
 import h5py
+import traceback
 
 #Imports for PyQt5 (GUI)
 from PyQt5 import QtWidgets, QtGui
@@ -2454,7 +2455,8 @@ class MyGUI(QMainWindow):
                 if runFitting:
                     self.runFitting(polarityVal)
             except Exception as e:
-                self.open_critical_warning(f"Critical error in Finding routine! Breaking off!\nError information:\n{e}")
+                error_message = f"Critical error in Finding routine! Breaking off!\nError information:\n{type(e).__name__}: {e}\n\n{traceback.format_exc()}"
+                self.open_critical_warning(error_message)
                 self.data['FindingResult'] = {}
         else:
             self.open_critical_warning(f"No Finding evaluation text provided/found")
@@ -2540,7 +2542,8 @@ class MyGUI(QMainWindow):
                         #Update the GUI
                         self.updateGUIafterNewFitting()
             except Exception as e:
-                self.open_critical_warning(f"Critical error in Fitting routine! Breaking off!\nError information:\n{e}")
+                error_message = f"Critical error in Fitting routine! Breaking off!\nError information:\n{type(e).__name__}: {e}\n\n{traceback.format_exc()}"
+                self.open_critical_warning(error_message)
                 self.data['FittingResult'] = {}
         else:
             self.open_critical_warning(f"No Fitting evaluation text provided/found")
@@ -2641,8 +2644,8 @@ class MyGUI(QMainWindow):
             Number of candidates found: {len(self.data['FindingResult'][0])}
             Candidate finding took {self.currentFileInfo['FindingTime']} seconds.
 
-            Custom output from finding function:""")\
-            + f"""{self.data['FindingResult'][1]}""" + dedent(f"""\
+            Custom output from finding function:\n""")\
+            + f"""{self.data['FindingResult'][1]}\n""" + dedent(f"""\
 
             ---- Fitting metadata output: ----
             Methodology used:
@@ -2651,7 +2654,7 @@ class MyGUI(QMainWindow):
             Number of localizations found: {len(self.data['FittingResult'][0].dropna(axis=0))}
             Candidate fitting took {self.currentFileInfo['FittingTime']} seconds.
 
-            Custom output from fitting function:""")\
+            Custom output from fitting function:\n""")\
             + f"""{self.data['FittingResult'][1]}
             """
             #Store this metadatastring:
