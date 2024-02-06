@@ -31,8 +31,9 @@ def AverageXYTpos(candidate_dic,settings,**kwargs):
         localizations[i]['y'] = np.mean(candidate_dic[i]['events']['y'])*float(settings['PixelSize_nm']['value']) #Y position in nm
         mean_polarity = np.mean(candidate_dic[i]['events']['p'])
         localizations[i]['p'] = int(mean_polarity == 1) + int(mean_polarity == 0) * 0 + int(mean_polarity > 0 and mean_polarity < 1) * 2
-        localizations[i]['t'] = np.mean(candidate_dic[i]['events']['t'])/1000 #time in ms ?
-    
+        localizations[i]['t'] = np.mean(candidate_dic[i]['events']['t'])/1000. 
+        localizations[i]['fit_info'] = ''
+        
     #Make a pd dataframe out of it - needs to be transposed
     localizations = pd.DataFrame(localizations).T
     

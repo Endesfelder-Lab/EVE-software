@@ -2493,8 +2493,8 @@ class MyGUI(QMainWindow):
             Number of candidates found: {len(self.data['FindingResult'][0])}
             Candidate finding took {self.currentFileInfo['FindingTime']} seconds.
 
-            Custom output from finding function:""")\
-            + f"""{self.data['FindingResult'][1]}""" + dedent(f"""\
+            Custom output from finding function:\n""")\
+            + f"""{self.data['FindingResult'][1]}\n""" + dedent(f"""\
 
             ---- Fitting metadata output: ----
             Methodology used:
@@ -2503,7 +2503,7 @@ class MyGUI(QMainWindow):
             Number of localizations found: {len(self.data['FittingResult'][0].dropna(axis=0))}
             Candidate fitting took {self.currentFileInfo['FittingTime']} seconds.
 
-            Custom output from fitting function:""")\
+            Custom output from fitting function:\n""")\
             + f"""{self.data['FittingResult'][1]}
             """
             #Store this metadatastring:
