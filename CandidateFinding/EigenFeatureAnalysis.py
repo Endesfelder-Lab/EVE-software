@@ -119,15 +119,15 @@ def compute_eig(pcc):
 def EigenValueCalculation(npyarr,kwargs):
     ms_to_px=float(kwargs['ratio_ms_to_px'])
     data_for_o3d = npyarr
-    multiCore = True
+    multiCore = False
     if multiCore == True:
         start_time = time.time()
         point_cloud = o3d.geometry.PointCloud()
         point_cloud.points = o3d.utility.Vector3dVector(zip(data_for_o3d['x'],data_for_o3d['y'],data_for_o3d['t']/(1000*ms_to_px)))
         
-        print('point cloud created')
+        logging.debug('point cloud created')
         point_cloud.estimate_covariances(search_param=o3d.geometry.KDTreeSearchParamKNN(knn=int(kwargs['search_n_neighbours'])))
-        print('pcc estimated')
+        logging.debug('pcc estimated')
         pcc = np.asarray(point_cloud.covariances)
         point_cloud.estimate_normals(fast_normal_computation=True,search_param=o3d.geometry.KDTreeSearchParamKNN(knn=int(kwargs['search_n_neighbours'])))
         
@@ -139,23 +139,23 @@ def EigenValueCalculation(npyarr,kwargs):
         eig_valso3d_list = []
         eig_valso3d_list.extend([res[0] for res in results])
         eig_valso3d = np.concatenate(eig_valso3d_list, axis=0)
-        print('eigv calculated')
+        logging.debug('eigv calculated')
         end_time = time.time()
-        print('Eigenvalue calculation time1: ', end_time - start_time)
+        logging.info('Eigenvalue calculation time: '+ str(end_time - start_time))
     
     else:
         start_time = time.time()
         point_cloud = o3d.geometry.PointCloud()
         point_cloud.points = o3d.utility.Vector3dVector(zip(data_for_o3d['x'],data_for_o3d['y'],data_for_o3d['t']/(1000*ms_to_px)))
-        print('point cloud created')
+        logging.debug('point cloud created')
         point_cloud.estimate_covariances(search_param=o3d.geometry.KDTreeSearchParamKNN(knn=int(kwargs['search_n_neighbours'])))
-        print('pcc estimated')
+        logging.debug('pcc estimated')
         pcc = np.asarray(point_cloud.covariances)        
         eig_valso3d = np.linalg.svd(pcc,compute_uv=False,hermitian=True)
         #svdres = np.linalg.svd(pcc,compute_uv=True,hermitian=True) #eigenvals == svdres.S == singular values
-        print('eigv calculated')
+        logging.debug('eigv calculated')
         end_time = time.time()
-        print('Eigenvalue calculation time2: ', end_time - start_time)
+        logging.info('Eigenvalue calculation time: '+ str(end_time - start_time))
     
     return eig_valso3d, point_cloud
 
@@ -168,7 +168,7 @@ def EigenValueCalculation_radius(npyarr,radius,kwargs):
         point_cloud = o3d.geometry.PointCloud()
         point_cloud.points = o3d.utility.Vector3dVector(zip(data_for_o3d['x'],data_for_o3d['y'],data_for_o3d['t']/(1000*ms_to_px)))
         
-        print('point cloud created')
+        logging.debug('point cloud created')
         point_cloud.estimate_covariances(search_param=o3d.geometry.KDTreeSearchParamRadius(radius=float(radius)))
 
         N = 150  # Number of chunks
@@ -181,22 +181,22 @@ def EigenValueCalculation_radius(npyarr,radius,kwargs):
         eig_valso3d = np.concatenate(eig_valso3d_list, axis=0)
         
         
-        print('eigv calculated')
+        logging.debug('eigv calculated')
         end_time = time.time()
-        print('Eigenvalue calculation time1: ', end_time - start_time)
+        logging.info('Eigenvalue calculation time: '+ str(end_time - start_time))
     
     else:
         start_time = time.time()
         point_cloud = o3d.geometry.PointCloud()
         point_cloud.points = o3d.utility.Vector3dVector(zip(data_for_o3d['x'],data_for_o3d['y'],data_for_o3d['t']/(1000*ms_to_px)))
-        print('point cloud created')
+        logging.debug('point cloud created')
         point_cloud.estimate_covariances(search_param=o3d.geometry.KDTreeSearchParamRadius(radius=float(radius)))
-        print('pcc estimated')
+        logging.debug('pcc estimated')
         pcc = np.asarray(point_cloud.covariances)        
         eig_valso3d = np.linalg.svd(pcc,compute_uv=False,hermitian=True)
-        print('eigv calculated')
+        logging.debug('eigv calculated')
         end_time = time.time()
-        print('Eigenvalue calculation time2: ', end_time - start_time)
+        logging.info('Eigenvalue calculation time: '+ str(end_time - start_time))
     
     return eig_valso3d, point_cloud
 
@@ -263,9 +263,7 @@ def determineEigenValueCutoffComputationally(maxeigenval,kwargs):
             peakind = signal.find_peaks_cwt(max(hist)-hist, np.arange(1,nbins/4))
             print(bin_edges[peakind]+bin_edges[1])
             
-            
-            
-            
+
             fig, ax1 = plt.subplots()
 
             # Plot the histogram on the first y-axis
@@ -275,7 +273,6 @@ def determineEigenValueCutoffComputationally(maxeigenval,kwargs):
 
             # Create a second y-axis
             ax2 = ax1.twinx()
-
 
             # Display the plot
             plt.show()
@@ -295,7 +292,7 @@ def clusterPoints_to_candidates(clusterpoints,cluster_labels,ms_to_px):
     new_arr = pd.DataFrame(clusterpoints, columns=headers)
     new_arr['x'] = new_arr['x'].astype(int)
     new_arr['y'] = new_arr['y'].astype(int)
-    new_arr['t'] = new_arr['t'].astype(int)
+    new_arr['t'] = new_arr['t'].astype(np.int64)
     new_arr['p'] = new_arr['p'].astype(int)
     
     starttime = time.time()
@@ -311,7 +308,6 @@ def clusterPoints_to_candidates(clusterpoints,cluster_labels,ms_to_px):
             candidates[cl]['cluster_size'] = [int(np.max(clusterEvents['y'])-np.min(clusterEvents['y'])), int(np.max(clusterEvents['x'])-np.min(clusterEvents['x'])), int(np.max(clusterEvents['t'])-np.min(clusterEvents['t']))]
             candidates[cl]['N_events'] = int(len(clusterEvents))
     endtime = time.time()
-    logging.info("candidates generated in: "+ str(endtime - starttime)+"s")
     
     return candidates
 
@@ -423,6 +419,7 @@ def eigenFeature_analysis(npy_array,settings,**kwargs):
     clusterpoints = points[(linearity < linearity_cutoff) & (maxeigenval < maxeigenvalcutoff), :]
     noisepoints = points[(linearity >= linearity_cutoff) | (maxeigenval >= maxeigenvalcutoff), :]
 
+
     if len(clusterpoints) > 0:
         logging.info("DBSCANning started")
         #Throw DBSCAN on the 'pre-clustered' data:
@@ -492,12 +489,12 @@ def eigenFeature_analysis_and_bbox_finding(npy_array,settings,**kwargs):
     bboxes = get_cluster_bounding_boxes(clusterpoints, cluster_labels,padding_xy=float(kwargs['bbox_padding']),padding_t=float(kwargs['bbox_padding']))
     
     #adapt noHotPixelPoints array so that the columns are 'named' again:
-    noHotPixelPoints = points[(np.max(normeigenval, axis=1) < normeigenvalcutoff), :]
+    noHotPixelPoints = points[(np.max(normeigenval, axis=1) < linearity_cutoff), :]
     noHotPixelPoints_rec = pd.DataFrame(noHotPixelPoints,columns=['x','y','t','p'])
     noHotPixelPoints_rec['x'] = noHotPixelPoints_rec['x'].astype(int)
     noHotPixelPoints_rec['y'] = noHotPixelPoints_rec['y'].astype(int)
     noHotPixelPoints_rec['t'] *= ms_to_px*1000
-    noHotPixelPoints_rec['t'] = noHotPixelPoints_rec['t'].astype(int)
+    noHotPixelPoints_rec['t'] = noHotPixelPoints_rec['t'].astype(np.int64)
     noHotPixelPoints_rec['p'] = noHotPixelPoints_rec['p'].astype(int)
     
     candidates = get_events_in_bbox_NE(noHotPixelPoints_rec,bboxes,float(kwargs['ratio_ms_to_px']))

@@ -2125,7 +2125,7 @@ class MyGUI(QMainWindow):
                     
                     #Read all chunks:
                     self.chunckloading_number_chuck = 0
-                    events_prev = np.zeros(0, dtype={'names': ['x', 'y', 'p', 't'], 'formats': ['<u2', '<u2', '<i2', '<i8'], 'offsets': [0, 2, 4, 8], 'itemsize': 16})
+                    events_prev = np.zeros(0, dtype={'names': ['x', 'y', 'p', 't'], 'formats': ['<u2', '<u2', '<i2', '<i8'], 'offsets': [0, 2, 4, 8], 'itemsize': 32})
                     self.chunckloading_finished_chunking = False
                     self.chunckloading_currentLimits = [[0,0],[0,0]]
                     
@@ -2279,7 +2279,7 @@ class MyGUI(QMainWindow):
                     
                     
                     previous_read_hdfChunk = 1
-                    events_prev = np.zeros(0, dtype={'names': ['x', 'y', 'p', 't'], 'formats': ['<u2', '<u2', '<i2', '<i8'], 'offsets': [0, 2, 4, 8], 'itemsize': 16})
+                    events_prev = np.zeros(0, dtype={'names': ['x', 'y', 'p', 't'], 'formats': ['<u2', '<u2', '<i2', '<i8'], 'offsets': [0, 2, 4, 8], 'itemsize': 32})
                     self.chunckloading_number_chuck = 0
                     
                     while self.chunckloading_finished_chunking == False:
@@ -2290,10 +2290,9 @@ class MyGUI(QMainWindow):
                         current_read_index = 0
                         hdf5_read_chunk_size = 100000 #nr of entries that are loaded after which it's checked whether T makes sense
                         
-                        
                         # Retrieve all entries within the specified bounding box
-                        t_min = self.chunckloading_currentLimits[0][0]
-                        t_max = self.chunckloading_currentLimits[1][1]
+                        t_min = self.chunckloading_currentLimits[0][0]+float(self.run_startTLineEdit.text())*1000
+                        t_max = min(self.chunckloading_currentLimits[1][1],float(self.run_durationTLineEdit.text())*1000)+float(self.run_startTLineEdit.text())*1000
                         
                         #Load the hdf5 file
                         with h5py.File(fileToRun, mode='r') as file:
@@ -2303,21 +2302,27 @@ class MyGUI(QMainWindow):
                             n_hdfChunk = previous_read_hdfChunk
                             #We check if this chunk is fully loaded in hdf5
                             fullChunkLoaded = False
-                            allhdf5chunkslices = np.zeros(0, dtype={'names': ['x', 'y', 'p', 't'], 'formats': ['<u2', '<u2', '<i2', '<i8'], 'offsets': [0, 2, 4, 8], 'itemsize': 16})
+                            allhdf5chunkslices = np.zeros(0, dtype={'names': ['x', 'y', 'p', 't'], 'formats': ['<u2', '<u2', '<i2', '<i8'], 'offsets': [0, 2, 4, 8], 'itemsize': 32})
                             
                             #First figure out the start/end of this chunk:
                             startPos = -1
                             endPos = -1
                             while (startPos == -1) or (endPos == -1):
                                 #Read a single entry:
-                                single_entry = events_hdf5[current_read_index*hdf5_read_chunk_size]
-                                if startPos == -1:
-                                    if single_entry[3] > t_min:
-                                        startPos = current_read_index*hdf5_read_chunk_size
-                                if endPos == -1:
-                                    if single_entry[3] > t_max:
-                                        endPos = current_read_index*hdf5_read_chunk_size
-                                current_read_index+=1
+                                if current_read_index*hdf5_read_chunk_size < events_hdf5.size:
+                                    single_entry = events_hdf5[current_read_index*hdf5_read_chunk_size]
+                                    if startPos == -1:
+                                        if single_entry[3] > t_min:
+                                            startPos = current_read_index*hdf5_read_chunk_size
+                                    if endPos == -1:
+                                        if single_entry[3] > t_max:
+                                            endPos = current_read_index*hdf5_read_chunk_size
+                                    current_read_index+=1
+                                else:
+                                    if startPos == -1:
+                                        startPos = events_hdf5.size
+                                    endPos = events_hdf5.size
+                                    logging.info('end of file reached while streaming')
                             
                             allhdf5chunkslices = events_hdf5[max(0,startPos-hdf5_read_chunk_size):endPos]
                             
