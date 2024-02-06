@@ -2125,7 +2125,7 @@ class MyGUI(QMainWindow):
                     
                     #Read all chunks:
                     self.chunckloading_number_chuck = 0
-                    events_prev = np.zeros(0, dtype={'names': ['x', 'y', 'p', 't'], 'formats': ['<u2', '<u2', '<i2', '<i8'], 'offsets': [0, 2, 4, 8], 'itemsize': 16})
+                    events_prev = np.zeros(0, dtype={'names': ['x', 'y', 'p', 't'], 'formats': ['<u2', '<u2', '<i2', '<i8'], 'offsets': [0, 2, 4, 8], 'itemsize': 32})
                     self.chunckloading_finished_chunking = False
                     self.chunckloading_currentLimits = [[0,0],[0,0]]
                     
@@ -2279,7 +2279,7 @@ class MyGUI(QMainWindow):
                     
                     
                     previous_read_hdfChunk = 1
-                    events_prev = np.zeros(0, dtype={'names': ['x', 'y', 'p', 't'], 'formats': ['<u2', '<u2', '<i2', '<i8'], 'offsets': [0, 2, 4, 8], 'itemsize': 16})
+                    events_prev = np.zeros(0, dtype={'names': ['x', 'y', 'p', 't'], 'formats': ['<u2', '<u2', '<i2', '<i8'], 'offsets': [0, 2, 4, 8], 'itemsize': 32})
                     self.chunckloading_number_chuck = 0
                     
                     while self.chunckloading_finished_chunking == False:
@@ -2302,7 +2302,7 @@ class MyGUI(QMainWindow):
                             n_hdfChunk = previous_read_hdfChunk
                             #We check if this chunk is fully loaded in hdf5
                             fullChunkLoaded = False
-                            allhdf5chunkslices = np.zeros(0, dtype={'names': ['x', 'y', 'p', 't'], 'formats': ['<u2', '<u2', '<i2', '<i8'], 'offsets': [0, 2, 4, 8], 'itemsize': 16})
+                            allhdf5chunkslices = np.zeros(0, dtype={'names': ['x', 'y', 'p', 't'], 'formats': ['<u2', '<u2', '<i2', '<i8'], 'offsets': [0, 2, 4, 8], 'itemsize': 32})
                             
                             #First figure out the start/end of this chunk:
                             startPos = -1

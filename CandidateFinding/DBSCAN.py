@@ -87,8 +87,8 @@ def remove_radius_outlier_o3d(events,nb_points=30,radius=3,print_progress=True,m
     
     pcp = np.asarray(cleaned_pcp[0].points)
     #change columns 0 and 1 to integer values:
-    pcp[:,0] = pcp[:,0].astype(int)
-    pcp[:,1] = pcp[:,1].astype(int)
+    pcp[:,0] = pcp[:,0].astype(np.int64)
+    pcp[:,1] = pcp[:,1].astype(np.int64)
     
     polarities_remaining=polarities[cleaned_pcp[1]]
     
@@ -522,7 +522,7 @@ def get_events_in_bbox_bisect(npyarr,bboxes,ms_to_px):
         #find the indeces where all of those is true:
         common_values = np.intersect1d(np.intersect1d(valid_indeces_x, valid_indeces_y), valid_indeces_t)
 
-        filtered_array = npyarr[common_values.astype(int)]
+        filtered_array = npyarr[common_values.astype(np.int64)]
         #Change filtered_array to a pd dataframe:
         filtered_df = pd.DataFrame(filtered_array)
         
