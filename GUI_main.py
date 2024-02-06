@@ -2016,12 +2016,6 @@ class MyGUI(QMainWindow):
             self.runFindingAndFitting(npyData,polarityVal=polarityVal)
         
     def FindingBatching(self,npyData,polarityVal):
-        #For now, print start and final time:
-        logging.info(self.chunckloading_currentLimits)
-        logging.info('Start time: '+str(npyData[0]['t']))
-        logging.info('End time: '+str(npyData[-1]['t']))
-        
-        
         #Get polarity info and do this:
         FindingEvalText = self.getFunctionEvalText('Finding',"npyData","self.globalSettings",polarityVal)
         if FindingEvalText is not None:
@@ -2166,7 +2160,7 @@ class MyGUI(QMainWindow):
                                 
                                 
                                 if len(events)>0:
-                                    logging.warning('RAW1 Current event min/max time:'+str(min(events['t'])/1000)+"/"+str(max(events['t'])/1000))
+                                    logging.info('Current event min/max time:'+str(min(events['t'])/1000)+"/"+str(max(events['t'])/1000))
                                     #Filter on correct polarity
                                     if polarityVal == "Pos":
                                         eventsPol = self.filterEvents_npy_p(events,1)
