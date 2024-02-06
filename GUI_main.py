@@ -1612,20 +1612,26 @@ class MyGUI(QMainWindow):
         value = line_edit.text()
         expectedType = utils.typeFromKwarg(function,kwarg)
         if expectedType is not None:
-            if expectedType is not str:
-                try:
-                    value = eval(line_edit.text())
-                    if isinstance(value,expectedType):
-                        self.setLineEditStyle(line_edit,type='Normal')
-                    else:
-                        self.setLineEditStyle(line_edit,type='Warning')
-                except:
-                    #Show as warning
-                    self.setLineEditStyle(line_edit,type='Warning')
-            elif expectedType is str:
+            if expectedType is str:
                 try:
                     value = str(line_edit.text())
                     self.setLineEditStyle(line_edit,type='Normal')
+                except:
+                    #Show as warning
+                    self.setLineEditStyle(line_edit,type='Warning')
+            elif expectedType is not str:
+                try:
+                    value = eval(line_edit.text())
+                    if expectedType == float:
+                        if isinstance(value,int) or isinstance(value,float):
+                            self.setLineEditStyle(line_edit,type='Normal')
+                        else:
+                            self.setLineEditStyle(line_edit,type='Warning')
+                    else:
+                        if isinstance(value,expectedType):
+                            self.setLineEditStyle(line_edit,type='Normal')
+                        else:
+                            self.setLineEditStyle(line_edit,type='Warning')
                 except:
                     #Show as warning
                     self.setLineEditStyle(line_edit,type='Warning')
