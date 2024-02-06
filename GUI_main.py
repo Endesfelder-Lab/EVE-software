@@ -342,6 +342,10 @@ class MyGUI(QMainWindow):
         globalSettings['StoreFindingOutput']['value'] = True
         globalSettings['StoreFindingOutput']['input'] = bool
         globalSettings['StoreFindingOutput']['displayName'] = 'Store intermediate output (after finding)'
+        globalSettings['StoreFittingOutput'] = {}
+        globalSettings['StoreFittingOutput']['value'] = True
+        globalSettings['StoreFittingOutput']['input'] = bool
+        globalSettings['StoreFittingOutput']['displayName'] = 'Store intermediate output (after fitting)'
         globalSettings['OutputDataFormat'] = {}
         globalSettings['OutputDataFormat']['value'] = 'thunderstorm'
         globalSettings['OutputDataFormat']['input'] = 'choice'
@@ -850,8 +854,9 @@ class MyGUI(QMainWindow):
         globalSettingsOrig = copy.deepcopy(self.globalSettings)
         self.globalSettings['StoreConvertedRawData']['value'] = False
         self.globalSettings['StoreFileMetadata']['value'] = False
-        self.globalSettings['StoreFinalOutput']['value'] = False
+        self.globalSettings['StoreFinalOutput']['StoreFinalOutput']['value'] = False
         self.globalSettings['StoreFindingOutput']['value'] = False
+        self.globalSettings['StoreFittingOutput']['value'] = False
         
         events_id = 0
         partialFinding = {}
@@ -1957,20 +1962,38 @@ class MyGUI(QMainWindow):
             self.storeNameDateTime = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             #Find polarity:
             #Check if we are loading existing finding
-            if 'ExistingFinding' in getattr(self,f"CandidateFindingDropdown{polarityVal}").currentText() or 'existing Finding' in getattr(self,f"CandidateFindingDropdown{polarityVal}").currentText():
-                logging.info('Skipping finding processing, going to fitting')
-                
-                #Ensure that we don't store the finding result
+            if 'ExistingFitting' in getattr(self,f"CandidateFittingDropdown{polarityVal}").currentText() or 'existing Fitting' in getattr(self,f"CandidateFittingDropdown{polarityVal}").currentText():
+                logging.info('Skipping finding and fitting processing')
+                # compare filenames of finding and fitting here? Following code is not yet adapted
+                # finding_file = getattr(self,f"CandidateFindingDropdown{polarityVal}").currentText().replace("_FindingResults_", "_")
+                # fitting_file = getattr(self,f"CandidateFittingDropdown{polarityVal}").currentText().replace("_FittingResults_", "_")
+
+                # Ensure that we don't store the finding result
                 origStoreFindingSetting=self.globalSettings['StoreFindingOutput']['value']
                 self.globalSettings['StoreFindingOutput']['value'] = False
-                
-                self.processSingleFile(self.dataLocationInput.text(),onlyFitting=True,polarityVal=polarityVal)
+                # Ensure that we don't store fitting result
+                origStoreFittingSetting=self.globalSettings['StoreFittingOutput']['value']
+                self.globalSettings['StoreFittingOutput']['value'] = False
+                self.processSingleFile(self.dataLocationInput.text(),noFindingFitting=True,polarityVal=polarityVal)
                 
                 #Reset the global setting:
                 self.globalSettings['StoreFindingOutput']['value']=origStoreFindingSetting
+                self.globalSettings['StoreFittingOutput']['value']=origStoreFittingSetting
+
             else:
-                #Otherwise normally process a single file
-                self.processSingleFile(self.dataLocationInput.text(),polarityVal=polarityVal)
+                if 'ExistingFinding' in getattr(self,f"CandidateFindingDropdown{polarityVal}").currentText() or 'existing Finding' in getattr(self,f"CandidateFindingDropdown{polarityVal}").currentText():
+                    logging.info('Skipping finding processing, going to fitting')
+                    #Ensure that we don't store the finding result
+                    origStoreFindingSetting=self.globalSettings['StoreFindingOutput']['value']
+                    self.globalSettings['StoreFindingOutput']['value'] = False
+                    
+                    self.processSingleFile(self.dataLocationInput.text(),onlyFitting=True,polarityVal=polarityVal)
+                    
+                    #Reset the global setting:
+                    self.globalSettings['StoreFindingOutput']['value']=origStoreFindingSetting
+                else:
+                    #Otherwise normally process a single file
+                    self.processSingleFile(self.dataLocationInput.text(),polarityVal=polarityVal)
         #if it's neither a file nor a folder
         else:
             logging.error('Input file/folder is not correct! Please check.')
@@ -2005,84 +2028,90 @@ class MyGUI(QMainWindow):
         
         return npyData
     
-    def processSingleFile(self,FileName,onlyFitting=False,polarityVal='Mix'):
+    def processSingleFile(self,FileName,onlyFitting=False,polarityVal='Mix', noFindingFitting=False):
 
         #Runtime of finding and fitting
         self.currentFileInfo['FindingTime'] = 0
         self.currentFileInfo['FittingTime'] = 0
 
-        if not onlyFitting:
-            #Run the analysis on a single file
-            self.currentFileInfo['CurrentFileLoc'] = FileName
-            if self.globalSettings['FindingBatching']['value']== False:
-                npyDataCell = self.loadRawData(FileName)
-                #Note that npyDataCell has 2 entries if pos/neg are treated seperately, otherwise just one entry:
-                #Logic for if there are multiple entires in npyDataCell
-                events_id = 0
-                partialFinding = {}
-                partialFitting = {}
-                for npyData in npyDataCell:
-                    if npyData is None:
-                        return
-                    
-                    #Sort event list on time
-                    npyData = npyData[np.argsort(npyData,order='t')]
-                    
-                    if self.dataSelectionPolarityDropdown.currentText() != self.polarityDropdownNames[3]:
-                        #Run the current finding and fitting routine only on these events:
-                        self.runFindingAndFitting(npyData,runFitting=True,storeFinding=True,polarityVal=polarityVal)
-                    else:
-                        #Run the current finding and fitting routine only on these events:
-                        if np.all(npyData['p'] == 1):
-                            polarityVal = 'Pos'
-                        elif np.all(npyData['p'] == 0):
-                            polarityVal = 'Neg'
-                        self.runFindingAndFitting(npyData,runFitting=True,storeFinding=True,polarityVal=polarityVal)
-                        #we store our finding and fitting results like this:
-                        partialFinding[events_id] = self.data['FindingResult']
-                        partialFitting[events_id] = self.data['FittingResult']
-                    
-                    events_id+=1
-            
-                #If the data was split in two parts... (or more)
-                if events_id > 1:
-                    updated_partialFinding = []
-                    updated_partialFindingMetadatastring = ''
-                    updated_partialFitting = []
-                    updated_partialFittingMetadatastring = ''
-                    totNrFindingIncrease = 0
-                    for i in range(events_id):
-                        updated_partialFindingMetadatastring = updated_partialFindingMetadatastring+partialFinding[i][1]+'\n'
-                        updated_partialFittingMetadatastring = updated_partialFittingMetadatastring+partialFitting[i][1]+'\n'
-                        for eachEntry in partialFinding[i][0].items():
-                            updated_partialFinding.append(eachEntry[1])
-                        for index,row in partialFitting[i][0].iterrows():
-                            row.candidate_id+=totNrFindingIncrease
-                            updated_partialFitting.append(row)
+        if not noFindingFitting:
+            if not onlyFitting:
+                #Run the analysis on a single file
+                self.currentFileInfo['CurrentFileLoc'] = FileName
+                if self.globalSettings['FindingBatching']['value']== False:
+                    npyDataCell = self.loadRawData(FileName)
+                    #Note that npyDataCell has 2 entries if pos/neg are treated seperately, otherwise just one entry:
+                    #Logic for if there are multiple entires in npyDataCell
+                    events_id = 0
+                    partialFinding = {}
+                    partialFitting = {}
+                    for npyData in npyDataCell:
+                        if npyData is None:
+                            return
                         
-                        #increase the total number of findings
-                        totNrFindingIncrease+=eachEntry[0]+1
+                        #Sort event list on time
+                        npyData = npyData[np.argsort(npyData,order='t')]
                         
-                    #Store them again in the self.data['FindingResult']
-                    self.data['FindingResult']={}
-                    self.data['FindingResult'][0] = dict(zip(range(len(updated_partialFinding)), updated_partialFinding))
-                    self.data['FindingResult'][1] = updated_partialFindingMetadatastring
-                    #Fitting should be changed to pd df
-                    res_dict_fitting = pd.DataFrame(updated_partialFitting)
-                    #Store them again in the self.data['FindingResult']
-                    self.data['FittingResult']={}
-                    self.data['FittingResult'][0] = res_dict_fitting
-                    self.data['FittingResult'][1] = updated_partialFittingMetadatastring
-    
-    
-            elif self.globalSettings['FindingBatching']['value']== True or self.globalSettings['FindingBatching']['value']== 2:
-                self.runFindingBatching()
+                        if self.dataSelectionPolarityDropdown.currentText() != self.polarityDropdownNames[3]:
+                            #Run the current finding and fitting routine only on these events:
+                            self.runFindingAndFitting(npyData,runFitting=True,storeFinding=True,polarityVal=polarityVal)
+                        else:
+                            #Run the current finding and fitting routine only on these events:
+                            if np.all(npyData['p'] == 1):
+                                polarityVal = 'Pos'
+                            elif np.all(npyData['p'] == 0):
+                                polarityVal = 'Neg'
+                            self.runFindingAndFitting(npyData,runFitting=True,storeFinding=True,polarityVal=polarityVal)
+                            #we store our finding and fitting results like this:
+                            partialFinding[events_id] = self.data['FindingResult']
+                            partialFitting[events_id] = self.data['FittingResult']
+                        
+                        events_id+=1
                 
-            
-        #If we only fit, we still run more or less the same info, butwe don't care about the npyData in the CurrentFileLoc.
-        elif onlyFitting:
+                    #If the data was split in two parts... (or more)
+                    if events_id > 1:
+                        updated_partialFinding = []
+                        updated_partialFindingMetadatastring = ''
+                        updated_partialFitting = []
+                        updated_partialFittingMetadatastring = ''
+                        totNrFindingIncrease = 0
+                        for i in range(events_id):
+                            updated_partialFindingMetadatastring = updated_partialFindingMetadatastring+partialFinding[i][1]+'\n'
+                            updated_partialFittingMetadatastring = updated_partialFittingMetadatastring+partialFitting[i][1]+'\n'
+                            for eachEntry in partialFinding[i][0].items():
+                                updated_partialFinding.append(eachEntry[1])
+                            for index,row in partialFitting[i][0].iterrows():
+                                row.candidate_id+=totNrFindingIncrease
+                                updated_partialFitting.append(row)
+                            
+                            #increase the total number of findings
+                            totNrFindingIncrease+=eachEntry[0]+1
+                            
+                        #Store them again in the self.data['FindingResult']
+                        self.data['FindingResult']={}
+                        self.data['FindingResult'][0] = dict(zip(range(len(updated_partialFinding)), updated_partialFinding))
+                        self.data['FindingResult'][1] = updated_partialFindingMetadatastring
+                        #Fitting should be changed to pd df
+                        res_dict_fitting = pd.DataFrame(updated_partialFitting)
+                        #Store them again in the self.data['FindingResult']
+                        self.data['FittingResult']={}
+                        self.data['FittingResult'][0] = res_dict_fitting
+                        self.data['FittingResult'][1] = updated_partialFittingMetadatastring
+        
+        
+                elif self.globalSettings['FindingBatching']['value']== True or self.globalSettings['FindingBatching']['value']== 2:
+                    self.runFindingBatching()
+                    
+                
+            #If we only fit, we still run more or less the same info, butwe don't care about the npyData in the CurrentFileLoc.
+            elif onlyFitting:
+                self.currentFileInfo['CurrentFileLoc'] = FileName
+                logging.info('Candidate finding NOT performed')
+                npyData = None
+                self.runFindingAndFitting(npyData,polarityVal=polarityVal)
+        elif noFindingFitting:
             self.currentFileInfo['CurrentFileLoc'] = FileName
-            logging.info('Candidate finding NOT performed')
+            logging.info('Candidate finding and fitting NOT performed')
             npyData = None
             self.runFindingAndFitting(npyData,polarityVal=polarityVal)
         
@@ -2649,28 +2678,30 @@ class MyGUI(QMainWindow):
         
         #Also store pickle information:
         #Also save pos and neg seperately if so useful:
-        if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[3]:
-            try:
-                if self.number_finding_found_polarity['Pos'] > 0 and self.number_finding_found_polarity['Neg'] > 0:
-                    allPosFittingResults = self.data['FittingResult'][0][0:self.number_finding_found_polarity['Pos']]
-                    allNegFittingResults = self.data['FittingResult'][0][self.number_finding_found_polarity['Pos']:]
-                    
-                    file_path = self.currentFileInfo['CurrentFileLoc'][:-4]+'_FittingResults_PosOnly_'+self.storeNameDateTime+'.pickle'
-                    with open(file_path, 'wb') as file:
-                        pickle.dump(allPosFittingResults, file)
+        if self.globalSettings['StoreFittingOutput']['value']:
+            if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[3]:
+                try:
+                    if self.number_finding_found_polarity['Pos'] > 0 and self.number_finding_found_polarity['Neg'] > 0:
+                        allPosFittingResults = self.data['FittingResult'][0][0:self.number_finding_found_polarity['Pos']]
+                        allNegFittingResults = self.data['FittingResult'][0][self.number_finding_found_polarity['Pos']:]
                         
-                        
-                    file_path = self.currentFileInfo['CurrentFileLoc'][:-4]+'_FittingResults_NegOnly_'+self.storeNameDateTime+'.pickle'
-                    with open(file_path, 'wb') as file:
-                        pickle.dump(allNegFittingResults, file)
-            except:
-                logging.debug('This can be safely ignored')
-        else:#Only a single pos/neg selected
-            file_path = self.currentFileInfo['CurrentFileLoc'][:-4]+'_FittingResults_'+self.storeNameDateTime+'.pickle'
-            with open(file_path, 'wb') as file:
-                pickle.dump(self.data['FittingResult'][0], file)
-            
-        logging.info('Fitting results output stored')
+                        file_path = self.currentFileInfo['CurrentFileLoc'][:-4]+'_FittingResults_PosOnly_'+self.storeNameDateTime+'.pickle'
+                        with open(file_path, 'wb') as file:
+                            pickle.dump(allPosFittingResults, file)
+                            
+                            
+                        file_path = self.currentFileInfo['CurrentFileLoc'][:-4]+'_FittingResults_NegOnly_'+self.storeNameDateTime+'.pickle'
+                        with open(file_path, 'wb') as file:
+                            pickle.dump(allNegFittingResults, file)
+                except:
+                    logging.debug('This can be safely ignored')
+            else:#Only a single pos/neg selected
+                file_path = self.currentFileInfo['CurrentFileLoc'][:-4]+'_FittingResults_'+self.storeNameDateTime+'.pickle'
+                with open(file_path, 'wb') as file:
+                    pickle.dump(self.data['FittingResult'][0], file)
+            logging.info('Fitting results output stored')
+        else:
+            pass
         
     def storeFindingOutput(self,polarityVal='Pos'):
         logging.debug('Attempting to store finding results output')
