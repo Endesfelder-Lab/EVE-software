@@ -1878,6 +1878,7 @@ class MyGUI(QMainWindow):
             logging.debug(allFiles)
             for file in allFiles:
                 try:
+                    self.storeNameDateTime = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
                     logging.info('Starting to process file '+file)
                     self.processSingleFile(file,polarityVal=polarityVal)
                     logging.info('Successfully processed file '+file)
@@ -1885,6 +1886,7 @@ class MyGUI(QMainWindow):
                     logging.error('Error in processing file '+file)  
         #If it's a file...
         elif os.path.isfile(self.dataLocationInput.text()):
+            self.storeNameDateTime = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             #Find polarity:
             #Check if we are loading existing finding
             if 'ExistingFinding' in getattr(self,f"CandidateFindingDropdown{polarityVal}").currentText() or 'existing Finding' in getattr(self,f"CandidateFindingDropdown{polarityVal}").currentText():
@@ -2288,7 +2290,7 @@ class MyGUI(QMainWindow):
                         self.chunckloading_currentLimits = [[(self.chunckloading_number_chuck)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000,(self.chunckloading_number_chuck+1)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000],[(self.chunckloading_number_chuck)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000-float(self.globalSettings['FindingBatchingTimeOverlapMs']['value'])*1000,(self.chunckloading_number_chuck+1)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000+float(self.globalSettings['FindingBatchingTimeOverlapMs']['value'])*1000]]        
                 
                         current_read_index = 0
-                        hdf5_read_chunk_size = 100000 #nr of entries that are loaded after which it's checked whether T makes sense
+                        hdf5_read_chunk_size = 500000 #nr of entries that are loaded after which it's checked whether T makes sense
                         
                         # Retrieve all entries within the specified bounding box
                         t_min = self.chunckloading_currentLimits[0][0]+float(self.run_startTLineEdit.text())*1000
@@ -2558,7 +2560,7 @@ class MyGUI(QMainWindow):
       
     def storeLocalizationOutput(self):
         logging.debug('Attempting to store fitting results output')
-        storeLocation = self.getStoreLocationPartial()+'_FitResults_'+datetime.datetime.now().strftime("%Y%m%d_%H%M%S")+'.csv'
+        storeLocation = self.getStoreLocationPartial()+'_FitResults_'+self.storeNameDateTime+'.csv'
         #Store the localization output
         localizations = self.data['FittingResult'][0].dropna(axis=0, ignore_index=True)
         localizations = localizations.drop('fit_info', axis=1)
@@ -2585,18 +2587,18 @@ class MyGUI(QMainWindow):
                     allPosFittingResults = self.data['FittingResult'][0][0:self.number_finding_found_polarity['Pos']]
                     allNegFittingResults = self.data['FittingResult'][0][self.number_finding_found_polarity['Pos']:]
                     
-                    file_path = self.currentFileInfo['CurrentFileLoc'][:-4]+'_FittingResults_PosOnly_'+datetime.datetime.now().strftime("%Y%m%d_%H%M%S")+'.pickle'
+                    file_path = self.currentFileInfo['CurrentFileLoc'][:-4]+'_FittingResults_PosOnly_'+self.storeNameDateTime+'.pickle'
                     with open(file_path, 'wb') as file:
                         pickle.dump(allPosFittingResults, file)
                         
                         
-                    file_path = self.currentFileInfo['CurrentFileLoc'][:-4]+'_FittingResults_NegOnly_'+datetime.datetime.now().strftime("%Y%m%d_%H%M%S")+'.pickle'
+                    file_path = self.currentFileInfo['CurrentFileLoc'][:-4]+'_FittingResults_NegOnly_'+self.storeNameDateTime+'.pickle'
                     with open(file_path, 'wb') as file:
                         pickle.dump(allNegFittingResults, file)
             except:
                 logging.debug('This can be safely ignored')
         else:#Only a single pos/neg selected
-            file_path = self.currentFileInfo['CurrentFileLoc'][:-4]+'_FittingResults_'+datetime.datetime.now().strftime("%Y%m%d_%H%M%S")+'.pickle'
+            file_path = self.currentFileInfo['CurrentFileLoc'][:-4]+'_FittingResults_'+self.storeNameDateTime+'.pickle'
             with open(file_path, 'wb') as file:
                 pickle.dump(self.data['FittingResult'][0], file)
             
@@ -2605,7 +2607,7 @@ class MyGUI(QMainWindow):
     def storeFindingOutput(self,polarityVal='Pos'):
         logging.debug('Attempting to store finding results output')
         #Store the Finding results output
-        file_path = self.currentFileInfo['CurrentFileLoc'][:-4]+'_FindingResults_'+datetime.datetime.now().strftime("%Y%m%d_%H%M%S")+'.pickle'
+        file_path = self.currentFileInfo['CurrentFileLoc'][:-4]+'_FindingResults_'+self.storeNameDateTime+'.pickle'
         with open(file_path, 'wb') as file:
             pickle.dump(self.data['FindingResult'][0], file)
             
@@ -2617,12 +2619,12 @@ class MyGUI(QMainWindow):
                     allPosFindingResults = {key: value for key, value in self.data['FindingResult'][0].items() if key < self.number_finding_found_polarity['Pos']}
                     allNegFindingResults = {key-self.number_finding_found_polarity['Pos']: value for key, value in self.data['FindingResult'][0].items() if key >= self.number_finding_found_polarity['Pos']}
                     
-                    file_path = self.currentFileInfo['CurrentFileLoc'][:-4]+'_FindingResults_PosOnly_'+datetime.datetime.now().strftime("%Y%m%d_%H%M%S")+'.pickle'
+                    file_path = self.currentFileInfo['CurrentFileLoc'][:-4]+'_FindingResults_PosOnly_'+self.storeNameDateTime+'.pickle'
                     with open(file_path, 'wb') as file:
                         pickle.dump(allPosFindingResults, file)
                         
                         
-                    file_path = self.currentFileInfo['CurrentFileLoc'][:-4]+'_FindingResults_NegOnly_'+datetime.datetime.now().strftime("%Y%m%d_%H%M%S")+'.pickle'
+                    file_path = self.currentFileInfo['CurrentFileLoc'][:-4]+'_FindingResults_NegOnly_'+self.storeNameDateTime+'.pickle'
                     with open(file_path, 'wb') as file:
                         pickle.dump(allNegFindingResults, file)
             except:
@@ -2658,7 +2660,7 @@ class MyGUI(QMainWindow):
             + f"""{self.data['FittingResult'][1]}
             """
             #Store this metadatastring:
-            with open(self.getStoreLocationPartial()+'_RunInfo_'+datetime.datetime.now().strftime("%Y%m%d_%H%M%S")+'.txt', 'w') as f:
+            with open(self.getStoreLocationPartial()+'_RunInfo_'+self.storeNameDateTime+'.txt', 'w') as f:
                 f.write(metadatastring)
             logging.info('File metadata created and stored')
         except:
