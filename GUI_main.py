@@ -14,6 +14,7 @@ import pickle
 import time
 from textwrap import dedent
 import h5py
+import traceback
 
 #Imports for PyQt5 (GUI)
 from PyQt5 import QtWidgets, QtGui
@@ -2449,7 +2450,8 @@ class MyGUI(QMainWindow):
                 if runFitting:
                     self.runFitting(polarityVal)
             except Exception as e:
-                self.open_critical_warning(f"Critical error in Finding routine! Breaking off!\nError information:\n{e}")
+                error_message = f"Critical error in Finding routine! Breaking off!\nError information:\n{type(e).__name__}: {e}\n\n{traceback.format_exc()}"
+                self.open_critical_warning(error_message)
                 self.data['FindingResult'] = {}
         else:
             self.open_critical_warning(f"No Finding evaluation text provided/found")
@@ -2535,7 +2537,8 @@ class MyGUI(QMainWindow):
                         #Update the GUI
                         self.updateGUIafterNewFitting()
             except Exception as e:
-                self.open_critical_warning(f"Critical error in Fitting routine! Breaking off!\nError information:\n{e}")
+                error_message = f"Critical error in Fitting routine! Breaking off!\nError information:\n{type(e).__name__}: {e}\n\n{traceback.format_exc()}"
+                self.open_critical_warning(error_message)
                 self.data['FittingResult'] = {}
         else:
             self.open_critical_warning(f"No Fitting evaluation text provided/found")
