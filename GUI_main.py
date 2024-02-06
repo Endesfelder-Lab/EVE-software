@@ -80,8 +80,6 @@ class ProcessingThread(QThread):
         self.globalSettings = self.GUIinfo.globalSettings
         self.currentFileInfo = self.GUIinfo.currentFileInfo
         self.logger = self.GUIinfo.logger
-        
-        
     
 class Worker(QObject):
     finished = pyqtSignal()
@@ -905,7 +903,7 @@ class MyGUI(QMainWindow):
         
         #Update the preview panel and localization list:
         #Note that self.previewEvents is XYT cut, but NOT p-cut
-        self.updateShowPreview(previewEvents=self.previewEvents)
+        self.updateShowPreview(previewEvents=self.previewEvents,timeStretch=timeStretch)
         self.updateLocList()
     
     def filterEvents_npy_t(self,events,tStretch=(-np.Inf,np.Inf)):
@@ -1443,12 +1441,12 @@ class MyGUI(QMainWindow):
         # self.previewImage_slider = ImageSlider([],self)
         # self.previewtab_layout.addWidget(self.previewImage_slider)
                
-    def updateShowPreview(self,previewEvents=None):
+    def updateShowPreview(self,previewEvents=None,timeStretch=None):
         """
         Function that's called to update the preview (or show it). Requires the previewEvents, or uses the self.previewEvents.
         """
         
-        self.previewtab_widget.displayEvents(previewEvents,frametime_ms=100,findingResult = self.data['FindingResult'][0],fittingResult=self.data['FittingResult'][0],settings=self.globalSettings)
+        self.previewtab_widget.displayEvents(previewEvents,frametime_ms=100,findingResult = self.data['FindingResult'][0],fittingResult=self.data['FittingResult'][0],settings=self.globalSettings,timeStretch=timeStretch)
         
         
         logging.info('UpdateShowPreview ran!')
@@ -2376,14 +2374,14 @@ class MyGUI(QMainWindow):
                         self.data['FittingMethod'] = str(FittingEvalText)
                         self.data['FittingResult'] = eval(str(FittingEvalText))
                         self.currentFileInfo['FittingTime'] = time.time() - self.currentFileInfo['FittingTime']
-                        #Update the GUI
-                        self.updateGUIafterNewFitting()
-                        #Create and store the metadata
-                        if self.globalSettings['StoreFileMetadata']['value']:
-                            self.createAndStoreFileMetadata()
                         #Create and store the localization output
                         if self.globalSettings['StoreFinalOutput']['value']:
                             self.storeLocalizationOutput()
+                        #Create and store the metadata
+                        if self.globalSettings['StoreFileMetadata']['value']:
+                            self.createAndStoreFileMetadata()
+                        #Update the GUI
+                        self.updateGUIafterNewFitting()
                 elif bothPolarities: #If we do pos and neg separately
                     if customFindingEval == None:
                         logging.warning('RunFitting is only possible with custom finding evaluation text for both polarities')
@@ -2408,14 +2406,14 @@ class MyGUI(QMainWindow):
                                 
                         #After both pos and neg fit is completed:
                         self.currentFileInfo['FittingTime'] = time.time() - self.currentFileInfo['FittingTime']
-                        #Update the GUI
-                        self.updateGUIafterNewFitting()
-                        #Create and store the metadata
-                        if self.globalSettings['StoreFileMetadata']['value']:
-                            self.createAndStoreFileMetadata()
                         #Create and store the localization output
                         if self.globalSettings['StoreFinalOutput']['value']:
                             self.storeLocalizationOutput()
+                        #Create and store the metadata
+                        if self.globalSettings['StoreFileMetadata']['value']:
+                            self.createAndStoreFileMetadata()
+                        #Update the GUI
+                        self.updateGUIafterNewFitting()
             except Exception as e:
                 self.open_critical_warning(f"Critical error in Fitting routine! Breaking off!\nError information:\n{e}")
                 self.data['FittingResult'] = {}
@@ -2449,6 +2447,31 @@ class MyGUI(QMainWindow):
         else:
             #default to minimal
             localizations.to_csv(storeLocation)
+            
+        
+        #Also store pickle information:
+        #Also save pos and neg seperately if so useful:
+        if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[3]:
+            try:
+                if self.number_finding_found_polarity['Pos'] > 0 and self.number_finding_found_polarity['Neg'] > 0:
+                    allPosFittingResults = self.data['FittingResult'][0][0:self.number_finding_found_polarity['Pos']]
+                    allNegFittingResults = self.data['FittingResult'][0][self.number_finding_found_polarity['Pos']:]
+                    
+                    file_path = self.currentFileInfo['CurrentFileLoc'][:-4]+'_FittingResults_PosOnly_'+datetime.datetime.now().strftime("%Y%m%d_%H%M%S")+'.pickle'
+                    with open(file_path, 'wb') as file:
+                        pickle.dump(allPosFittingResults, file)
+                        
+                        
+                    file_path = self.currentFileInfo['CurrentFileLoc'][:-4]+'_FittingResults_NegOnly_'+datetime.datetime.now().strftime("%Y%m%d_%H%M%S")+'.pickle'
+                    with open(file_path, 'wb') as file:
+                        pickle.dump(allNegFittingResults, file)
+            except:
+                logging.debug('This can be safely ignored')
+        else:#Only a single pos/neg selected
+            file_path = self.currentFileInfo['CurrentFileLoc'][:-4]+'_FittingResults_'+datetime.datetime.now().strftime("%Y%m%d_%H%M%S")+'.pickle'
+            with open(file_path, 'wb') as file:
+                pickle.dump(self.data['FittingResult'][0], file)
+            
         logging.info('Fitting results output stored')
         
     def storeFindingOutput(self,polarityVal='Pos'):
@@ -3612,7 +3635,7 @@ class PreviewFindingFitting(QWidget):
         #TODO: usefull info from mouse-over events
         # print(np.floor(highlighted_px_index))
     
-    def displayEvents(self,events,frametime_ms=100,findingResult = None,fittingResult=None,settings=None):
+    def displayEvents(self,events,frametime_ms=100,findingResult = None,fittingResult=None,settings=None,timeStretch=(0,1000)):
         #Delete all existing layers:
         for layer in reversed(self.napariviewer.layers):
             self.napariviewer.layers.remove(layer)
@@ -3620,11 +3643,11 @@ class PreviewFindingFitting(QWidget):
         
         preview_multiD_image = []
         #Loop over the frames:
-        n_frames = int(np.ceil((events['t'].max()-events['t'].min())/(frametime_ms*1000)))
+        n_frames = int(np.ceil(float(timeStretch[1])/(frametime_ms)))
         self.maxFrames = n_frames
         for n in range(0,n_frames):
             #Get the events on this 'frame'
-            events_this_frame = events[(events['t']>(n*frametime_ms*1000)) & (events['t']<((n+1)*frametime_ms*1000))]
+            events_this_frame = events[(events['t']>(float(timeStretch[0])*1000+n*frametime_ms*1000)) & (events['t']<(float(timeStretch[0])*1000+(n+1)*frametime_ms*1000))]
             #Create a 2d histogram out of this
             self.hist_xy = utilsHelper.SumPolarity(events_this_frame)
             #Add it to our image
@@ -3644,13 +3667,13 @@ class PreviewFindingFitting(QWidget):
             findingResults_thisbin = {}
             for findres_id in range(len(findingResult)):
                 findres = findingResult[findres_id]
-                if max(findres['events']['t']) >= (n*frametime_ms*1000) and min(findres['events']['t']) < ((n+1)*frametime_ms*1000):
+                if max(findres['events']['t']) >= (float(timeStretch[0])*1000+n*frametime_ms*1000) and min(findres['events']['t']) < (float(timeStretch[0])*1000+(n+1)*frametime_ms*1000):
                     findingResults_thisbin[findres_id] = findres
             #Create an overlay from this
             self.finding_overlays[n] = self.create_finding_overlay(findingResults_thisbin)
             
             #Get the fitting result in the current time bin:
-            fittingResults_thisbin = fittingResult[(fittingResult['t']>=(n*frametime_ms))* (fittingResult['t']<((n+1)*frametime_ms))]
+            fittingResults_thisbin = fittingResult[(fittingResult['t']>=(float(timeStretch[0])+n*frametime_ms))* (fittingResult['t']<(float(timeStretch[0])+(n+1)*frametime_ms))]
             self.fitting_overlays.append(self.create_fitting_overlay(fittingResults_thisbin,pxsize=settings['PixelSize_nm']['value']))
         
         #Select the original image-layer as selected
@@ -3689,7 +3712,7 @@ class PreviewFindingFitting(QWidget):
         }
         # Initialize an empty shapes layer for annotations
         self.shapes_layer = self.napariviewer.add_shapes(polygons, shape_type='rectangle', edge_width=1,edge_color='coral',face_color='transparent',visible=False,name='Finding Results',features=features,text=text)
-        self.shapes_layer.opacity = 1
+        self.shapes_layer.opacity = 0.7
         
         return self.shapes_layer
         
@@ -3708,7 +3731,7 @@ class PreviewFindingFitting(QWidget):
         
         # Initialize an empty shapes layer for annotations
         self.shapes_layer = self.napariviewer.add_shapes(polygons, shape_type='line', edge_width=1,edge_color='red',face_color='transparent',visible=False,name='Fitting Results')
-        self.shapes_layer.opacity = 1
+        self.shapes_layer.opacity = 0.7
         
         return self.shapes_layer
     
