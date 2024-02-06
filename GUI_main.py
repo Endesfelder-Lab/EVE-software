@@ -13,6 +13,7 @@ import appdirs
 import pickle
 import time
 from textwrap import dedent
+import h5py
 
 #Imports for PyQt5 (GUI)
 from PyQt5 import QtWidgets, QtGui
@@ -80,8 +81,6 @@ class ProcessingThread(QThread):
         self.globalSettings = self.GUIinfo.globalSettings
         self.currentFileInfo = self.GUIinfo.currentFileInfo
         self.logger = self.GUIinfo.logger
-        
-        
     
 class Worker(QObject):
     finished = pyqtSignal()
@@ -905,7 +904,7 @@ class MyGUI(QMainWindow):
         
         #Update the preview panel and localization list:
         #Note that self.previewEvents is XYT cut, but NOT p-cut
-        self.updateShowPreview(previewEvents=self.previewEvents)
+        self.updateShowPreview(previewEvents=self.previewEvents,timeStretch=timeStretch)
         self.updateLocList()
     
     def filterEvents_npy_t(self,events,tStretch=(-np.Inf,np.Inf)):
@@ -956,7 +955,6 @@ class MyGUI(QMainWindow):
                     #Filter on x,y coordinates:
                     events = events[(events['x'] >= float(xyStretch[0])) & (events['x'] <= float(xyStretch[1]))]
                     events = events[(events['y'] >= float(xyStretch[2])) & (events['y'] <= float(xyStretch[3]))]
-                    logging.info("XY cutting completed")
         except:
             #Warning if something crashes. Note the extra dash to the end of the warning
             logging.warning("No XY cutting due to not all entries being float-.")
@@ -1443,12 +1441,12 @@ class MyGUI(QMainWindow):
         # self.previewImage_slider = ImageSlider([],self)
         # self.previewtab_layout.addWidget(self.previewImage_slider)
                
-    def updateShowPreview(self,previewEvents=None):
+    def updateShowPreview(self,previewEvents=None,timeStretch=None):
         """
         Function that's called to update the preview (or show it). Requires the previewEvents, or uses the self.previewEvents.
         """
         
-        self.previewtab_widget.displayEvents(previewEvents,frametime_ms=100,findingResult = self.data['FindingResult'][0],fittingResult=self.data['FittingResult'][0],settings=self.globalSettings)
+        self.previewtab_widget.displayEvents(previewEvents,frametime_ms=100,findingResult = self.data['FindingResult'][0],fittingResult=self.data['FittingResult'][0],settings=self.globalSettings,timeStretch=timeStretch)
         
         
         logging.info('UpdateShowPreview ran!')
@@ -1614,20 +1612,26 @@ class MyGUI(QMainWindow):
         value = line_edit.text()
         expectedType = utils.typeFromKwarg(function,kwarg)
         if expectedType is not None:
-            if expectedType is not str:
-                try:
-                    value = eval(line_edit.text())
-                    if isinstance(value,expectedType):
-                        self.setLineEditStyle(line_edit,type='Normal')
-                    else:
-                        self.setLineEditStyle(line_edit,type='Warning')
-                except:
-                    #Show as warning
-                    self.setLineEditStyle(line_edit,type='Warning')
-            elif expectedType is str:
+            if expectedType is str:
                 try:
                     value = str(line_edit.text())
                     self.setLineEditStyle(line_edit,type='Normal')
+                except:
+                    #Show as warning
+                    self.setLineEditStyle(line_edit,type='Warning')
+            elif expectedType is not str:
+                try:
+                    value = eval(line_edit.text())
+                    if expectedType == float:
+                        if isinstance(value,int) or isinstance(value,float):
+                            self.setLineEditStyle(line_edit,type='Normal')
+                        else:
+                            self.setLineEditStyle(line_edit,type='Warning')
+                    else:
+                        if isinstance(value,expectedType):
+                            self.setLineEditStyle(line_edit,type='Normal')
+                        else:
+                            self.setLineEditStyle(line_edit,type='Warning')
                 except:
                     #Show as warning
                     self.setLineEditStyle(line_edit,type='Warning')
@@ -2012,12 +2016,6 @@ class MyGUI(QMainWindow):
             self.runFindingAndFitting(npyData,polarityVal=polarityVal)
         
     def FindingBatching(self,npyData,polarityVal):
-        #For now, print start and final time:
-        logging.info(self.chunckloading_currentLimits)
-        logging.info('Start time: '+str(npyData[0]['t']))
-        logging.info('End time: '+str(npyData[-1]['t']))
-        
-        
         #Get polarity info and do this:
         FindingEvalText = self.getFunctionEvalText('Finding',"npyData","self.globalSettings",polarityVal)
         if FindingEvalText is not None:
@@ -2131,6 +2129,7 @@ class MyGUI(QMainWindow):
                     self.chunckloading_currentLimits = [[0,0],[0,0]]
                     
                     while self.chunckloading_finished_chunking == False:
+                        logging.info('New chunk analysis starting')
                         if self.chunckloading_number_chuck == 0:
                             events = record_raw.load_delta_t(float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000+float(self.globalSettings['FindingBatchingTimeOverlapMs']['value'])*1000)
                         else:
@@ -2138,7 +2137,6 @@ class MyGUI(QMainWindow):
                         #Check if any events are still within the range of time we want to assess
                         if len(events) > 0:
                             
-                            logging.info('New chunk analysis starting')
                             
                             if (min(events['t']) < (float(self.run_startTLineEdit.text())+float(self.run_durationTLineEdit.text()))*1000):
                                 #limit to requested xy
@@ -2162,7 +2160,7 @@ class MyGUI(QMainWindow):
                                 
                                 
                                 if len(events)>0:
-                                    logging.warning('RAW1 Current event min/max time:'+str(min(events['t'])/1000)+"/"+str(max(events['t'])/1000))
+                                    logging.info('Current event min/max time:'+str(min(events['t'])/1000)+"/"+str(max(events['t'])/1000))
                                     #Filter on correct polarity
                                     if polarityVal == "Pos":
                                         eventsPol = self.filterEvents_npy_p(events,1)
@@ -2176,7 +2174,7 @@ class MyGUI(QMainWindow):
                                         self.chunckloading_number_chuck += 1
                                         
                                         #Keep the previous 'overlap-events' for next round
-                                        events_prev = events[events['t']>self.chunckloading_currentLimits[0][1]]
+                                        events_prev = events[events['t']>self.chunckloading_currentLimits[0][1]-(self.chunckloading_currentLimits[1][1]-self.chunckloading_currentLimits[0][1])]
                             else:
                                 logging.info('Finished chunking!')
                                 self.number_finding_found_polarity[polarityVal] = len(self.data['FindingResult'][0])
@@ -2263,8 +2261,128 @@ class MyGUI(QMainWindow):
                         logging.info('Finished chunking!')
                         self.number_finding_found_polarity[polarityVal] = len(self.data['FindingResult'][0])
                         self.chunckloading_finished_chunking = True
+        elif fileToRun.endswith('.hdf5'):
+            logging.info('Starting with HDF5 for chunking')
+            #Empty dict to keep track of how many pos/neg psfs were found
+            self.number_finding_found_polarity = {}
+            
+            for polarityVal in polarityValArray:
+                logging.info('Starting Batching with polarity: '+polarityVal)
+                
+                if not ('ExistingFinding' in getattr(self,f"CandidateFindingDropdown{polarityVal}").currentText() or 'existing Finding' in getattr(self,f"CandidateFindingDropdown{polarityVal}").currentText()):
+                
+                
+                
+                    self.chunckloading_finished_chunking = False
+                    self.chunckloading_currentLimits = [[0,0],[0,0]]
+                    
+                    
+                    previous_read_hdfChunk = 1
+                    events_prev = np.zeros(0, dtype={'names': ['x', 'y', 'p', 't'], 'formats': ['<u2', '<u2', '<i2', '<i8'], 'offsets': [0, 2, 4, 8], 'itemsize': 16})
+                    self.chunckloading_number_chuck = 0
+                    
+                    while self.chunckloading_finished_chunking == False:
+                
+                
+                        self.chunckloading_currentLimits = [[(self.chunckloading_number_chuck)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000,(self.chunckloading_number_chuck+1)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000],[(self.chunckloading_number_chuck)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000-float(self.globalSettings['FindingBatchingTimeOverlapMs']['value'])*1000,(self.chunckloading_number_chuck+1)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000+float(self.globalSettings['FindingBatchingTimeOverlapMs']['value'])*1000]]        
+                
+                        current_read_index = 0
+                        hdf5_read_chunk_size = 100000 #nr of entries that are loaded after which it's checked whether T makes sense
+                        
+                        
+                        # Retrieve all entries within the specified bounding box
+                        t_min = self.chunckloading_currentLimits[0][0]
+                        t_max = self.chunckloading_currentLimits[1][1]
+                        
+                        #Load the hdf5 file
+                        with h5py.File(fileToRun, mode='r') as file:
+                            events_hdf5 = file['CD']['events']
+                            
+                            #We start at some chunk in time
+                            n_hdfChunk = previous_read_hdfChunk
+                            #We check if this chunk is fully loaded in hdf5
+                            fullChunkLoaded = False
+                            allhdf5chunkslices = np.zeros(0, dtype={'names': ['x', 'y', 'p', 't'], 'formats': ['<u2', '<u2', '<i2', '<i8'], 'offsets': [0, 2, 4, 8], 'itemsize': 16})
+                            
+                            #First figure out the start/end of this chunk:
+                            startPos = -1
+                            endPos = -1
+                            while (startPos == -1) or (endPos == -1):
+                                #Read a single entry:
+                                single_entry = events_hdf5[current_read_index*hdf5_read_chunk_size]
+                                if startPos == -1:
+                                    if single_entry[3] > t_min:
+                                        startPos = current_read_index*hdf5_read_chunk_size
+                                if endPos == -1:
+                                    if single_entry[3] > t_max:
+                                        endPos = current_read_index*hdf5_read_chunk_size
+                                current_read_index+=1
+                            
+                            allhdf5chunkslices = events_hdf5[max(0,startPos-hdf5_read_chunk_size):endPos]
+                            
+                            previous_read_hdfChunk = current_read_index
+                            
+                                        
+                        #Better structure
+                        events = allhdf5chunkslices
+                        # logging.warning(min(events['t']))
+                        # logging.warning(max(events['t']))
+                        #Store this for the next chunk
+                        previous_read_hdfChunk = n_hdfChunk-1
+                        #at this point fullChunkData is a (slightly too big in time) time-slice of the hdf5 file, and previous_read_hdfChunk is set so that next run we continue where we left off.
+                        
+                        events = events[(events['t'] >= t_min) & (events['t'] <= t_max)]
+                        
+                        #Check if any events are still within the range of time we want to assess
+                        if len(events) > 0:
+                            if (min(events['t']) < (float(self.run_startTLineEdit.text())+float(self.run_durationTLineEdit.text()))*1000):
+                                #limit to requested xy
+                                events = self.filterEvents_xy(events,xyStretch=(float(self.run_minXLineEdit.text()),float(self.run_maxXLineEdit.text()),float(self.run_minYLineEdit.text()),float(self.run_maxYLineEdit.text())))
+                        
+                                #Add the starting time
+                                self.chunckloading_currentLimits = [[float(self.run_startTLineEdit.text())*1000 + x for x in sublist] for sublist in self.chunckloading_currentLimits]
+                                #Add events_prev before these events:
+                                
+                                events = np.concatenate((events_prev,events))
+                                
+                                if len(events)>0:
+                                    logging.info('Current event min/max time:'+str(min(events['t'])/1000)+"/"+str(max(events['t'])/1000))
+                                    #Filter on correct polarity
+                                    if polarityVal == "Pos":
+                                        eventsPol = self.filterEvents_npy_p(events,1)
+                                    elif polarityVal == "Neg":
+                                        eventsPol = self.filterEvents_npy_p(events,0)
+                                    elif polarityVal == "Mix":
+                                        eventsPol = events
+                                    
+                                    if (len(eventsPol) > 0):
+                                        self.FindingBatching(eventsPol,polarityVal)
+                                        self.chunckloading_number_chuck += 1
+                                        
+                                        #Keep the previous 'overlap-events' for next round
+                                        events_prev = events[events['t']>self.chunckloading_currentLimits[0][1]-(self.chunckloading_currentLimits[1][1]-self.chunckloading_currentLimits[0][1])]
+                                        
+                                
+                            else:
+                                logging.info('Finished chunking!')
+                                self.number_finding_found_polarity[polarityVal] = len(self.data['FindingResult'][0])
+                                self.chunckloading_finished_chunking = True
+                        else:
+                            logging.info('Finished chunking!')
+                            self.number_finding_found_polarity[polarityVal] = len(self.data['FindingResult'][0])
+                            self.chunckloading_finished_chunking = True
+                        
+                else: #If we want to pre-load the existing finding info:
+                    findingOffset = 0
+                    if polarityVal == 'Neg':
+                        findingOffset = self.number_finding_found_polarity['Pos']
+                    
+                    self.runFindingAndFitting('',runFitting=False,storeFinding=False,polarityVal=polarityVal,findingOffset = findingOffset)
+                    self.number_finding_found_polarity[polarityVal] = len(self.data['FindingResult'][0])
+                    
+                    
         else:
-            logging.error("Please choose a .raw or .npy file for previews.")
+            logging.error("Please choose a .raw or .npy or .hdf5 file for previews.")
             return
         
         #Check if some candidates are found:
@@ -2376,14 +2494,14 @@ class MyGUI(QMainWindow):
                         self.data['FittingMethod'] = str(FittingEvalText)
                         self.data['FittingResult'] = eval(str(FittingEvalText))
                         self.currentFileInfo['FittingTime'] = time.time() - self.currentFileInfo['FittingTime']
-                        #Update the GUI
-                        self.updateGUIafterNewFitting()
-                        #Create and store the metadata
-                        if self.globalSettings['StoreFileMetadata']['value']:
-                            self.createAndStoreFileMetadata()
                         #Create and store the localization output
                         if self.globalSettings['StoreFinalOutput']['value']:
                             self.storeLocalizationOutput()
+                        #Create and store the metadata
+                        if self.globalSettings['StoreFileMetadata']['value']:
+                            self.createAndStoreFileMetadata()
+                        #Update the GUI
+                        self.updateGUIafterNewFitting()
                 elif bothPolarities: #If we do pos and neg separately
                     if customFindingEval == None:
                         logging.warning('RunFitting is only possible with custom finding evaluation text for both polarities')
@@ -2408,14 +2526,14 @@ class MyGUI(QMainWindow):
                                 
                         #After both pos and neg fit is completed:
                         self.currentFileInfo['FittingTime'] = time.time() - self.currentFileInfo['FittingTime']
-                        #Update the GUI
-                        self.updateGUIafterNewFitting()
-                        #Create and store the metadata
-                        if self.globalSettings['StoreFileMetadata']['value']:
-                            self.createAndStoreFileMetadata()
                         #Create and store the localization output
                         if self.globalSettings['StoreFinalOutput']['value']:
                             self.storeLocalizationOutput()
+                        #Create and store the metadata
+                        if self.globalSettings['StoreFileMetadata']['value']:
+                            self.createAndStoreFileMetadata()
+                        #Update the GUI
+                        self.updateGUIafterNewFitting()
             except Exception as e:
                 self.open_critical_warning(f"Critical error in Fitting routine! Breaking off!\nError information:\n{e}")
                 self.data['FittingResult'] = {}
@@ -2449,6 +2567,31 @@ class MyGUI(QMainWindow):
         else:
             #default to minimal
             localizations.to_csv(storeLocation)
+            
+        
+        #Also store pickle information:
+        #Also save pos and neg seperately if so useful:
+        if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[3]:
+            try:
+                if self.number_finding_found_polarity['Pos'] > 0 and self.number_finding_found_polarity['Neg'] > 0:
+                    allPosFittingResults = self.data['FittingResult'][0][0:self.number_finding_found_polarity['Pos']]
+                    allNegFittingResults = self.data['FittingResult'][0][self.number_finding_found_polarity['Pos']:]
+                    
+                    file_path = self.currentFileInfo['CurrentFileLoc'][:-4]+'_FittingResults_PosOnly_'+datetime.datetime.now().strftime("%Y%m%d_%H%M%S")+'.pickle'
+                    with open(file_path, 'wb') as file:
+                        pickle.dump(allPosFittingResults, file)
+                        
+                        
+                    file_path = self.currentFileInfo['CurrentFileLoc'][:-4]+'_FittingResults_NegOnly_'+datetime.datetime.now().strftime("%Y%m%d_%H%M%S")+'.pickle'
+                    with open(file_path, 'wb') as file:
+                        pickle.dump(allNegFittingResults, file)
+            except:
+                logging.debug('This can be safely ignored')
+        else:#Only a single pos/neg selected
+            file_path = self.currentFileInfo['CurrentFileLoc'][:-4]+'_FittingResults_'+datetime.datetime.now().strftime("%Y%m%d_%H%M%S")+'.pickle'
+            with open(file_path, 'wb') as file:
+                pickle.dump(self.data['FittingResult'][0], file)
+            
         logging.info('Fitting results output stored')
         
     def storeFindingOutput(self,polarityVal='Pos'):
@@ -3612,7 +3755,7 @@ class PreviewFindingFitting(QWidget):
         #TODO: usefull info from mouse-over events
         # print(np.floor(highlighted_px_index))
     
-    def displayEvents(self,events,frametime_ms=100,findingResult = None,fittingResult=None,settings=None):
+    def displayEvents(self,events,frametime_ms=100,findingResult = None,fittingResult=None,settings=None,timeStretch=(0,1000)):
         #Delete all existing layers:
         for layer in reversed(self.napariviewer.layers):
             self.napariviewer.layers.remove(layer)
@@ -3620,11 +3763,11 @@ class PreviewFindingFitting(QWidget):
         
         preview_multiD_image = []
         #Loop over the frames:
-        n_frames = int(np.ceil((events['t'].max()-events['t'].min())/(frametime_ms*1000)))
+        n_frames = int(np.ceil(float(timeStretch[1])/(frametime_ms)))
         self.maxFrames = n_frames
         for n in range(0,n_frames):
             #Get the events on this 'frame'
-            events_this_frame = events[(events['t']>(n*frametime_ms*1000)) & (events['t']<((n+1)*frametime_ms*1000))]
+            events_this_frame = events[(events['t']>(float(timeStretch[0])*1000+n*frametime_ms*1000)) & (events['t']<(float(timeStretch[0])*1000+(n+1)*frametime_ms*1000))]
             #Create a 2d histogram out of this
             self.hist_xy = utilsHelper.SumPolarity(events_this_frame)
             #Add it to our image
@@ -3644,13 +3787,13 @@ class PreviewFindingFitting(QWidget):
             findingResults_thisbin = {}
             for findres_id in range(len(findingResult)):
                 findres = findingResult[findres_id]
-                if max(findres['events']['t']) >= (n*frametime_ms*1000) and min(findres['events']['t']) < ((n+1)*frametime_ms*1000):
+                if max(findres['events']['t']) >= (float(timeStretch[0])*1000+n*frametime_ms*1000) and min(findres['events']['t']) < (float(timeStretch[0])*1000+(n+1)*frametime_ms*1000):
                     findingResults_thisbin[findres_id] = findres
             #Create an overlay from this
             self.finding_overlays[n] = self.create_finding_overlay(findingResults_thisbin)
             
             #Get the fitting result in the current time bin:
-            fittingResults_thisbin = fittingResult[(fittingResult['t']>=(n*frametime_ms))* (fittingResult['t']<((n+1)*frametime_ms))]
+            fittingResults_thisbin = fittingResult[(fittingResult['t']>=(float(timeStretch[0])+n*frametime_ms))* (fittingResult['t']<(float(timeStretch[0])+(n+1)*frametime_ms))]
             self.fitting_overlays.append(self.create_fitting_overlay(fittingResults_thisbin,pxsize=settings['PixelSize_nm']['value']))
         
         #Select the original image-layer as selected
@@ -3689,7 +3832,7 @@ class PreviewFindingFitting(QWidget):
         }
         # Initialize an empty shapes layer for annotations
         self.shapes_layer = self.napariviewer.add_shapes(polygons, shape_type='rectangle', edge_width=1,edge_color='coral',face_color='transparent',visible=False,name='Finding Results',features=features,text=text)
-        self.shapes_layer.opacity = 1
+        self.shapes_layer.opacity = 0.7
         
         return self.shapes_layer
         
@@ -3708,7 +3851,7 @@ class PreviewFindingFitting(QWidget):
         
         # Initialize an empty shapes layer for annotations
         self.shapes_layer = self.napariviewer.add_shapes(polygons, shape_type='line', edge_width=1,edge_color='red',face_color='transparent',visible=False,name='Fitting Results')
-        self.shapes_layer.opacity = 1
+        self.shapes_layer.opacity = 0.7
         
         return self.shapes_layer
     
