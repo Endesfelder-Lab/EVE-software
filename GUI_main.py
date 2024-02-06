@@ -342,6 +342,10 @@ class MyGUI(QMainWindow):
         globalSettings['StoreFindingOutput']['value'] = True
         globalSettings['StoreFindingOutput']['input'] = bool
         globalSettings['StoreFindingOutput']['displayName'] = 'Store intermediate output (after finding)'
+        globalSettings['StoreFittingOutput'] = {}
+        globalSettings['StoreFittingOutput']['value'] = True
+        globalSettings['StoreFittingOutput']['input'] = bool
+        globalSettings['StoreFittingOutput']['displayName'] = 'Store intermediate output (after fitting)'
         globalSettings['OutputDataFormat'] = {}
         globalSettings['OutputDataFormat']['value'] = 'thunderstorm'
         globalSettings['OutputDataFormat']['input'] = 'choice'
@@ -842,8 +846,9 @@ class MyGUI(QMainWindow):
         globalSettingsOrig = copy.deepcopy(self.globalSettings)
         self.globalSettings['StoreConvertedRawData']['value'] = False
         self.globalSettings['StoreFileMetadata']['value'] = False
-        self.globalSettings['StoreFinalOutput']['value'] = False
+        self.globalSettings['StoreFinalOutput']['StoreFinalOutput']['value'] = False
         self.globalSettings['StoreFindingOutput']['value'] = False
+        self.globalSettings['StoreFittingOutput']['value'] = False
         
         events_id = 0
         partialFinding = {}
@@ -1891,13 +1896,16 @@ class MyGUI(QMainWindow):
             #Check if we are loading existing finding
             if 'ExistingFitting' in getattr(self,f"CandidateFittingDropdown{polarityVal}").currentText() or 'existing Fitting' in getattr(self,f"CandidateFittingDropdown{polarityVal}").currentText():
                 logging.info('Skipping finding and fitting processing')
-                # Ensure that we don't store finding and fitting result
-                #Ensure that we don't store the finding result
+                # compare filenames of finding and fitting here? Following code is not yet adapted
+                # finding_file = getattr(self,f"CandidateFindingDropdown{polarityVal}").currentText().replace("_FindingResults_", "_")
+                # fitting_file = getattr(self,f"CandidateFittingDropdown{polarityVal}").currentText().replace("_FittingResults_", "_")
+
+                # Ensure that we don't store the finding result
                 origStoreFindingSetting=self.globalSettings['StoreFindingOutput']['value']
                 self.globalSettings['StoreFindingOutput']['value'] = False
+                # Ensure that we don't store fitting result
                 origStoreFittingSetting=self.globalSettings['StoreFittingOutput']['value']
                 self.globalSettings['StoreFittingOutput']['value'] = False
-                
                 self.processSingleFile(self.dataLocationInput.text(),noFindingFitting=True,polarityVal=polarityVal)
                 
                 #Reset the global setting:
@@ -1907,7 +1915,6 @@ class MyGUI(QMainWindow):
             else:
                 if 'ExistingFinding' in getattr(self,f"CandidateFindingDropdown{polarityVal}").currentText() or 'existing Finding' in getattr(self,f"CandidateFindingDropdown{polarityVal}").currentText():
                     logging.info('Skipping finding processing, going to fitting')
-                    
                     #Ensure that we don't store the finding result
                     origStoreFindingSetting=self.globalSettings['StoreFindingOutput']['value']
                     self.globalSettings['StoreFindingOutput']['value'] = False
@@ -2603,28 +2610,30 @@ class MyGUI(QMainWindow):
         
         #Also store pickle information:
         #Also save pos and neg seperately if so useful:
-        if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[3]:
-            try:
-                if self.number_finding_found_polarity['Pos'] > 0 and self.number_finding_found_polarity['Neg'] > 0:
-                    allPosFittingResults = self.data['FittingResult'][0][0:self.number_finding_found_polarity['Pos']]
-                    allNegFittingResults = self.data['FittingResult'][0][self.number_finding_found_polarity['Pos']:]
-                    
-                    file_path = self.currentFileInfo['CurrentFileLoc'][:-4]+'_FittingResults_PosOnly_'+self.storeNameDateTime+'.pickle'
-                    with open(file_path, 'wb') as file:
-                        pickle.dump(allPosFittingResults, file)
+        if self.globalSettings['StoreFittingOutput']['value']:
+            if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[3]:
+                try:
+                    if self.number_finding_found_polarity['Pos'] > 0 and self.number_finding_found_polarity['Neg'] > 0:
+                        allPosFittingResults = self.data['FittingResult'][0][0:self.number_finding_found_polarity['Pos']]
+                        allNegFittingResults = self.data['FittingResult'][0][self.number_finding_found_polarity['Pos']:]
                         
-                        
-                    file_path = self.currentFileInfo['CurrentFileLoc'][:-4]+'_FittingResults_NegOnly_'+self.storeNameDateTime+'.pickle'
-                    with open(file_path, 'wb') as file:
-                        pickle.dump(allNegFittingResults, file)
-            except:
-                logging.debug('This can be safely ignored')
-        else:#Only a single pos/neg selected
-            file_path = self.currentFileInfo['CurrentFileLoc'][:-4]+'_FittingResults_'+self.storeNameDateTime+'.pickle'
-            with open(file_path, 'wb') as file:
-                pickle.dump(self.data['FittingResult'][0], file)
-            
-        logging.info('Fitting results output stored')
+                        file_path = self.currentFileInfo['CurrentFileLoc'][:-4]+'_FittingResults_PosOnly_'+self.storeNameDateTime+'.pickle'
+                        with open(file_path, 'wb') as file:
+                            pickle.dump(allPosFittingResults, file)
+                            
+                            
+                        file_path = self.currentFileInfo['CurrentFileLoc'][:-4]+'_FittingResults_NegOnly_'+self.storeNameDateTime+'.pickle'
+                        with open(file_path, 'wb') as file:
+                            pickle.dump(allNegFittingResults, file)
+                except:
+                    logging.debug('This can be safely ignored')
+            else:#Only a single pos/neg selected
+                file_path = self.currentFileInfo['CurrentFileLoc'][:-4]+'_FittingResults_'+self.storeNameDateTime+'.pickle'
+                with open(file_path, 'wb') as file:
+                    pickle.dump(self.data['FittingResult'][0], file)
+            logging.info('Fitting results output stored')
+        else:
+            pass
         
     def storeFindingOutput(self,polarityVal='Pos'):
         logging.debug('Attempting to store finding results output')
