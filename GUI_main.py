@@ -13,6 +13,7 @@ import appdirs
 import pickle
 import time
 from textwrap import dedent
+import h5py
 
 #Imports for PyQt5 (GUI)
 from PyQt5 import QtWidgets, QtGui
@@ -954,7 +955,6 @@ class MyGUI(QMainWindow):
                     #Filter on x,y coordinates:
                     events = events[(events['x'] >= float(xyStretch[0])) & (events['x'] <= float(xyStretch[1]))]
                     events = events[(events['y'] >= float(xyStretch[2])) & (events['y'] <= float(xyStretch[3]))]
-                    logging.info("XY cutting completed")
         except:
             #Warning if something crashes. Note the extra dash to the end of the warning
             logging.warning("No XY cutting due to not all entries being float-.")
@@ -2261,8 +2261,128 @@ class MyGUI(QMainWindow):
                         logging.info('Finished chunking!')
                         self.number_finding_found_polarity[polarityVal] = len(self.data['FindingResult'][0])
                         self.chunckloading_finished_chunking = True
+        elif fileToRun.endswith('.hdf5'):
+            logging.info('Starting with HDF5 for chunking')
+            #Empty dict to keep track of how many pos/neg psfs were found
+            self.number_finding_found_polarity = {}
+            
+            for polarityVal in polarityValArray:
+                logging.info('Starting Batching with polarity: '+polarityVal)
+                
+                if not ('ExistingFinding' in getattr(self,f"CandidateFindingDropdown{polarityVal}").currentText() or 'existing Finding' in getattr(self,f"CandidateFindingDropdown{polarityVal}").currentText()):
+                
+                
+                
+                    self.chunckloading_finished_chunking = False
+                    self.chunckloading_currentLimits = [[0,0],[0,0]]
+                    
+                    
+                    previous_read_hdfChunk = 1
+                    events_prev = np.zeros(0, dtype={'names': ['x', 'y', 'p', 't'], 'formats': ['<u2', '<u2', '<i2', '<i8'], 'offsets': [0, 2, 4, 8], 'itemsize': 16})
+                    self.chunckloading_number_chuck = 0
+                    
+                    while self.chunckloading_finished_chunking == False:
+                
+                
+                        self.chunckloading_currentLimits = [[(self.chunckloading_number_chuck)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000,(self.chunckloading_number_chuck+1)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000],[(self.chunckloading_number_chuck)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000-float(self.globalSettings['FindingBatchingTimeOverlapMs']['value'])*1000,(self.chunckloading_number_chuck+1)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000+float(self.globalSettings['FindingBatchingTimeOverlapMs']['value'])*1000]]        
+                
+                        current_read_index = 0
+                        hdf5_read_chunk_size = 100000 #nr of entries that are loaded after which it's checked whether T makes sense
+                        
+                        
+                        # Retrieve all entries within the specified bounding box
+                        t_min = self.chunckloading_currentLimits[0][0]
+                        t_max = self.chunckloading_currentLimits[1][1]
+                        
+                        #Load the hdf5 file
+                        with h5py.File(fileToRun, mode='r') as file:
+                            events_hdf5 = file['CD']['events']
+                            
+                            #We start at some chunk in time
+                            n_hdfChunk = previous_read_hdfChunk
+                            #We check if this chunk is fully loaded in hdf5
+                            fullChunkLoaded = False
+                            allhdf5chunkslices = np.zeros(0, dtype={'names': ['x', 'y', 'p', 't'], 'formats': ['<u2', '<u2', '<i2', '<i8'], 'offsets': [0, 2, 4, 8], 'itemsize': 16})
+                            
+                            #First figure out the start/end of this chunk:
+                            startPos = -1
+                            endPos = -1
+                            while (startPos == -1) or (endPos == -1):
+                                #Read a single entry:
+                                single_entry = events_hdf5[current_read_index*hdf5_read_chunk_size]
+                                if startPos == -1:
+                                    if single_entry[3] > t_min:
+                                        startPos = current_read_index*hdf5_read_chunk_size
+                                if endPos == -1:
+                                    if single_entry[3] > t_max:
+                                        endPos = current_read_index*hdf5_read_chunk_size
+                                current_read_index+=1
+                            
+                            allhdf5chunkslices = events_hdf5[max(0,startPos-hdf5_read_chunk_size):endPos]
+                            
+                            previous_read_hdfChunk = current_read_index
+                            
+                                        
+                        #Better structure
+                        events = allhdf5chunkslices
+                        # logging.warning(min(events['t']))
+                        # logging.warning(max(events['t']))
+                        #Store this for the next chunk
+                        previous_read_hdfChunk = n_hdfChunk-1
+                        #at this point fullChunkData is a (slightly too big in time) time-slice of the hdf5 file, and previous_read_hdfChunk is set so that next run we continue where we left off.
+                        
+                        events = events[(events['t'] >= t_min) & (events['t'] <= t_max)]
+                        
+                        #Check if any events are still within the range of time we want to assess
+                        if len(events) > 0:
+                            if (min(events['t']) < (float(self.run_startTLineEdit.text())+float(self.run_durationTLineEdit.text()))*1000):
+                                #limit to requested xy
+                                events = self.filterEvents_xy(events,xyStretch=(float(self.run_minXLineEdit.text()),float(self.run_maxXLineEdit.text()),float(self.run_minYLineEdit.text()),float(self.run_maxYLineEdit.text())))
+                        
+                                #Add the starting time
+                                self.chunckloading_currentLimits = [[float(self.run_startTLineEdit.text())*1000 + x for x in sublist] for sublist in self.chunckloading_currentLimits]
+                                #Add events_prev before these events:
+                                
+                                events = np.concatenate((events_prev,events))
+                                
+                                if len(events)>0:
+                                    logging.info('Current event min/max time:'+str(min(events['t'])/1000)+"/"+str(max(events['t'])/1000))
+                                    #Filter on correct polarity
+                                    if polarityVal == "Pos":
+                                        eventsPol = self.filterEvents_npy_p(events,1)
+                                    elif polarityVal == "Neg":
+                                        eventsPol = self.filterEvents_npy_p(events,0)
+                                    elif polarityVal == "Mix":
+                                        eventsPol = events
+                                    
+                                    if (len(eventsPol) > 0):
+                                        self.FindingBatching(eventsPol,polarityVal)
+                                        self.chunckloading_number_chuck += 1
+                                        
+                                        #Keep the previous 'overlap-events' for next round
+                                        events_prev = events[events['t']>self.chunckloading_currentLimits[0][1]-(self.chunckloading_currentLimits[1][1]-self.chunckloading_currentLimits[0][1])]
+                                        
+                                
+                            else:
+                                logging.info('Finished chunking!')
+                                self.number_finding_found_polarity[polarityVal] = len(self.data['FindingResult'][0])
+                                self.chunckloading_finished_chunking = True
+                        else:
+                            logging.info('Finished chunking!')
+                            self.number_finding_found_polarity[polarityVal] = len(self.data['FindingResult'][0])
+                            self.chunckloading_finished_chunking = True
+                        
+                else: #If we want to pre-load the existing finding info:
+                    findingOffset = 0
+                    if polarityVal == 'Neg':
+                        findingOffset = self.number_finding_found_polarity['Pos']
+                    
+                    self.runFindingAndFitting('',runFitting=False,storeFinding=False,polarityVal=polarityVal,findingOffset = findingOffset)
+                    self.number_finding_found_polarity[polarityVal] = len(self.data['FindingResult'][0])
+                    
+                    
         else:
-            logging.error("Please choose a .raw or .npy file for previews.")
+            logging.error("Please choose a .raw or .npy or .hdf5 file for previews.")
             return
         
         #Check if some candidates are found:
