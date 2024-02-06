@@ -2133,7 +2133,9 @@ class MyGUI(QMainWindow):
                 npyData = None
                 if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[3]:
                     self.runFindingAndFitting(npyData,polarityVal='Pos')
-                    self.runFindingAndFitting(npyData,polarityVal='Neg')
+                    #Get the number of positive candidates:
+                    
+                    self.runFindingAndFitting(npyData,polarityVal='Neg',findingOffset=len(self.data['FindingResult'][0]))
                 else:
                     self.runFindingAndFitting(npyData,polarityVal=polarityVal)
         elif noFindingFitting:
@@ -2142,7 +2144,7 @@ class MyGUI(QMainWindow):
             npyData = None
             if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[3]:
                 self.runFindingAndFitting(npyData,polarityVal='Pos')
-                self.runFindingAndFitting(npyData,polarityVal='Neg')
+                self.runFindingAndFitting(npyData,polarityVal='Neg',findingOffset=len(self.data['FindingResult'][0]))
             else:
                 self.runFindingAndFitting(npyData,polarityVal=polarityVal)
         
