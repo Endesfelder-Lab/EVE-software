@@ -1678,6 +1678,8 @@ class MyGUI(QMainWindow):
         #Get the value
         value = line_edit.text()
         expectedType = utils.typeFromKwarg(function,kwarg)
+        if expectedType == 'fileLoc':
+            expectedType=str
         if expectedType is not None:
             if expectedType is str:
                 try:
