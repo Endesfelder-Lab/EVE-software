@@ -2135,6 +2135,7 @@ class MyGUI(QMainWindow):
                     self.chunckloading_currentLimits = [[0,0],[0,0]]
                     
                     while self.chunckloading_finished_chunking == False:
+                        logging.info('New chunk analysis starting')
                         if self.chunckloading_number_chuck == 0:
                             events = record_raw.load_delta_t(float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000+float(self.globalSettings['FindingBatchingTimeOverlapMs']['value'])*1000)
                         else:
@@ -2142,7 +2143,6 @@ class MyGUI(QMainWindow):
                         #Check if any events are still within the range of time we want to assess
                         if len(events) > 0:
                             
-                            logging.info('New chunk analysis starting')
                             
                             if (min(events['t']) < (float(self.run_startTLineEdit.text())+float(self.run_durationTLineEdit.text()))*1000):
                                 #limit to requested xy
@@ -2180,7 +2180,7 @@ class MyGUI(QMainWindow):
                                         self.chunckloading_number_chuck += 1
                                         
                                         #Keep the previous 'overlap-events' for next round
-                                        events_prev = events[events['t']>self.chunckloading_currentLimits[0][1]]
+                                        events_prev = events[events['t']>self.chunckloading_currentLimits[0][1]-(self.chunckloading_currentLimits[1][1]-self.chunckloading_currentLimits[0][1])]
                             else:
                                 logging.info('Finished chunking!')
                                 self.number_finding_found_polarity[polarityVal] = len(self.data['FindingResult'][0])
