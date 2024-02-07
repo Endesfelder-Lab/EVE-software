@@ -2730,6 +2730,11 @@ class MyGUI(QMainWindow):
                         file_path = self.currentFileInfo['CurrentFileLoc'][:-4]+'_FittingResults_NegOnly_'+self.storeNameDateTime+'.pickle'
                         with open(file_path, 'wb') as file:
                             pickle.dump(allNegFittingResults, file)
+                        
+                        #And store all of them
+                        file_path = self.currentFileInfo['CurrentFileLoc'][:-4]+'_FittingResults_'+self.storeNameDateTime+'.pickle'
+                        with open(file_path, 'wb') as file:
+                            pickle.dump(self.data['FittingResult'][0], file)
                 except:
                     logging.debug('This can be safely ignored')
             else:#Only a single pos/neg selected
