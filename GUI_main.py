@@ -34,6 +34,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 #Import all scripts in the custom script folders
 from CandidateFitting import *
 from CandidateFinding import *
+from Visualisation import *
 #Obtain the helperfunctions
 from Utils import utils, utilsHelper
 
@@ -1047,35 +1048,43 @@ class MyGUI(QMainWindow):
         """
         Function to set up the Visualisation tab (scatter, average shifted histogram and such)
         """
-        #Add a vertical layout, not a grid layout:
-        visualisationTab_vertical_container = QVBoxLayout()
-        self.tab_visualisation.setLayout(visualisationTab_vertical_container)
         
-        #Add a horizontal layout to the first row of the vertical layout - this contains the buttons:
-        visualisationTab_horizontal_container = QHBoxLayout()
-        visualisationTab_vertical_container.addLayout(visualisationTab_horizontal_container)
+
+        #It's a grid layout
+        self.visualisationtab_layout = QGridLayout()
+        self.tab_visualisation.setLayout(self.visualisationtab_layout)
         
-        #Add a button that says scatter:
-        self.buttonScatter = QPushButton("Scatter Plot")
-        visualisationTab_horizontal_container.addWidget(self.buttonScatter)
-        #Give it a function on click:
-        self.buttonScatter.clicked.connect(lambda: self.plotScatter())
+        self.visualisationtab_widget = VisualisationNapari(self)
+        self.visualisationtab_layout.addWidget(self.visualisationtab_widget)
+        # #Add a vertical layout, not a grid layout:
+        # visualisationTab_vertical_container = QVBoxLayout()
+        # self.tab_visualisation.setLayout(visualisationTab_vertical_container)
         
-        #Add a button that says 2d interp histogram:
-        self.buttonInterpHist = QPushButton("Interp histogram")
-        visualisationTab_horizontal_container.addWidget(self.buttonInterpHist)
-        #Give it a function on click:
-        self.buttonInterpHist.clicked.connect(lambda: self.plotLinearInterpHist())
+        # #Add a horizontal layout to the first row of the vertical layout - this contains the buttons:
+        # visualisationTab_horizontal_container = QHBoxLayout()
+        # visualisationTab_vertical_container.addLayout(visualisationTab_horizontal_container)
         
-        #Create an empty figure and store it as self.data:
-        self.data['figurePlot'], self.data['figureAx'] = plt.subplots(figsize=(5, 5))
-        self.data['figureCanvas'] = FigureCanvas(self.data['figurePlot'])
-        self.data['figurePlot'].tight_layout()
+        # #Add a button that says scatter:
+        # self.buttonScatter = QPushButton("Scatter Plot")
+        # visualisationTab_horizontal_container.addWidget(self.buttonScatter)
+        # #Give it a function on click:
+        # self.buttonScatter.clicked.connect(lambda: self.plotScatter())
         
-        #Add a navigation toolbar (zoom, pan etc)
-        visualisationTab_vertical_container.addWidget(NavigationToolbar(self.data['figureCanvas'], self))
-        #Add the canvas to the tab
-        visualisationTab_vertical_container.addWidget(self.data['figureCanvas'])
+        # #Add a button that says 2d interp histogram:
+        # self.buttonInterpHist = QPushButton("Interp histogram")
+        # visualisationTab_horizontal_container.addWidget(self.buttonInterpHist)
+        # #Give it a function on click:
+        # self.buttonInterpHist.clicked.connect(lambda: self.plotLinearInterpHist())
+        
+        # #Create an empty figure and store it as self.data:
+        # self.data['figurePlot'], self.data['figureAx'] = plt.subplots(figsize=(5, 5))
+        # self.data['figureCanvas'] = FigureCanvas(self.data['figurePlot'])
+        # self.data['figurePlot'].tight_layout()
+        
+        # #Add a navigation toolbar (zoom, pan etc)
+        # visualisationTab_vertical_container.addWidget(NavigationToolbar(self.data['figureCanvas'], self))
+        # #Add the canvas to the tab
+        # visualisationTab_vertical_container.addWidget(self.data['figureCanvas'])
     
     def plotScatter(self):
         """
@@ -1442,14 +1451,6 @@ class MyGUI(QMainWindow):
         #And I add the previewfindingfitting class (QWidget extension):
         self.previewtab_widget = PreviewFindingFitting()
         self.previewtab_layout.addWidget(self.previewtab_widget)
-        
-        # #It requires global variables for the color-bar limits (to allow the same limits for all images of the preview)
-        # self.PreviewMinCbarVal = 0
-        # self.PreviewMaxCbarVal = 0
-        
-        # #It creates the ImageSlider class
-        # self.previewImage_slider = ImageSlider([],self)
-        # self.previewtab_layout.addWidget(self.previewImage_slider)
 
     def updateShowPreview(self,previewEvents=None,timeStretch=None):
         """
@@ -2599,7 +2600,7 @@ class MyGUI(QMainWindow):
         
         #Function call: get the to-be-evaluated text out, giving the methodName, method KwargNames, methodKwargValues, and 'function Type (i.e. cellSegmentScripts, etc)' - do the same with scoring as with method
         if methodName_method != '':
-            EvalTextMethod = self.getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart=str(p1)+','+str(p2))
+            EvalTextMethod = utils.getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart=str(p1)+','+str(p2))
             #append this to moduleEvalTexts
             moduleMethodEvalTexts.append(EvalTextMethod)
             
@@ -2607,83 +2608,7 @@ class MyGUI(QMainWindow):
             return moduleMethodEvalTexts[0]
         else:
             return None
-    
-    def getEvalTextFromGUIFunction(self, methodName, methodKwargNames, methodKwargValues, partialStringStart=None, removeKwargs=None):
-    #--------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    #methodName: the physical name of the method, i.e. StarDist.StarDistSegment
-    #methodKwargNames: found kwarg NAMES from the GUI
-    #methodKwargValues: found kwarg VALUES from the GUI
-    #methodTypeString: type of method, i.e. 'function Type' (e.g. CellSegmentScripts, CellScoringScripts etc)'
-    #Optionals: partialStringStart: gives a different start to the partial eval-string
-    #Optionals: removeKwargs: removes kwargs from assessment (i.e. for scoring script, where this should always be changed by partialStringStart)
-    #--------------------------------------------------------------------------------------------------------------------------------------------------------------------
-        specialcaseKwarg = [] #Kwarg where the special case is used
-        specialcaseKwargPartialStringAddition = [] #text to be eval-ed in case this kwarg is found
-        #We have the method name and all its kwargs, so:
-        if len(methodName)>0: #if the method exists
-            #Check if all req. kwargs have some value
-            reqKwargs = utils.reqKwargsFromFunction(methodName)
-            #Remove values from this array if wanted
-            if removeKwargs is not None:
-                for removeKwarg in removeKwargs:
-                    if removeKwarg in reqKwargs:
-                        reqKwargs.remove(removeKwarg)
-                    else:
-                        #nothing, but want to make a note of this (log message)
-                        reqKwargs = reqKwargs
-            #Stupid dummy-check whether we have the reqKwargs in the methodKwargNames, which we should (basically by definition)
 
-            if all(elem in set(methodKwargNames) for elem in reqKwargs):
-                allreqKwargsHaveValue = True
-                for id in range(0,len(reqKwargs)):
-                    #First find the index of the function-based reqKwargs in the GUI-based methodKwargNames. 
-                    GUIbasedIndex = methodKwargNames.index(reqKwargs[id])
-                    #Get the value of the kwarg - we know the name already now due to reqKwargs.
-                    kwargvalue = methodKwargValues[GUIbasedIndex]
-                    if kwargvalue == '':
-                        allreqKwargsHaveValue = False
-                        logging.error(f'Missing required keyword argument in {methodName}: {reqKwargs[id]}, NOT CONTINUING')
-                if allreqKwargsHaveValue:
-                    #If we're at this point, all req kwargs have a value, so we can run!
-                    #Get the string for the required kwargs
-                    if partialStringStart is not None:
-                        partialString = partialStringStart
-                    else:
-                        partialString = ''
-                    for id in range(0,len(reqKwargs)):
-                        #First find the index of the function-based reqKwargs in the GUI-based methodKwargNames. 
-                        GUIbasedIndex = methodKwargNames.index(reqKwargs[id])
-                        #Get the value of the kwarg - we know the name already now due to reqKwargs.
-                        kwargvalue = methodKwargValues[GUIbasedIndex]
-                        #Add a comma if there is some info in the partialString already
-                        if partialString != '':
-                            partialString+=","
-                        #Check for special requests of kwargs, this is normally used when pointing to the output of a different value
-                        if reqKwargs[id] in specialcaseKwarg:
-                            #Get the index
-                            ps_index = specialcaseKwarg.index(reqKwargs[id])
-                            #Change the partialString with the special case
-                            partialString+=eval(specialcaseKwargPartialStringAddition[ps_index])
-                        else:
-                            partialString+=reqKwargs[id]+"=\""+kwargvalue+"\""
-                    #Add the optional kwargs if they have a value
-                    optKwargs = utils.optKwargsFromFunction(methodName)
-                    for id in range(0,len(optKwargs)):
-                        if methodKwargValues[id+len(reqKwargs)] != '':
-                            if partialString != '':
-                                partialString+=","
-                            partialString+=optKwargs[id]+"=\""+methodKwargValues[methodKwargNames.index(optKwargs[id])]+"\""
-                    #Add the distribution kwarg if it exists
-                    if 'dist_kwarg' in methodKwargNames:
-                        partialString += ",dist_kwarg=\""+methodKwargValues[methodKwargNames.index('dist_kwarg')]+"\""
-                    segmentEval = methodName+"("+partialString+")"
-                    return segmentEval
-                else:
-                    logging.error('NOT ALL KWARGS PROVIDED!')
-                    return None
-            else:
-                logging.error('SOMETHING VERY STUPID HAPPENED')
-                return None
 
     def save_entries_to_json(self):
         self.entries = {}
@@ -3565,7 +3490,7 @@ class VisualisationNapari(QWidget):
     General idea: have a single implementation similar to CandidateFinding/Fitting, where user-created visualisations can be created. They have a list of localizations as input, and output an image.
     This class handles both the showcasing/choosing of visualisations and the napari showing of the output images.
     """
-    def __init__(self):
+    def __init__(self,parent):
         super().__init__()
         # Create a napari viewer
         self.napariviewer = Viewer(show=False)
@@ -3574,12 +3499,130 @@ class VisualisationNapari(QWidget):
         # Set the layout for the main widget
         self.setLayout(self.mainlayout)
         
+        #Create a groupbox for visualisation methods
+        self.VisualisationGroupbox = QGroupBox("Visualisation")
+        self.VisualisationGroupbox.setLayout(QGridLayout())
+        
+        #Add a button:
+        button = QPushButton("Visualise", self)
+        self.VisualisationGroupbox.layout().addWidget(button)
+        #Ensure that we have 'KEEP' in the objectname so it's not deleted later
+        self.VisualisationGroupbox.setObjectName("VisualiseGroupboxKEEP")
+        
+        visualisationDropdown = QComboBox(self)
+        visualisationDropdown.setMaxVisibleItems(30)
+        
+        #Add the visualisationDropdown to the layout
+        self.VisualisationGroupbox.layout().addWidget(visualisationDropdown)
+        
+        #Ensure that we have 'KEEP' in the objectname so it's not deleted later
+        visualisationDropdown_name = "VisualisationDropdownKEEP"
+        Visualisation_functionNameToDisplayNameMapping_name = f"Visualisation_functionNameToDisplayNameMapping"
+        # self.Visualisation_functionNameToDisplayNameMapping = Visualisation_functionNameToDisplayNameMapping_name
+        
+        options = utils.functionNamesFromDir('Visualisation')
+        displaynames, Visualisation_functionNameToDisplayNameMapping = utils.displayNamesFromFunctionNames(options,'')
+        visualisationDropdown.setObjectName(visualisationDropdown_name)
+        visualisationDropdown.addItems(displaynames)
+            
+        setattr(self, Visualisation_functionNameToDisplayNameMapping_name, Visualisation_functionNameToDisplayNameMapping)
+        groupbox_name="GroupboxVisualisation"
+        layout_name = f"layoutVisualisation"
+        
+        # #On startup/initiatlisation: also do changeLayout_choice
+        utils.changeLayout_choice(self.VisualisationGroupbox.layout(),visualisationDropdown_name,getattr(self, Visualisation_functionNameToDisplayNameMapping_name),parent=self,ignorePolarity=True)
+        
+        #add a 'Visualise!' button to this groupbox:
+        button = QPushButton("Visualise!", self)
+        button.setObjectName("VisualiseRunButtonKEEP")
+        self.VisualisationGroupbox.layout().addWidget(button)
+        #And add a callback to this:
+        button.clicked.connect(lambda text, parent=parent: self.visualise_callback(parent))
+        
+        #Add the groupbox to the mainlayout
+        self.mainlayout.layout().addWidget(self.VisualisationGroupbox)
+        
+        
         self.viewer = QtViewer(self.napariviewer)
         
         self.mainlayout.addWidget(self.viewer)
         self.mainlayout.addWidget(self.viewer.controls)
         logging.info('VisualisationNapari init')
 
+    def visualise_callback(self,parent):
+        logging.info('Visualise button pressed')
+        
+        #Get the current function callback
+        FunctionEvalText = self.getVisFunctionEvalText("parent.data['FittingResult'][0]","parent.globalSettings")
+        print(FunctionEvalText)
+        resultImage = eval(FunctionEvalText)
+        
+        #Clear all existing layers
+        for layer in reversed(self.napariviewer.layers):
+            self.napariviewer.layers.remove(layer)
+            
+        #Add a new layer which is this image
+        self.napariviewer.add_image(resultImage[0], multiscale=False)
+        
+
+
+    def getVisFunctionEvalText(self,p1,p2):
+        #Get the dropdown info
+        moduleMethodEvalTexts = []
+        all_layouts = self.VisualisationGroupbox.findChildren(QLayout)
+        
+        methodKwargNames_method = []
+        methodKwargValues_method = []
+        methodName_method = ''
+        # Iterate over the items in the layout
+        for index in range(len(all_layouts)):
+            item = all_layouts[index]
+            widget = item.widget()
+            if isinstance(item, QLayout):
+                for index2 in range(item.count()):
+                    item_sub = item.itemAt(index2)
+                    widget_sub = item_sub.widget()
+                    try:
+                        if ("LineEdit" in widget_sub.objectName()) and widget_sub.isVisibleTo(self.VisualisationGroupbox):
+                            # The objectName will be along the lines of foo#bar#str
+                            #Check if the objectname is part of a method or part of a scoring
+                            split_list = widget_sub.objectName().split('#')
+                            methodName_method = split_list[1]
+                            methodKwargNames_method.append(split_list[2])
+                            
+                            #Widget.text() could contain a file location. Thus, we need to swap out all \ for /:
+                            methodKwargValues_method.append(widget_sub.text().replace('\\','/'))
+                    except:
+                        pass
+        #If at this point there is no methodName_method, it means that the method has exactly 0 req or opt kwargs. Thus, we simply find the value of the QComboBox which should be the methodName:
+        if methodName_method == '':
+            for index in range(len(all_layouts)):
+                item = all_layouts[index]
+                widget = item.widget()
+                if isinstance(item, QLayout):
+                    for index2 in range(item.count()):
+                        item_sub = item.itemAt(index2)
+                        widget_sub = item_sub.widget()
+                        try:
+                            if "VisualisationDropdownKEEP"in widget_sub.objectName():
+                                text = widget_sub.currentText()
+                                for i in range(len(self.Visualisation_functionNameToDisplayNameMapping)):
+                                    if self.Visualisation_functionNameToDisplayNameMapping[i][0] == text:
+                                        methodName_method = self.Visualisation_functionNameToDisplayNameMapping[i][1]
+                                        break
+                        except:
+                            pass
+        #Function call: get the to-be-evaluated text out, giving the methodName, method KwargNames, methodKwargValues, and 'function Type (i.e. cellSegmentScripts, etc)' - do the same with scoring as with method
+        if methodName_method != '':
+            EvalTextMethod = utils.getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart=str(p1)+','+str(p2))
+            #append this to moduleEvalTexts
+            moduleMethodEvalTexts.append(EvalTextMethod)
+            
+        if moduleMethodEvalTexts is not None and len(moduleMethodEvalTexts) > 0:
+            return moduleMethodEvalTexts[0]
+        else:
+            return None
+    
 class PreviewFindingFitting(QWidget):
     """
     Class that runs the GUI of finding/fitting preview (i.e. showing alle vents as an image and overlays with boxes/dots)
@@ -3698,7 +3741,6 @@ class PreviewFindingFitting(QWidget):
         self.napariviewer.layers.selection.active = self.napariviewer.layers[0]
         self.update_visibility()
 
-    
     def create_finding_overlay(self,findingResults):
         """
         Creation of a finding overlay
