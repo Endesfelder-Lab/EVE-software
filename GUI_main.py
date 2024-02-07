@@ -2148,7 +2148,7 @@ class MyGUI(QMainWindow):
             npyData = None
             if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[3]:
                 self.runFindingAndFitting(npyData,polarityVal='Pos')
-                self.runFindingAndFitting(npyData,polarityVal='Neg',findingOffset=len(self.data['FindingResult'][0]))
+                self.runFindingAndFitting(npyData,polarityVal='Neg',findingOffset=len(self.data['FindingResult'][0]),fittingOffset=len(self.data['FindingResult'][0]))
             else:
                 self.runFindingAndFitting(npyData,polarityVal=polarityVal)
         
@@ -2326,7 +2326,7 @@ class MyGUI(QMainWindow):
                     if polarityVal == 'Neg':
                         findingOffset = self.number_finding_found_polarity['Pos']
                     
-                    self.runFindingAndFitting('',runFitting=False,storeFinding=False,polarityVal=polarityVal,findingOffset = findingOffset)
+                    self.runFindingAndFitting('',runFitting=False,storeFinding=False,polarityVal=polarityVal,findingOffset = findingOffset,fittingOffset=findingOffset)
                     self.number_finding_found_polarity[polarityVal] = len(self.data['FindingResult'][0])
                     z=3
                     
@@ -2519,7 +2519,7 @@ class MyGUI(QMainWindow):
                     if polarityVal == 'Neg':
                         findingOffset = self.number_finding_found_polarity['Pos']
                     
-                    self.runFindingAndFitting('',runFitting=False,storeFinding=False,polarityVal=polarityVal,findingOffset = findingOffset)
+                    self.runFindingAndFitting('',runFitting=False,storeFinding=False,polarityVal=polarityVal,findingOffset = findingOffset,fittingOffset=findingOffset)
                     self.number_finding_found_polarity[polarityVal] = len(self.data['FindingResult'][0])
                     
                     
@@ -2548,7 +2548,7 @@ class MyGUI(QMainWindow):
             customFindingEval = ["{key: value for key, value in self.data['FindingResult'][0].items() if key < "+str(self.number_finding_found_polarity['Pos'])+"}","{key-"+str(self.number_finding_found_polarity['Pos']-1)+": value for key, value in self.data['FindingResult'][0].items() if key >= "+str(self.number_finding_found_polarity['Pos'])+"}"]
             self.runFitting(polarityVal = polArr,customFindingEval = customFindingEval,bothPolarities=True)
         
-    def runFindingAndFitting(self,npyData,runFitting=True,storeFinding=True,polarityVal='Mix',findingOffset=0):
+    def runFindingAndFitting(self,npyData,runFitting=True,storeFinding=True,polarityVal='Mix',findingOffset=0,fittingOffset=0):
         FindingEvalText = self.getFunctionEvalText('Finding',"npyData","self.globalSettings",polarityVal)
 
         #I want to note that I can send this to a QThread, and it technically works, but the GUI still freezes. Implementaiton here:
@@ -2575,7 +2575,14 @@ class MyGUI(QMainWindow):
                     
                     #Update the finding result entry, their id, but the offset:
                     newFindingResult2 = {key+findingOffset: value for key, value in newFindingResult[0].items()}
+                                        
+                    newFindingResultTot = list(self.data['FindingResult'])
                     self.data['FindingResult'][0].update(newFindingResult2)
+                    newFindingResultTot[0] = self.data['FindingResult'][0]
+                    newFindingResultTot[1] += "\n"+newFindingResult[1]
+                    self.data['FindingResult'] = tuple(newFindingResultTot)
+                    
+                    
                     #todo: THE string in findingresult[1] is wrong now, wont be fixed.
                     # self.data['FindingResult'][1] += "Test"+newFindingResult[1]
                     
@@ -2589,7 +2596,7 @@ class MyGUI(QMainWindow):
                         self.storeFindingOutput(polarityVal = polarityVal)
                 #And run the fitting
                 if runFitting:
-                    self.runFitting(polarityVal)
+                    self.runFitting(polarityVal,fittingOffset=fittingOffset)
             except Exception as e:
                 error_message = f"Critical error in Finding routine! Breaking off!\nError information:\n{type(e).__name__}: {e}\n\n{traceback.format_exc()}"
                 self.open_critical_warning(error_message)
@@ -2625,7 +2632,7 @@ class MyGUI(QMainWindow):
             logging.error('No localizations found after fitting!')
             return
     
-    def runFitting(self,polarityVal,customFindingEval = None,bothPolarities=False):
+    def runFitting(self,polarityVal,customFindingEval = None,bothPolarities=False,fittingOffset=0):
         if self.data['FindingResult'][0] is not None:
             #Run the finding function!
             try:
@@ -2635,7 +2642,15 @@ class MyGUI(QMainWindow):
                     if FittingEvalText is not None:
                         self.currentFileInfo['FittingTime'] = time.time()
                         self.data['FittingMethod'] = str(FittingEvalText)
-                        self.data['FittingResult'] = eval(str(FittingEvalText))
+                        fittingResult = eval(str(FittingEvalText))
+                        if fittingOffset == 0:
+                            self.data['FittingResult'] = fittingResult
+                        elif fittingOffset > 0:
+                            newFittingResultTot = list(self.data['FittingResult'])
+                            newFittingResultTot[0] = pd.concat([newFittingResultTot[0], fittingResult[0]])
+                            newFittingResultTot[1] += "\n"+fittingResult[1]
+                            self.data['FittingResult'][0].update(pd.concat([self.data['FittingResult'][0], fittingResult[0]]))
+                            self.data['FittingResult'] = tuple(newFittingResultTot)
                         self.currentFileInfo['FittingTime'] = time.time() - self.currentFileInfo['FittingTime']
                         #Create and store the localization output
                         if self.globalSettings['StoreFinalOutput']['value']:
@@ -2844,7 +2859,6 @@ class MyGUI(QMainWindow):
                         item_sub = item.itemAt(index2)
                         widget_sub = item_sub.widget()
                         if ("LineEdit" in widget_sub.objectName()) and widget_sub.isVisibleTo(self.tab_processing):
-                            print(widget_sub.objectName())
                             # The objectName will be along the lines of foo#bar#str
                             #Check if the objectname is part of a method or part of a scoring
                             split_list = widget_sub.objectName().split('#')
