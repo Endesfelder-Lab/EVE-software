@@ -269,7 +269,6 @@ class MyGUI(QMainWindow):
         
         logging.info('Initialisation complete.')
     
-    
     def QThreadEmitCatcher(self,text):
         #Catches all output from the worker thread
         print(text)
@@ -1458,7 +1457,7 @@ class MyGUI(QMainWindow):
         # #It creates the ImageSlider class
         # self.previewImage_slider = ImageSlider([],self)
         # self.previewtab_layout.addWidget(self.previewImage_slider)
-               
+
     def updateShowPreview(self,previewEvents=None,timeStretch=None):
         """
         Function that's called to update the preview (or show it). Requires the previewEvents, or uses the self.previewEvents.
@@ -1468,7 +1467,7 @@ class MyGUI(QMainWindow):
         
         
         logging.info('UpdateShowPreview ran!')
- 
+
     def previewEventStartedOnThisFrame(self,row,frame):
         """
         Function that checks if a preview event *started* on this frame
@@ -1514,7 +1513,7 @@ class MyGUI(QMainWindow):
         """
         #Add the text!
         fig.text(max(data['x']),max(data['y']),str(strv),color=col)
-                
+
     def changeLayout_choice(self,curr_layout,className,displayNameToFunctionNameMap):
         logging.debug('Changing layout '+curr_layout.parent().objectName())
         #This removes everything except the first entry (i.e. the drop-down menu)
@@ -1679,10 +1678,6 @@ class MyGUI(QMainWindow):
                     #Add a on-change listener:
                     line_edit.textChanged.connect(lambda text,line_edit=line_edit: self.kwargValueInputChanged(line_edit))
     
-    
-    
-    
-    
     def kwargValueInputChanged(self,line_edit):
         #Get the function name
         function = line_edit.objectName().split("#")[1]
@@ -1751,7 +1746,7 @@ class MyGUI(QMainWindow):
                             widget.show()
                             return
         return False
-                
+
     #Remove everythign in this layout except className_dropdown
     def resetLayout(self,curr_layout,className):
         for index in range(curr_layout.count()):
@@ -1788,7 +1783,6 @@ class MyGUI(QMainWindow):
         #Return the dropdown
         return curr_dropdown
     
-    
     def find_raw_npy_files(self,directory):
         raw_files = glob.glob(os.path.join(directory, "*.raw"))
         npy_files = glob.glob(os.path.join(directory, "*.npy"))
@@ -1805,7 +1799,6 @@ class MyGUI(QMainWindow):
 
         return unique_files
     
-
     def updateGUIafterNewResults(self,error=None):
         if error == None:
             self.updateLocList()
@@ -2029,7 +2022,7 @@ class MyGUI(QMainWindow):
             error = 'Input file/folder is not correct! Please check.'
         self.updateGUIafterNewResults(error)     
         return
-        
+    
     def run_processing(self):
         self.globalSettings['StoreFinalOutput']['value'] = True
         # self.run_processing_i()
@@ -2151,7 +2144,7 @@ class MyGUI(QMainWindow):
                 self.runFindingAndFitting(npyData,polarityVal='Neg',findingOffset=len(self.data['FindingResult'][0]),fittingOffset=len(self.data['FindingResult'][0]))
             else:
                 self.runFindingAndFitting(npyData,polarityVal=polarityVal)
-        
+    
     def FindingBatching(self,npyData,polarityVal):
         #Get polarity info and do this:
         FindingEvalText = self.getFunctionEvalText('Finding',"npyData","self.globalSettings",polarityVal)
@@ -2171,7 +2164,7 @@ class MyGUI(QMainWindow):
                         self.data['FindingResult'][0][len(self.data['FindingResult'][0])] = BatchFindingResult[0][k]
                 except:
                     print('issues with index '+str(k))
-        
+    
     def filter_finding_on_chunking(self,candidate,chunking_limits):
         #Return true if it should be in this chunk, false if not
         
@@ -2226,7 +2219,6 @@ class MyGUI(QMainWindow):
             #NOTE: Do both after one another
             polarityVal = ['Pos','Neg']
         return polarityVal
-        
     
     def runFindingBatching(self):
         logging.info('Batching-dependant finding starting!')
@@ -2547,7 +2539,7 @@ class MyGUI(QMainWindow):
             polArr = ['Pos','Neg']
             customFindingEval = ["{key: value for key, value in self.data['FindingResult'][0].items() if key < "+str(self.number_finding_found_polarity['Pos'])+"}","{key-"+str(self.number_finding_found_polarity['Pos']-1)+": value for key, value in self.data['FindingResult'][0].items() if key >= "+str(self.number_finding_found_polarity['Pos'])+"}"]
             self.runFitting(polarityVal = polArr,customFindingEval = customFindingEval,bothPolarities=True)
-        
+    
     def runFindingAndFitting(self,npyData,runFitting=True,storeFinding=True,polarityVal='Mix',findingOffset=0,fittingOffset=0):
         FindingEvalText = self.getFunctionEvalText('Finding',"npyData","self.globalSettings",polarityVal)
 
@@ -2706,7 +2698,7 @@ class MyGUI(QMainWindow):
         else:
             storeLocationPartial = self.currentFileInfo['CurrentFileLoc'][:-4]
         return storeLocationPartial     
-      
+    
     def storeLocalizationOutput(self):
         logging.debug('Attempting to store fitting results output')
         storeLocation = self.getStoreLocationPartial()+'_FitResults_'+self.storeNameDateTime+'.csv'
@@ -2759,7 +2751,7 @@ class MyGUI(QMainWindow):
             logging.info('Fitting results output stored')
         else:
             pass
-        
+    
     def storeFindingOutput(self,polarityVal='Pos'):
         logging.debug('Attempting to store finding results output')
         #Store the Finding results output
@@ -2821,8 +2813,6 @@ class MyGUI(QMainWindow):
             logging.info('File metadata created and stored')
         except:
             logging.error('Error in creating file metadata, not stored')
-    
-
     
     def getFunctionEvalText(self,className,p1,p2,polarity):
         #Get the dropdown info
@@ -2894,7 +2884,7 @@ class MyGUI(QMainWindow):
             return moduleMethodEvalTexts[0]
         else:
             return None
-                
+    
     def getEvalTextFromGUIFunction(self, methodName, methodKwargNames, methodKwargValues, partialStringStart=None, removeKwargs=None):
     #--------------------------------------------------------------------------------------------------------------------------------------------------------------------
     #methodName: the physical name of the method, i.e. StarDist.StarDistSegment
@@ -3044,7 +3034,7 @@ class MyGUI(QMainWindow):
             self.save_entries_to_json()
             logging.info('No GUI settings storage found, new one created.')
             pass
-        
+    
     def get_editable_fields(self):
         fields = {}
 
@@ -3093,7 +3083,6 @@ class MyGUI(QMainWindow):
                     self.changeLayout_choice(getattr(self, f"groupboxFitting{polVal}").layout(),combobox.objectName(),getattr(self, f"Fitting_functionNameToDisplayNameMapping{polVal}"))
         # except:
         #     pass
-
 
 class AdvancedSettingsWindow(QMainWindow):
     def __init__(self, parent):
@@ -3273,7 +3262,6 @@ class AdvancedSettingsWindow(QMainWindow):
         except:
             self.save_global_settings()
             logging.info('No global settings storage found, new one created.')
-
 
 class ImageSlider(QWidget):
     def __init__(self, figures=None, parent=None):
@@ -3804,7 +3792,6 @@ class TwoDDelays:
         self.ax_mean.set_xlabel('x [px]')
         self.ax_mean.set_ylabel('y [px]')
 
-
 class CriticalWarningWindow(QMainWindow):
     def __init__(self, parent, text):
         super().__init__(parent)
@@ -3852,6 +3839,8 @@ class CriticalWarningWindow(QMainWindow):
 class VisualisationNapari(QWidget):
     """
     Class that visualises the data in napari in e.g. scatter/average shifted histogram
+    General idea: have a single implementation similar to CandidateFinding/Fitting, where user-created visualisations can be created. They have a list of localizations as input, and output an image.
+    This class handles both the showcasing/choosing of visualisations and the napari showing of the output images.
     """
     def __init__(self):
         super().__init__()
@@ -3867,27 +3856,6 @@ class VisualisationNapari(QWidget):
         self.mainlayout.addWidget(self.viewer)
         self.mainlayout.addWidget(self.viewer.controls)
         logging.info('VisualisationNapari init')
-
-    def createAvgShiftHist(self):
-        pass
-    
-    def createScatter(self):
-        pass
-    
-    def visualiseAvgShiftHist(self):
-        pass
-    
-    def visualiseScatter(self):
-        pass
-    
-    def createandvisualiseAvgShiftHist(self):
-        self.createAvgShiftHist()
-        self.visualiseAvgShiftHist()
-    
-    def createandvisualiseScatter(self):
-        self.createScatter()
-        self.visualiseScatter()
-
 
 class PreviewFindingFitting(QWidget):
     """
