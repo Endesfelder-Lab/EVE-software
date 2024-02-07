@@ -364,7 +364,11 @@ class MyGUI(QMainWindow):
         globalSettings['LoggingFilePath'] = {}
         globalSettings['LoggingFilePath']['value'] = user_data_folder+os.sep+"logging.log"
         globalSettings['LoggingFilePath']['input'] = str
-        
+
+        # Multi-threading
+        globalSettings['Multithread'] = {}
+        globalSettings['Multithread']['value'] = True
+        globalSettings['Multithread']['input'] = bool
         #Finding batching info
         globalSettings['FindingBatching'] = {}
         globalSettings['FindingBatching']['value'] = True
