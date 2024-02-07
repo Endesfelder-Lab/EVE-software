@@ -130,6 +130,9 @@ class MyGUI(QMainWindow):
         
         #Create a dictionary that stores data and passes it between finding,fitting,saving, etc
         self.data = {}
+        self.data['refFindingFile'] = ''
+        self.data['refFindingFilepos'] = ''
+        self.data['refFindingFileneg'] = ''
         self.data['prevFindingMethod'] = 'None'
         self.data['prevNrEvents'] = 0
         self.data['prevNrCandidates'] = 0
@@ -2550,6 +2553,7 @@ class MyGUI(QMainWindow):
         
     def runFindingAndFitting(self,npyData,runFitting=True,storeFinding=True,polarityVal='Mix',findingOffset=0):
         FindingEvalText = self.getFunctionEvalText('Finding',"npyData","self.globalSettings",polarityVal)
+        print(FindingEvalText)
 
         #I want to note that I can send this to a QThread, and it technically works, but the GUI still freezes. Implementaiton here:
         # self.thread.setFindingEvalText(self.getFunctionEvalText('Finding',"self.npyData","self.globalSettings",polarityVal))
@@ -2724,17 +2728,20 @@ class MyGUI(QMainWindow):
                         
                         file_path = self.currentFileInfo['CurrentFileLoc'][:-4]+'_FittingResults_PosOnly_'+self.storeNameDateTime+'.pickle'
                         with open(file_path, 'wb') as file:
+                            pickle.dump(self.data['refFindingFilepos'], file)
                             pickle.dump(allPosFittingResults, file)
                             
                             
                         file_path = self.currentFileInfo['CurrentFileLoc'][:-4]+'_FittingResults_NegOnly_'+self.storeNameDateTime+'.pickle'
                         with open(file_path, 'wb') as file:
+                            pickle.dump(self.data['refFindingFileneg'], file)
                             pickle.dump(allNegFittingResults, file)
                 except:
                     logging.debug('This can be safely ignored')
             else:#Only a single pos/neg selected
                 file_path = self.currentFileInfo['CurrentFileLoc'][:-4]+'_FittingResults_'+self.storeNameDateTime+'.pickle'
                 with open(file_path, 'wb') as file:
+                    pickle.dump(self.data['refFindingFile'], file)
                     pickle.dump(self.data['FittingResult'][0], file)
             logging.info('Fitting results output stored')
         else:
@@ -2744,6 +2751,7 @@ class MyGUI(QMainWindow):
         logging.debug('Attempting to store finding results output')
         #Store the Finding results output
         file_path = self.currentFileInfo['CurrentFileLoc'][:-4]+'_FindingResults_'+self.storeNameDateTime+'.pickle'
+        self.data['refFindingFile'] = file_path
         with open(file_path, 'wb') as file:
             pickle.dump(self.data['FindingResult'][0], file)
             
@@ -2756,11 +2764,13 @@ class MyGUI(QMainWindow):
                     allNegFindingResults = {key-self.number_finding_found_polarity['Pos']: value for key, value in self.data['FindingResult'][0].items() if key >= self.number_finding_found_polarity['Pos']}
                     
                     file_path = self.currentFileInfo['CurrentFileLoc'][:-4]+'_FindingResults_PosOnly_'+self.storeNameDateTime+'.pickle'
+                    self.data['refFindingFilepos'] = file_path
                     with open(file_path, 'wb') as file:
                         pickle.dump(allPosFindingResults, file)
                         
                         
                     file_path = self.currentFileInfo['CurrentFileLoc'][:-4]+'_FindingResults_NegOnly_'+self.storeNameDateTime+'.pickle'
+                    self.data['refFindingFileneg'] = file_path
                     with open(file_path, 'wb') as file:
                         pickle.dump(allNegFindingResults, file)
             except:
