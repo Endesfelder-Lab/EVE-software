@@ -22,30 +22,29 @@ def __function_metadata__():
                  {"name": "fitting_tolerance", "description": "Discard localizations with uncertainties larger than this value times the pixel size. ","default":1.},
             ],
             "optional_kwargs": [
-                {"name": "multithread","description": "True to use multithread parallelization; False not to.","default":True},
             ],
             "help_string": "Makes a 2D gaussian fit (via least squares) to determine the localization parameters.",
             "display_name": "2D Gaussian"
         }, 
         "LogGaussian2D": {
+            "dist_kwarg" : {"base": "Dist2d", "description": "Two-dimensional event-distribution to run fitting on.", "default_option": "Hist2d_xy"},
             "required_kwargs": [
                  {"name": "expected_width", "description": "Expected width of log-Gaussian fit (in nm)","default":150.},
                  {"name": "fitting_tolerance", "description": "Discard localizations with uncertainties larger than this value times the pixel size. ","default":1.},
             ],
             "optional_kwargs": [
-                {"name": "multithread","description": "True to use multithread parallelization; False not to.","default":True},
             ],
             "help_string": "Makes a 2D log-gaussian fit (via least squares) to determine the localization parameters.",
             "display_name": "2D LogGaussian"
         }, 
         "Gaussian3D": {
+            "dist_kwarg" : {"base": "Dist2d", "description": "Two-dimensional event-distribution to run fitting on.", "default_option": "Hist2d_xy"},
             "required_kwargs": [
                 {"name": "theta", "description": "Rotation angle (in degrees) of the Gaussian","default":0},
                 {"name": "expected_width", "description": "Expected width of Gaussian fit (in nm)","default":150.},
                 {"name": "fitting_tolerance", "description": "Discard localizations with uncertainties larger than this value times the pixel size. ","default":1.},
             ],
             "optional_kwargs": [
-                {"name": "multithread","description": "True to use multithread parallelization; False not to.","default":True},
             ],
             "help_string": "Makes a 2D gaussian fit with rotation angle theta to determine the 3D localization parameters.",
             "display_name": "3D Gaussian: astigmatism"
@@ -216,10 +215,8 @@ def Gaussian2D(candidate_dic,settings,**kwargs):
     expected_width = float(kwargs['expected_width'])
     fitting_tolerance = float(kwargs['fitting_tolerance'])
 
-    # Load the optional kwargs
-    multithread = utilsHelper.strtobool(kwargs['multithread'])
-
     # Initializations - general
+    multithread = bool(settings['Multithread']['value'])
     pixel_size = float(settings['PixelSize_nm']['value']) # in nm
     expected_width = expected_width/pixel_size
     fit_func = gauss2D
@@ -260,13 +257,12 @@ def LogGaussian2D(candidate_dic,settings,**kwargs):
     expected_width = float(kwargs['expected_width'])
     fitting_tolerance = float(kwargs['fitting_tolerance'])
 
-    # Load the optional kwargs
-    multithread = utilsHelper.strtobool(kwargs['multithread'])
-
     # Initializations - general
+    multithread = bool(settings['Multithread']['value'])
     pixel_size = float(settings['PixelSize_nm']['value']) # in nm
     expected_width = expected_width/pixel_size
     fit_func = loggauss2D
+    dist_func = getattr(utilsHelper, kwargs['dist_kwarg'])
     params = expected_width, fitting_tolerance, pixel_size
 
     if multithread == True: num_cores = multiprocessing.cpu_count()
@@ -279,7 +275,7 @@ def LogGaussian2D(candidate_dic,settings,**kwargs):
     logging.info("Candidate fitting split in "+str(njobs)+" job(s) and divided on "+str(num_cores)+" core(s).")
 
     # Determine all localizations
-    RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(localize_canditates2D)(i, data_split[i], fit_func, *params) for i in range(len(data_split)))
+    RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(localize_canditates2D)(i, data_split[i], fit_func, dist_func, *params) for i in range(len(data_split)))
     
     localization_list = [res[0] for res in RES]
     localizations = pd.concat(localization_list)
@@ -303,14 +299,13 @@ def Gaussian3D(candidate_dic,settings,**kwargs):
     expected_width = float(kwargs['expected_width'])
     fitting_tolerance = float(kwargs['fitting_tolerance'])
 
-    # Load the optional kwargs
-    multithread = utilsHelper.strtobool(kwargs['multithread'])
-
     # Initializations - general
+    multithread = bool(settings['Multithread']['value'])
     pixel_size = float(settings['PixelSize_nm']['value']) # in nm
     expected_width = expected_width/pixel_size
     theta = np.radians(float(kwargs['theta']))
     fit_func = gauss3D
+    dist_func = getattr(utilsHelper, kwargs['dist_kwarg'])
     params = expected_width, fitting_tolerance, pixel_size, theta
 
     if multithread == True: num_cores = multiprocessing.cpu_count()
@@ -323,7 +318,7 @@ def Gaussian3D(candidate_dic,settings,**kwargs):
     logging.info("Candidate fitting split in "+str(njobs)+" job(s) and divided on "+str(num_cores)+" core(s).")
 
     # Determine all localizations
-    RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(localize_canditates2D)(i, data_split[i], fit_func, *params) for i in range(len(data_split)))
+    RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(localize_canditates2D)(i, data_split[i], fit_func, dist_func, *params) for i in range(len(data_split)))
     
     localization_list = [res[0] for res in RES]
     localizations = pd.concat(localization_list)

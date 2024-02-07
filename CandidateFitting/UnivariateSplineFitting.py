@@ -24,7 +24,6 @@ def __function_metadata__():
             ],
             "optional_kwargs": [
                 {"name": "degree", "description": "Degree of smoothing spline, must be in the range 1 to 5.", "default":3},
-                {"name": "multithread","description": "True to use multithread parallelization; False not to.","default":True},
             ],
             "help_string": "Makes a 1D spline fit to determin the localization parameters.",
             "display_name": "Tracking: 1D Spline"
@@ -102,9 +101,9 @@ def Spline1D(candidate_dic,settings,**kwargs):
 
     # Load the optional kwargs
     k = int(kwargs['degree'])
-    multithread = utilsHelper.strtobool(kwargs['multithread'])
 
     # Initializations - general
+    multithread = bool(settings['Multithread']['value'])
     pixel_size = float(settings['PixelSize_nm']['value']) # in nm
 
     if multithread == True: num_cores = multiprocessing.cpu_count()

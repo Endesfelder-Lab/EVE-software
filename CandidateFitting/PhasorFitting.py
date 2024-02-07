@@ -19,7 +19,6 @@ def __function_metadata__():
         "PhasorFitting": {
             "required_kwargs": [            ],
             "optional_kwargs": [
-                {"name": "multithread","description": "True to use multithread parallelization; False not to.","default":True},
             ],
             "help_string": "3D phasor.",
             "display_name": "Phasor"
@@ -129,12 +128,10 @@ def PhasorFitting(candidate_dic,settings,**kwargs):
     logging.info("Load and initiate all parameters of candidate fitting...")
 
     # Initializations - general
+    multithread = bool(settings['Multithread']['value'])
     pixel_size = float(settings['PixelSize_nm']['value']) # in nm
     fit_func = phasor
     params = [pixel_size]
-    
-    # Load the optional kwargs
-    multithread = utilsHelper.strtobool(kwargs['multithread'])
 
     if multithread == True: num_cores = multiprocessing.cpu_count()
     else: num_cores = 1
