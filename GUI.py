@@ -57,7 +57,6 @@ def get_stylesheet():
     return stylesheet
  
 if __name__ == "__main__":
-    multiprocessing.freeze_support()
     app = QApplication(sys.argv)
     
     gui = MyGUI()

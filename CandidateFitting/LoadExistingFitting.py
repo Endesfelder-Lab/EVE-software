@@ -31,7 +31,8 @@ def LoadExistingFitting(candidate_dic,settings,**kwargs):
             kwargs['File_Location'] = kwargs['File_Location']+'.pickle'
 
         with open(kwargs['File_Location'], 'rb') as file:
-            localizations = pickle.load(file)
+            localizations = pickle.load(file) 
+            
         performance_metadata = f"Loaded file {kwargs['File_Location']}."
         logging.info('Existing Fitting result correctly loaded')
     except:
