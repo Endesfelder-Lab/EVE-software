@@ -146,7 +146,6 @@ def PhasorFitting(candidate_dic,settings,**kwargs):
 
     # Determine all localizations
     RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(localize_canditates2D)(i, data_split[i], fit_func, *params) for i in range(len(data_split)))
-    print(RES)
 
     localization_list = [res for res in RES]
     localizations = pd.concat(localization_list)
