@@ -1600,6 +1600,8 @@ class MyGUI(QMainWindow):
                     hor_boxLayout.addWidget(line_edit_lookup)
                     
                     #Actually placing it in the layout
+                    self.checkAndShowWidget(curr_layout,line_edit.objectName())
+                    self.checkAndShowWidget(curr_layout,line_edit_lookup.objectName())
                     if self.checkAndShowWidget(curr_layout,line_edit.objectName()) == False:
                         line_edit.setToolTip(utils.infoFromMetadata(current_selected_function,specificKwarg=reqKwargs[k]))
                         if defaultValue is not None:
@@ -1652,6 +1654,8 @@ class MyGUI(QMainWindow):
                 hor_boxLayout.addWidget(line_edit_lookup)
                 
                 #Actually placing it in the layout
+                self.checkAndShowWidget(curr_layout,line_edit.objectName())
+                self.checkAndShowWidget(curr_layout,line_edit_lookup.objectName())
                 if self.checkAndShowWidget(curr_layout,line_edit.objectName()) == False:
                     line_edit.setToolTip(utils.infoFromMetadata(current_selected_function,specificKwarg=optKwargs[k]))
                     if defaultValue is not None:
@@ -1735,6 +1739,17 @@ class MyGUI(QMainWindow):
                     # Widget already exists, unhide it
                     widget.show()
                     return
+            else:
+                for index2 in range(item.count()):
+                    item_sub = item.itemAt(index2)
+                    # Check if the item is a widget
+                    if item_sub.widget() is not None:
+                        widget = item_sub.widget()
+                        # Check if the widget has the desired name
+                        if widget.objectName() == widgetName:
+                            # Widget already exists, unhide it
+                            widget.show()
+                            return
         return False
                 
     #Remove everythign in this layout except className_dropdown
@@ -1748,6 +1763,16 @@ class MyGUI(QMainWindow):
                 if not ("CandidateFindingDropdown" in widget.objectName()) and not ("CandidateFittingDropdown" in widget.objectName()) and widget.objectName() != f"titleLabel_{className}" and not ("KEEP" in widget.objectName()):
                     logging.debug(f"Hiding {widget.objectName()}")
                     widget.hide()
+            else:
+                for index2 in range(widget_item.count()):
+                    widget_sub_item = widget_item.itemAt(index2)
+                    # Check if the item is a widget (as opposed to a layout)
+                    if widget_sub_item.widget() is not None:
+                        widget = widget_sub_item.widget()
+                        #If it's the dropdown segment, label it as such
+                        if not ("CandidateFindingDropdown" in widget.objectName()) and not ("CandidateFittingDropdown" in widget.objectName()) and widget.objectName() != f"titleLabel_{className}" and not ("KEEP" in widget.objectName()):
+                            logging.debug(f"Hiding {widget.objectName()}")
+                            widget.hide()
     
     def getMethodDropdownInfo(self,curr_layout,className):
         curr_dropdown = []
@@ -2105,19 +2130,27 @@ class MyGUI(QMainWindow):
         
                 elif self.globalSettings['FindingBatching']['value']== True or self.globalSettings['FindingBatching']['value']== 2:
                     self.runFindingBatching()
-                    
-                
             #If we only fit, we still run more or less the same info, butwe don't care about the npyData in the CurrentFileLoc.
             elif onlyFitting:
                 self.currentFileInfo['CurrentFileLoc'] = FileName
                 logging.info('Candidate finding NOT performed')
                 npyData = None
-                self.runFindingAndFitting(npyData,polarityVal=polarityVal)
+                if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[3]:
+                    self.runFindingAndFitting(npyData,polarityVal='Pos')
+                    #Get the number of positive candidates:
+                    
+                    self.runFindingAndFitting(npyData,polarityVal='Neg',findingOffset=len(self.data['FindingResult'][0]))
+                else:
+                    self.runFindingAndFitting(npyData,polarityVal=polarityVal)
         elif noFindingFitting:
             self.currentFileInfo['CurrentFileLoc'] = FileName
             logging.info('Candidate finding and fitting NOT performed')
             npyData = None
-            self.runFindingAndFitting(npyData,polarityVal=polarityVal)
+            if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[3]:
+                self.runFindingAndFitting(npyData,polarityVal='Pos')
+                self.runFindingAndFitting(npyData,polarityVal='Neg',findingOffset=len(self.data['FindingResult'][0]))
+            else:
+                self.runFindingAndFitting(npyData,polarityVal=polarityVal)
         
     def FindingBatching(self,npyData,polarityVal):
         #Get polarity info and do this:
@@ -2769,6 +2802,8 @@ class MyGUI(QMainWindow):
         except:
             logging.error('Error in creating file metadata, not stored')
     
+
+    
     def getFunctionEvalText(self,className,p1,p2,polarity):
         #Get the dropdown info
         moduleMethodEvalTexts = []
@@ -2782,22 +2817,43 @@ class MyGUI(QMainWindow):
         for index in range(all_layouts.count()):
             item = all_layouts.itemAt(index)
             widget = item.widget()
-                        
-            if ("LineEdit" in widget.objectName()) and widget.isVisibleTo(self.tab_processing):
-                # The objectName will be along the lines of foo#bar#str
-                #Check if the objectname is part of a method or part of a scoring
-                split_list = widget.objectName().split('#')
-                methodName_method = split_list[1]
-                methodKwargNames_method.append(split_list[2])
+            if widget is not None:#Catching layouts rather than widgets....   
+                if ("LineEdit" in widget.objectName()) and widget.isVisibleTo(self.tab_processing):
+                    # The objectName will be along the lines of foo#bar#str
+                    #Check if the objectname is part of a method or part of a scoring
+                    split_list = widget.objectName().split('#')
+                    methodName_method = split_list[1]
+                    methodKwargNames_method.append(split_list[2])
+                    
+                    #Widget.text() could contain a file location. Thus, we need to swap out all \ for /:
+                    methodKwargValues_method.append(widget.text().replace('\\','/'))
                 
-                #Widget.text() could contain a file location. Thus, we need to swap out all \ for /:
-                methodKwargValues_method.append(widget.text().replace('\\','/'))
-            
-            # add distKwarg choice to Kwargs if given
-            if ("ComboBox" in widget.objectName()) and widget.isVisibleTo(self.tab_processing) and 'dist_kwarg' in widget.objectName():
-                methodKwargNames_method.append('dist_kwarg')
-                methodKwargValues_method.append(widget.currentText())                
-               
+                # add distKwarg choice to Kwargs if given
+                if ("ComboBox" in widget.objectName()) and widget.isVisibleTo(self.tab_processing) and 'dist_kwarg' in widget.objectName():
+                    methodKwargNames_method.append('dist_kwarg')
+                    methodKwargValues_method.append(widget.currentText())
+            else:
+                #If the item is a layout instead...
+                if isinstance(item, QLayout):
+                    for index2 in range(item.count()):
+                        item_sub = item.itemAt(index2)
+                        widget_sub = item_sub.widget()
+                        if ("LineEdit" in widget_sub.objectName()) and widget_sub.isVisibleTo(self.tab_processing):
+                            print(widget_sub.objectName())
+                            # The objectName will be along the lines of foo#bar#str
+                            #Check if the objectname is part of a method or part of a scoring
+                            split_list = widget_sub.objectName().split('#')
+                            methodName_method = split_list[1]
+                            methodKwargNames_method.append(split_list[2])
+                            
+                            #Widget.text() could contain a file location. Thus, we need to swap out all \ for /:
+                            methodKwargValues_method.append(widget_sub.text().replace('\\','/'))
+                        
+                        # add distKwarg choice to Kwargs if given
+                        if ("ComboBox" in widget_sub.objectName()) and widget_sub.isVisibleTo(self.tab_processing) and 'dist_kwarg' in widget_sub.objectName():
+                            methodKwargNames_method.append('dist_kwarg')
+                            methodKwargValues_method.append(widget_sub.currentText())
+                        
         #If at this point there is no methodName_method, it means that the method has exactly 0 req or opt kwargs. Thus, we simply find the value of the QComboBox which should be the methodName:
         if methodName_method == '':
             for index in range(all_layouts.count()):
@@ -2814,6 +2870,7 @@ class MyGUI(QMainWindow):
             EvalTextMethod = self.getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart=str(p1)+','+str(p2))
             #append this to moduleEvalTexts
             moduleMethodEvalTexts.append(EvalTextMethod)
+            
         if moduleMethodEvalTexts is not None and len(moduleMethodEvalTexts) > 0:
             return moduleMethodEvalTexts[0]
         else:
@@ -2843,6 +2900,7 @@ class MyGUI(QMainWindow):
                         #nothing, but want to make a note of this (log message)
                         reqKwargs = reqKwargs
             #Stupid dummy-check whether we have the reqKwargs in the methodKwargNames, which we should (basically by definition)
+
             if all(elem in set(methodKwargNames) for elem in reqKwargs):
                 allreqKwargsHaveValue = True
                 for id in range(0,len(reqKwargs)):
