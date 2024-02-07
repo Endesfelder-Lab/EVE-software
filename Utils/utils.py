@@ -12,6 +12,12 @@ from Utils import utilsHelper
 from CandidateFinding import *
 from CandidateFitting import *
 
+#Imports for PyQt5 (GUI)
+from PyQt5 import QtWidgets, QtGui
+from PyQt5.QtGui import QCursor, QTextCursor, QIntValidator
+from PyQt5.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QTableWidget, QTableWidgetItem, QLayout, QMainWindow, QLabel, QPushButton, QSizePolicy, QGroupBox, QTabWidget, QGridLayout, QWidget, QComboBox, QLineEdit, QFileDialog, QToolBar, QCheckBox,QDesktopWidget, QMessageBox, QTextEdit, QSlider, QSpacerItem
+from PyQt5.QtCore import Qt, QPoint, QProcess, QCoreApplication, QTimer, QFileSystemWatcher, QFile, QThread, pyqtSignal, QObject
+
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
 # Function declarations
@@ -411,3 +417,284 @@ def typeFromKwarg(functionname,kwargname):
     
     return typing
 
+
+
+
+def changeLayout_choice(curr_layout,className,displayNameToFunctionNameMap,parent=None):
+    logging.debug('Changing layout '+curr_layout.parent().objectName())
+    #This removes everything except the first entry (i.e. the drop-down menu)
+    resetLayout(curr_layout,className)
+    #Get the dropdown info
+    curr_dropdown = getMethodDropdownInfo(curr_layout,className)
+    if len(curr_dropdown) == 0:
+        pass
+    #Get the kw-arguments from the current dropdown.
+    current_selected_function = functionNameFromDisplayName(curr_dropdown.currentText(),displayNameToFunctionNameMap)
+    logging.debug('current selected function: '+current_selected_function)
+    current_selected_polarity = polaritySelectedFromDisplayName(curr_dropdown.currentText())
+    
+    #Classname should always end in pos/neg/mix!
+    wantedPolarity = className[-3:].lower()
+    
+    #Hide dropdown entries that are not part of the current_selected property
+    model = curr_dropdown.model()
+    totalNrRows = model.rowCount()
+    for rowId in range(totalNrRows):
+        #First show all rows:
+        curr_dropdown.view().setRowHidden(rowId, False)
+        item = model.item(rowId)
+        item.setFlags(item.flags() | Qt.ItemIsEnabled)
+        
+        #Then hide based on the row name
+        rowName = model.item(rowId,0).text()
+        if polaritySelectedFromDisplayName(rowName) != wantedPolarity:
+            item = model.item(rowId)
+            item.setFlags(item.flags() & ~Qt.ItemIsEnabled)
+            curr_dropdown.view().setRowHidden(rowId, True)
+    
+    #Visual max number of rows before a 2nd column is started.
+    maxNrRows = 4
+    labelposoffset = 0
+
+    #Add a widget-pair for the distribution
+    distKwargValues = distKwargValuesFromFittingFunction(current_selected_function)
+    if len(distKwargValues) != 0:
+        # Add a combobox containing all the possible kw-args
+        label = QLabel("<b>distribution</b>")
+        label.setObjectName(f"Label#{current_selected_function}#dist_kwarg#{current_selected_polarity}")
+        if checkAndShowWidget(curr_layout,label.objectName()) == False:
+            label.setToolTip(infoFromMetadata(current_selected_function,specificKwarg='dist_kwarg'))
+            curr_layout.addWidget(label,2,0)
+        combobox = QComboBox()
+        combobox.addItems(distKwargValues)
+        combobox.setObjectName(f"ComboBox#{current_selected_function}#dist_kwarg#{current_selected_polarity}")
+        defaultOption = defaultOptionFromDistKwarg(current_selected_function)
+        if defaultOption != None:
+            combobox.setCurrentText(defaultOption)
+        test = combobox.currentText()
+        combobox.setToolTip(getInfoFromDistribution(combobox.currentText()))
+        combobox.currentTextChanged.connect(lambda text: combobox.setToolTip(getInfoFromDistribution(text)))
+        if checkAndShowWidget(curr_layout,combobox.objectName()) == False:
+            curr_layout.addWidget(combobox,2,1)
+        labelposoffset += 1
+        
+    reqKwargs = reqKwargsFromFunction(current_selected_function)
+    #Add a widget-pair for every kw-arg
+    
+    for k in range(len(reqKwargs)):
+        #Value is used for scoring, and takes the output of the method
+        if reqKwargs[k] != 'methodValue':
+            label = QLabel(f"<b>{reqKwargs[k]}</b>")
+            label.setObjectName(f"Label#{current_selected_function}#{reqKwargs[k]}#{current_selected_polarity}")
+            if checkAndShowWidget(curr_layout,label.objectName()) == False:
+                label.setToolTip(infoFromMetadata(current_selected_function,specificKwarg=reqKwargs[k]))
+                curr_layout.addWidget(label,2+((k+labelposoffset))%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+0)
+            #Check if we want to add a fileLoc-input:
+            if typeFromKwarg(current_selected_function,reqKwargs[k]) == 'fileLoc':
+                #Create a new qhboxlayout:
+                hor_boxLayout = QHBoxLayout()
+                #Add a line_edit to this:
+                line_edit = QLineEdit()
+                line_edit.setObjectName(f"LineEdit#{current_selected_function}#{reqKwargs[k]}#{current_selected_polarity}")
+                defaultValue = defaultValueFromKwarg(current_selected_function,reqKwargs[k])
+                hor_boxLayout.addWidget(line_edit)
+                #Also add a QButton with ...:
+                line_edit_lookup = QPushButton()
+                line_edit_lookup.setText('...')
+                line_edit_lookup.setObjectName(f"PushButton#{current_selected_function}#{reqKwargs[k]}#{current_selected_polarity}")
+                hor_boxLayout.addWidget(line_edit_lookup)
+                
+                #Actually placing it in the layout
+                checkAndShowWidget(curr_layout,line_edit.objectName())
+                checkAndShowWidget(curr_layout,line_edit_lookup.objectName())
+                if checkAndShowWidget(curr_layout,line_edit.objectName()) == False:
+                    line_edit.setToolTip(infoFromMetadata(current_selected_function,specificKwarg=reqKwargs[k]))
+                    if defaultValue is not None:
+                        line_edit.setText(str(defaultValue))
+                    curr_layout.addLayout(hor_boxLayout,2+((k+labelposoffset))%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+1)
+                    #Add a on-change listener:
+                    line_edit.textChanged.connect(lambda text,line_edit=line_edit: kwargValueInputChanged(line_edit))
+                    
+                    #Add an listener when the pushButton is pressed
+                    line_edit_lookup.clicked.connect(lambda text2,line_edit_change_objName = line_edit,text="Select file",filter="*.*": lineEditFileLookup(line_edit_change_objName, text, filter,parent=parent))
+                    
+            else: #'normal' type - int, float, string, whatever
+                #Creating a line-edit...
+                line_edit = QLineEdit()
+                line_edit.setObjectName(f"LineEdit#{current_selected_function}#{reqKwargs[k]}#{current_selected_polarity}")
+                defaultValue = defaultValueFromKwarg(current_selected_function,reqKwargs[k])
+                #Actually placing it in the layout
+                if checkAndShowWidget(curr_layout,line_edit.objectName()) == False:
+                    line_edit.setToolTip(infoFromMetadata(current_selected_function,specificKwarg=reqKwargs[k]))
+                    if defaultValue is not None:
+                        line_edit.setText(str(defaultValue))
+                    curr_layout.addWidget(line_edit,2+((k+labelposoffset))%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+1)
+                    #Add a on-change listener:
+                    line_edit.textChanged.connect(lambda text,line_edit=line_edit: kwargValueInputChanged(line_edit))
+        else:
+            labelposoffset -= 1
+        
+    #Get the optional kw-arguments from the current dropdown.
+    optKwargs = optKwargsFromFunction(current_selected_function)
+    #Add a widget-pair for every kwarg
+    for k in range(len(optKwargs)):
+        label = QLabel(f"<i>{optKwargs[k]}</i>")
+        label.setObjectName(f"Label#{current_selected_function}#{optKwargs[k]}#{current_selected_polarity}")
+        if checkAndShowWidget(curr_layout,label.objectName()) == False:
+            label.setToolTip(infoFromMetadata(current_selected_function,specificKwarg=optKwargs[k]))
+            curr_layout.addWidget(label,2+((k+labelposoffset+len(reqKwargs)))%maxNrRows,(((k+labelposoffset+len(reqKwargs)))//maxNrRows)*2+0)
+        #Check if we want to add a fileLoc-input:
+        if typeFromKwarg(current_selected_function,optKwargs[k]) == 'fileLoc':
+            #Create a new qhboxlayout:
+            hor_boxLayout = QHBoxLayout()
+            #Add a line_edit to this:
+            line_edit = QLineEdit()
+            line_edit.setObjectName(f"LineEdit#{current_selected_function}#{optKwargs[k]}#{current_selected_polarity}")
+            defaultValue = defaultValueFromKwarg(current_selected_function,optKwargs[k])
+            hor_boxLayout.addWidget(line_edit)
+            #Also add a QButton with ...:
+            line_edit_lookup = QPushButton()
+            line_edit_lookup.setText('...')
+            line_edit_lookup.setObjectName(f"PushButton#{current_selected_function}#{optKwargs[k]}#{current_selected_polarity}")
+            hor_boxLayout.addWidget(line_edit_lookup)
+            
+            #Actually placing it in the layout
+            checkAndShowWidget(curr_layout,line_edit.objectName())
+            checkAndShowWidget(curr_layout,line_edit_lookup.objectName())
+            if checkAndShowWidget(curr_layout,line_edit.objectName()) == False:
+                line_edit.setToolTip(infoFromMetadata(current_selected_function,specificKwarg=optKwargs[k]))
+                if defaultValue is not None:
+                    line_edit.setText(str(defaultValue))
+                curr_layout.addLayout(hor_boxLayout,2+((k+labelposoffset))%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+1)
+                #Add a on-change listener:
+                line_edit.textChanged.connect(lambda text,line_edit=line_edit: kwargValueInputChanged(line_edit))
+                
+                #Add an listener when the pushButton is pressed
+                line_edit_lookup.clicked.connect(lambda text2,line_edit_change_objName = line_edit,text="Select file",filter="*.*": lineEditFileLookup(line_edit_change_objName, text, filter,parent=parent))
+                    
+        else:
+            line_edit = QLineEdit()
+            line_edit.setObjectName(f"LineEdit#{current_selected_function}#{optKwargs[k]}#{current_selected_polarity}")
+            defaultValue = defaultValueFromKwarg(current_selected_function,optKwargs[k])
+            if checkAndShowWidget(curr_layout,line_edit.objectName()) == False:
+                line_edit.setToolTip(infoFromMetadata(current_selected_function,specificKwarg=optKwargs[k]))
+                if defaultValue is not None:
+                    line_edit.setText(str(defaultValue))
+                curr_layout.addWidget(line_edit,2+((k+labelposoffset+len(reqKwargs)))%maxNrRows,(((k+labelposoffset+len(reqKwargs)))//maxNrRows)*2+1)
+                #Add a on-change listener:
+                line_edit.textChanged.connect(lambda text,line_edit=line_edit: kwargValueInputChanged(line_edit))
+
+def kwargValueInputChanged(line_edit):
+    #Get the function name
+    function = line_edit.objectName().split("#")[1]
+    #Get the kwarg
+    kwarg = line_edit.objectName().split("#")[2]
+    #Get the value
+    value = line_edit.text()
+    expectedType = typeFromKwarg(function,kwarg)
+    if expectedType == 'fileLoc':
+        expectedType=str
+    if expectedType is not None:
+        if expectedType is str:
+            try:
+                value = str(line_edit.text())
+                setLineEditStyle(line_edit,type='Normal')
+            except:
+                #Show as warning
+                setLineEditStyle(line_edit,type='Warning')
+        elif expectedType is not str:
+            try:
+                value = eval(line_edit.text())
+                if expectedType == float:
+                    if isinstance(value,int) or isinstance(value,float):
+                        setLineEditStyle(line_edit,type='Normal')
+                    else:
+                        setLineEditStyle(line_edit,type='Warning')
+                else:
+                    if isinstance(value,expectedType):
+                        setLineEditStyle(line_edit,type='Normal')
+                    else:
+                        setLineEditStyle(line_edit,type='Warning')
+            except:
+                #Show as warning
+                setLineEditStyle(line_edit,type='Warning')
+    else:
+        setLineEditStyle(line_edit,type='Normal')
+    pass
+
+def setLineEditStyle(line_edit,type='Normal'):
+    if type == 'Normal':
+        line_edit.setStyleSheet("border: 1px  solid #D5D5E5;")
+    elif type == 'Warning':
+        line_edit.setStyleSheet("border: 1px solid red;")
+
+def checkAndShowWidget(layout, widgetName):
+    # Iterate over the layout's items
+    for index in range(layout.count()):
+        item = layout.itemAt(index)
+        # Check if the item is a widget
+        if item.widget() is not None:
+            widget = item.widget()
+            # Check if the widget has the desired name
+            if widget.objectName() == widgetName:
+                # Widget already exists, unhide it
+                widget.show()
+                return
+        else:
+            for index2 in range(item.count()):
+                item_sub = item.itemAt(index2)
+                # Check if the item is a widget
+                if item_sub.widget() is not None:
+                    widget = item_sub.widget()
+                    # Check if the widget has the desired name
+                    if widget.objectName() == widgetName:
+                        # Widget already exists, unhide it
+                        widget.show()
+                        return
+    return False
+
+#Remove everythign in this layout except className_dropdown
+def resetLayout(curr_layout,className):
+    for index in range(curr_layout.count()):
+        widget_item = curr_layout.itemAt(index)
+        # Check if the item is a widget (as opposed to a layout)
+        if widget_item.widget() is not None:
+            widget = widget_item.widget()
+            #If it's the dropdown segment, label it as such
+            if not ("CandidateFindingDropdown" in widget.objectName()) and not ("CandidateFittingDropdown" in widget.objectName()) and widget.objectName() != f"titleLabel_{className}" and not ("KEEP" in widget.objectName()):
+                logging.debug(f"Hiding {widget.objectName()}")
+                widget.hide()
+        else:
+            for index2 in range(widget_item.count()):
+                widget_sub_item = widget_item.itemAt(index2)
+                # Check if the item is a widget (as opposed to a layout)
+                if widget_sub_item.widget() is not None:
+                    widget = widget_sub_item.widget()
+                    #If it's the dropdown segment, label it as such
+                    if not ("CandidateFindingDropdown" in widget.objectName()) and not ("CandidateFittingDropdown" in widget.objectName()) and widget.objectName() != f"titleLabel_{className}" and not ("KEEP" in widget.objectName()):
+                        logging.debug(f"Hiding {widget.objectName()}")
+                        widget.hide()
+
+def getMethodDropdownInfo(curr_layout,className):
+    curr_dropdown = []
+    #Look through all widgets in the current layout
+    for index in range(curr_layout.count()):
+        widget_item = curr_layout.itemAt(index)
+        #Check if it's fair to check
+        if widget_item.widget() is not None:
+            widget = widget_item.widget()
+            #If it's the dropdown segment, label it as such
+            if (className in widget.objectName()) and ("Dropdown" in widget.objectName()):
+                curr_dropdown = widget
+    #Return the dropdown
+    return curr_dropdown
+
+
+def lineEditFileLookup(line_edit_objName, text, filter,parent=None):
+    file_path = generalFileSearchButtonAction(parent=parent,text=text,filter=filter)
+    line_edit_objName.setText(file_path)
+        
+def generalFileSearchButtonAction(parent=None,text='Select File',filter='*.txt'):
+    file_path, _ = QFileDialog.getOpenFileName(parent,text,filter=filter)
+    return file_path
+    

@@ -272,7 +272,6 @@ class MyGUI(QMainWindow):
         
         logging.info('Initialisation complete.')
     
-    
     def QThreadEmitCatcher(self,text):
         #Catches all output from the worker thread
         print(text)
@@ -386,19 +385,11 @@ class MyGUI(QMainWindow):
         #Add options here that should NOT show up in the global settings window - i.e. options that should not be changed
         globalSettings['IgnoreInOptions'] = ('IgnoreInOptions','StoreFinalOutput', 'JSONGUIstorePath','GlobalOptionsStorePath') 
         return globalSettings
-    
-    def generalFileSearchButtonAction(self,text='Select File',filter='*.txt'):
-        file_path, _ = QFileDialog.getOpenFileName(self, text,filter=filter)
-        return file_path
-    
-    def lineEditFileLookup(self,line_edit_objName, text, filter):
-        file_path = self.generalFileSearchButtonAction(text=text,filter=filter)
-        line_edit_objName.setText(file_path)
-    
+
     def datasetSearchButtonClicked(self):
         # Function that handles the dataset 'File' lookup button
         logging.debug('data lookup search button clicked')
-        file_path = self.generalFileSearchButtonAction(text="Select File",filter="EBS files (*.raw *.npy *hdf5);;All Files (*)")
+        file_path = utils.generalFileSearchButtonAction(parent=self,text="Select File",filter="EBS files (*.raw *.npy *hdf5);;All Files (*)")
         if file_path:
             self.dataLocationInput.setText(file_path)
     
@@ -556,7 +547,7 @@ class MyGUI(QMainWindow):
             setattr(self, Finding_functionNameToDisplayNameMapping_name, Finding_functionNameToDisplayNameMapping)
             
             #On startup/initiatlisation: also do changeLayout_choice
-            self.changeLayout_choice(groupbox.layout(),candidateFindingDropdown_name,getattr(self, Finding_functionNameToDisplayNameMapping_name))
+            utils.changeLayout_choice(groupbox.layout(),candidateFindingDropdown_name,getattr(self, Finding_functionNameToDisplayNameMapping_name),parent=self)
         
             setattr(self, groupbox_name, groupbox)
             setattr(self, candidateFindingDropdown_name, candidateFindingDropdown)
@@ -566,9 +557,9 @@ class MyGUI(QMainWindow):
             
         #Can't get this part to work dynamically so eh
         #Activation for candidateFindingDropdown.activated
-        self.CandidateFindingDropdownPos.activated.connect(lambda: self.changeLayout_choice(self.groupboxFindingPos.layout(),'CandidateFindingDropdownPos', self.Finding_functionNameToDisplayNameMappingPos))
-        self.CandidateFindingDropdownNeg.activated.connect(lambda: self.changeLayout_choice(self.groupboxFindingNeg.layout(),'CandidateFindingDropdownNeg', self.Finding_functionNameToDisplayNameMappingNeg))
-        self.CandidateFindingDropdownMix.activated.connect(lambda: self.changeLayout_choice(self.groupboxFindingMix.layout(),'CandidateFindingDropdownMix', self.Finding_functionNameToDisplayNameMappingMix))
+        self.CandidateFindingDropdownPos.activated.connect(lambda: utils.changeLayout_choice(self.groupboxFindingPos.layout(),'CandidateFindingDropdownPos', self.Finding_functionNameToDisplayNameMappingPos,parent=self))
+        self.CandidateFindingDropdownNeg.activated.connect(lambda: utils.changeLayout_choice(self.groupboxFindingNeg.layout(),'CandidateFindingDropdownNeg', self.Finding_functionNameToDisplayNameMappingNeg,parent=self))
+        self.CandidateFindingDropdownMix.activated.connect(lambda: utils.changeLayout_choice(self.groupboxFindingMix.layout(),'CandidateFindingDropdownMix', self.Finding_functionNameToDisplayNameMappingMix,parent=self))
             
         """
         Candidate Fitting Grid Layout
@@ -605,7 +596,7 @@ class MyGUI(QMainWindow):
             setattr(self, Fitting_functionNameToDisplayNameMapping_name, Fitting_functionNameToDisplayNameMapping)
             
             #On startup/initiatlisation: also do changeLayout_choice
-            self.changeLayout_choice(groupbox.layout(),candidateFittingDropdown_name, getattr(self, Fitting_functionNameToDisplayNameMapping_name))
+            utils.changeLayout_choice(groupbox.layout(),candidateFittingDropdown_name, getattr(self, Fitting_functionNameToDisplayNameMapping_name),parent=self)
             
             setattr(self, groupbox_name, groupbox)
             setattr(self, layout_name, functools.partial(self.mainCandidateFittingGroupbox.layout().addWidget, groupbox, 0,ii))
@@ -615,9 +606,9 @@ class MyGUI(QMainWindow):
         
         #Can't get this part to work dynamically so eh
         #Activation for candidateFindingDropdown.activated
-        self.CandidateFittingDropdownPos.activated.connect(lambda: self.changeLayout_choice(self.groupboxFittingPos.layout(),'CandidateFittingDropdownPos', self.Fitting_functionNameToDisplayNameMappingPos))
-        self.CandidateFittingDropdownNeg.activated.connect(lambda: self.changeLayout_choice(self.groupboxFittingNeg.layout(),'CandidateFittingDropdownNeg', self.Fitting_functionNameToDisplayNameMappingNeg))
-        self.CandidateFittingDropdownMix.activated.connect(lambda: self.changeLayout_choice(self.groupboxFittingMix.layout(),'CandidateFittingDropdownMix', self.Fitting_functionNameToDisplayNameMappingMix))
+        self.CandidateFittingDropdownPos.activated.connect(lambda: utils.changeLayout_choice(self.groupboxFittingPos.layout(),'CandidateFittingDropdownPos', self.Fitting_functionNameToDisplayNameMappingPos,parent=self))
+        self.CandidateFittingDropdownNeg.activated.connect(lambda: utils.changeLayout_choice(self.groupboxFittingNeg.layout(),'CandidateFittingDropdownNeg', self.Fitting_functionNameToDisplayNameMappingNeg,parent=self))
+        self.CandidateFittingDropdownMix.activated.connect(lambda: utils.changeLayout_choice(self.groupboxFittingMix.layout(),'CandidateFittingDropdownMix', self.Fitting_functionNameToDisplayNameMappingMix,parent=self))
 
         """
         "Run" Group Box
@@ -861,7 +852,8 @@ class MyGUI(QMainWindow):
         globalSettingsOrig = copy.deepcopy(self.globalSettings)
         self.globalSettings['StoreConvertedRawData']['value'] = False
         self.globalSettings['StoreFileMetadata']['value'] = False
-        self.globalSettings['StoreFinalOutput']['StoreFinalOutput']['value'] = False
+        # self.globalSettings['StoreFinalOutput']['StoreFinalOutput']['value'] = False
+        self.globalSettings['StoreFinalOutput']['value'] = False
         self.globalSettings['StoreFindingOutput']['value'] = False
         self.globalSettings['StoreFittingOutput']['value'] = False
         
@@ -1461,7 +1453,7 @@ class MyGUI(QMainWindow):
         # #It creates the ImageSlider class
         # self.previewImage_slider = ImageSlider([],self)
         # self.previewtab_layout.addWidget(self.previewImage_slider)
-               
+
     def updateShowPreview(self,previewEvents=None,timeStretch=None):
         """
         Function that's called to update the preview (or show it). Requires the previewEvents, or uses the self.previewEvents.
@@ -1471,7 +1463,7 @@ class MyGUI(QMainWindow):
         
         
         logging.info('UpdateShowPreview ran!')
- 
+
     def previewEventStartedOnThisFrame(self,row,frame):
         """
         Function that checks if a preview event *started* on this frame
@@ -1517,281 +1509,6 @@ class MyGUI(QMainWindow):
         """
         #Add the text!
         fig.text(max(data['x']),max(data['y']),str(strv),color=col)
-                
-    def changeLayout_choice(self,curr_layout,className,displayNameToFunctionNameMap):
-        logging.debug('Changing layout '+curr_layout.parent().objectName())
-        #This removes everything except the first entry (i.e. the drop-down menu)
-        self.resetLayout(curr_layout,className)
-        #Get the dropdown info
-        curr_dropdown = self.getMethodDropdownInfo(curr_layout,className)
-        if len(curr_dropdown) == 0:
-            pass
-        #Get the kw-arguments from the current dropdown.
-        current_selected_function = utils.functionNameFromDisplayName(curr_dropdown.currentText(),displayNameToFunctionNameMap)
-        logging.debug('current selected function: '+current_selected_function)
-        current_selected_polarity = utils.polaritySelectedFromDisplayName(curr_dropdown.currentText())
-        
-        #Classname should always end in pos/neg/mix!
-        wantedPolarity = className[-3:].lower()
-        
-        #Hide dropdown entries that are not part of the current_selected property
-        model = curr_dropdown.model()
-        totalNrRows = model.rowCount()
-        for rowId in range(totalNrRows):
-            #First show all rows:
-            curr_dropdown.view().setRowHidden(rowId, False)
-            item = model.item(rowId)
-            item.setFlags(item.flags() | Qt.ItemIsEnabled)
-            
-            #Then hide based on the row name
-            rowName = model.item(rowId,0).text()
-            if utils.polaritySelectedFromDisplayName(rowName) != wantedPolarity:
-                item = model.item(rowId)
-                item.setFlags(item.flags() & ~Qt.ItemIsEnabled)
-                curr_dropdown.view().setRowHidden(rowId, True)
-        
-        #Visual max number of rows before a 2nd column is started.
-        maxNrRows = 4
-        labelposoffset = 0
-
-        #Add a widget-pair for the distribution
-        distKwargValues = utils.distKwargValuesFromFittingFunction(current_selected_function)
-        if len(distKwargValues) != 0:
-            # Add a combobox containing all the possible kw-args
-            label = QLabel("<b>distribution</b>")
-            label.setObjectName(f"Label#{current_selected_function}#dist_kwarg#{current_selected_polarity}")
-            if self.checkAndShowWidget(curr_layout,label.objectName()) == False:
-                label.setToolTip(utils.infoFromMetadata(current_selected_function,specificKwarg='dist_kwarg'))
-                curr_layout.addWidget(label,2,0)
-            combobox = QComboBox()
-            combobox.addItems(distKwargValues)
-            combobox.setObjectName(f"ComboBox#{current_selected_function}#dist_kwarg#{current_selected_polarity}")
-            defaultOption = utils.defaultOptionFromDistKwarg(current_selected_function)
-            if defaultOption != None:
-                combobox.setCurrentText(defaultOption)
-            test = combobox.currentText()
-            combobox.setToolTip(utils.getInfoFromDistribution(combobox.currentText()))
-            combobox.currentTextChanged.connect(lambda text: combobox.setToolTip(utils.getInfoFromDistribution(text)))
-            if self.checkAndShowWidget(curr_layout,combobox.objectName()) == False:
-                curr_layout.addWidget(combobox,2,1)
-            labelposoffset += 1
-            
-        reqKwargs = utils.reqKwargsFromFunction(current_selected_function)
-        #Add a widget-pair for every kw-arg
-        
-        for k in range(len(reqKwargs)):
-            #Value is used for scoring, and takes the output of the method
-            if reqKwargs[k] != 'methodValue':
-                label = QLabel(f"<b>{reqKwargs[k]}</b>")
-                label.setObjectName(f"Label#{current_selected_function}#{reqKwargs[k]}#{current_selected_polarity}")
-                if self.checkAndShowWidget(curr_layout,label.objectName()) == False:
-                    label.setToolTip(utils.infoFromMetadata(current_selected_function,specificKwarg=reqKwargs[k]))
-                    curr_layout.addWidget(label,2+((k+labelposoffset))%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+0)
-                #Check if we want to add a fileLoc-input:
-                if utils.typeFromKwarg(current_selected_function,reqKwargs[k]) == 'fileLoc':
-                    #Create a new qhboxlayout:
-                    hor_boxLayout = QHBoxLayout()
-                    #Add a line_edit to this:
-                    line_edit = QLineEdit()
-                    line_edit.setObjectName(f"LineEdit#{current_selected_function}#{reqKwargs[k]}#{current_selected_polarity}")
-                    defaultValue = utils.defaultValueFromKwarg(current_selected_function,reqKwargs[k])
-                    hor_boxLayout.addWidget(line_edit)
-                    #Also add a QButton with ...:
-                    line_edit_lookup = QPushButton()
-                    line_edit_lookup.setText('...')
-                    line_edit_lookup.setObjectName(f"PushButton#{current_selected_function}#{reqKwargs[k]}#{current_selected_polarity}")
-                    hor_boxLayout.addWidget(line_edit_lookup)
-                    
-                    #Actually placing it in the layout
-                    self.checkAndShowWidget(curr_layout,line_edit.objectName())
-                    self.checkAndShowWidget(curr_layout,line_edit_lookup.objectName())
-                    if self.checkAndShowWidget(curr_layout,line_edit.objectName()) == False:
-                        line_edit.setToolTip(utils.infoFromMetadata(current_selected_function,specificKwarg=reqKwargs[k]))
-                        if defaultValue is not None:
-                            line_edit.setText(str(defaultValue))
-                        curr_layout.addLayout(hor_boxLayout,2+((k+labelposoffset))%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+1)
-                        #Add a on-change listener:
-                        line_edit.textChanged.connect(lambda text,line_edit=line_edit: self.kwargValueInputChanged(line_edit))
-                        
-                        #Add an listener when the pushButton is pressed
-                        line_edit_lookup.clicked.connect(lambda text2,line_edit_change_objName = line_edit,text="Select file",filter="*.*": self.lineEditFileLookup(line_edit_change_objName, text, filter))
-                        
-                else: #'normal' type - int, float, string, whatever
-                    #Creating a line-edit...
-                    line_edit = QLineEdit()
-                    line_edit.setObjectName(f"LineEdit#{current_selected_function}#{reqKwargs[k]}#{current_selected_polarity}")
-                    defaultValue = utils.defaultValueFromKwarg(current_selected_function,reqKwargs[k])
-                    #Actually placing it in the layout
-                    if self.checkAndShowWidget(curr_layout,line_edit.objectName()) == False:
-                        line_edit.setToolTip(utils.infoFromMetadata(current_selected_function,specificKwarg=reqKwargs[k]))
-                        if defaultValue is not None:
-                            line_edit.setText(str(defaultValue))
-                        curr_layout.addWidget(line_edit,2+((k+labelposoffset))%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+1)
-                        #Add a on-change listener:
-                        line_edit.textChanged.connect(lambda text,line_edit=line_edit: self.kwargValueInputChanged(line_edit))
-            else:
-                labelposoffset -= 1
-            
-        #Get the optional kw-arguments from the current dropdown.
-        optKwargs = utils.optKwargsFromFunction(current_selected_function)
-        #Add a widget-pair for every kwarg
-        for k in range(len(optKwargs)):
-            label = QLabel(f"<i>{optKwargs[k]}</i>")
-            label.setObjectName(f"Label#{current_selected_function}#{optKwargs[k]}#{current_selected_polarity}")
-            if self.checkAndShowWidget(curr_layout,label.objectName()) == False:
-                label.setToolTip(utils.infoFromMetadata(current_selected_function,specificKwarg=optKwargs[k]))
-                curr_layout.addWidget(label,2+((k+labelposoffset+len(reqKwargs)))%maxNrRows,(((k+labelposoffset+len(reqKwargs)))//maxNrRows)*2+0)
-            #Check if we want to add a fileLoc-input:
-            if utils.typeFromKwarg(current_selected_function,optKwargs[k]) == 'fileLoc':
-                #Create a new qhboxlayout:
-                hor_boxLayout = QHBoxLayout()
-                #Add a line_edit to this:
-                line_edit = QLineEdit()
-                line_edit.setObjectName(f"LineEdit#{current_selected_function}#{optKwargs[k]}#{current_selected_polarity}")
-                defaultValue = utils.defaultValueFromKwarg(current_selected_function,optKwargs[k])
-                hor_boxLayout.addWidget(line_edit)
-                #Also add a QButton with ...:
-                line_edit_lookup = QPushButton()
-                line_edit_lookup.setText('...')
-                line_edit_lookup.setObjectName(f"PushButton#{current_selected_function}#{optKwargs[k]}#{current_selected_polarity}")
-                hor_boxLayout.addWidget(line_edit_lookup)
-                
-                #Actually placing it in the layout
-                self.checkAndShowWidget(curr_layout,line_edit.objectName())
-                self.checkAndShowWidget(curr_layout,line_edit_lookup.objectName())
-                if self.checkAndShowWidget(curr_layout,line_edit.objectName()) == False:
-                    line_edit.setToolTip(utils.infoFromMetadata(current_selected_function,specificKwarg=optKwargs[k]))
-                    if defaultValue is not None:
-                        line_edit.setText(str(defaultValue))
-                    curr_layout.addLayout(hor_boxLayout,2+((k+labelposoffset))%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+1)
-                    #Add a on-change listener:
-                    line_edit.textChanged.connect(lambda text,line_edit=line_edit: self.kwargValueInputChanged(line_edit))
-                    
-                    #Add an listener when the pushButton is pressed
-                    line_edit_lookup.clicked.connect(lambda text2,line_edit_change_objName = line_edit,text="Select file",filter="*.*": self.lineEditFileLookup(line_edit_change_objName, text, filter))
-                        
-            else:
-                line_edit = QLineEdit()
-                line_edit.setObjectName(f"LineEdit#{current_selected_function}#{optKwargs[k]}#{current_selected_polarity}")
-                defaultValue = utils.defaultValueFromKwarg(current_selected_function,optKwargs[k])
-                if self.checkAndShowWidget(curr_layout,line_edit.objectName()) == False:
-                    line_edit.setToolTip(utils.infoFromMetadata(current_selected_function,specificKwarg=optKwargs[k]))
-                    if defaultValue is not None:
-                        line_edit.setText(str(defaultValue))
-                    curr_layout.addWidget(line_edit,2+((k+labelposoffset+len(reqKwargs)))%maxNrRows,(((k+labelposoffset+len(reqKwargs)))//maxNrRows)*2+1)
-                    #Add a on-change listener:
-                    line_edit.textChanged.connect(lambda text,line_edit=line_edit: self.kwargValueInputChanged(line_edit))
-    
-    
-    
-    
-    
-    def kwargValueInputChanged(self,line_edit):
-        #Get the function name
-        function = line_edit.objectName().split("#")[1]
-        #Get the kwarg
-        kwarg = line_edit.objectName().split("#")[2]
-        #Get the value
-        value = line_edit.text()
-        expectedType = utils.typeFromKwarg(function,kwarg)
-        if expectedType == 'fileLoc':
-            expectedType=str
-        if expectedType is not None:
-            if expectedType is str:
-                try:
-                    value = str(line_edit.text())
-                    self.setLineEditStyle(line_edit,type='Normal')
-                except:
-                    #Show as warning
-                    self.setLineEditStyle(line_edit,type='Warning')
-            elif expectedType is not str:
-                try:
-                    value = eval(line_edit.text())
-                    if expectedType == float:
-                        if isinstance(value,int) or isinstance(value,float):
-                            self.setLineEditStyle(line_edit,type='Normal')
-                        else:
-                            self.setLineEditStyle(line_edit,type='Warning')
-                    else:
-                        if isinstance(value,expectedType):
-                            self.setLineEditStyle(line_edit,type='Normal')
-                        else:
-                            self.setLineEditStyle(line_edit,type='Warning')
-                except:
-                    #Show as warning
-                    self.setLineEditStyle(line_edit,type='Warning')
-        else:
-            self.setLineEditStyle(line_edit,type='Normal')
-        pass
-    
-    def setLineEditStyle(self,line_edit,type='Normal'):
-        if type == 'Normal':
-            line_edit.setStyleSheet("border: 1px  solid #D5D5E5;")
-        elif type == 'Warning':
-            line_edit.setStyleSheet("border: 1px solid red;")
-    
-    def checkAndShowWidget(self,layout, widgetName):
-        # Iterate over the layout's items
-        for index in range(layout.count()):
-            item = layout.itemAt(index)
-            # Check if the item is a widget
-            if item.widget() is not None:
-                widget = item.widget()
-                # Check if the widget has the desired name
-                if widget.objectName() == widgetName:
-                    # Widget already exists, unhide it
-                    widget.show()
-                    return
-            else:
-                for index2 in range(item.count()):
-                    item_sub = item.itemAt(index2)
-                    # Check if the item is a widget
-                    if item_sub.widget() is not None:
-                        widget = item_sub.widget()
-                        # Check if the widget has the desired name
-                        if widget.objectName() == widgetName:
-                            # Widget already exists, unhide it
-                            widget.show()
-                            return
-        return False
-                
-    #Remove everythign in this layout except className_dropdown
-    def resetLayout(self,curr_layout,className):
-        for index in range(curr_layout.count()):
-            widget_item = curr_layout.itemAt(index)
-            # Check if the item is a widget (as opposed to a layout)
-            if widget_item.widget() is not None:
-                widget = widget_item.widget()
-                #If it's the dropdown segment, label it as such
-                if not ("CandidateFindingDropdown" in widget.objectName()) and not ("CandidateFittingDropdown" in widget.objectName()) and widget.objectName() != f"titleLabel_{className}" and not ("KEEP" in widget.objectName()):
-                    logging.debug(f"Hiding {widget.objectName()}")
-                    widget.hide()
-            else:
-                for index2 in range(widget_item.count()):
-                    widget_sub_item = widget_item.itemAt(index2)
-                    # Check if the item is a widget (as opposed to a layout)
-                    if widget_sub_item.widget() is not None:
-                        widget = widget_sub_item.widget()
-                        #If it's the dropdown segment, label it as such
-                        if not ("CandidateFindingDropdown" in widget.objectName()) and not ("CandidateFittingDropdown" in widget.objectName()) and widget.objectName() != f"titleLabel_{className}" and not ("KEEP" in widget.objectName()):
-                            logging.debug(f"Hiding {widget.objectName()}")
-                            widget.hide()
-    
-    def getMethodDropdownInfo(self,curr_layout,className):
-        curr_dropdown = []
-        #Look through all widgets in the current layout
-        for index in range(curr_layout.count()):
-            widget_item = curr_layout.itemAt(index)
-            #Check if it's fair to check
-            if widget_item.widget() is not None:
-                widget = widget_item.widget()
-                #If it's the dropdown segment, label it as such
-                if (className in widget.objectName()) and ("Dropdown" in widget.objectName()):
-                    curr_dropdown = widget
-        #Return the dropdown
-        return curr_dropdown
-    
-    
     def find_raw_npy_files(self,directory):
         raw_files = glob.glob(os.path.join(directory, "*.raw"))
         npy_files = glob.glob(os.path.join(directory, "*.npy"))
@@ -1808,7 +1525,6 @@ class MyGUI(QMainWindow):
 
         return unique_files
     
-
     def updateGUIafterNewResults(self,error=None):
         if error == None:
             self.updateLocList()
@@ -2032,7 +1748,7 @@ class MyGUI(QMainWindow):
             error = 'Input file/folder is not correct! Please check.'
         self.updateGUIafterNewResults(error)     
         return
-        
+    
     def run_processing(self):
         self.globalSettings['StoreFinalOutput']['value'] = True
         # self.run_processing_i()
@@ -2151,10 +1867,10 @@ class MyGUI(QMainWindow):
             npyData = None
             if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[3]:
                 self.runFindingAndFitting(npyData,polarityVal='Pos')
-                self.runFindingAndFitting(npyData,polarityVal='Neg',findingOffset=len(self.data['FindingResult'][0]))
+                self.runFindingAndFitting(npyData,polarityVal='Neg',findingOffset=len(self.data['FindingResult'][0]),fittingOffset=len(self.data['FindingResult'][0]))
             else:
                 self.runFindingAndFitting(npyData,polarityVal=polarityVal)
-        
+    
     def FindingBatching(self,npyData,polarityVal):
         #Get polarity info and do this:
         FindingEvalText = self.getFunctionEvalText('Finding',"npyData","self.globalSettings",polarityVal)
@@ -2174,7 +1890,7 @@ class MyGUI(QMainWindow):
                         self.data['FindingResult'][0][len(self.data['FindingResult'][0])] = BatchFindingResult[0][k]
                 except:
                     print('issues with index '+str(k))
-        
+    
     def filter_finding_on_chunking(self,candidate,chunking_limits):
         #Return true if it should be in this chunk, false if not
         
@@ -2229,7 +1945,6 @@ class MyGUI(QMainWindow):
             #NOTE: Do both after one another
             polarityVal = ['Pos','Neg']
         return polarityVal
-        
     
     def runFindingBatching(self):
         logging.info('Batching-dependant finding starting!')
@@ -2329,7 +2044,7 @@ class MyGUI(QMainWindow):
                     if polarityVal == 'Neg':
                         findingOffset = self.number_finding_found_polarity['Pos']
                     
-                    self.runFindingAndFitting('',runFitting=False,storeFinding=False,polarityVal=polarityVal,findingOffset = findingOffset)
+                    self.runFindingAndFitting('',runFitting=False,storeFinding=False,polarityVal=polarityVal,findingOffset = findingOffset,fittingOffset=findingOffset)
                     self.number_finding_found_polarity[polarityVal] = len(self.data['FindingResult'][0])
                     z=3
                     
@@ -2522,7 +2237,7 @@ class MyGUI(QMainWindow):
                     if polarityVal == 'Neg':
                         findingOffset = self.number_finding_found_polarity['Pos']
                     
-                    self.runFindingAndFitting('',runFitting=False,storeFinding=False,polarityVal=polarityVal,findingOffset = findingOffset)
+                    self.runFindingAndFitting('',runFitting=False,storeFinding=False,polarityVal=polarityVal,findingOffset = findingOffset,fittingOffset=findingOffset)
                     self.number_finding_found_polarity[polarityVal] = len(self.data['FindingResult'][0])
                     
                     
@@ -2550,8 +2265,8 @@ class MyGUI(QMainWindow):
             polArr = ['Pos','Neg']
             customFindingEval = ["{key: value for key, value in self.data['FindingResult'][0].items() if key < "+str(self.number_finding_found_polarity['Pos'])+"}","{key-"+str(self.number_finding_found_polarity['Pos']-1)+": value for key, value in self.data['FindingResult'][0].items() if key >= "+str(self.number_finding_found_polarity['Pos'])+"}"]
             self.runFitting(polarityVal = polArr,customFindingEval = customFindingEval,bothPolarities=True)
-        
-    def runFindingAndFitting(self,npyData,runFitting=True,storeFinding=True,polarityVal='Mix',findingOffset=0):
+    
+    def runFindingAndFitting(self,npyData,runFitting=True,storeFinding=True,polarityVal='Mix',findingOffset=0,fittingOffset=0):
         FindingEvalText = self.getFunctionEvalText('Finding',"npyData","self.globalSettings",polarityVal)
         print(FindingEvalText)
 
@@ -2579,7 +2294,14 @@ class MyGUI(QMainWindow):
                     
                     #Update the finding result entry, their id, but the offset:
                     newFindingResult2 = {key+findingOffset: value for key, value in newFindingResult[0].items()}
+                                        
+                    newFindingResultTot = list(self.data['FindingResult'])
                     self.data['FindingResult'][0].update(newFindingResult2)
+                    newFindingResultTot[0] = self.data['FindingResult'][0]
+                    newFindingResultTot[1] += "\n"+newFindingResult[1]
+                    self.data['FindingResult'] = tuple(newFindingResultTot)
+                    
+                    
                     #todo: THE string in findingresult[1] is wrong now, wont be fixed.
                     # self.data['FindingResult'][1] += "Test"+newFindingResult[1]
                     
@@ -2593,7 +2315,7 @@ class MyGUI(QMainWindow):
                         self.storeFindingOutput(polarityVal = polarityVal)
                 #And run the fitting
                 if runFitting:
-                    self.runFitting(polarityVal)
+                    self.runFitting(polarityVal,fittingOffset=fittingOffset)
             except Exception as e:
                 error_message = f"Critical error in Finding routine! Breaking off!\nError information:\n{type(e).__name__}: {e}\n\n{traceback.format_exc()}"
                 self.open_critical_warning(error_message)
@@ -2629,7 +2351,7 @@ class MyGUI(QMainWindow):
             logging.error('No localizations found after fitting!')
             return
     
-    def runFitting(self,polarityVal,customFindingEval = None,bothPolarities=False):
+    def runFitting(self,polarityVal,customFindingEval = None,bothPolarities=False,fittingOffset=0):
         if self.data['FindingResult'][0] is not None:
             #Run the finding function!
             try:
@@ -2639,7 +2361,15 @@ class MyGUI(QMainWindow):
                     if FittingEvalText is not None:
                         self.currentFileInfo['FittingTime'] = time.time()
                         self.data['FittingMethod'] = str(FittingEvalText)
-                        self.data['FittingResult'] = eval(str(FittingEvalText))
+                        fittingResult = eval(str(FittingEvalText))
+                        if fittingOffset == 0:
+                            self.data['FittingResult'] = fittingResult
+                        elif fittingOffset > 0:
+                            newFittingResultTot = list(self.data['FittingResult'])
+                            newFittingResultTot[0] = pd.concat([newFittingResultTot[0], fittingResult[0]])
+                            newFittingResultTot[1] += "\n"+fittingResult[1]
+                            self.data['FittingResult'][0].update(pd.concat([self.data['FittingResult'][0], fittingResult[0]]))
+                            self.data['FittingResult'] = tuple(newFittingResultTot)
                         self.currentFileInfo['FittingTime'] = time.time() - self.currentFileInfo['FittingTime']
                         #Create and store the localization output
                         if self.globalSettings['StoreFinalOutput']['value']:
@@ -2695,7 +2425,7 @@ class MyGUI(QMainWindow):
         else:
             storeLocationPartial = self.currentFileInfo['CurrentFileLoc'][:-4]
         return storeLocationPartial     
-      
+    
     def storeLocalizationOutput(self):
         logging.debug('Attempting to store fitting results output')
         storeLocation = self.getStoreLocationPartial()+'_FitResults_'+self.storeNameDateTime+'.csv'
@@ -2736,6 +2466,11 @@ class MyGUI(QMainWindow):
                         with open(file_path, 'wb') as file:
                             pickle.dump(self.data['refFindingFileneg'], file)
                             pickle.dump(allNegFittingResults, file)
+                        
+                        #And store all of them
+                        file_path = self.currentFileInfo['CurrentFileLoc'][:-4]+'_FittingResults_'+self.storeNameDateTime+'.pickle'
+                        with open(file_path, 'wb') as file:
+                            pickle.dump(self.data['FittingResult'][0], file)
                 except:
                     logging.debug('This can be safely ignored')
             else:#Only a single pos/neg selected
@@ -2746,7 +2481,7 @@ class MyGUI(QMainWindow):
             logging.info('Fitting results output stored')
         else:
             pass
-        
+    
     def storeFindingOutput(self,polarityVal='Pos'):
         logging.debug('Attempting to store finding results output')
         #Store the Finding results output
@@ -2812,8 +2547,6 @@ class MyGUI(QMainWindow):
         except:
             logging.error('Error in creating file metadata, not stored')
     
-
-    
     def getFunctionEvalText(self,className,p1,p2,polarity):
         #Get the dropdown info
         moduleMethodEvalTexts = []
@@ -2849,7 +2582,6 @@ class MyGUI(QMainWindow):
                         item_sub = item.itemAt(index2)
                         widget_sub = item_sub.widget()
                         if ("LineEdit" in widget_sub.objectName()) and widget_sub.isVisibleTo(self.tab_processing):
-                            print(widget_sub.objectName())
                             # The objectName will be along the lines of foo#bar#str
                             #Check if the objectname is part of a method or part of a scoring
                             split_list = widget_sub.objectName().split('#')
@@ -2885,7 +2617,7 @@ class MyGUI(QMainWindow):
             return moduleMethodEvalTexts[0]
         else:
             return None
-                
+    
     def getEvalTextFromGUIFunction(self, methodName, methodKwargNames, methodKwargValues, partialStringStart=None, removeKwargs=None):
     #--------------------------------------------------------------------------------------------------------------------------------------------------------------------
     #methodName: the physical name of the method, i.e. StarDist.StarDistSegment
@@ -3021,13 +2753,13 @@ class MyGUI(QMainWindow):
                                     #Also change the lineedits and such:
                                     if 'Finding' in field_widget.objectName():
                                         polVal2 = field_widget.objectName()[-3:]
-                                        self.changeLayout_choice(getattr(self, f"groupboxFinding{polVal2}").layout(),field_widget.objectName(),getattr(self, f"Finding_functionNameToDisplayNameMapping{polVal2}"))
+                                        utils.changeLayout_choice(getattr(self, f"groupboxFinding{polVal2}").layout(),field_widget.objectName(),getattr(self, f"Finding_functionNameToDisplayNameMapping{polVal2}"),parent=self)
                                     elif 'Fitting' in field_widget.objectName():
                                         polVal2 = field_widget.objectName()[-3:]
                                         if 'dist_kwarg' in field_widget.objectName():
                                             field_widget.setCurrentText(self.entries[field_name])
                                         else:
-                                            self.changeLayout_choice(getattr(self, f"groupboxFitting{polVal2}").layout(),field_widget.objectName(),getattr(self, f"Fitting_functionNameToDisplayNameMapping{polVal2}"))
+                                            utils.changeLayout_choice(getattr(self, f"groupboxFitting{polVal2}").layout(),field_widget.objectName(),getattr(self, f"Fitting_functionNameToDisplayNameMapping{polVal2}"),parent=self)
         
 
         except FileNotFoundError:
@@ -3035,7 +2767,7 @@ class MyGUI(QMainWindow):
             self.save_entries_to_json()
             logging.info('No GUI settings storage found, new one created.')
             pass
-        
+    
     def get_editable_fields(self):
         fields = {}
 
@@ -3065,10 +2797,10 @@ class MyGUI(QMainWindow):
                         if 'Finding' in widget.objectName():
                             logging.info('Line 2299')
                             logging.info(getattr(self, f"groupboxFinding{polVal}").objectName())
-                            self.changeLayout_choice(getattr(self, f"groupboxFinding{polVal}").layout(),widget.objectName(),getattr(self, f"Finding_functionNameToDisplayNameMapping{polVal}"))
+                            utils.changeLayout_choice(getattr(self, f"groupboxFinding{polVal}").layout(),widget.objectName(),getattr(self, f"Finding_functionNameToDisplayNameMapping{polVal}"),parent=self)
                         elif 'Fitting' in widget.objectName():
                             logging.info('Line 2299+2')
-                            self.changeLayout_choice(getattr(self, f"groupboxFitting{polVal}").layout(),widget.objectName(),getattr(self, f"Fitting_functionNameToDisplayNameMapping{polVal}"))
+                            utils.changeLayout_choice(getattr(self, f"groupboxFitting{polVal}").layout(),widget.objectName(),getattr(self, f"Fitting_functionNameToDisplayNameMapping{polVal}"),parent=self)
             elif isinstance(widget, QWidget):
                 for child_widget in widget.children():
                     set_combobox_states(child_widget,polVal)
@@ -3079,12 +2811,11 @@ class MyGUI(QMainWindow):
             for combobox, original_state in original_states.items():
                 combobox.setCurrentIndex(original_state)
                 if 'Finding' in combobox.objectName():
-                    self.changeLayout_choice(getattr(self, f"groupboxFinding{polVal}").layout(),combobox.objectName(),getattr(self, f"Finding_functionNameToDisplayNameMapping{polVal}"))
+                    utils.changeLayout_choice(getattr(self, f"groupboxFinding{polVal}").layout(),combobox.objectName(),getattr(self, f"Finding_functionNameToDisplayNameMapping{polVal}"),parent=self)
                 elif 'Fitting' in combobox.objectName():
-                    self.changeLayout_choice(getattr(self, f"groupboxFitting{polVal}").layout(),combobox.objectName(),getattr(self, f"Fitting_functionNameToDisplayNameMapping{polVal}"))
+                    utils.changeLayout_choice(getattr(self, f"groupboxFitting{polVal}").layout(),combobox.objectName(),getattr(self, f"Fitting_functionNameToDisplayNameMapping{polVal}"),parent=self)
         # except:
         #     pass
-
 
 class AdvancedSettingsWindow(QMainWindow):
     def __init__(self, parent):
@@ -3264,7 +2995,6 @@ class AdvancedSettingsWindow(QMainWindow):
         except:
             self.save_global_settings()
             logging.info('No global settings storage found, new one created.')
-
 
 class ImageSlider(QWidget):
     def __init__(self, figures=None, parent=None):
@@ -3795,7 +3525,6 @@ class TwoDDelays:
         self.ax_mean.set_xlabel('x [px]')
         self.ax_mean.set_ylabel('y [px]')
 
-
 class CriticalWarningWindow(QMainWindow):
     def __init__(self, parent, text):
         super().__init__(parent)
@@ -3843,6 +3572,8 @@ class CriticalWarningWindow(QMainWindow):
 class VisualisationNapari(QWidget):
     """
     Class that visualises the data in napari in e.g. scatter/average shifted histogram
+    General idea: have a single implementation similar to CandidateFinding/Fitting, where user-created visualisations can be created. They have a list of localizations as input, and output an image.
+    This class handles both the showcasing/choosing of visualisations and the napari showing of the output images.
     """
     def __init__(self):
         super().__init__()
@@ -3859,32 +3590,15 @@ class VisualisationNapari(QWidget):
         self.mainlayout.addWidget(self.viewer.controls)
         logging.info('VisualisationNapari init')
 
-    def createAvgShiftHist(self):
-        pass
-    
-    def createScatter(self):
-        pass
-    
-    def visualiseAvgShiftHist(self):
-        pass
-    
-    def visualiseScatter(self):
-        pass
-    
-    def createandvisualiseAvgShiftHist(self):
-        self.createAvgShiftHist()
-        self.visualiseAvgShiftHist()
-    
-    def createandvisualiseScatter(self):
-        self.createScatter()
-        self.visualiseScatter()
-
-
 class PreviewFindingFitting(QWidget):
     """
     Class that runs the GUI of finding/fitting preview (i.e. showing alle vents as an image and overlays with boxes/dots)
     """
     def __init__(self):
+        """
+        Initialisation of the PreviewFindingFitting class. Sets up a napari viewer and adds the viewer and viewer control widgets to the main layout.
+        Also initialises some empty arrays
+        """
         super().__init__()
         # Create a napari viewer
         self.napariviewer = Viewer(show=False)
@@ -3914,34 +3628,48 @@ class PreviewFindingFitting(QWidget):
         self.maxFrames = 0
         self.napariviewer.dims.events.current_step.connect(self.update_visibility)
 
-    
-    
     def currently_under_cursor(self,event: Event):
+        """
+        Class that determines which pixel is currently under the cursor. The main task of this function is to go from cavnas position to image position.
+
+        Args:
+            event (Event): general Vispy event, containing, amongst others, the xy position of the curosr in the canvas.
+        """
         #Vispy mouse position
-        # print(event._pos)
         
+        #We get the canvas size/position in image pixel units
         canvas_size_in_px_units = event.source.size/self.napariviewer.camera.zoom
-        
         camera_coords = [self.napariviewer.camera.center[2]+.5, self.napariviewer.camera.center[1]+.5]
-        
         canvas_pos = np.vstack([camera_coords-(canvas_size_in_px_units/2),camera_coords+(canvas_size_in_px_units/2)])
-        
+        #And we can normalize the cursor position to image pixels
         cursor_unit_norm = event._pos/event.source.size
+        #Thus, we can find the pixel index - at the moment we simply calculate this and not do anything with it
         highlighted_px_index=np.zeros((2,))
         highlighted_px_index[0] = cursor_unit_norm[0]*canvas_size_in_px_units[0]+canvas_pos[0][0]
-        
         highlighted_px_index[1] = cursor_unit_norm[1]*canvas_size_in_px_units[1]+canvas_pos[0][1]
         
+        #Here's the calculated pixel index in x,y coordinate.
         pixel_index = np.floor(highlighted_px_index).astype(int)
         #TODO: usefull info from mouse-over events
         # print(np.floor(highlighted_px_index))
     
     def displayEvents(self,events,frametime_ms=100,findingResult = None,fittingResult=None,settings=None,timeStretch=(0,1000)):
+        """
+        Function that's called with new a new preview window is generated. It requires the input of the events (as a list), others are optional
+
+        Args:
+            events (list): list of all events (x,y,pol,time)
+            frametime_ms (int, optional): The displayed frametime in milliseconds. Defaults to 100.
+            findingResult (dict, optional): The visualised finding result (i.e. boxes). Defaults to None.
+            fittingResult (dict, optional): The visualised fitting result (i.e. crosses). Defaults to None.
+            settings (dict, optional): Settings. Defaults to None.
+            timeStretch (tuple, optional): The time stretch to visualise. Defaults to (0,1000).
+        """
         #Delete all existing layers:
         for layer in reversed(self.napariviewer.layers):
             self.napariviewer.layers.remove(layer)
         
-        
+        #Create a new image
         preview_multiD_image = []
         #Loop over the frames:
         n_frames = int(np.ceil(float(timeStretch[1])/(frametime_ms)))
@@ -3954,11 +3682,10 @@ class PreviewFindingFitting(QWidget):
             #Add it to our image
             preview_multiD_image.append(self.hist_xy.dist2D)
             
-
-        
-
+        #add this image to the napariviewer
         self.napariviewer.add_image(np.asarray(preview_multiD_image), multiscale=False)
         
+        #Create the finding/fitting overlays or reset them to zero
         self.finding_overlays = {}
         self.fitting_overlays = []
         #Create an empty finding and fitting result overlay for each layer:
@@ -3980,11 +3707,18 @@ class PreviewFindingFitting(QWidget):
         #Select the original image-layer as selected
         self.napariviewer.layers.selection.active = self.napariviewer.layers[0]
         self.update_visibility()
-        
-        # hist_xy = utilsHelper.Hist2d_xy(events)
-    
+
     
     def create_finding_overlay(self,findingResults):
+        """
+        Creation of a finding overlay
+
+        Args:
+            findingResults (dict): The finding results as given by Eve
+
+        Returns:
+            self.shapes_layer (napari layer): a napari shapes layer with the finding boxes
+        """
         #Loop over the finding results, and create a polygon for each, then show these:
         polygons = []
         candidates_ids = []
@@ -4018,6 +3752,16 @@ class PreviewFindingFitting(QWidget):
         return self.shapes_layer
         
     def create_fitting_overlay(self,fittingResults,pxsize=80):
+        """
+        Creation of a fitting overlay
+
+        Args:
+            fittingResults (dict): The fitting results as given by Eve
+            pxsize (float): The pixel size in nm. Defaulta to 80
+
+        Returns:
+            self.shapes_layer (napari layer): a napari shapes layer with the fitting crosses
+        """
         
         polygons = []
         
@@ -4036,40 +3780,10 @@ class PreviewFindingFitting(QWidget):
         
         return self.shapes_layer
     
-    
-    
-    def load_multi_page_images(self):
-        self.images = []
-        # Generate synthetic images
-        # for i in range(5):
-        synthetic_image = np.random.rand(5,100,100)
-        self.mask = np.zeros(5,)
-        self.mask[2] = True
-        # Add synthetic images to the viewer
-        self.images = synthetic_image
-        self.napariviewer.add_image(synthetic_image, multiscale=False, colormap='gray')
-        # Connect the update_visibility function to the events
-        
-        triangle = np.array([[11, 13], [111, 113], [22, 246]])
-
-        person = np.array([[505, 60], [402, 71], [383, 42], [251, 95], [212, 59],
-                        [131, 137], [126, 187], [191, 204], [171, 248], [211, 260],
-                        [273, 243], [264, 225], [430, 173], [512, 160]])
-
-        building = np.array([[310, 382], [229, 381], [209, 401], [221, 411],
-                            [258, 411], [300, 412], [306, 435], [268, 434],
-                            [265, 454], [298, 461], [307, 461], [307, 507],
-                            [349, 510], [352, 369], [330, 366], [330, 366]])
-
-        polygons2 = [triangle, person, building]
-                
-        # Initialize an empty shapes layer for annotations
-        self.shapes_layer = self.napariviewer.add_shapes(polygons, shape_type='polygon', edge_width=5,
-                          edge_color='coral', face_color='royalblue')
-        
-        
-    # Function to update visibility based on the current layer
     def update_visibility(self):
+        """
+        Function to update visibility based on the current layer - the finding/fitting overlays are one for each time-step. All are hidden except the one that's wanted
+        """
         #Disable all
         if not not self.finding_overlays: #worst syntax ever to check if a dictionary is empty or not
             for n in range(self.maxFrames):
