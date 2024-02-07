@@ -8,7 +8,7 @@ def __function_metadata__():
     return {
         "LoadExistingFitting": {
             "required_kwargs": [
-                {"name": "File_Location", "description": "Location of a FittingResults .pickle file"},
+                {"name": "File_Location", "description": "Location of a FittingResults .pickle file","type":"fileLoc"},
             ],
             "optional_kwargs": [
              ],
