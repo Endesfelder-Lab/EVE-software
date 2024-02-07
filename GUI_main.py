@@ -3894,6 +3894,10 @@ class PreviewFindingFitting(QWidget):
     Class that runs the GUI of finding/fitting preview (i.e. showing alle vents as an image and overlays with boxes/dots)
     """
     def __init__(self):
+        """
+        Initialisation of the PreviewFindingFitting class. Sets up a napari viewer and adds the viewer and viewer control widgets to the main layout.
+        Also initialises some empty arrays
+        """
         super().__init__()
         # Create a napari viewer
         self.napariviewer = Viewer(show=False)
@@ -3923,34 +3927,48 @@ class PreviewFindingFitting(QWidget):
         self.maxFrames = 0
         self.napariviewer.dims.events.current_step.connect(self.update_visibility)
 
-    
-    
     def currently_under_cursor(self,event: Event):
+        """
+        Class that determines which pixel is currently under the cursor. The main task of this function is to go from cavnas position to image position.
+
+        Args:
+            event (Event): general Vispy event, containing, amongst others, the xy position of the curosr in the canvas.
+        """
         #Vispy mouse position
-        # print(event._pos)
         
+        #We get the canvas size/position in image pixel units
         canvas_size_in_px_units = event.source.size/self.napariviewer.camera.zoom
-        
         camera_coords = [self.napariviewer.camera.center[2]+.5, self.napariviewer.camera.center[1]+.5]
-        
         canvas_pos = np.vstack([camera_coords-(canvas_size_in_px_units/2),camera_coords+(canvas_size_in_px_units/2)])
-        
+        #And we can normalize the cursor position to image pixels
         cursor_unit_norm = event._pos/event.source.size
+        #Thus, we can find the pixel index - at the moment we simply calculate this and not do anything with it
         highlighted_px_index=np.zeros((2,))
         highlighted_px_index[0] = cursor_unit_norm[0]*canvas_size_in_px_units[0]+canvas_pos[0][0]
-        
         highlighted_px_index[1] = cursor_unit_norm[1]*canvas_size_in_px_units[1]+canvas_pos[0][1]
         
+        #Here's the calculated pixel index in x,y coordinate.
         pixel_index = np.floor(highlighted_px_index).astype(int)
         #TODO: usefull info from mouse-over events
         # print(np.floor(highlighted_px_index))
     
     def displayEvents(self,events,frametime_ms=100,findingResult = None,fittingResult=None,settings=None,timeStretch=(0,1000)):
+        """
+        Function that's called with new a new preview window is generated. It requires the input of the events (as a list), others are optional
+
+        Args:
+            events (list): list of all events (x,y,pol,time)
+            frametime_ms (int, optional): The displayed frametime in milliseconds. Defaults to 100.
+            findingResult (dict, optional): The visualised finding result (i.e. boxes). Defaults to None.
+            fittingResult (dict, optional): The visualised fitting result (i.e. crosses). Defaults to None.
+            settings (dict, optional): Settings. Defaults to None.
+            timeStretch (tuple, optional): The time stretch to visualise. Defaults to (0,1000).
+        """
         #Delete all existing layers:
         for layer in reversed(self.napariviewer.layers):
             self.napariviewer.layers.remove(layer)
         
-        
+        #Create a new image
         preview_multiD_image = []
         #Loop over the frames:
         n_frames = int(np.ceil(float(timeStretch[1])/(frametime_ms)))
@@ -3963,11 +3981,10 @@ class PreviewFindingFitting(QWidget):
             #Add it to our image
             preview_multiD_image.append(self.hist_xy.dist2D)
             
-
-        
-
+        #add this image to the napariviewer
         self.napariviewer.add_image(np.asarray(preview_multiD_image), multiscale=False)
         
+        #Create the finding/fitting overlays or reset them to zero
         self.finding_overlays = {}
         self.fitting_overlays = []
         #Create an empty finding and fitting result overlay for each layer:
@@ -3989,11 +4006,18 @@ class PreviewFindingFitting(QWidget):
         #Select the original image-layer as selected
         self.napariviewer.layers.selection.active = self.napariviewer.layers[0]
         self.update_visibility()
-        
-        # hist_xy = utilsHelper.Hist2d_xy(events)
-    
+
     
     def create_finding_overlay(self,findingResults):
+        """
+        Creation of a finding overlay
+
+        Args:
+            findingResults (dict): The finding results as given by Eve
+
+        Returns:
+            self.shapes_layer (napari layer): a napari shapes layer with the finding boxes
+        """
         #Loop over the finding results, and create a polygon for each, then show these:
         polygons = []
         candidates_ids = []
@@ -4027,6 +4051,16 @@ class PreviewFindingFitting(QWidget):
         return self.shapes_layer
         
     def create_fitting_overlay(self,fittingResults,pxsize=80):
+        """
+        Creation of a fitting overlay
+
+        Args:
+            fittingResults (dict): The fitting results as given by Eve
+            pxsize (float): The pixel size in nm. Defaulta to 80
+
+        Returns:
+            self.shapes_layer (napari layer): a napari shapes layer with the fitting crosses
+        """
         
         polygons = []
         
@@ -4045,40 +4079,10 @@ class PreviewFindingFitting(QWidget):
         
         return self.shapes_layer
     
-    
-    
-    def load_multi_page_images(self):
-        self.images = []
-        # Generate synthetic images
-        # for i in range(5):
-        synthetic_image = np.random.rand(5,100,100)
-        self.mask = np.zeros(5,)
-        self.mask[2] = True
-        # Add synthetic images to the viewer
-        self.images = synthetic_image
-        self.napariviewer.add_image(synthetic_image, multiscale=False, colormap='gray')
-        # Connect the update_visibility function to the events
-        
-        triangle = np.array([[11, 13], [111, 113], [22, 246]])
-
-        person = np.array([[505, 60], [402, 71], [383, 42], [251, 95], [212, 59],
-                        [131, 137], [126, 187], [191, 204], [171, 248], [211, 260],
-                        [273, 243], [264, 225], [430, 173], [512, 160]])
-
-        building = np.array([[310, 382], [229, 381], [209, 401], [221, 411],
-                            [258, 411], [300, 412], [306, 435], [268, 434],
-                            [265, 454], [298, 461], [307, 461], [307, 507],
-                            [349, 510], [352, 369], [330, 366], [330, 366]])
-
-        polygons2 = [triangle, person, building]
-                
-        # Initialize an empty shapes layer for annotations
-        self.shapes_layer = self.napariviewer.add_shapes(polygons, shape_type='polygon', edge_width=5,
-                          edge_color='coral', face_color='royalblue')
-        
-        
-    # Function to update visibility based on the current layer
     def update_visibility(self):
+        """
+        Function to update visibility based on the current layer - the finding/fitting overlays are one for each time-step. All are hidden except the one that's wanted
+        """
         #Disable all
         if not not self.finding_overlays: #worst syntax ever to check if a dictionary is empty or not
             for n in range(self.maxFrames):
