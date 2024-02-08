@@ -46,14 +46,18 @@ def PseudoScatter(resultArray,settings,**kwargs):
     maxy = maxy - yoffset
     
     #Create the upscaled image:
-    upScaledImage = np.zeros((int(maxy*zoomvalue),int(maxx*zoomvalue)))
+    upScaledImage = np.zeros((int(maxx*zoomvalue),int(maxy*zoomvalue)))
     #Loop through the results:
     for i in range(len(resultArray)):
         #Get the pixel coordinates:
-        if not np.isnan(resultArray['x'][i]):
-            x,y = int(np.floor((resultArray['x'][i] / settings['PixelSize_nm']['value'] - xoffset)*zoomvalue)), int(np.floor((resultArray['y'][i] / settings['PixelSize_nm']['value'] - yoffset)*zoomvalue))
-            if x>=0 and y>=0 and x<upScaledImage.shape[0] and y<upScaledImage.shape[1]:
-                upScaledImage[x,y] += 1
+        #Check if it's in the list (when filtered out):
+        if i in resultArray['id'].values:
+            #Check if it's not a nan (when fitting failed)
+            if not np.isnan(resultArray['x'][i]):
+                if not np.isnan(resultArray['y'][i]):
+                    x,y = int(np.floor((resultArray['x'][i] / settings['PixelSize_nm']['value'] - xoffset)*zoomvalue)), int(np.floor((resultArray['y'][i] / settings['PixelSize_nm']['value'] - yoffset)*zoomvalue))
+                    if x>=0 and y>=0 and x<upScaledImage.shape[0] and y<upScaledImage.shape[1]:
+                        upScaledImage[x,y] += 1
     
     # Stop the timer
     end_time = time.time()

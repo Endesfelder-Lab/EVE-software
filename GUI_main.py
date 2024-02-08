@@ -3711,19 +3711,31 @@ class PostProcessing(QWidget):
         
         #------------End of GUI dynamic layout -----------------
         
-        
+        #Add a history of post-processing
+        self.postProcessingHistory = {}
         logging.info('PostProcessing init')
 
     def PostProcessing_callback(self,parent):
         logging.info('PostProcessing button pressed')
         
+        
         #Get the current function callback
-        FunctionEvalText = self.getPostProcessingFunctionEvalText("parent.data['FittingResult'][0]","parent.globalSettings")
+        FunctionEvalText = self.getPostProcessingFunctionEvalText("parent.data['FittingResult'][0]","parent.data['FindingResult'][0]","parent.globalSettings")
         print(FunctionEvalText)
-        result = eval(FunctionEvalText)
+        
+        #Store the history of postprocessing
+        current_postprocessinghistoryid = len(self.postProcessingHistory)
+        self.postProcessingHistory[current_postprocessinghistoryid] = {}
+        self.postProcessingHistory[current_postprocessinghistoryid][0] = parent.data['FittingResult'][0]
+        self.postProcessingHistory[current_postprocessinghistoryid][1] = FunctionEvalText
+        
+        parent.data['FittingResult'][0] = eval(FunctionEvalText)
+        parent.updateLocList()
+        
+        z=3
         
     
-    def getPostProcessingFunctionEvalText(self,p1,p2):
+    def getPostProcessingFunctionEvalText(self,p1,p2,p3):
         #Get the dropdown info
         moduleMethodEvalTexts = []
         all_layouts = self.PostProcessingGroupbox.findChildren(QLayout)
@@ -3771,7 +3783,7 @@ class PostProcessing(QWidget):
                             pass
         #Function call: get the to-be-evaluated text out, giving the methodName, method KwargNames, methodKwargValues, and 'function Type (i.e. cellSegmentScripts, etc)' - do the same with scoring as with method
         if methodName_method != '':
-            EvalTextMethod = utils.getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart=str(p1)+','+str(p2))
+            EvalTextMethod = utils.getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart=str(p1)+','+str(p2)+','+str(p3))
             #append this to moduleEvalTexts
             moduleMethodEvalTexts.append(EvalTextMethod)
             
@@ -3779,8 +3791,6 @@ class PostProcessing(QWidget):
             return moduleMethodEvalTexts[0]
         else:
             return None
-
-
 
 class PreviewFindingFitting(QWidget):
     """
