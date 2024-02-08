@@ -20,7 +20,7 @@ import re
 #Imports for PyQt5 (GUI)
 from PyQt5 import QtWidgets, QtGui
 from PyQt5.QtGui import QCursor, QTextCursor, QIntValidator
-from PyQt5.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QTableWidget, QTableWidgetItem, QLayout, QMainWindow, QLabel, QPushButton, QSizePolicy, QGroupBox, QTabWidget, QGridLayout, QWidget, QComboBox, QLineEdit, QFileDialog, QToolBar, QCheckBox,QDesktopWidget, QMessageBox, QTextEdit, QSlider, QSpacerItem, QTableView
+from PyQt5.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QTableWidget, QTableWidgetItem, QLayout, QMainWindow, QLabel, QPushButton, QSizePolicy, QGroupBox, QTabWidget, QGridLayout, QWidget, QComboBox, QLineEdit, QFileDialog, QToolBar, QCheckBox,QDesktopWidget, QMessageBox, QTextEdit, QSlider, QSpacerItem, QTableView, QFrame, QScrollArea
 from PyQt5.QtCore import Qt, QPoint, QProcess, QCoreApplication, QTimer, QFileSystemWatcher, QFile, QThread, pyqtSignal, QObject
 import sys
 import typing
@@ -3658,6 +3658,7 @@ class PostProcessing(QWidget):
     This class handles both the GUI initialisation of the PostProcessing tab and the actual post-processing.
     """
     def __init__(self,parent):
+        self.parent=parent
         super().__init__()
         # Create a layout for the main widget
         self.mainlayout = QVBoxLayout()
@@ -3714,13 +3715,20 @@ class PostProcessing(QWidget):
         
         #------------End of GUI dynamic layout -----------------
         
+        #Add a vertical spacer to push everything to top and bottom:
+        spacer = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding)
+        self.mainlayout.layout().addItem(spacer)
+        
+        #Add the history grid-layout to the mainlayout:
+        self.PostProcessingHistoryGrid = self.PostProcessingHistoryGrid(self)
+        self.mainlayout.layout().addWidget(self.PostProcessingHistoryGrid)
+        
         #Add a history of post-processing
         self.postProcessingHistory = {}
         logging.info('PostProcessing init')
 
     def PostProcessing_callback(self,parent):
         logging.info('PostProcessing button pressed')
-        
         
         #Get the current function callback
         FunctionEvalText = self.getPostProcessingFunctionEvalText("parent.data['FittingResult'][0]","parent.data['FindingResult'][0]","parent.globalSettings")
@@ -3729,15 +3737,80 @@ class PostProcessing(QWidget):
         #Store the history of postprocessing
         current_postprocessinghistoryid = len(self.postProcessingHistory)
         self.postProcessingHistory[current_postprocessinghistoryid] = {}
-        self.postProcessingHistory[current_postprocessinghistoryid][0] = parent.data['FittingResult'][0]
+        self.postProcessingHistory[current_postprocessinghistoryid][0] = self.parent.data['FittingResult'][0]
         self.postProcessingHistory[current_postprocessinghistoryid][1] = FunctionEvalText
+        self.postProcessingHistory[current_postprocessinghistoryid][2] = [len(self.postProcessingHistory[current_postprocessinghistoryid][0]),-1]
         
-        parent.data['FittingResult'][0] = eval(FunctionEvalText)
-        parent.updateLocList()
+        self.parent.data['FittingResult'][0] = eval(FunctionEvalText)
         
-        z=3
+        self.postProcessingHistory[current_postprocessinghistoryid][2][1] = len(self.parent.data['FittingResult'][0])
         
-    
+        #Update the history grid-widget
+        self.PostProcessingHistoryGrid.addHistoryEntryToGrid(current_postprocessinghistoryid)
+        
+        self.parent.updateLocList()
+        
+    class PostProcessingHistoryGrid(QWidget):
+        def __init__(self,parent):
+            super().__init__()
+            
+            self.parent=parent
+            # Create a vertical layout to hold the scroll area
+            main_layout = QVBoxLayout()
+            # Set the main layout of the widget
+            self.setLayout(main_layout)
+            
+            #Create a scroll area
+            scroll_area = QtWidgets.QScrollArea()
+            scroll_area.setWidgetResizable(True)
+            #Give it a container
+            container = QtWidgets.QWidget()
+            scroll_area.setWidget(container)
+            
+            #Create a qgridlayout:
+            self.grid_layout = QGridLayout()
+            self.grid_layout.setContentsMargins(0, 0, 0, 0)
+            self.grid_layout.setSpacing(0)  # Set spacing between widgets to 0
+
+            #Put it inside the container:
+            container.setLayout(self.grid_layout)
+            
+            main_layout.addWidget(scroll_area)
+            
+        def addHistoryEntryToGrid(self,historyId):
+            self.parent.postProcessingHistory[historyId][1]
+            
+            #Add some entries to the gridlayout:
+            #This is the title of what operation we did
+            self.grid_layout.addWidget(QLabel(self.parent.postProcessingHistory[historyId][1]), 0,historyId)
+            #This is the change in number of localizations
+            self.grid_layout.addWidget(QLabel(str(self.parent.postProcessingHistory[historyId][2][0])+"-->"+str(self.parent.postProcessingHistory[historyId][2][1])+" entries"), 1,historyId)
+            #This is a button to restore to before this operation
+            button = QPushButton("Restore to before this", self)
+            self.grid_layout.addWidget(button, 2,historyId)
+            #And add a callback to this:
+            button.clicked.connect(lambda text, historyId=historyId: self.historyRestore_callback(historyId))
+        
+        def removeHistoryEntryFromGrid(self,historyId):
+            #Remove the entries from the grid layout at this point in history
+            self.grid_layout.removeWidget(self.grid_layout.itemAtPosition(0,historyId).widget())
+            self.grid_layout.removeWidget(self.grid_layout.itemAtPosition(1,historyId).widget())
+            self.grid_layout.removeWidget(self.grid_layout.itemAtPosition(2,historyId).widget())
+        
+        def historyRestore_callback(self,historyId):
+            #First restore the localizations
+            self.parent.parent.data['FittingResult'][0] = self.parent.postProcessingHistory[historyId][0]
+            #Remove all history after this point
+            keys_to_remove = [k for k in self.parent.postProcessingHistory if k >= historyId]
+            for k in reversed(keys_to_remove):
+                del self.parent.postProcessingHistory[k]
+                self.removeHistoryEntryFromGrid(k)
+            
+            #Update the grandparent loc list
+            self.parent.parent.updateLocList()
+            #Give some info
+            logging.info('Restored postprocessing history')
+            
     def getPostProcessingFunctionEvalText(self,p1,p2,p3):
         #Get the dropdown info
         moduleMethodEvalTexts = []
