@@ -242,7 +242,7 @@ class MyGUI(QMainWindow):
 
 
         #Loop through all combobox states briefly to initialise them (and hide them)
-        self.set_all_combobox_states()
+        #self.set_all_combobox_states()
         
         #Load the GUI settings from last time:
         self.load_entries_from_json()
@@ -1528,8 +1528,8 @@ class MyGUI(QMainWindow):
     def updateGUIafterNewResults(self,error=None):
         if error == None:
             self.updateLocList()
-        # else:
-        #     self.open_critical_warning(error)
+        else:
+            self.open_critical_warning(error)
     
     def updateLocList(self):
         #data is stored in self.data['FittingResult'][0]
@@ -1709,24 +1709,51 @@ class MyGUI(QMainWindow):
         elif os.path.isfile(self.dataLocationInput.text()):
             self.storeNameDateTime = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             #Find polarity:
-            #Check if we are loading existing finding
+            #Check if we are loading existing fitting
             if 'ExistingFitting' in getattr(self,f"CandidateFittingDropdown{polarityVal}").currentText() or 'existing Fitting' in getattr(self,f"CandidateFittingDropdown{polarityVal}").currentText():
                 logging.info('Skipping finding and fitting processing')
                 # compare filenames of finding and fitting here? Following code is not yet adapted
-                # finding_file = getattr(self,f"CandidateFindingDropdown{polarityVal}").currentText().replace("_FindingResults_", "_")
-                # fitting_file = getattr(self,f"CandidateFittingDropdown{polarityVal}").currentText().replace("_FittingResults_", "_")
+                FittingEvalText = self.getFunctionEvalText('Fitting',"self.data['FindingResult'][0]","self.globalSettings",polarityVal)
+                import re
+                match = re.search(r'File_Location="([^"]+)"', FittingEvalText)
+                FittingResults = match.group(1)
+                with open(FittingResults, 'rb') as file:
+                    FindingRef = pickle.load(file)
+                if FindingRef == '':
+                    logging.error('No finding results are stored for these fitting results, please check the global settings and re-run finding and fitting.')
+                    error = 'No finding results are stored for fitting results trying to load.'
+                elif not os.path.exists(FindingRef):
+                    logging.error('Cannot find finding results, please re-run finding and fitting and save corresponding results.')
+                    error = 'FileNotFound: Cannot find finding results.'
+                else:
+                    if 'ExistingFinding' in getattr(self,f"CandidateFindingDropdown{polarityVal}").currentText() or 'existing Finding' in getattr(self,f"CandidateFindingDropdown{polarityVal}").currentText():
+                        FindingEvalText = self.getFunctionEvalText('Finding',"npyData","self.globalSettings",polarityVal)
+                        match = re.search(r'File_Location="([^"]+)"', FindingEvalText)
+                        if match:
+                            FindingResults = match.group(1)
+                        if FindingResults != FindingRef:
+                            logging.warning('Existing finding and fitting do not match, try to reset finding path to correct file.')
+                            self.setFilepathExisting("Finding", polarityVal, FindingRef)
+                    else:
+                        logging.warning("Existing finding and fitting do not match, try to reset finding routine.")
+                        print(self.getFunctionEvalText('Finding',"npyData","self.globalSettings",polarityVal))
+                        self.setMethod("Finding", polarityVal, "Load an existing Finding Result")
+                        # reset comboboxes
+                        #self.set_all_combobox_states()
+                        print(self.getFunctionEvalText('Finding',"npyData","self.globalSettings",polarityVal))
+                        self.setFilepathExisting("Finding", polarityVal, FindingRef)
 
-                # Ensure that we don't store the finding result
-                origStoreFindingSetting=self.globalSettings['StoreFindingOutput']['value']
-                self.globalSettings['StoreFindingOutput']['value'] = False
-                # Ensure that we don't store fitting result
-                origStoreFittingSetting=self.globalSettings['StoreFittingOutput']['value']
-                self.globalSettings['StoreFittingOutput']['value'] = False
-                self.processSingleFile(self.dataLocationInput.text(),noFindingFitting=True,polarityVal=polarityVal)
-                
-                #Reset the global setting:
-                self.globalSettings['StoreFindingOutput']['value']=origStoreFindingSetting
-                self.globalSettings['StoreFittingOutput']['value']=origStoreFittingSetting
+                    # Ensure that we don't store the finding result
+                    origStoreFindingSetting=self.globalSettings['StoreFindingOutput']['value']
+                    self.globalSettings['StoreFindingOutput']['value'] = False
+                    # Ensure that we don't store fitting result
+                    origStoreFittingSetting=self.globalSettings['StoreFittingOutput']['value']
+                    self.globalSettings['StoreFittingOutput']['value'] = False
+                    self.processSingleFile(self.dataLocationInput.text(),noFindingFitting=True,polarityVal=polarityVal)
+                    
+                    #Reset the global setting:
+                    self.globalSettings['StoreFindingOutput']['value']=origStoreFindingSetting
+                    self.globalSettings['StoreFittingOutput']['value']=origStoreFittingSetting
 
             else:
                 if 'ExistingFinding' in getattr(self,f"CandidateFindingDropdown{polarityVal}").currentText() or 'existing Finding' in getattr(self,f"CandidateFindingDropdown{polarityVal}").currentText():
@@ -2694,6 +2721,28 @@ class MyGUI(QMainWindow):
             else:
                 logging.error('SOMETHING VERY STUPID HAPPENED')
                 return None
+            
+    def setFilepathExisting(self, className, polarity, newFilepath):
+        #Get the dropdown info
+        all_layouts = self.findChild(QWidget, "groupbox"+className+polarity).findChildren(QLayout)[0]
+        # Iterate over the items in the layout
+        for index in range(all_layouts.count()):
+            item = all_layouts.itemAt(index)
+            if isinstance(item, QLayout):
+                for index2 in range(item.count()):
+                    item_sub = item.itemAt(index2)
+                    widget_sub = item_sub.widget()
+                    if ("LineEdit" in widget_sub.objectName()) and widget_sub.isVisibleTo(self.tab_processing):
+                        widget_sub.setText(newFilepath)
+    
+    def setMethod(self, className, polarity, newMethod):
+        #Get the dropdown info
+        all_layouts = self.findChild(QWidget, "groupbox"+className+polarity).findChildren(QLayout)[0]
+        # get dropdown item
+        dropdown = all_layouts.itemAt(0)
+        widget = dropdown.widget()
+        widget.setCurrentText(f"{newMethod} ({polarity.lower()})")
+        print(widget)
 
     def save_entries_to_json(self):
         self.entries = {}
@@ -2788,34 +2837,37 @@ class MyGUI(QMainWindow):
         # try:
         def set_combobox_states(widget,polVal):
             if isinstance(widget, QComboBox):
-                if widget.objectName()[:-3] == polVal.lower():
+                if widget.objectName()[-3:] == polVal:
                     original_states[widget] = widget.currentIndex()
                     for i in range(widget.count()):
-                        logging.info('Set text of combobox '+widget.objectName()+' to '+widget.itemText(i))
+                        #logging.info('Set text of combobox '+widget.objectName()+' to '+widget.itemText(i))
                         widget.setCurrentIndex(i)
                         #Update all line edits and such
                         if 'Finding' in widget.objectName():
-                            logging.info('Line 2299')
-                            logging.info(getattr(self, f"groupboxFinding{polVal}").objectName())
+                            logging.info(widget.objectName())
+                            #logging.info(getattr(self, f"groupboxFinding{polVal}").objectName())
                             utils.changeLayout_choice(getattr(self, f"groupboxFinding{polVal}").layout(),widget.objectName(),getattr(self, f"Finding_functionNameToDisplayNameMapping{polVal}"),parent=self)
                         elif 'Fitting' in widget.objectName():
-                            logging.info('Line 2299+2')
+                            #logging.info(getattr(self, f"groupboxFitting{polVal}").objectName())
                             utils.changeLayout_choice(getattr(self, f"groupboxFitting{polVal}").layout(),widget.objectName(),getattr(self, f"Fitting_functionNameToDisplayNameMapping{polVal}"),parent=self)
             elif isinstance(widget, QWidget):
                 for child_widget in widget.children():
                     set_combobox_states(child_widget,polVal)
 
-        # Reset to orig states
-        for polVal in ['Pos','Neg','Mix']:
-            set_combobox_states(self,polVal)
-            for combobox, original_state in original_states.items():
-                combobox.setCurrentIndex(original_state)
-                if 'Finding' in combobox.objectName():
-                    utils.changeLayout_choice(getattr(self, f"groupboxFinding{polVal}").layout(),combobox.objectName(),getattr(self, f"Finding_functionNameToDisplayNameMapping{polVal}"),parent=self)
-                elif 'Fitting' in combobox.objectName():
-                    utils.changeLayout_choice(getattr(self, f"groupboxFitting{polVal}").layout(),combobox.objectName(),getattr(self, f"Fitting_functionNameToDisplayNameMapping{polVal}"),parent=self)
-        # except:
-        #     pass
+        # # Reset to orig states
+        # for polVal in ['Pos','Neg','Mix']:
+        #     set_combobox_states(self,polVal)
+        #     print(original_states)
+        #     for combobox, original_state in original_states.items():
+        #         combobox.setCurrentIndex(original_state)
+        #         if 'Finding' in combobox.objectName():
+        #             logging.info(combobox.objectName())
+        #             utils.changeLayout_choice(getattr(self, f"groupboxFinding{polVal}").layout(),combobox.objectName(),getattr(self, f"Finding_functionNameToDisplayNameMapping{polVal}"), parent=self)
+        #         elif 'Fitting' in combobox.objectName():
+        #             logging.info(combobox.objectName())
+        #             utils.changeLayout_choice(getattr(self, f"groupboxFitting{polVal}").layout(),combobox.objectName(),getattr(self, f"Fitting_functionNameToDisplayNameMapping{polVal}"),parent=self)
+        # # except:
+        # #     pass
 
 class AdvancedSettingsWindow(QMainWindow):
     def __init__(self, parent):
