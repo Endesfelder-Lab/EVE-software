@@ -243,7 +243,7 @@ class MyGUI(QMainWindow):
 
 
         #Loop through all combobox states briefly to initialise them (and hide them)
-        #self.set_all_combobox_states()
+        self.set_all_combobox_states()
         
         #Load the GUI settings from last time:
         self.load_entries_from_json()
@@ -1740,7 +1740,7 @@ class MyGUI(QMainWindow):
                         print(self.getFunctionEvalText('Finding',"npyData","self.globalSettings",polarityVal))
                         self.setMethod("Finding", polarityVal, "Load an existing Finding Result")
                         # reset comboboxes
-                        #self.set_all_combobox_states()
+                        self.reset_single_combobox_states()
                         print(self.getFunctionEvalText('Finding',"npyData","self.globalSettings",polarityVal))
                         self.setFilepathExisting("Finding", polarityVal, FindingRef)
 
@@ -2756,7 +2756,43 @@ class MyGUI(QMainWindow):
         find_editable_fields(self)
         return fields
 
+
+    def reset_single_combobox_states(self):
+        logging.info('Ran reset_single_combobox_states')
+        original_states = {}
+        # try:
+        def set_single_combobox_states(widget,polVal):
+            if isinstance(widget, QComboBox):
+                if widget.objectName()[-3:] == polVal:
+                    original_states[widget] = widget.currentIndex()
+                    #Update all line edits and such
+                    if 'CandidateFinding' in widget.objectName():
+                        #logging.info(getattr(self, f"groupboxFinding{polVal}").objectName())
+                        utils.changeLayout_choice(getattr(self, f"groupboxFinding{polVal}").layout(),widget.objectName(),getattr(self, f"Finding_functionNameToDisplayNameMapping{polVal}"),parent=self)
+                    elif 'CandidateFitting' in widget.objectName():
+                        #logging.info(getattr(self, f"groupboxFitting{polVal}").objectName())
+                        utils.changeLayout_choice(getattr(self, f"groupboxFitting{polVal}").layout(),widget.objectName(),getattr(self, f"Fitting_functionNameToDisplayNameMapping{polVal}"),parent=self)
+            elif isinstance(widget, QWidget):
+                for child_widget in widget.children():
+                    set_single_combobox_states(child_widget,polVal)
+
+        # Reset to orig states
+        for polVal in ['Pos','Neg','Mix']:
+            set_single_combobox_states(self,polVal)
+            for combobox, original_state in original_states.items():
+                combobox.setCurrentIndex(original_state)
+                if 'Finding' in combobox.objectName():
+                    logging.debug(combobox.objectName())
+                    utils.changeLayout_choice(getattr(self, f"groupboxFinding{polVal}").layout(),combobox.objectName(),getattr(self, f"Finding_functionNameToDisplayNameMapping{polVal}"), parent=self)
+                elif 'Fitting' in combobox.objectName():
+                    logging.debug(combobox.objectName())
+                    utils.changeLayout_choice(getattr(self, f"groupboxFitting{polVal}").layout(),combobox.objectName(),getattr(self, f"Fitting_functionNameToDisplayNameMapping{polVal}"),parent=self)
+        # except:
+        #     pass
+
+
     def set_all_combobox_states(self):
+        logging.info('Ran set_all_combobox_states')
         original_states = {}
         # try:
         def set_combobox_states(widget,polVal):
@@ -2764,34 +2800,32 @@ class MyGUI(QMainWindow):
                 if widget.objectName()[-3:] == polVal:
                     original_states[widget] = widget.currentIndex()
                     for i in range(widget.count()):
-                        #logging.info('Set text of combobox '+widget.objectName()+' to '+widget.itemText(i))
+                        # logging.info('Set text of combobox '+widget.objectName()+' to '+widget.itemText(i))
                         widget.setCurrentIndex(i)
                         #Update all line edits and such
-                        if 'Finding' in widget.objectName():
-                            logging.info(widget.objectName())
+                        if 'CandidateFinding' in widget.objectName():
                             #logging.info(getattr(self, f"groupboxFinding{polVal}").objectName())
                             utils.changeLayout_choice(getattr(self, f"groupboxFinding{polVal}").layout(),widget.objectName(),getattr(self, f"Finding_functionNameToDisplayNameMapping{polVal}"),parent=self)
-                        elif 'Fitting' in widget.objectName():
+                        elif 'CandidateFitting' in widget.objectName():
                             #logging.info(getattr(self, f"groupboxFitting{polVal}").objectName())
                             utils.changeLayout_choice(getattr(self, f"groupboxFitting{polVal}").layout(),widget.objectName(),getattr(self, f"Fitting_functionNameToDisplayNameMapping{polVal}"),parent=self)
             elif isinstance(widget, QWidget):
                 for child_widget in widget.children():
                     set_combobox_states(child_widget,polVal)
 
-        # # Reset to orig states
-        # for polVal in ['Pos','Neg','Mix']:
-        #     set_combobox_states(self,polVal)
-        #     print(original_states)
-        #     for combobox, original_state in original_states.items():
-        #         combobox.setCurrentIndex(original_state)
-        #         if 'Finding' in combobox.objectName():
-        #             logging.info(combobox.objectName())
-        #             utils.changeLayout_choice(getattr(self, f"groupboxFinding{polVal}").layout(),combobox.objectName(),getattr(self, f"Finding_functionNameToDisplayNameMapping{polVal}"), parent=self)
-        #         elif 'Fitting' in combobox.objectName():
-        #             logging.info(combobox.objectName())
-        #             utils.changeLayout_choice(getattr(self, f"groupboxFitting{polVal}").layout(),combobox.objectName(),getattr(self, f"Fitting_functionNameToDisplayNameMapping{polVal}"),parent=self)
-        # # except:
-        # #     pass
+        # Reset to orig states
+        for polVal in ['Pos','Neg','Mix']:
+            set_combobox_states(self,polVal)
+            for combobox, original_state in original_states.items():
+                combobox.setCurrentIndex(original_state)
+                if 'Finding' in combobox.objectName():
+                    logging.debug(combobox.objectName())
+                    utils.changeLayout_choice(getattr(self, f"groupboxFinding{polVal}").layout(),combobox.objectName(),getattr(self, f"Finding_functionNameToDisplayNameMapping{polVal}"), parent=self)
+                elif 'Fitting' in combobox.objectName():
+                    logging.debug(combobox.objectName())
+                    utils.changeLayout_choice(getattr(self, f"groupboxFitting{polVal}").layout(),combobox.objectName(),getattr(self, f"Fitting_functionNameToDisplayNameMapping{polVal}"),parent=self)
+        # except:
+        #     pass
 
 class AdvancedSettingsWindow(QMainWindow):
     def __init__(self, parent):
