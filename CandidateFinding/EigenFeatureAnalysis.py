@@ -295,18 +295,23 @@ def clusterPoints_to_candidates(clusterpoints,cluster_labels,ms_to_px):
     new_arr['t'] = new_arr['t'].astype(np.int64)
     new_arr['p'] = new_arr['p'].astype(int)
     
+    candidates={}
     starttime = time.time()
     new_arr['Cluster_Labels'] = cluster_labels
     grouped_clusters = new_arr.groupby('Cluster_Labels')
     #This should be sped up: 
-    candidates = {}
+    midtime = time.time()
     for cl, cluster_events in grouped_clusters:
         if cl > -1:
             clusterEvents = cluster_events.drop(columns='Cluster_Labels')
             candidates[cl] = {}
             candidates[cl]['events'] = clusterEvents
-            candidates[cl]['cluster_size'] = [int(np.max(clusterEvents['y'])-np.min(clusterEvents['y'])), int(np.max(clusterEvents['x'])-np.min(clusterEvents['x'])), int(np.max(clusterEvents['t'])-np.min(clusterEvents['t']))]
             candidates[cl]['N_events'] = int(len(clusterEvents))
+            # candidates[cl]['cluster_size'] = [int((clusterEvents['y']).max()-(clusterEvents['y']).min()), int((clusterEvents['x']).max()-(clusterEvents['x']).min()), int((clusterEvents['t']).max()-(clusterEvents['t']).min())]
+            
+            #We know that they're time-sorted, so for time, we can do end-start, which is max-min. Speeds up a little
+            candidates[cl]['cluster_size'] = [int((clusterEvents['y']).max()-(clusterEvents['y']).min()), int((clusterEvents['x']).max()-(clusterEvents['x']).min()), int(clusterEvents['t'].iloc[-1]-clusterEvents['t'].iloc[0])]
+            
     endtime = time.time()
     
     return candidates
