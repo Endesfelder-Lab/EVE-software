@@ -22,6 +22,13 @@ from PyQt5 import QtWidgets, QtGui
 from PyQt5.QtGui import QCursor, QTextCursor, QIntValidator
 from PyQt5.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QTableWidget, QTableWidgetItem, QLayout, QMainWindow, QLabel, QPushButton, QSizePolicy, QGroupBox, QTabWidget, QGridLayout, QWidget, QComboBox, QLineEdit, QFileDialog, QToolBar, QCheckBox,QDesktopWidget, QMessageBox, QTextEdit, QSlider, QSpacerItem, QTableView
 from PyQt5.QtCore import Qt, QPoint, QProcess, QCoreApplication, QTimer, QFileSystemWatcher, QFile, QThread, pyqtSignal, QObject
+import sys
+import typing
+
+import pandas as pd
+from PyQt5.QtCore import QAbstractTableModel, QModelIndex, Qt
+from PyQt5.QtWidgets import QApplication, QMainWindow, QTableView, QWidget, QGridLayout, QPushButton
+
 
 from napari import Viewer
 from napari.qt import QtViewer
@@ -991,8 +998,8 @@ class MyGUI(QMainWindow):
         tab2_layout = QGridLayout()
         self.tab_postProcessing.setLayout(tab2_layout)
         
-        self.label2 = QLabel("Hello from Tab 2!")
-        tab2_layout.addWidget(self.label2, 0, 0)
+        self.postProcessingtab_widget = PostProcessing(self)
+        self.tab_postProcessing.addWidget(self.postProcessingtab_widget)
 
     def setup_logFileTab(self):
         """
@@ -1062,7 +1069,6 @@ class MyGUI(QMainWindow):
         self.buttonReadCSV.clicked.connect(self.open_loclist_csv)
     
     def open_loclist_csv(self):
-        logging.info('starting CSV loaded')
         loclistcsvloc = 'C:\Data\EBS\Tubulin_hdf5._FitResults_20240208_121847.csv'
         #Read the csv:
         loclist = pd.read_csv(loclistcsvloc)
@@ -1075,10 +1081,8 @@ class MyGUI(QMainWindow):
         #Set this as result:
         self.data['FittingResult'] = {}
         self.data['FittingResult'][0] = loclist
-        
-        logging.info('CSV loaded')
         self.updateLocList()
-        logging.info('Loclist updated')
+        logging.info('CSV loaded, loclist updated')
         
     def setup_visualisationTab(self):
         """
@@ -1122,139 +1126,6 @@ class MyGUI(QMainWindow):
         # #Add the canvas to the tab
         # visualisationTab_vertical_container.addWidget(self.data['figureCanvas'])
     
-    def plotScatter(self):
-        """
-        Function that creates a scatter plot from the localizations
-        """
-        #check if we have results stored:
-        if 'FittingMethod' in self.data:
-            logging.debug('Attempting to show scatter plot')
-            #Delete any existing cbar - needs to be done before anything else:
-            try:
-                if hasattr(self, 'cbar'):
-                    self.cbar.remove()
-            except:
-                pass
-            #Plot the contents of the loclist as scatter points, color-coded on time:
-            #Clear axis
-            self.data['figureAx'].clear()
-            #Plot the data as scatter plot
-            scatter = self.data['figureAx'].scatter(self.data['FittingResult'][0]['x'], self.data['FittingResult'][0]['y'], c=self.data['FittingResult'][0]['t'], cmap='viridis')
-            self.data['figureAx'].set_xlabel('x [nm]')
-            self.data['figureAx'].set_ylabel('y [nm]')
-            self.data['figureAx'].set_aspect('equal', adjustable='box')  
-            
-            #Draw a cbar
-            self.cbar = self.data['figurePlot'].colorbar(scatter)
-            self.cbar.set_label('Time (ms)')
-            
-            #Give it a nice layout
-            self.data['figurePlot'].tight_layout()
-            #Update drawing of the canvas
-            self.data['figureCanvas'].draw()
-            logging.info('Scatter plot drawn')
-        else:
-            logging.error('Tried to visualise but no data found!')
-    
-    def plotLinearInterpHist(self,pixel_recon_dim=10):
-        """
-        Function that creates an average-shifted histogram (linearly-interpolated histogram)
-        Currently hard-coded on both pixel_recon_dim = 10, and run with 3-x-3 shifts
-        """
-        #check if we have results stored:
-        if 'FittingMethod' in self.data:
-            #Code inspired by Frontiers Martens et al
-            logging.debug('Attempting to show 2d hist plot')
-            #Delete any existing cbar - needs to be done before anything else:
-            try:
-                if hasattr(self, 'cbar'):
-                    self.cbar.remove()
-            except:
-                pass
-            # First, an empty two-dimensional array is allocated. It will be populated with 
-            # datapoints and finally will be used for the image reconstruction. 
-            # Its dimensions are adjusted to the maximum X and Y coordinate values in 
-            # the dataset divided by the pixel dimensions
-            max_x = max(self.data['FittingResult'][0]['x'])
-            max_y = max(self.data['FittingResult'][0]['y'])
-            hist_2d = np.zeros((int(max_x/pixel_recon_dim)+3, int(max_y/pixel_recon_dim)+3))
-            # We prepare the method which will compute the amount of intensity which will 
-            # be received by the pixel based on the subpixel localization of the processed event
-            def interpolation_value(x, pixel_dim=10):
-                y = (-np.abs(x)/pixel_dim + 1)
-                return y
-
-            # In this for loop each datapoint is assigned to four pixels (and in very 
-            # exceptional cases to a single pixel if it is positioned at the center of 
-            # the reconstruction iamge pixel) in the image reconstruction.
-            for index, d in self.data['FittingResult'][0].iterrows():
-                if 'int' in d:
-                    intensity = d['int']
-                else:
-                    intensity = 1
-                # Based on X and Y coordinates we determine the pixel position by dividing the 
-                # coordinates with the floor division (//) operation...
-                coord_x = int(d['x'] // pixel_recon_dim) + 1
-                coord_y = int(d['y'] // pixel_recon_dim) + 1
-                # ... and also we determine the subpixel pisition of the event. We subtract 
-                # the halved pixel dimension value from X and Y subpixel position in order 
-                # to determine how the event is oriented with respect to the pixel center. 
-                # This value will be used  for the intensity distribution and finding 
-                # neighboring pixels which will receive a fraction of this intensity as well
-                position_x = d['x'] % pixel_recon_dim - pixel_recon_dim/2
-                position_y = d['y'] % pixel_recon_dim - pixel_recon_dim/2
-
-                # we calculate the 'pixel-intensity' which is used for the linear interpolation
-                x_int = interpolation_value(position_x,pixel_dim=pixel_recon_dim)
-                y_int = interpolation_value(position_y,pixel_dim=pixel_recon_dim)
-
-                # Finally we distribute even itnensities to pixels. 
-                # The original pixel is at coord_x and coord_y values
-                hist_2d[coord_x, coord_y] += x_int*y_int * intensity
-
-                # The horizontal neighbor pixel is on the right (or left) side of the 
-                # original pixel, assuming the datapoint is on the right (or left) 
-                # half of the original pixel.
-                if position_x > 0:
-                    hist_2d[coord_x+1, coord_y] += (1-x_int)*y_int * intensity
-                else:
-                    hist_2d[coord_x-1, coord_y] += (1-x_int)*y_int * intensity
-
-                # Similarly we find a vertical neighbor in up & down dimension.
-                if position_y > 0:
-                    hist_2d[coord_x, coord_y+1] += x_int*(1-y_int) * intensity
-                else:
-                    hist_2d[coord_x, coord_y-1] += x_int*(1-y_int) * intensity
-
-                # Finally we find the diagonal neighbors by combining the code used in the 
-                # horizontal and vertical neighbours
-                if position_x > 0:
-                    if position_y > 0:
-                        hist_2d[coord_x+1, coord_y+1] += (1-x_int)*(1-y_int) * intensity
-                    else:
-                        hist_2d[coord_x+1, coord_y-1] += (1-x_int)*(1-y_int) * intensity
-                else:
-                    if position_y > 0:
-                        hist_2d[coord_x-1, coord_y+1] += (1-x_int)*(1-y_int) * intensity
-                    else:
-                        hist_2d[coord_x-1, coord_y-1] += (1-x_int)*(1-y_int) * intensity
-
-            #Plot hist_2d:
-            #Clear axis
-            self.data['figureAx'].clear()
-            #Plot the data as scatter plot
-            self.data['figureAx'].imshow(hist_2d)
-            self.data['figureAx'].set_xlabel('x [nm]')
-            self.data['figureAx'].set_ylabel('y [nm]')
-            self.data['figureAx'].set_aspect('equal', adjustable='box')  
-            #Give it a nice layout
-            self.data['figurePlot'].tight_layout()
-            #Update drawing of the canvas
-            self.data['figureCanvas'].draw()
-            logging.info('2d interp hist drawn')
-        else:
-            logging.error('Tried to visualise but no data found!')
-
     def setup_canPreviewTab(self):
         """
         Function to setup the Candidate Preview tab
@@ -1583,28 +1454,6 @@ class MyGUI(QMainWindow):
                 localizations[localizations.columns[y]] = localizations[localizations.columns[y]].apply(lambda x: round(x, significant_digit))
                 
         self.LocListTable.setModel(TableModel(table_data = localizations))
-        
-        #Get the shape of the data
-        # nrRows = np.shape(localizations)[0]
-        # nrColumns = np.shape(localizations)[1]
-        
-        
-        # #Give the loclisttable the correct row/column count:
-        # self.LocListTable.setRowCount(nrRows)
-        # self.LocListTable.setColumnCount(nrColumns)
-        
-        # #Fill the loclisttable with the output:
-        # for r in range(nrRows):
-        #     for c in range(nrColumns):
-        #         nrDigits = 2
-        #         item = QTableWidgetItem(f"{round(localizations.iloc[r, c], nrDigits):.{nrDigits}f}")
-        #         self.LocListTable.setItem(r, c, item)
-        
-        # #Add headers
-        # self.LocListTable.setHorizontalHeaderLabels(localizations.columns.tolist())
-        # self.LocListTable.setSortingEnabled(True)
-        
-        
         return
     
     def checkPolarity(self,npyData):
@@ -3660,61 +3509,69 @@ class VisualisationNapari(QWidget):
     """
     def __init__(self,parent):
         super().__init__()
-        # Create a napari viewer
-        self.napariviewer = Viewer(show=False)
         # Create a layout for the main widget
         self.mainlayout = QVBoxLayout()
         # Set the layout for the main widget
         self.setLayout(self.mainlayout)
         
+        
+        #------------Start of GUI dynamic layout -----------------
+        
         #Create a groupbox for visualisation methods
         self.VisualisationGroupbox = QGroupBox("Visualisation")
         self.VisualisationGroupbox.setLayout(QGridLayout())
-        
-        #Add a button:
-        button = QPushButton("Visualise", self)
-        self.VisualisationGroupbox.layout().addWidget(button)
         #Ensure that we have 'KEEP' in the objectname so it's not deleted later
         self.VisualisationGroupbox.setObjectName("VisualiseGroupboxKEEP")
         
+        #Add a combobox-dropdown
         visualisationDropdown = QComboBox(self)
         visualisationDropdown.setMaxVisibleItems(30)
-        
-        #Add the visualisationDropdown to the layout
-        self.VisualisationGroupbox.layout().addWidget(visualisationDropdown)
-        
         #Ensure that we have 'KEEP' in the objectname so it's not deleted later
         visualisationDropdown_name = "VisualisationDropdownKEEP"
         Visualisation_functionNameToDisplayNameMapping_name = f"Visualisation_functionNameToDisplayNameMapping"
-        # self.Visualisation_functionNameToDisplayNameMapping = Visualisation_functionNameToDisplayNameMapping_name
-        
+        #Get the options dynamically from the Visualisation folder
         options = utils.functionNamesFromDir('Visualisation')
+        #Also find the mapping of 'display name' to 'function name'
         displaynames, Visualisation_functionNameToDisplayNameMapping = utils.displayNamesFromFunctionNames(options,'')
+        #and add this to our self attributes
+        setattr(self, Visualisation_functionNameToDisplayNameMapping_name, Visualisation_functionNameToDisplayNameMapping)
+        
+        #Set a current name and add the items
         visualisationDropdown.setObjectName(visualisationDropdown_name)
         visualisationDropdown.addItems(displaynames)
-            
-        setattr(self, Visualisation_functionNameToDisplayNameMapping_name, Visualisation_functionNameToDisplayNameMapping)
-        groupbox_name="GroupboxVisualisation"
-        layout_name = f"layoutVisualisation"
         
-        # #On startup/initiatlisation: also do changeLayout_choice
+        #Add a callback to the changing of the dropdown:
+        visualisationDropdown.currentTextChanged.connect(lambda text: utils.changeLayout_choice(self.VisualisationGroupbox.layout(),visualisationDropdown_name,getattr(self, Visualisation_functionNameToDisplayNameMapping_name),parent=self,ignorePolarity=True))
+        
+        #Add the visualisationDropdown to the layout
+        #Ensure it is full-width with the [1,6]
+        self.VisualisationGroupbox.layout().addWidget(visualisationDropdown,1,0,1,6)
+        
+        #On startup/initiatlisation: also do changeLayout_choice
         utils.changeLayout_choice(self.VisualisationGroupbox.layout(),visualisationDropdown_name,getattr(self, Visualisation_functionNameToDisplayNameMapping_name),parent=self,ignorePolarity=True)
-        
-        #add a 'Visualise!' button to this groupbox:
+                
+        #add a 'Visualise!' button to this groupbox at the bottom:
         button = QPushButton("Visualise!", self)
+        #Ensure 'KEEP' is in the objectname so it's never removed
         button.setObjectName("VisualiseRunButtonKEEP")
-        self.VisualisationGroupbox.layout().addWidget(button)
+        #Ensure it is full-width with the [1,6]
+        self.VisualisationGroupbox.layout().addWidget(button,99,0,1,6)
         #And add a callback to this:
         button.clicked.connect(lambda text, parent=parent: self.visualise_callback(parent))
         
         #Add the groupbox to the mainlayout
         self.mainlayout.layout().addWidget(self.VisualisationGroupbox)
         
+        #------------End of GUI dynamic layout -----------------
         
+        
+        # Create a napari viewer
+        self.napariviewer = Viewer(show=False)
+        #Add a napariViewer to the layout
         self.viewer = QtViewer(self.napariviewer)
-        
         self.mainlayout.addWidget(self.viewer)
         self.mainlayout.addWidget(self.viewer.controls)
+        
         logging.info('VisualisationNapari init')
 
     def visualise_callback(self,parent):
@@ -3731,9 +3588,7 @@ class VisualisationNapari(QWidget):
             
         #Add a new layer which is this image
         self.napariviewer.add_image(resultImage[0], multiscale=False)
-        
-
-
+    
     def getVisFunctionEvalText(self,p1,p2):
         #Get the dropdown info
         moduleMethodEvalTexts = []
@@ -3790,7 +3645,141 @@ class VisualisationNapari(QWidget):
             return moduleMethodEvalTexts[0]
         else:
             return None
+
+
+class PostProcessing(QWidget):
+    """
+    Class that handles the post-processing
+    This class handles both the GUI initialisation of the PostProcessing tab and the actual post-processing.
+    """
+    def __init__(self,parent):
+        super().__init__()
+        # Create a layout for the main widget
+        self.mainlayout = QVBoxLayout()
+        # Set the layout for the main widget
+        self.setLayout(self.mainlayout)
+        
+        
+        #------------Start of GUI dynamic layout -----------------
+        
+        #Create a groupbox for PostProcessing methods
+        self.PostProcessingGroupbox = QGroupBox("Post-Processing")
+        self.PostProcessingGroupbox.setLayout(QGridLayout())
+        #Ensure that we have 'KEEP' in the objectname so it's not deleted later
+        self.PostProcessingGroupbox.setObjectName("PostProcessingGroupboxKEEP")
+        
+        #Add a combobox-dropdown
+        PostProcessingDropdown = QComboBox(self)
+        PostProcessingDropdown.setMaxVisibleItems(30)
+        #Ensure that we have 'KEEP' in the objectname so it's not deleted later
+        PostProcessingDropdown_name = "PostProcessingDropdownKEEP"
+        PostProcessing_functionNameToDisplayNameMapping_name = f"PostProcessing_functionNameToDisplayNameMapping"
+        #Get the options dynamically from the PostProcessing folder
+        options = utils.functionNamesFromDir('PostProcessing')
+        #Also find the mapping of 'display name' to 'function name'
+        displaynames, PostProcessing_functionNameToDisplayNameMapping = utils.displayNamesFromFunctionNames(options,'')
+        #and add this to our self attributes
+        setattr(self, PostProcessing_functionNameToDisplayNameMapping_name, PostProcessing_functionNameToDisplayNameMapping)
+        
+        #Set a current name and add the items
+        PostProcessingDropdown.setObjectName(PostProcessingDropdown_name)
+        PostProcessingDropdown.addItems(displaynames)
+        
+        #Add a callback to the changing of the dropdown:
+        PostProcessingDropdown.currentTextChanged.connect(lambda text: utils.changeLayout_choice(self.PostProcessingGroupbox.layout(),PostProcessingDropdown_name,getattr(self, PostProcessing_functionNameToDisplayNameMapping_name),parent=self,ignorePolarity=True))
+        
+        #Add the visualisationDropdown to the layout
+        #Ensure it is full-width with the [1,6]
+        self.PostProcessingGroupbox.layout().addWidget(PostProcessingDropdown,1,0,1,6)
+        
+        #On startup/initiatlisation: also do changeLayout_choice
+        utils.changeLayout_choice(self.PostProcessingGroupbox.layout(),PostProcessingDropdown_name,getattr(self, PostProcessing_functionNameToDisplayNameMapping_name),parent=self,ignorePolarity=True)
+                
+        #add a 'Visualise!' button to this groupbox at the bottom:
+        button = QPushButton("PostProcessing!", self)
+        #Ensure 'KEEP' is in the objectname so it's never removed
+        button.setObjectName("PostProcessingRunButtonKEEP")
+        #Ensure it is full-width with the [1,6]
+        self.PostProcessingGroupbox.layout().addWidget(button,99,0,1,6)
+        #And add a callback to this:
+        button.clicked.connect(lambda text, parent=parent: self.PostProcessing_callback(parent))
+        
+        #Add the groupbox to the mainlayout
+        self.mainlayout.layout().addWidget(self.PostProcessingGroupbox)
+        
+        #------------End of GUI dynamic layout -----------------
+        
+        
+        logging.info('PostProcessing init')
+
+    def PostProcessing_callback(self,parent):
+        logging.info('PostProcessing button pressed')
+        
+        #Get the current function callback
+        FunctionEvalText = self.getPostProcessingFunctionEvalText("parent.data['FittingResult'][0]","parent.globalSettings")
+        print(FunctionEvalText)
+        result = eval(FunctionEvalText)
+        
     
+    def getPostProcessingFunctionEvalText(self,p1,p2):
+        #Get the dropdown info
+        moduleMethodEvalTexts = []
+        all_layouts = self.PostProcessingGroupbox.findChildren(QLayout)
+        
+        methodKwargNames_method = []
+        methodKwargValues_method = []
+        methodName_method = ''
+        # Iterate over the items in the layout
+        for index in range(len(all_layouts)):
+            item = all_layouts[index]
+            widget = item.widget()
+            if isinstance(item, QLayout):
+                for index2 in range(item.count()):
+                    item_sub = item.itemAt(index2)
+                    widget_sub = item_sub.widget()
+                    try:
+                        if ("LineEdit" in widget_sub.objectName()) and widget_sub.isVisibleTo(self.PostProcessingGroupbox):
+                            # The objectName will be along the lines of foo#bar#str
+                            #Check if the objectname is part of a method or part of a scoring
+                            split_list = widget_sub.objectName().split('#')
+                            methodName_method = split_list[1]
+                            methodKwargNames_method.append(split_list[2])
+                            
+                            #Widget.text() could contain a file location. Thus, we need to swap out all \ for /:
+                            methodKwargValues_method.append(widget_sub.text().replace('\\','/'))
+                    except:
+                        pass
+        #If at this point there is no methodName_method, it means that the method has exactly 0 req or opt kwargs. Thus, we simply find the value of the QComboBox which should be the methodName:
+        if methodName_method == '':
+            for index in range(len(all_layouts)):
+                item = all_layouts[index]
+                widget = item.widget()
+                if isinstance(item, QLayout):
+                    for index2 in range(item.count()):
+                        item_sub = item.itemAt(index2)
+                        widget_sub = item_sub.widget()
+                        try:
+                            if "PostProcessingDropdownKEEP"in widget_sub.objectName():
+                                text = widget_sub.currentText()
+                                for i in range(len(self.PostProcessing_functionNameToDisplayNameMapping)):
+                                    if self.PostProcessing_functionNameToDisplayNameMapping[i][0] == text:
+                                        methodName_method = self.PostProcessing_functionNameToDisplayNameMapping[i][1]
+                                        break
+                        except:
+                            pass
+        #Function call: get the to-be-evaluated text out, giving the methodName, method KwargNames, methodKwargValues, and 'function Type (i.e. cellSegmentScripts, etc)' - do the same with scoring as with method
+        if methodName_method != '':
+            EvalTextMethod = utils.getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart=str(p1)+','+str(p2))
+            #append this to moduleEvalTexts
+            moduleMethodEvalTexts.append(EvalTextMethod)
+            
+        if moduleMethodEvalTexts is not None and len(moduleMethodEvalTexts) > 0:
+            return moduleMethodEvalTexts[0]
+        else:
+            return None
+
+
+
 class PreviewFindingFitting(QWidget):
     """
     Class that runs the GUI of finding/fitting preview (i.e. showing alle vents as an image and overlays with boxes/dots)
@@ -3997,18 +3986,11 @@ class PreviewFindingFitting(QWidget):
             
         
         # print('wopp'+str(self.napariviewer.dims.current_step[0]))
-        
-        
-        
-import sys
-import typing
-
-import pandas as pd
-from PyQt5.QtCore import QAbstractTableModel, QModelIndex, Qt
-from PyQt5.QtWidgets import QApplication, QMainWindow, QTableView, QWidget, QGridLayout, QPushButton
-
 
 class TableModel(QAbstractTableModel):
+    """TableModel that heavily speedsup the table view
+    Blatantly taken from https://stackoverflow.com/questions/71076164/fastest-way-to-fill-or-read-from-a-qtablewidget-in-pyqt5
+    """
 
     def __init__(self, table_data, parent=None):
         super().__init__(parent)
