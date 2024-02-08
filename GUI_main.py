@@ -43,6 +43,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from CandidateFitting import *
 from CandidateFinding import *
 from Visualisation import *
+from PostProcessing import *
+
 #Obtain the helperfunctions
 from Utils import utils, utilsHelper
 
@@ -999,7 +1001,7 @@ class MyGUI(QMainWindow):
         self.tab_postProcessing.setLayout(tab2_layout)
         
         self.postProcessingtab_widget = PostProcessing(self)
-        self.tab_postProcessing.addWidget(self.postProcessingtab_widget)
+        self.tab_postProcessing.layout().addWidget(self.postProcessingtab_widget)
 
     def setup_logFileTab(self):
         """
