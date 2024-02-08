@@ -20,7 +20,7 @@ import re
 #Imports for PyQt5 (GUI)
 from PyQt5 import QtWidgets, QtGui
 from PyQt5.QtGui import QCursor, QTextCursor, QIntValidator
-from PyQt5.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QTableWidget, QTableWidgetItem, QLayout, QMainWindow, QLabel, QPushButton, QSizePolicy, QGroupBox, QTabWidget, QGridLayout, QWidget, QComboBox, QLineEdit, QFileDialog, QToolBar, QCheckBox,QDesktopWidget, QMessageBox, QTextEdit, QSlider, QSpacerItem
+from PyQt5.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QTableWidget, QTableWidgetItem, QLayout, QMainWindow, QLabel, QPushButton, QSizePolicy, QGroupBox, QTabWidget, QGridLayout, QWidget, QComboBox, QLineEdit, QFileDialog, QToolBar, QCheckBox,QDesktopWidget, QMessageBox, QTextEdit, QSlider, QSpacerItem, QTableView
 from PyQt5.QtCore import Qt, QPoint, QProcess, QCoreApplication, QTimer, QFileSystemWatcher, QFile, QThread, pyqtSignal, QObject
 
 from napari import Viewer
@@ -268,10 +268,10 @@ class MyGUI(QMainWindow):
         
         #Initialise empty dictionaries for storage
         self.data['FindingResult'] = {}
-        self.data['FindingResult'][0] = []
+        self.data['FindingResult'][0] = {}
         self.data['FindingResult'][1] = []
         self.data['FittingResult'] = {}
-        self.data['FittingResult'][0] = []
+        self.data['FittingResult'][0] = {}
         self.data['FittingResult'][1] = []
         
         
@@ -1053,7 +1053,7 @@ class MyGUI(QMainWindow):
         self.tab_locList.setLayout(tab4_layout)
         
         #Create an empty table and add this:
-        self.LocListTable = QTableWidget()
+        self.LocListTable = QTableView()
         tab4_layout.addWidget(self.LocListTable, 0, 0)
         
         #Also add a button to read a csv
@@ -1063,15 +1063,22 @@ class MyGUI(QMainWindow):
     
     def open_loclist_csv(self):
         logging.info('starting CSV loaded')
-        loclistcsvloc = 'C:\Data\EBS\Tubulin_hdf5._FitResults_20240208_121706.csv'
+        loclistcsvloc = 'C:\Data\EBS\Tubulin_hdf5._FitResults_20240208_121847.csv'
         #Read the csv:
         loclist = pd.read_csv(loclistcsvloc)
+        
+        #Rename some of the headers:
+        loclist.rename(columns={'x [nm]': 'x'}, inplace=True)
+        loclist.rename(columns={'y [nm]': 'y'}, inplace=True)
+        loclist.rename(columns={'t [ms]': 't'}, inplace=True)
         
         #Set this as result:
         self.data['FittingResult'] = {}
         self.data['FittingResult'][0] = loclist
         
         logging.info('CSV loaded')
+        self.updateLocList()
+        logging.info('Loclist updated')
         
     def setup_visualisationTab(self):
         """
@@ -1562,25 +1569,41 @@ class MyGUI(QMainWindow):
         #data is stored in self.data['FittingResult'][0]
         #fill the self.LocListTable QTableWidget with the data:
         localizations = self.data['FittingResult'][0].dropna(axis=0, ignore_index=True)
-        localizations = localizations.drop('fit_info', axis=1)
+        try:
+            localizations = localizations.drop('fit_info', axis=1)
+        except:
+            pass
+        
+        # Define the number of significant digits for each column
+        significant_digits = {'x': 2, 'y': 2, 'p': 0, 'id':0,'candidate_id':0,'del_x':2,'del_y':2, 't':0}
+
+        for y in range(len(localizations.columns)):
+            significant_digit = significant_digits.get(localizations.columns[y])
+            if significant_digit is not None:
+                localizations[localizations.columns[y]] = localizations[localizations.columns[y]].apply(lambda x: round(x, significant_digit))
+                
+        self.LocListTable.setModel(TableModel(table_data = localizations))
         
         #Get the shape of the data
-        nrRows = np.shape(localizations)[0]
-        nrColumns = np.shape(localizations)[1]
+        # nrRows = np.shape(localizations)[0]
+        # nrColumns = np.shape(localizations)[1]
         
-        #Give the loclisttable the correct row/column count:
-        self.LocListTable.setRowCount(nrRows)
-        self.LocListTable.setColumnCount(nrColumns)
         
-        #Fill the loclisttable with the output:
-        for r in range(nrRows):
-            for c in range(nrColumns):
-                nrDigits = 2
-                item = QTableWidgetItem(f"{round(localizations.iloc[r, c], nrDigits):.{nrDigits}f}")
-                self.LocListTable.setItem(r, c, item)
+        # #Give the loclisttable the correct row/column count:
+        # self.LocListTable.setRowCount(nrRows)
+        # self.LocListTable.setColumnCount(nrColumns)
         
-        #Add headers
-        self.LocListTable.setHorizontalHeaderLabels(localizations.columns.tolist())
+        # #Fill the loclisttable with the output:
+        # for r in range(nrRows):
+        #     for c in range(nrColumns):
+        #         nrDigits = 2
+        #         item = QTableWidgetItem(f"{round(localizations.iloc[r, c], nrDigits):.{nrDigits}f}")
+        #         self.LocListTable.setItem(r, c, item)
+        
+        # #Add headers
+        # self.LocListTable.setHorizontalHeaderLabels(localizations.columns.tolist())
+        # self.LocListTable.setSortingEnabled(True)
+        
         
         return
     
@@ -2393,6 +2416,8 @@ class MyGUI(QMainWindow):
                 error_message = f"Critical error in Finding routine! Breaking off!\nError information:\n{type(e).__name__}: {e}\n\n{traceback.format_exc()}"
                 self.open_critical_warning(error_message)
                 self.data['FindingResult'] = {}
+                self.data['FindingResult'][0] = {}
+                self.data['FindingResult'][1] = []
         else:
             self.open_critical_warning(f"No Finding evaluation text provided/found")
 
@@ -2488,6 +2513,8 @@ class MyGUI(QMainWindow):
                 error_message = f"Critical error in Fitting routine! Breaking off!\nError information:\n{type(e).__name__}: {e}\n\n{traceback.format_exc()}"
                 self.open_critical_warning(error_message)
                 self.data['FittingResult'] = {}
+                self.data['FittingResult'][0] = {}
+                self.data['FittingResult'][1] = [{}]
         else:
             self.open_critical_warning(f"No Fitting evaluation text provided/found")
 
@@ -3970,3 +3997,45 @@ class PreviewFindingFitting(QWidget):
             
         
         # print('wopp'+str(self.napariviewer.dims.current_step[0]))
+        
+        
+        
+import sys
+import typing
+
+import pandas as pd
+from PyQt5.QtCore import QAbstractTableModel, QModelIndex, Qt
+from PyQt5.QtWidgets import QApplication, QMainWindow, QTableView, QWidget, QGridLayout, QPushButton
+
+
+class TableModel(QAbstractTableModel):
+
+    def __init__(self, table_data, parent=None):
+        super().__init__(parent)
+        self.table_data = table_data
+
+    def rowCount(self, parent: QModelIndex = ...) -> int:
+        return self.table_data.shape[0]
+
+    def columnCount(self, parent: QModelIndex = ...) -> int:
+        return self.table_data.shape[1]
+
+    def data(self, index: QModelIndex, role: int = ...) -> typing.Any:
+        if role == Qt.DisplayRole:
+            return str(self.table_data.loc[index.row()][index.column()])
+
+    def headerData(self, section: int, orientation: Qt.Orientation, role: int = ...) -> typing.Any:
+        if orientation == Qt.Horizontal and role == Qt.DisplayRole:
+            return str(self.table_data.columns[section])
+
+    def setColumn(self, col, array_items):
+        """Set column data"""
+        self.table_data[col] = array_items
+        # Notify table, that data has been changed
+        self.dataChanged.emit(QModelIndex(), QModelIndex())
+
+    def getColumn(self, col):
+        """Get column data"""
+        return self.table_data[col]
+    
+    
