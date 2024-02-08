@@ -266,6 +266,14 @@ class MyGUI(QMainWindow):
         # self.worker.finished.connect(self.worker.deleteLater)
         # self.worker_thread.finished.connect(self.worker_thread.deleteLater)
         
+        #Initialise empty dictionaries for storage
+        self.data['FindingResult'] = {}
+        self.data['FindingResult'][0] = []
+        self.data['FindingResult'][1] = []
+        self.data['FittingResult'] = {}
+        self.data['FittingResult'][0] = []
+        self.data['FittingResult'][1] = []
+        
         
         self.thread = ProcessingThread()
         self.thread.finished.connect(self.thread.quit)
@@ -1048,6 +1056,23 @@ class MyGUI(QMainWindow):
         self.LocListTable = QTableWidget()
         tab4_layout.addWidget(self.LocListTable, 0, 0)
         
+        #Also add a button to read a csv
+        self.buttonReadCSV = QPushButton("Read CSV")
+        tab4_layout.addWidget(self.buttonReadCSV, 1, 0)
+        self.buttonReadCSV.clicked.connect(self.open_loclist_csv)
+    
+    def open_loclist_csv(self):
+        logging.info('starting CSV loaded')
+        loclistcsvloc = 'C:\Data\EBS\Tubulin_hdf5._FitResults_20240208_121706.csv'
+        #Read the csv:
+        loclist = pd.read_csv(loclistcsvloc)
+        
+        #Set this as result:
+        self.data['FittingResult'] = {}
+        self.data['FittingResult'][0] = loclist
+        
+        logging.info('CSV loaded')
+        
     def setup_visualisationTab(self):
         """
         Function to set up the Visualisation tab (scatter, average shifted histogram and such)
@@ -1824,6 +1849,8 @@ class MyGUI(QMainWindow):
     
     def processSingleFile(self,FileName,onlyFitting=False,polarityVal='Mix', noFindingFitting=False):
 
+        self.data['FindingResult']={}
+        self.data['FittingResult']={}
         #Runtime of finding and fitting
         self.currentFileInfo['FindingTime'] = 0
         self.currentFileInfo['FittingTime'] = 0
