@@ -16,7 +16,7 @@ import multiprocessing
 def __function_metadata__():
     return {
         "Gaussian2D": {
-            "dist_kwarg" : {"base": "Dist2d", "description": "Two-dimensional event-distribution to run fitting on.", "default_option": "Hist2d_xy"},
+            "dist_kwarg" : {"base": "XYDist", "description": "Two-dimensional event-distribution to run fitting on.", "default_option": "Hist2d_xy"},
             "required_kwargs": [
                  {"name": "expected_width", "description": "Expected width of Gaussian fit (in nm)","default":150.},
                  {"name": "fitting_tolerance", "description": "Discard localizations with uncertainties larger than this value times the pixel size. ","default":1.},
@@ -27,7 +27,7 @@ def __function_metadata__():
             "display_name": "2D Gaussian"
         }, 
         "LogGaussian2D": {
-            "dist_kwarg" : {"base": "Dist2d", "description": "Two-dimensional event-distribution to run fitting on.", "default_option": "Hist2d_xy"},
+            "dist_kwarg" : {"base": "XYDist", "description": "Two-dimensional event-distribution to run fitting on.", "default_option": "Hist2d_xy"},
             "required_kwargs": [
                  {"name": "expected_width", "description": "Expected width of log-Gaussian fit (in nm)","default":150.},
                  {"name": "fitting_tolerance", "description": "Discard localizations with uncertainties larger than this value times the pixel size. ","default":1.},
@@ -38,7 +38,7 @@ def __function_metadata__():
             "display_name": "2D LogGaussian"
         }, 
         "Gaussian3D": {
-            "dist_kwarg" : {"base": "Dist2d", "description": "Two-dimensional event-distribution to run fitting on.", "default_option": "Hist2d_xy"},
+            "dist_kwarg" : {"base": "XYDist", "description": "Two-dimensional event-distribution to run fitting on.", "default_option": "Hist2d_xy"},
             "required_kwargs": [
                 {"name": "theta", "description": "Rotation angle (in degrees) of the Gaussian","default":0},
                 {"name": "expected_width", "description": "Expected width of Gaussian fit (in nm)","default":150.},

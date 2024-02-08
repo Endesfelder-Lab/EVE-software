@@ -6,7 +6,7 @@ import re
 import warnings, logging
 import numpy as np
 import itertools
-from Utils import utilsHelper
+from EventDistributions import eventDistributions
 
 #Import all scripts in the custom script folders
 from CandidateFinding import *
@@ -110,10 +110,10 @@ def distKwargValuesFromFittingFunction(functionname):
         base_pattern = r"base:\s*(\S+)"
         base_name = re.findall(base_pattern, allkwarginfo[2][0])[0]
         # get base class
-        baseClass = getattr(utilsHelper, base_name, None)
+        baseClass = getattr(eventDistributions, base_name, None)
         if not baseClass == None:
             # get all derived classes that share common base
-            for name, obj in inspect.getmembers(utilsHelper):
+            for name, obj in inspect.getmembers(eventDistributions):
                 if inspect.isclass(obj) and issubclass(obj, baseClass) and obj != baseClass:
                     derivedClasses.append(name)
     return derivedClasses
@@ -128,14 +128,14 @@ def defaultOptionFromDistKwarg(functionname):
         if "default_option" in functionMetadata["dist_kwarg"]:
             defaultOption = functionMetadata["dist_kwarg"]["default_option"]
             # check if defaultOption is a valid option
-            defaultOption = getattr(utilsHelper, defaultOption, None)
+            defaultOption = getattr(eventDistributions, defaultOption, None)
             if defaultOption != None:
                 defaultOption = defaultOption.__name__
     return defaultOption
 
 def getInfoFromDistribution(distribution):
     description = None
-    distClass = getattr(utilsHelper, distribution, None)
+    distClass = getattr(eventDistributions, distribution, None)
     if not distClass == None:
         try:
             description = distClass.description
