@@ -11,6 +11,7 @@ from Utils import utilsHelper
 #Import all scripts in the custom script folders
 from CandidateFinding import *
 from CandidateFitting import *
+from Visualisation import *
 
 #Imports for PyQt5 (GUI)
 from PyQt5 import QtWidgets, QtGui
@@ -420,7 +421,7 @@ def typeFromKwarg(functionname,kwargname):
 
 
 
-def changeLayout_choice(curr_layout,className,displayNameToFunctionNameMap,parent=None):
+def changeLayout_choice(curr_layout,className,displayNameToFunctionNameMap,parent=None,ignorePolarity=False):
     logging.debug('Changing layout '+curr_layout.parent().objectName())
     #This removes everything except the first entry (i.e. the drop-down menu)
     resetLayout(curr_layout,className)
@@ -431,26 +432,37 @@ def changeLayout_choice(curr_layout,className,displayNameToFunctionNameMap,paren
     #Get the kw-arguments from the current dropdown.
     current_selected_function = functionNameFromDisplayName(curr_dropdown.currentText(),displayNameToFunctionNameMap)
     logging.debug('current selected function: '+current_selected_function)
-    current_selected_polarity = polaritySelectedFromDisplayName(curr_dropdown.currentText())
-    
-    #Classname should always end in pos/neg/mix!
-    wantedPolarity = className[-3:].lower()
-    
-    #Hide dropdown entries that are not part of the current_selected property
-    model = curr_dropdown.model()
-    totalNrRows = model.rowCount()
-    for rowId in range(totalNrRows):
-        #First show all rows:
-        curr_dropdown.view().setRowHidden(rowId, False)
-        item = model.item(rowId)
-        item.setFlags(item.flags() | Qt.ItemIsEnabled)
+    if not ignorePolarity:
+        current_selected_polarity = polaritySelectedFromDisplayName(curr_dropdown.currentText())
         
-        #Then hide based on the row name
-        rowName = model.item(rowId,0).text()
-        if polaritySelectedFromDisplayName(rowName) != wantedPolarity:
+        #Classname should always end in pos/neg/mix!
+        wantedPolarity = className[-3:].lower()
+        
+        #Hide dropdown entries that are not part of the current_selected property
+        model = curr_dropdown.model()
+        totalNrRows = model.rowCount()
+        for rowId in range(totalNrRows):
+            #First show all rows:
+            curr_dropdown.view().setRowHidden(rowId, False)
             item = model.item(rowId)
-            item.setFlags(item.flags() & ~Qt.ItemIsEnabled)
-            curr_dropdown.view().setRowHidden(rowId, True)
+            item.setFlags(item.flags() | Qt.ItemIsEnabled)
+            
+            #Then hide based on the row name
+            rowName = model.item(rowId,0).text()
+            if polaritySelectedFromDisplayName(rowName) != wantedPolarity:
+                item = model.item(rowId)
+                item.setFlags(item.flags() & ~Qt.ItemIsEnabled)
+                curr_dropdown.view().setRowHidden(rowId, True)
+    else:
+        #Unhide everything
+        model = curr_dropdown.model()
+        totalNrRows = model.rowCount()
+        for rowId in range(totalNrRows):
+            #First show all rows:
+            curr_dropdown.view().setRowHidden(rowId, False)
+            item = model.item(rowId)
+            item.setFlags(item.flags() | Qt.ItemIsEnabled)
+        current_selected_polarity = 'None'
     
     #Visual max number of rows before a 2nd column is started.
     maxNrRows = 4
@@ -697,4 +709,81 @@ def lineEditFileLookup(line_edit_objName, text, filter,parent=None):
 def generalFileSearchButtonAction(parent=None,text='Select File',filter='*.txt'):
     file_path, _ = QFileDialog.getOpenFileName(parent,text,filter=filter)
     return file_path
+
     
+def getEvalTextFromGUIFunction(methodName, methodKwargNames, methodKwargValues, partialStringStart=None, removeKwargs=None):
+    #--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    #methodName: the physical name of the method, i.e. StarDist.StarDistSegment
+    #methodKwargNames: found kwarg NAMES from the GUI
+    #methodKwargValues: found kwarg VALUES from the GUI
+    #methodTypeString: type of method, i.e. 'function Type' (e.g. CellSegmentScripts, CellScoringScripts etc)'
+    #Optionals: partialStringStart: gives a different start to the partial eval-string
+    #Optionals: removeKwargs: removes kwargs from assessment (i.e. for scoring script, where this should always be changed by partialStringStart)
+    #--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    specialcaseKwarg = [] #Kwarg where the special case is used
+    specialcaseKwargPartialStringAddition = [] #text to be eval-ed in case this kwarg is found
+    #We have the method name and all its kwargs, so:
+    if len(methodName)>0: #if the method exists
+        #Check if all req. kwargs have some value
+        reqKwargs = reqKwargsFromFunction(methodName)
+        #Remove values from this array if wanted
+        if removeKwargs is not None:
+            for removeKwarg in removeKwargs:
+                if removeKwarg in reqKwargs:
+                    reqKwargs.remove(removeKwarg)
+                else:
+                    #nothing, but want to make a note of this (log message)
+                    reqKwargs = reqKwargs
+        #Stupid dummy-check whether we have the reqKwargs in the methodKwargNames, which we should (basically by definition)
+
+        if all(elem in set(methodKwargNames) for elem in reqKwargs):
+            allreqKwargsHaveValue = True
+            for id in range(0,len(reqKwargs)):
+                #First find the index of the function-based reqKwargs in the GUI-based methodKwargNames. 
+                GUIbasedIndex = methodKwargNames.index(reqKwargs[id])
+                #Get the value of the kwarg - we know the name already now due to reqKwargs.
+                kwargvalue = methodKwargValues[GUIbasedIndex]
+                if kwargvalue == '':
+                    allreqKwargsHaveValue = False
+                    logging.error(f'Missing required keyword argument in {methodName}: {reqKwargs[id]}, NOT CONTINUING')
+            if allreqKwargsHaveValue:
+                #If we're at this point, all req kwargs have a value, so we can run!
+                #Get the string for the required kwargs
+                if partialStringStart is not None:
+                    partialString = partialStringStart
+                else:
+                    partialString = ''
+                for id in range(0,len(reqKwargs)):
+                    #First find the index of the function-based reqKwargs in the GUI-based methodKwargNames. 
+                    GUIbasedIndex = methodKwargNames.index(reqKwargs[id])
+                    #Get the value of the kwarg - we know the name already now due to reqKwargs.
+                    kwargvalue = methodKwargValues[GUIbasedIndex]
+                    #Add a comma if there is some info in the partialString already
+                    if partialString != '':
+                        partialString+=","
+                    #Check for special requests of kwargs, this is normally used when pointing to the output of a different value
+                    if reqKwargs[id] in specialcaseKwarg:
+                        #Get the index
+                        ps_index = specialcaseKwarg.index(reqKwargs[id])
+                        #Change the partialString with the special case
+                        partialString+=eval(specialcaseKwargPartialStringAddition[ps_index])
+                    else:
+                        partialString+=reqKwargs[id]+"=\""+kwargvalue+"\""
+                #Add the optional kwargs if they have a value
+                optKwargs = optKwargsFromFunction(methodName)
+                for id in range(0,len(optKwargs)):
+                    if methodKwargValues[id+len(reqKwargs)] != '':
+                        if partialString != '':
+                            partialString+=","
+                        partialString+=optKwargs[id]+"=\""+methodKwargValues[methodKwargNames.index(optKwargs[id])]+"\""
+                #Add the distribution kwarg if it exists
+                if 'dist_kwarg' in methodKwargNames:
+                    partialString += ",dist_kwarg=\""+methodKwargValues[methodKwargNames.index('dist_kwarg')]+"\""
+                segmentEval = methodName+"("+partialString+")"
+                return segmentEval
+            else:
+                logging.error('NOT ALL KWARGS PROVIDED!')
+                return None
+        else:
+            logging.error('SOMETHING VERY STUPID HAPPENED')
+            return None
