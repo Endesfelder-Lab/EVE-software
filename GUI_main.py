@@ -46,7 +46,10 @@ from Visualisation import *
 from PostProcessing import *
 
 #Obtain the helperfunctions
-from Utils import utils, utilsHelper
+from Utils import utils
+
+#Obtain eventdistribution functions
+from EventDistributions import eventDistributions
 
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
@@ -3227,7 +3230,7 @@ class ThreeDPointCloudwFirst:
         self.ax.cla()
 
     def plot(self, figure, events, surrounding, localizations, pixel_size):
-        first_events = utilsHelper.FirstTimestamp(events).get_smallest_t(events)
+        first_events = eventDistributions.FirstTimestamp(events).get_smallest_t(events)
         eventsFiltered = events.merge(first_events, indicator=True, how='outer').query('_merge=="left_only"').drop('_merge', axis=1)
         pos_events = eventsFiltered[eventsFiltered['p'] == 1]
         neg_events = eventsFiltered[eventsFiltered['p'] == 0]
@@ -3265,9 +3268,9 @@ class TwoDProjection:
         self.ax_yt.set_aspect('auto')
 
     def plot(self, figure, events, surrounding, localizations, pixel_size):
-        hist_xy = utilsHelper.Hist2d_xy(events)
-        hist_tx = utilsHelper.Hist2d_tx(events)
-        hist_ty = utilsHelper.Hist2d_ty(events)
+        hist_xy = eventDistributions.Hist2d_xy(events)
+        hist_tx = eventDistributions.Hist2d_tx(events)
+        hist_ty = eventDistributions.Hist2d_ty(events)
 
         x_edges, y_edges, t_edges = hist_xy.x_edges, hist_xy.y_edges, hist_tx.x_edges
 
@@ -3366,11 +3369,11 @@ class TwoDTimestamps:
 
     def plot(self, figure, events, surrounding, localizations, pixel_size):
 
-        first = utilsHelper.FirstTimestamp(events).dist2D
-        median = utilsHelper.MedianTimestamp(events).dist2D
-        mean = utilsHelper.AverageTimestamp(events).dist2D
+        first = eventDistributions.FirstTimestamp(events).dist2D
+        median = eventDistributions.MedianTimestamp(events).dist2D
+        mean = eventDistributions.AverageTimestamp(events).dist2D
 
-        x_edges, y_edges = utilsHelper.Hist2d_xy(events).x_edges, utilsHelper.Hist2d_xy(events).y_edges
+        x_edges, y_edges = eventDistributions.Hist2d_xy(events).x_edges, eventDistributions.Hist2d_xy(events).y_edges
 
         # Plot the 2D histograms
         first_mesh = self.ax_first.pcolormesh(x_edges, y_edges, first*1e-3)
@@ -3434,11 +3437,11 @@ class TwoDDelays:
         self.ax_mean.set_aspect('equal')
 
     def plot(self, figure, events, surrounding, localizations, pixel_size):
-        min = utilsHelper.MinTimeDiff(events).dist2D
-        max = utilsHelper.MaxTimeDiff(events).dist2D
-        mean = utilsHelper.AverageTimeDiff(events).dist2D
+        min = eventDistributions.MinTimeDiff(events).dist2D
+        max = eventDistributions.MaxTimeDiff(events).dist2D
+        mean = eventDistributions.AverageTimeDiff(events).dist2D
 
-        x_edges, y_edges = utilsHelper.Hist2d_xy(events).x_edges, utilsHelper.Hist2d_xy(events).y_edges
+        x_edges, y_edges = eventDistributions.Hist2d_xy(events).x_edges, eventDistributions.Hist2d_xy(events).y_edges
 
         # Plot the 2D histograms
         self.ax_min.pcolormesh(x_edges, y_edges, min)
@@ -3870,7 +3873,7 @@ class PreviewFindingFitting(QWidget):
             #Get the events on this 'frame'
             events_this_frame = events[(events['t']>(float(timeStretch[0])*1000+n*frametime_ms*1000)) & (events['t']<(float(timeStretch[0])*1000+(n+1)*frametime_ms*1000))]
             #Create a 2d histogram out of this
-            self.hist_xy = utilsHelper.SumPolarity(events_this_frame)
+            self.hist_xy = eventDistributions.SumPolarity(events_this_frame)
             #Add it to our image
             preview_multiD_image.append(self.hist_xy.dist2D)
             
