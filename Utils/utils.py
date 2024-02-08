@@ -422,7 +422,7 @@ def typeFromKwarg(functionname,kwargname):
 
 
 def changeLayout_choice(curr_layout,className,displayNameToFunctionNameMap,parent=None,ignorePolarity=False):
-    logging.info('Changing layout '+curr_layout.parent().objectName())
+    logging.debug('Changing layout '+curr_layout.parent().objectName())
     #This removes everything except the first entry (i.e. the drop-down menu)
     resetLayout(curr_layout,className)
     #Get the dropdown info
