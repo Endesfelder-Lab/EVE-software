@@ -15,6 +15,7 @@ import time
 from textwrap import dedent
 import h5py
 import traceback
+import re
 
 #Imports for PyQt5 (GUI)
 from PyQt5 import QtWidgets, QtGui
@@ -1715,7 +1716,6 @@ class MyGUI(QMainWindow):
                 logging.info('Skipping finding and fitting processing')
                 # compare filenames of finding and fitting here? Following code is not yet adapted
                 FittingEvalText = self.getFunctionEvalText('Fitting',"self.data['FindingResult'][0]","self.globalSettings",polarityVal)
-                import re
                 match = re.search(r'File_Location="([^"]+)"', FittingEvalText)
                 FittingResults = match.group(1)
                 with open(FittingResults, 'rb') as file:
@@ -1729,9 +1729,13 @@ class MyGUI(QMainWindow):
                 else:
                     if 'ExistingFinding' in getattr(self,f"CandidateFindingDropdown{polarityVal}").currentText() or 'existing Finding' in getattr(self,f"CandidateFindingDropdown{polarityVal}").currentText():
                         FindingEvalText = self.getFunctionEvalText('Finding',"npyData","self.globalSettings",polarityVal)
-                        match = re.search(r'File_Location="([^"]+)"', FindingEvalText)
-                        if match:
-                            FindingResults = match.group(1)
+                        emptyPath = "File_Location=\"\""
+                        if FindingEvalText == None:
+                            FindingResults = ''
+                        if FindingEvalText != None:
+                            match = re.search(r'File_Location="([^"]+)"', FindingEvalText)
+                            if match:
+                                FindingResults = match.group(1)
                         if FindingResults != FindingRef:
                             logging.warning('Existing finding and fitting do not match, try to reset finding path to correct file.')
                             self.setFilepathExisting("Finding", polarityVal, FindingRef)
@@ -1759,6 +1763,20 @@ class MyGUI(QMainWindow):
             else:
                 if 'ExistingFinding' in getattr(self,f"CandidateFindingDropdown{polarityVal}").currentText() or 'existing Finding' in getattr(self,f"CandidateFindingDropdown{polarityVal}").currentText():
                     logging.info('Skipping finding processing, going to fitting')
+                    FindingEvalText = self.getFunctionEvalText('Finding',"npyData","self.globalSettings",polarityVal)
+                    emptyPath = "File_Location=\"\""
+                    if FindingEvalText == None:
+                        FindingResults = ''
+                    if FindingEvalText != None:
+                        match = re.search(r'File_Location="([^"]+)"', FindingEvalText)
+                        if match:
+                            FindingResults = match.group(1)
+                    if polarityVal == 'Pos':
+                        self.data['refFindingFilepos'] = FindingResults
+                    if polarityVal == 'Neg':
+                        self.data['refFindingFileneg'] = FindingResults
+                    else:
+                        self.data['refFindingFile'] = FindingResults
                     #Ensure that we don't store the finding result
                     origStoreFindingSetting=self.globalSettings['StoreFindingOutput']['value']
                     self.globalSettings['StoreFindingOutput']['value'] = False
@@ -2498,6 +2516,7 @@ class MyGUI(QMainWindow):
                         #And store all of them
                         file_path = self.currentFileInfo['CurrentFileLoc'][:-4]+'_FittingResults_'+self.storeNameDateTime+'.pickle'
                         with open(file_path, 'wb') as file:
+                            pickle.dump(self.data['refFindingFile'], file)
                             pickle.dump(self.data['FittingResult'][0], file)
                 except:
                     logging.debug('This can be safely ignored')
