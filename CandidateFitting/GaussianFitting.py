@@ -18,8 +18,8 @@ def __function_metadata__():
         "Gaussian2D": {
             "dist_kwarg" : {"base": "XYDist", "description": "Two-dimensional event-distribution to run fitting on.", "default_option": "Hist2d_xy"},
             "required_kwargs": [
-                 {"name": "expected_width", "description": "Expected width of Gaussian fit (in nm)","default":150.},
-                 {"name": "fitting_tolerance", "description": "Discard localizations with uncertainties larger than this value times the pixel size. ","default":1.},
+                {"name": "expected_width", "description": "Expected width of Gaussian fit (in nm)","default":150.},
+                {"name": "fitting_tolerance", "description": "Discard localizations with uncertainties larger than this value times the pixel size. ","default":1.},
             ],
             "optional_kwargs": [
             ],
@@ -29,8 +29,8 @@ def __function_metadata__():
         "LogGaussian2D": {
             "dist_kwarg" : {"base": "XYDist", "description": "Two-dimensional event-distribution to run fitting on.", "default_option": "Hist2d_xy"},
             "required_kwargs": [
-                 {"name": "expected_width", "description": "Expected width of log-Gaussian fit (in nm)","default":150.},
-                 {"name": "fitting_tolerance", "description": "Discard localizations with uncertainties larger than this value times the pixel size. ","default":1.},
+                {"name": "expected_width", "description": "Expected width of log-Gaussian fit (in nm)","default":150.},
+                {"name": "fitting_tolerance", "description": "Discard localizations with uncertainties larger than this value times the pixel size. ","default":1.},
             ],
             "optional_kwargs": [
             ],

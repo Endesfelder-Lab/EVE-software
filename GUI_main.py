@@ -3592,7 +3592,9 @@ class VisualisationNapari(QWidget):
             self.napariviewer.layers.remove(layer)
             
         #Add a new layer which is this image
-        self.napariviewer.add_image(resultImage[0], multiscale=False)
+        percentile_value_display = 0.5
+        contrast_limits = np.percentile(resultImage[0], [percentile_value_display,100-percentile_value_display])
+        self.napariviewer.add_image(resultImage[0], multiscale=False,contrast_limits=contrast_limits)
     
     def getVisFunctionEvalText(self,p1,p2):
         #Get the dropdown info
