@@ -422,7 +422,7 @@ def typeFromKwarg(functionname,kwargname):
 
 
 
-def changeLayout_choice(curr_layout,className,displayNameToFunctionNameMap,parent=None,ignorePolarity=False):
+def changeLayout_choice(curr_layout,className,displayNameToFunctionNameMap,parent=None,ignorePolarity=False,maxNrRows=4):
     logging.debug('Changing layout '+curr_layout.parent().objectName())
     #This removes everything except the first entry (i.e. the drop-down menu)
     resetLayout(curr_layout,className)
@@ -465,7 +465,6 @@ def changeLayout_choice(curr_layout,className,displayNameToFunctionNameMap,paren
             current_selected_polarity = 'None'
     
         #Visual max number of rows before a 2nd column is started.
-        maxNrRows = 4
         labelposoffset = 0
 
         #Add a widget-pair for the distribution
