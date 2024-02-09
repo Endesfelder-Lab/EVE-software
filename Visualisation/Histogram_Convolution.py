@@ -10,8 +10,8 @@ def __function_metadata__():
     return {
         "Histogram_convolution": {
             "required_kwargs": [
-                {"name": "ZoomValue", "description": "Pixel-to-pseudopixel ratio","Default":10},
-                {"name": "Convolution_kernel", "description": "Convolution pixel size","Default":3},
+                {"name": "ZoomValue", "description": "Pixel-to-pseudopixel ratio","default":10},
+                {"name": "Convolution_kernel", "description": "Convolution pixel size","default":3},
             ],
             "optional_kwargs": [
             ],
