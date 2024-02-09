@@ -1,5 +1,6 @@
 import inspect
 from Utils import utilsHelper
+from EventDistributions import eventDistributions
 import pandas as pd
 import numpy as np
 import time, logging
@@ -220,7 +221,7 @@ def Gaussian2D(candidate_dic,settings,**kwargs):
     pixel_size = float(settings['PixelSize_nm']['value']) # in nm
     expected_width = expected_width/pixel_size
     fit_func = gauss2D
-    dist_func = getattr(utilsHelper, kwargs['dist_kwarg'])
+    dist_func = getattr(eventDistributions, kwargs['dist_kwarg'])
     params = expected_width, fitting_tolerance, pixel_size
 
     if multithread == True: num_cores = multiprocessing.cpu_count()
@@ -262,7 +263,7 @@ def LogGaussian2D(candidate_dic,settings,**kwargs):
     pixel_size = float(settings['PixelSize_nm']['value']) # in nm
     expected_width = expected_width/pixel_size
     fit_func = loggauss2D
-    dist_func = getattr(utilsHelper, kwargs['dist_kwarg'])
+    dist_func = getattr(eventDistributions, kwargs['dist_kwarg'])
     params = expected_width, fitting_tolerance, pixel_size
 
     if multithread == True: num_cores = multiprocessing.cpu_count()
@@ -305,7 +306,7 @@ def Gaussian3D(candidate_dic,settings,**kwargs):
     expected_width = expected_width/pixel_size
     theta = np.radians(float(kwargs['theta']))
     fit_func = gauss3D
-    dist_func = getattr(utilsHelper, kwargs['dist_kwarg'])
+    dist_func = getattr(eventDistributions, kwargs['dist_kwarg'])
     params = expected_width, fitting_tolerance, pixel_size, theta
 
     if multithread == True: num_cores = multiprocessing.cpu_count()
