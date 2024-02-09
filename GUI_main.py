@@ -1110,6 +1110,8 @@ class MyGUI(QMainWindow):
         self.data['FittingResult'][0] = loclist
         self.updateLocList()
         logging.info('CSV loaded, loclist updated')
+        #Also clear the post-processing history since it's a completely new dataset
+        self.postProcessingtab_widget.PostProcessingHistoryGrid.clearHistory()
         
     def setup_visualisationTab(self):
         """
@@ -1460,6 +1462,8 @@ class MyGUI(QMainWindow):
     def updateGUIafterNewResults(self,error=None):
         if error == None:
             self.updateLocList()
+            #Also clear the post-processing history since it's a completely new dataset
+            self.postProcessingtab_widget.PostProcessingHistoryGrid.clearHistory()
         else:
             self.open_critical_warning(error)
     
@@ -3616,7 +3620,7 @@ class VisualisationNapari(QWidget):
             
         #Add a new layer which is this image
         #Dynamically set contrast limits based on percentile to get proper visualisation and not be affected by outliers too much
-        percentile_value_display = 0.5
+        percentile_value_display = 0.01
         contrast_limits = np.percentile(resultImage[0], [percentile_value_display,100-percentile_value_display])
         #Ensure that contrast_limits maximum value is always higher than the minimum
         if contrast_limits[1]<=contrast_limits[0]:
@@ -3783,7 +3787,8 @@ class PostProcessing(QWidget):
         self.postProcessingHistory[current_postprocessinghistoryid][1] = FunctionEvalText
         self.postProcessingHistory[current_postprocessinghistoryid][2] = [len(self.postProcessingHistory[current_postprocessinghistoryid][0]),-1]
         
-        self.parent.data['FittingResult'][0] = eval(FunctionEvalText)[0]
+        postProcessingResult = eval(FunctionEvalText)
+        self.parent.data['FittingResult'][0] = postProcessingResult[0]
         
         self.postProcessingHistory[current_postprocessinghistoryid][2][1] = len(self.parent.data['FittingResult'][0])
         
@@ -3852,6 +3857,12 @@ class PostProcessing(QWidget):
             self.parent.parent.updateLocList()
             #Give some info
             logging.info('Restored postprocessing history')
+        
+        def clearHistory(self):
+            for i in reversed(range(self.grid_layout.count())):
+                self.grid_layout.removeWidget(self.grid_layout.itemAt(i).widget())
+            self.parent.postProcessingHistory = {}
+            logging.info('Cleared postprocessing history')
             
     def getPostProcessingFunctionEvalText(self,p1,p2,p3):
         #Get the dropdown info

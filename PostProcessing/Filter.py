@@ -78,4 +78,5 @@ def Regular_filter(localizations,findingResult,settings,**kwargs):
     
     logging.info(f'Went from {orig_len_localizations} to {new_len_localizations} localizations in {elapsed_time} seconds.')
     #Required output: localizations
-    return localizations
+    metadata = 'Information or so'
+    return localizations,metadata
