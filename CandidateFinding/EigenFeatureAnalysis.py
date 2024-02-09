@@ -432,7 +432,7 @@ def eigenFeature_analysis(npy_array,settings,**kwargs):
         cluster_labels = dbscan.fit_predict(clusterpoints)
         
         # Print how many clusters are found
-        logging.info("Number of clusters found:"+ str(max(cluster_labels)))
+        logging.info("Number of clusters found:"+ str(max(cluster_labels)+1))
         
         candidates = clusterPoints_to_candidates(clusterpoints,cluster_labels,ms_to_px)
     else:
@@ -722,7 +722,7 @@ def eigen_feature_analysis_autoRadiusSelect(npy_array,settings,**kwargs):
     full_data_labels[sphere_indeces] = labels
     
     # Print how many clusters are found
-    logging.info("Number of clusters found:"+ str(max(labels)))
+    logging.info("Number of clusters found:"+ str(max(labels)+1))
     
     candidates = clusterPoints_to_candidates(points_mostly_spher,labels,ms_to_px)
         
@@ -1002,7 +1002,7 @@ def spectral_clustering_showcase(npy_array,settings,**kwargs):
     cluster_labels = dbscan.fit_predict(clusterpoints)
     
     # Print how many clusters are found
-    logging.info("Number of clusters found:"+ str(max(cluster_labels)))
+    logging.info("Number of clusters found:"+ str(max(cluster_labels)+1))
     
     
     clusterpoints_dbscan = clusterpoints[cluster_labels>-1]
