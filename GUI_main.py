@@ -3585,7 +3585,7 @@ class VisualisationNapari(QWidget):
         
         #Get the current function callback
         FunctionEvalText = self.getVisFunctionEvalText("parent.data['FittingResult'][0]","parent.globalSettings")
-        print(FunctionEvalText)
+        
         resultImage = eval(FunctionEvalText)
         
         #Clear all existing layers
@@ -3596,6 +3596,9 @@ class VisualisationNapari(QWidget):
         #Dynamically set contrast limits based on percentile to get proper visualisation and not be affected by outliers too much
         percentile_value_display = 0.5
         contrast_limits = np.percentile(resultImage[0], [percentile_value_display,100-percentile_value_display])
+        #Ensure that contrast_limits maximum value is always higher than the minimum
+        if contrast_limits[1]<=contrast_limits[0]:
+            contrast_limits[1]=contrast_limits[0]+1
         
         #Quick check that the scale value is sensible
         if type(resultImage[1]) == float or type(resultImage[1]) == int or type(resultImage[1]) == np.float64:
