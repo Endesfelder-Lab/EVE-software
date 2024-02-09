@@ -1068,13 +1068,35 @@ class MyGUI(QMainWindow):
         self.LocListTable = QTableView()
         tab4_layout.addWidget(self.LocListTable, 0, 0)
         
-        #Also add a button to read a csv
+        #Add an empty horizontal widget to load a .csv:
+        self.CSVReadLayout = QHBoxLayout()
+        
+        #Add an empty line edit for a .csv loading string:
+        self.CSVlocationLineEdit = QLineEdit()
+        self.CSVReadLayout.addWidget(self.CSVlocationLineEdit)
+        
+        #Add a ... button that opens a file dialog:
+        self.findCSVlocationButton = QPushButton("...")
+        self.findCSVlocationButton.clicked.connect(self.fileDialogCSVopen)
+        self.CSVReadLayout.addWidget(self.findCSVlocationButton)
+        
+        #Also add a button to read the csv
         self.buttonReadCSV = QPushButton("Read CSV")
-        tab4_layout.addWidget(self.buttonReadCSV, 1, 0)
         self.buttonReadCSV.clicked.connect(self.open_loclist_csv)
+        self.CSVReadLayout.addWidget(self.buttonReadCSV)
+        
+        tab4_layout.addLayout(self.CSVReadLayout, 1, 0)
+    
+    def fileDialogCSVopen(self):
+        #Open a file dialog:
+        fname = QFileDialog.getOpenFileName(self, 'Select a localization CSV file', None,"CSV file (*.csv)")
+        #Set this selected file as line edit:
+        self.CSVlocationLineEdit.setText(fname[0])
+
     
     def open_loclist_csv(self):
-        loclistcsvloc = 'C:\Data\EBS\Tubulin_hdf5._FitResults_20240208_121847.csv'
+        k=2
+        loclistcsvloc = self.CSVlocationLineEdit.text()
         #Read the csv:
         loclist = pd.read_csv(loclistcsvloc)
         
