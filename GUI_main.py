@@ -3592,9 +3592,23 @@ class VisualisationNapari(QWidget):
             self.napariviewer.layers.remove(layer)
             
         #Add a new layer which is this image
+        #Dynamically set contrast limits based on percentile to get proper visualisation and not be affected by outliers too much
         percentile_value_display = 0.5
         contrast_limits = np.percentile(resultImage[0], [percentile_value_display,100-percentile_value_display])
-        self.napariviewer.add_image(resultImage[0], multiscale=False,contrast_limits=contrast_limits)
+        
+        #Quick check that the scale value is sensible
+        if type(resultImage[1]) == float or type(resultImage[1]) == int or type(resultImage[1]) == np.float64:
+            scaleValue = resultImage[1]
+        else:
+            scaleValue = -1
+        
+        self.napariviewer.add_image(resultImage[0], multiscale=False,contrast_limits=contrast_limits,scale = [scaleValue,scaleValue])
+        
+        if scaleValue > -1:
+            self.napariviewer.scale_bar.visible=True
+            self.napariviewer.scale_bar.unit = "um"
+        else:
+            self.napariviewer.scale_bar.visible=False
     
     def getVisFunctionEvalText(self,p1,p2):
         #Get the dropdown info

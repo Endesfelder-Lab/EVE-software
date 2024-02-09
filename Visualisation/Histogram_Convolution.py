@@ -82,7 +82,9 @@ def Histogram_convolution(resultArray,settings,**kwargs):
     # Calculate the elapsed time
     elapsed_time = end_time - start_time
 
-    performance_metadata = f"Visualisation function ran for {elapsed_time} seconds."
+    #Scale should be the scale of pixel - to - um. E.g. a scale of 0.01 means 100 pixels = 1 um
+    scale = (maxx*(settings['PixelSize_nm']['value'])/1000)/np.shape(histogram_convolved)[0]
+
     logging.info('Histogram with convolution created!')
 
-    return histogram_convolved.T, performance_metadata
+    return histogram_convolved.T, scale
