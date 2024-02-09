@@ -3580,6 +3580,7 @@ class VisualisationNapari(QWidget):
         logging.info('VisualisationNapari init')
 
     def visualise_callback(self,parent):
+        #Visuliation method from https://www.frontiersin.org/articles/10.3389/fbinf.2021.817254/full
         logging.info('Visualise button pressed')
         
         #Get the current function callback
@@ -3757,7 +3758,7 @@ class PostProcessing(QWidget):
         self.postProcessingHistory[current_postprocessinghistoryid][1] = FunctionEvalText
         self.postProcessingHistory[current_postprocessinghistoryid][2] = [len(self.postProcessingHistory[current_postprocessinghistoryid][0]),-1]
         
-        self.parent.data['FittingResult'][0] = eval(FunctionEvalText)
+        self.parent.data['FittingResult'][0] = eval(FunctionEvalText)[0]
         
         self.postProcessingHistory[current_postprocessinghistoryid][2][1] = len(self.parent.data['FittingResult'][0])
         

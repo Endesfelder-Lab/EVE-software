@@ -67,7 +67,7 @@ def Regular_filter(localizations,findingResult,settings,**kwargs):
                             logging.warning(f'Unexpected error with filtering on {filter_textSplit[filter_entry]}')
                 break
         if inequalityFound == False:
-            logging.warning(f'No inequality found in \"{filter_textSplit[filter_entry]}\"! Please use ==,<=,>=,<,>,!=')
+            logging.warning(f'No inequality found in \"{filter_textSplit[filter_entry]}\"! Please use ==,\<=,\>=,\<,\>,!=')
 
     # Stop the timer
     end_time = time.time()
