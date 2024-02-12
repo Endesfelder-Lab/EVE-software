@@ -824,17 +824,31 @@ class MyGUI(QMainWindow):
             events = self.filterEvents_npy_t(data,timeStretch)
             #Check if we have at least 1 event:
             if len(events) > 0:
-                # correct the coordinates and time stamps
-                events['x']-=np.min(events['x'])
-                events['y']-=np.min(events['y'])
-                events['t']-=np.min(events['t'])
+                # # correct the coordinates and time stamps
+                # events['x']-=np.min(events['x'])
+                # events['y']-=np.min(events['y'])
+                # events['t']-=np.min(events['t'])
                 #Log the nr of events found:
                 logging.info(f"Preview - Found {len(events)} events in the chosen time frame.")
             else:
                 logging.error("Preview - No events found in the chosen time frame.")
                 return
+        elif self.dataLocationInput.text().endswith('hdf5'):
+            
+            #Load events from HDF
+            events,_ = self.timeSliceFromHDF(self.dataLocationInput.text(),requested_start_time_ms = float(timeStretch[0]),requested_end_time_ms=float(timeStretch[0])+float(timeStretch[1]),howOftenCheckHdfTime = 50000,loggingBool=True)
+            
+            #Check if we have at least 1 event:
+            if len(events) > 0:
+                #Log the nr of events found:
+                logging.info(f"Preview - Found {len(events)} events in the chosen time frame.")
+            else:
+                logging.error("Preview - No events found in the chosen time frame.")
+                return
+                    
+            z=3
         else:
-            logging.error("Please choose a .raw or .npy file for previews.")
+            logging.error("Please choose a .raw or .npy or .hdf5 file for previews.")
             return
         
         #Load the events in self memory and filter on XY
@@ -941,7 +955,61 @@ class MyGUI(QMainWindow):
         #Note that self.previewEvents is XYT cut, but NOT p-cut
         self.updateShowPreview(previewEvents=self.previewEvents,timeStretch=timeStretch)
         self.updateLocList()
+
+    def timeSliceFromHDF(self,dataLocation,requested_start_time_ms = 0,requested_end_time_ms=1000,howOftenCheckHdfTime = 100000,loggingBool=True,curr_chunk = 0):
+        
+        #Variable starting
+        lookup_start_index = -1
+        lookup_end_index = -1
+        
     
+        #Load the hdf5 file
+        with h5py.File(dataLocation, mode='r') as file:
+            #Events are here in this file:
+            events_hdf5 = file['CD']['events']
+            
+            #Loop while either start or end index hasn't been found yet
+            while lookup_start_index == -1 or lookup_end_index == -1:
+                index = curr_chunk*howOftenCheckHdfTime
+                
+                
+                if index <= events_hdf5.size:
+                    #Get the time
+                    foundtime = events_hdf5[index]['t']/1000 #in ms
+                    
+                    if loggingBool == True:
+                        logging.info('Loading HDF, currently on chunk '+str(curr_chunk)+', at time: '+str(foundtime))
+                    
+                    #Check if the start time has surpassed
+                    if foundtime > requested_start_time_ms:
+                        if lookup_start_index == -1:
+                            lookup_start_index = max(0,curr_chunk-1)*howOftenCheckHdfTime
+                    #Check if the end-time is surpassed
+                    if foundtime > requested_end_time_ms:
+                        if lookup_end_index == -1:
+                            lookup_end_index = max(1,curr_chunk+1)*howOftenCheckHdfTime
+                    #Increase current chunk
+                    curr_chunk+=1
+                else:
+                    logging.info('End of file reached while chunking HDF5')
+                    if lookup_start_index == -1:
+                        lookup_start_index = events_hdf5.size #Set to end of file
+                    if lookup_end_index == -1:
+                        lookup_end_index = events_hdf5.size #Set to end of file
+            
+            #Properly (32bit) initialise dicts
+            wantedEvents_tooLarge = np.zeros(0, dtype={'names': ['x', 'y', 'p', 't'], 'formats': ['<u2', '<u2', '<i2', '<i8'], 'offsets': [0, 2, 4, 8], 'itemsize': 32})
+            events_output = np.zeros(0, dtype={'names': ['x', 'y', 'p', 't'], 'formats': ['<u2', '<u2', '<i2', '<i8'], 'offsets': [0, 2, 4, 8], 'itemsize': 32})
+            
+            #Now we know the start/end index, so we cut out that area:
+            wantedEvents_tooLarge = events_hdf5[lookup_start_index:lookup_end_index]
+            #And we fully cut it to exact size:
+            events_output = wantedEvents_tooLarge[wantedEvents_tooLarge['t']/1000>=requested_start_time_ms]
+            events_output = events_output[events_output['t']/1000<=requested_end_time_ms]
+        
+        #Return the events
+        return events_output,curr_chunk
+
     def filterEvents_npy_t(self,events,tStretch=(-np.Inf,np.Inf)):
         """
         Filter events that are in a numpy array to a certain time-stretch.
@@ -1093,9 +1161,7 @@ class MyGUI(QMainWindow):
         #Set this selected file as line edit:
         self.CSVlocationLineEdit.setText(fname[0])
 
-    
     def open_loclist_csv(self):
-        k=2
         loclistcsvloc = self.CSVlocationLineEdit.text()
         #Read the csv:
         loclist = pd.read_csv(loclistcsvloc)
@@ -2104,7 +2170,7 @@ class MyGUI(QMainWindow):
                     self.chunckloading_currentLimits = [[0,0],[0,0]]
                     
                     
-                    previous_read_hdfChunk = 1
+                    previous_read_hdfChunk = 0
                     events_prev = np.zeros(0, dtype={'names': ['x', 'y', 'p', 't'], 'formats': ['<u2', '<u2', '<i2', '<i8'], 'offsets': [0, 2, 4, 8], 'itemsize': 32})
                     self.chunckloading_number_chuck = 0
                     
@@ -2113,57 +2179,21 @@ class MyGUI(QMainWindow):
                 
                         self.chunckloading_currentLimits = [[(self.chunckloading_number_chuck)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000,(self.chunckloading_number_chuck+1)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000],[(self.chunckloading_number_chuck)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000-float(self.globalSettings['FindingBatchingTimeOverlapMs']['value'])*1000,(self.chunckloading_number_chuck+1)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000+float(self.globalSettings['FindingBatchingTimeOverlapMs']['value'])*1000]]        
                 
-                        current_read_index = 0
+                
+                
+                
+                
+                
                         hdf5_read_chunk_size = 500000 #nr of entries that are loaded after which it's checked whether T makes sense
                         
                         # Retrieve all entries within the specified bounding box
                         t_min = self.chunckloading_currentLimits[0][0]+float(self.run_startTLineEdit.text())*1000
-                        t_max = min(self.chunckloading_currentLimits[1][1],float(self.run_durationTLineEdit.text())*1000)+float(self.run_startTLineEdit.text())*1000
+                        t_max = min(self.chunckloading_currentLimits[1][1],float(self.run_durationTLineEdit.text())*1000+float(self.run_startTLineEdit.text())*1000)
                         
-                        #Load the hdf5 file
-                        with h5py.File(fileToRun, mode='r') as file:
-                            events_hdf5 = file['CD']['events']
-                            
-                            #We start at some chunk in time
-                            n_hdfChunk = previous_read_hdfChunk
-                            #We check if this chunk is fully loaded in hdf5
-                            fullChunkLoaded = False
-                            allhdf5chunkslices = np.zeros(0, dtype={'names': ['x', 'y', 'p', 't'], 'formats': ['<u2', '<u2', '<i2', '<i8'], 'offsets': [0, 2, 4, 8], 'itemsize': 32})
-                            
-                            #First figure out the start/end of this chunk:
-                            startPos = -1
-                            endPos = -1
-                            while (startPos == -1) or (endPos == -1):
-                                #Read a single entry:
-                                if current_read_index*hdf5_read_chunk_size < events_hdf5.size:
-                                    single_entry = events_hdf5[current_read_index*hdf5_read_chunk_size]
-                                    if startPos == -1:
-                                        if single_entry[3] > t_min:
-                                            startPos = current_read_index*hdf5_read_chunk_size
-                                    if endPos == -1:
-                                        if single_entry[3] > t_max:
-                                            endPos = current_read_index*hdf5_read_chunk_size
-                                    current_read_index+=1
-                                else:
-                                    if startPos == -1:
-                                        startPos = events_hdf5.size
-                                    endPos = events_hdf5.size
-                                    logging.info('end of file reached while streaming')
-                            
-                            allhdf5chunkslices = events_hdf5[max(0,startPos-hdf5_read_chunk_size):endPos]
-                            
-                            previous_read_hdfChunk = current_read_index
-                            
-                                        
-                        #Better structure
-                        events = allhdf5chunkslices
-                        # logging.warning(min(events['t']))
-                        # logging.warning(max(events['t']))
+                        events,curr_chunk = self.timeSliceFromHDF(fileToRun,requested_start_time_ms = t_min/1000,requested_end_time_ms=t_max/1000,howOftenCheckHdfTime = 500000,loggingBool=False,curr_chunk = previous_read_hdfChunk)
+                                                
                         #Store this for the next chunk
-                        previous_read_hdfChunk = n_hdfChunk-1
-                        #at this point fullChunkData is a (slightly too big in time) time-slice of the hdf5 file, and previous_read_hdfChunk is set so that next run we continue where we left off.
-                        
-                        events = events[(events['t'] >= t_min) & (events['t'] <= t_max)]
+                        previous_read_hdfChunk = curr_chunk-1
                         
                         #Check if any events are still within the range of time we want to assess
                         if len(events) > 0:
@@ -3692,7 +3722,6 @@ class VisualisationNapari(QWidget):
             return moduleMethodEvalTexts[0]
         else:
             return None
-
 
 class PostProcessing(QWidget):
     """
