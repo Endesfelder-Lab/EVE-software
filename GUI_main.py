@@ -1166,6 +1166,17 @@ class MyGUI(QMainWindow):
         self.buttonReadCSV.clicked.connect(self.open_loclist_csv)
         self.CSVReadLayout.addWidget(self.buttonReadCSV)
         
+        #Add a horizontal divider line
+        horizontal_line = QFrame(self)
+        horizontal_line.setFrameShape(QFrame.VLine)
+        horizontal_line.setFrameShadow(QFrame.Sunken)
+        self.CSVReadLayout.addWidget(horizontal_line)
+        
+        #And add a save CSV button
+        self.buttonSaveCSV = QPushButton("Save CSV")
+        self.buttonSaveCSV.clicked.connect(self.save_loclist_csv)
+        self.CSVReadLayout.addWidget(self.buttonSaveCSV)
+        
         tab4_layout.addLayout(self.CSVReadLayout, 1, 0)
     
     def fileDialogCSVopen(self):
@@ -1173,24 +1184,38 @@ class MyGUI(QMainWindow):
         fname = QFileDialog.getOpenFileName(self, 'Select a localization CSV file', None,"CSV file (*.csv)")
         #Set this selected file as line edit:
         self.CSVlocationLineEdit.setText(fname[0])
+        #Then also read this file:
+        self.open_loclist_csv()
 
+    def save_loclist_csv(self):
+        #Open a file dialog:
+        fname,_ = QFileDialog.getSaveFileName(self, 'Storage location', None,"CSV file (*.csv)")
+        localizations = self.data['FittingResult'][0]
+        #Store the localizations
+        self.storeLocalization(fname,localizations,outputType='thunderstorm')
+        logging.info('Localizations stored to ' + fname)
+        
     def open_loclist_csv(self):
         loclistcsvloc = self.CSVlocationLineEdit.text()
-        #Read the csv:
-        loclist = pd.read_csv(loclistcsvloc)
         
-        #Rename some of the headers:
-        loclist.rename(columns={'x [nm]': 'x'}, inplace=True)
-        loclist.rename(columns={'y [nm]': 'y'}, inplace=True)
-        loclist.rename(columns={'t [ms]': 't'}, inplace=True)
-        
-        #Set this as result:
-        self.data['FittingResult'] = {}
-        self.data['FittingResult'][0] = loclist
-        self.updateLocList()
-        logging.info('CSV loaded, loclist updated')
-        #Also clear the post-processing history since it's a completely new dataset
-        self.postProcessingtab_widget.PostProcessingHistoryGrid.clearHistory()
+        if loclistcsvloc == '': #If it's an empy line, actually go to filedialog
+            self.fileDialogCSVopen() #this contains a new call to open_loclist_csv         
+        else:#if it's actually a file, read it:
+            #Read the csv:
+            loclist = pd.read_csv(loclistcsvloc)
+            
+            #Rename some of the headers:
+            loclist.rename(columns={'x [nm]': 'x'}, inplace=True)
+            loclist.rename(columns={'y [nm]': 'y'}, inplace=True)
+            loclist.rename(columns={'t [ms]': 't'}, inplace=True)
+            
+            #Set this as result:
+            self.data['FittingResult'] = {}
+            self.data['FittingResult'][0] = loclist
+            self.updateLocList()
+            logging.info('CSV loaded, loclist updated')
+            #Also clear the post-processing history since it's a completely new dataset
+            self.postProcessingtab_widget.PostProcessingHistoryGrid.clearHistory()
         
     def setup_visualisationTab(self):
         """
@@ -2441,15 +2466,10 @@ class MyGUI(QMainWindow):
             storeLocationPartial = self.currentFileInfo['CurrentFileLoc'][:-4]
         return storeLocationPartial     
     
-    def storeLocalizationOutput(self):
-        logging.debug('Attempting to store fitting results output')
-        storeLocation = self.getStoreLocationPartial()+'_FitResults_'+self.storeNameDateTime+'.csv'
-        #Store the localization output
-        localizations = self.data['FittingResult'][0].dropna(axis=0, ignore_index=True)
-        localizations = localizations.drop('fit_info', axis=1)
-        if self.globalSettings['OutputDataFormat']['value'] == 'minimal':
+    def storeLocalization(self,storeLocation,localizations,outputType='thunderstorm'):
+        if outputType == 'minimal':
             localizations.to_csv(storeLocation)
-        elif self.globalSettings['OutputDataFormat']['value'] == 'thunderstorm':
+        elif outputType == 'thunderstorm':
             #Add a frame column to fittingResult:
             localizations['frame'] = localizations['t'].apply(round).astype(int)
             localizations['frame'] -= min(localizations['frame'])-1
@@ -2460,7 +2480,16 @@ class MyGUI(QMainWindow):
         else:
             #default to minimal
             localizations.to_csv(storeLocation)
-            
+        
+    def storeLocalizationOutput(self):
+        logging.debug('Attempting to store fitting results output')
+        storeLocation = self.getStoreLocationPartial()+'_FitResults_'+self.storeNameDateTime+'.csv'
+        #Store the localization output
+        localizations = self.data['FittingResult'][0].dropna(axis=0, ignore_index=True)
+        localizations = localizations.drop('fit_info', axis=1)
+        
+        #Actually store
+        self.storeLocalization(storeLocation,localizations,outputType=self.globalSettings['OutputDataFormat']['value'])
         
         #Also store pickle information:
         #Also save pos and neg seperately if so useful:
