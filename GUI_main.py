@@ -836,7 +836,7 @@ class MyGUI(QMainWindow):
         elif self.dataLocationInput.text().endswith('hdf5'):
             
             #Load events from HDF
-            events,_ = self.timeSliceFromHDF(self.dataLocationInput.text(),requested_start_time_ms = float(timeStretch[0]),requested_end_time_ms=float(timeStretch[0])+float(timeStretch[1]),howOftenCheckHdfTime = 50000,loggingBool=True)
+            events,_ = self.timeSliceFromHDF(self.dataLocationInput.text(),requested_start_time_ms = float(timeStretch[0]),requested_end_time_ms=float(timeStretch[0])+float(timeStretch[1]),howOftenCheckHdfTime = 50000)
             
             #Check if we have at least 1 event:
             if len(events) > 0:
@@ -956,7 +956,7 @@ class MyGUI(QMainWindow):
         self.updateShowPreview(previewEvents=self.previewEvents,timeStretch=timeStretch)
         self.updateLocList()
 
-    def timeSliceFromHDF(self,dataLocation,requested_start_time_ms = 0,requested_end_time_ms=1000,howOftenCheckHdfTime = 100000,loggingBool=True,curr_chunk = 0):
+    def timeSliceFromHDF(self,dataLocation,requested_start_time_ms = 0,requested_end_time_ms=1000,howOftenCheckHdfTime = 100000,loggingBool=False,curr_chunk = 0):
         """Function that returns all events between start/end time in a HDF5 file. Extremely sped-up since the HDF5 file is time-sorted, and only checked every 100k (howOftenCheckHdfTime) events.
 
         Args:
