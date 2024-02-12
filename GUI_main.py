@@ -1176,6 +1176,8 @@ class MyGUI(QMainWindow):
         self.data['FittingResult'][0] = loclist
         self.updateLocList()
         logging.info('CSV loaded, loclist updated')
+        #Also clear the post-processing history since it's a completely new dataset
+        self.postProcessingtab_widget.PostProcessingHistoryGrid.clearHistory()
         
     def setup_visualisationTab(self):
         """
@@ -1526,6 +1528,8 @@ class MyGUI(QMainWindow):
     def updateGUIafterNewResults(self,error=None):
         if error == None:
             self.updateLocList()
+            #Also clear the post-processing history since it's a completely new dataset
+            self.postProcessingtab_widget.PostProcessingHistoryGrid.clearHistory()
         else:
             self.open_critical_warning(error)
     
@@ -3646,7 +3650,7 @@ class VisualisationNapari(QWidget):
             
         #Add a new layer which is this image
         #Dynamically set contrast limits based on percentile to get proper visualisation and not be affected by outliers too much
-        percentile_value_display = 0.5
+        percentile_value_display = 0.01
         contrast_limits = np.percentile(resultImage[0], [percentile_value_display,100-percentile_value_display])
         #Ensure that contrast_limits maximum value is always higher than the minimum
         if contrast_limits[1]<=contrast_limits[0]:
@@ -3787,7 +3791,7 @@ class PostProcessing(QWidget):
         #------------End of GUI dynamic layout -----------------
         
         #Add a vertical spacer to push everything to top and bottom:
-        spacer = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding)
+        spacer = QSpacerItem(0, 1e5, QSizePolicy.Minimum, QSizePolicy.Expanding)
         self.mainlayout.layout().addItem(spacer)
         
         #Add the history grid-layout to the mainlayout:
@@ -3812,7 +3816,8 @@ class PostProcessing(QWidget):
         self.postProcessingHistory[current_postprocessinghistoryid][1] = FunctionEvalText
         self.postProcessingHistory[current_postprocessinghistoryid][2] = [len(self.postProcessingHistory[current_postprocessinghistoryid][0]),-1]
         
-        self.parent.data['FittingResult'][0] = eval(FunctionEvalText)[0]
+        postProcessingResult = eval(FunctionEvalText)
+        self.parent.data['FittingResult'][0] = postProcessingResult[0]
         
         self.postProcessingHistory[current_postprocessinghistoryid][2][1] = len(self.parent.data['FittingResult'][0])
         
@@ -3828,8 +3833,12 @@ class PostProcessing(QWidget):
             self.parent=parent
             # Create a vertical layout to hold the scroll area
             main_layout = QVBoxLayout()
+            
             # Set the main layout of the widget
             self.setLayout(main_layout)
+            
+            groupbox = QGroupBox('PostProcessing history')
+            main_layout.addWidget(groupbox)
             
             #Create a scroll area
             scroll_area = QtWidgets.QScrollArea()
@@ -3837,28 +3846,58 @@ class PostProcessing(QWidget):
             #Give it a container
             container = QtWidgets.QWidget()
             scroll_area.setWidget(container)
+            #Define row heights for the grid
+            gridRowHeights = [30,30,30]
+            #The scroll area needs to be somewhat larger than this
+            scroll_area.setMinimumSize(0,sum(gridRowHeights)+25)
             
             #Create a qgridlayout:
             self.grid_layout = QGridLayout()
-            self.grid_layout.setContentsMargins(0, 0, 0, 0)
-            self.grid_layout.setSpacing(0)  # Set spacing between widgets to 0
+            #Set the minimum size of this grid layout
+            self.grid_layout.setRowMinimumHeight(0,gridRowHeights[0])
+            self.grid_layout.setRowMinimumHeight(1,gridRowHeights[1])
+            self.grid_layout.setRowMinimumHeight(2,gridRowHeights[2])
 
             #Put it inside the container:
             container.setLayout(self.grid_layout)
             
-            main_layout.addWidget(scroll_area)
+            container2 = QVBoxLayout()
+            container2.addWidget(scroll_area)
+            groupbox.setLayout(container2)
+            
+            self.grid_layout.setSizeConstraint(QLayout.SetMinimumSize)
+            main_layout.setSizeConstraint(QLayout.SetMinimumSize)
+            # groupbox.setSizeConstraint(QLayout.SetMinimumSize)
+            container2.setSizeConstraint(QLayout.SetMinimumSize)
+            # container.setSizeConstraint(QLayout.SetMinimumSize)
+            
+            #OK, so now we have a self, which has main_layout, which contains groupbox, which contains container2, which contains scroll_area, which contains container, which contains grid_layout.
             
         def addHistoryEntryToGrid(self,historyId):
-            self.parent.postProcessingHistory[historyId][1]
             
             #Add some entries to the gridlayout:
             #This is the title of what operation we did
-            self.grid_layout.addWidget(QLabel(self.parent.postProcessingHistory[historyId][1]), 0,historyId)
-            #This is the change in number of localizations
+            
+            #We know from earlier that this is the text we always put in:
+            #"parent.data['FittingResult'][0]","parent.data['FindingResult'][0]","parent.globalSettings"
+            #Thus, we can extract the info around this
+            fullText = self.parent.postProcessingHistory[historyId][1]
+            historyText = fullText.split("parent.data[\'FittingResult\'][0],parent.data[\'FindingResult\'][0],parent.globalSettings")
+            #We do a little cleanup:
+            historyText[0] = historyText[0].replace("(","")
+            historyText[1] = historyText[1].replace(")","")[1:]
+            #We create a QLabel from this
+            historyTextLabel = QLabel("<html><b>"+historyText[0]+'</b><br>'+historyText[1]+"</html>")
+            historyTextLabel.setWordWrap(True)
+            self.grid_layout.addWidget(historyTextLabel, 0,historyId)
+            
+            #Then we also show the change in nr of localizations
             self.grid_layout.addWidget(QLabel(str(self.parent.postProcessingHistory[historyId][2][0])+"-->"+str(self.parent.postProcessingHistory[historyId][2][1])+" entries"), 1,historyId)
+            
             #This is a button to restore to before this operation
             button = QPushButton("Restore to before this", self)
             self.grid_layout.addWidget(button, 2,historyId)
+            
             #And add a callback to this:
             button.clicked.connect(lambda text, historyId=historyId: self.historyRestore_callback(historyId))
         
@@ -3881,6 +3920,12 @@ class PostProcessing(QWidget):
             self.parent.parent.updateLocList()
             #Give some info
             logging.info('Restored postprocessing history')
+        
+        def clearHistory(self):
+            for i in reversed(range(self.grid_layout.count())):
+                self.grid_layout.removeWidget(self.grid_layout.itemAt(i).widget())
+            self.parent.postProcessingHistory = {}
+            logging.info('Cleared postprocessing history')
             
     def getPostProcessingFunctionEvalText(self,p1,p2,p3):
         #Get the dropdown info
