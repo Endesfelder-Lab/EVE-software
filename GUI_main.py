@@ -957,7 +957,20 @@ class MyGUI(QMainWindow):
         self.updateLocList()
 
     def timeSliceFromHDF(self,dataLocation,requested_start_time_ms = 0,requested_end_time_ms=1000,howOftenCheckHdfTime = 100000,loggingBool=True,curr_chunk = 0):
-        
+        """Function that returns all events between start/end time in a HDF5 file. Extremely sped-up since the HDF5 file is time-sorted, and only checked every 100k (howOftenCheckHdfTime) events.
+
+        Args:
+            dataLocation (String): Storage location of the .hdf5 file
+            requested_start_time_ms (int, optional): Start time in milliseconds. Defaults to 0.
+            requested_end_time_ms (int, optional): End time in milliseconds. Defaults to 1000.
+            howOftenCheckHdfTime (int, optional): At which N intervals the time should be checked. This means that HDF event 0,N*howOftenCheckHdfTime,(N+1)*howOftenCheckHdfTime etc will be checked and pre-loaded. After this, all events within the time bounds is loaded. Defaults to 100000.
+            loggingBool (bool, optional): Whether or not logging is activated. Defaults to True.
+            curr_chunk (int, optional): Starting chunk to look at. Normally should be 0. Defaults to 0.
+
+        Returns:
+            events: Events in wanted format
+            latest_chunk: Last chunk that was used. Can be used to run this function more often via curr_chunk. 
+        """
         #Variable starting
         lookup_start_index = -1
         lookup_end_index = -1
@@ -2179,17 +2192,16 @@ class MyGUI(QMainWindow):
                     self.chunckloading_number_chuck = 0
                     
                     while self.chunckloading_finished_chunking == False:
-                
-                
+                        #Get limits from GUI
                         self.chunckloading_currentLimits = [[(self.chunckloading_number_chuck)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000,(self.chunckloading_number_chuck+1)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000],[(self.chunckloading_number_chuck)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000-float(self.globalSettings['FindingBatchingTimeOverlapMs']['value'])*1000,(self.chunckloading_number_chuck+1)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000+float(self.globalSettings['FindingBatchingTimeOverlapMs']['value'])*1000]]       
                         
                         # Retrieve all entries within the specified bounding box
                         t_min = self.chunckloading_currentLimits[0][0]+float(self.run_startTLineEdit.text())*1000
                         t_max = min(self.chunckloading_currentLimits[1][1],float(self.run_durationTLineEdit.text())*1000)+float(self.run_startTLineEdit.text())*1000
-                        
+                        #Function to get events from HDF
                         events,curr_chunk = self.timeSliceFromHDF(fileToRun,requested_start_time_ms = t_min/1000,requested_end_time_ms=t_max/1000,howOftenCheckHdfTime = 500000,loggingBool=False,curr_chunk = previous_read_hdfChunk)
                                                 
-                        #Store this for the next chunk
+                        #Store this current chunk id for the next chunk
                         previous_read_hdfChunk = curr_chunk-1
                         
                         #Check if any events are still within the range of time we want to assess
@@ -2231,14 +2243,14 @@ class MyGUI(QMainWindow):
                             self.number_finding_found_polarity[polarityVal] = len(self.data['FindingResult'][0])
                             self.chunckloading_finished_chunking = True
                         
-                else: #If we want to pre-load the existing finding info:
+                else:
+                    #We dictate a findingOffset (i.e. nr of positive events if we're running negative events afterwards)
                     findingOffset = 0
                     if polarityVal == 'Neg':
                         findingOffset = self.number_finding_found_polarity['Pos']
-                    
+                    #And actually run the finding/fitting:
                     self.runFindingAndFitting('',runFitting=False,storeFinding=False,polarityVal=polarityVal,findingOffset = findingOffset,fittingOffset=findingOffset)
                     self.number_finding_found_polarity[polarityVal] = len(self.data['FindingResult'][0])
-                    
                     
         else:
             logging.error("Please choose a .raw or .npy or .hdf5 file for previews.")
