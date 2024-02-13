@@ -4193,8 +4193,8 @@ class PreviewFindingFitting(QWidget):
         polygons = []
         
         for f in range(len(fittingResults)):
-            xcoord_pxcoord = fittingResults['x'].iloc[f]/pxsize-self.hist_xy.xlim[0]
-            ycoord_pxcoord = fittingResults['y'].iloc[f]/pxsize-self.hist_xy.ylim[0]
+            xcoord_pxcoord = fittingResults['x'].iloc[f]/float(pxsize)-self.hist_xy.xlim[0]
+            ycoord_pxcoord = fittingResults['y'].iloc[f]/float(pxsize)-self.hist_xy.ylim[0]
             
             polygons.append(np.array([[ycoord_pxcoord-1,xcoord_pxcoord-1],[ycoord_pxcoord+1,xcoord_pxcoord+1]]))
             polygons.append(np.array([[ycoord_pxcoord-1,xcoord_pxcoord+1],[ycoord_pxcoord+1,xcoord_pxcoord-1]]))
