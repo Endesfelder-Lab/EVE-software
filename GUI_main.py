@@ -1416,7 +1416,7 @@ class MyGUI(QMainWindow):
                     if pd.isna(self.data['CandidatePreviewLocs']['x'].iloc[0]):
                         self.fit_info.setText(f"No localization generated due to {self.data['CandidatePreviewLocs']['fit_info'].iloc[0]}")
                         print(self.data['CandidatePreviewLocs']['fit_info'].iloc[0])
-                    pixel_size = self.globalSettings['PixelSize_nm']['value']
+                    pixel_size = float(self.globalSettings['PixelSize_nm']['value'])
 
                     # Get some info about the candidate
                     N_events = self.data['FindingResult'][0][self.data['CandidatePreviewID']]['N_events']
@@ -4130,7 +4130,7 @@ class PreviewFindingFitting(QWidget):
             
             #Get the fitting result in the current time bin:
             fittingResults_thisbin = fittingResult[(fittingResult['t']>=(float(timeStretch[0])+n*frametime_ms))* (fittingResult['t']<(float(timeStretch[0])+(n+1)*frametime_ms))]
-            self.fitting_overlays.append(self.create_fitting_overlay(fittingResults_thisbin,pxsize=settings['PixelSize_nm']['value']))
+            self.fitting_overlays.append(self.create_fitting_overlay(fittingResults_thisbin,pxsize=float(settings['PixelSize_nm']['value'])))
         
         #Select the original image-layer as selected
         self.napariviewer.layers.selection.active = self.napariviewer.layers[0]
