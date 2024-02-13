@@ -836,7 +836,7 @@ class MyGUI(QMainWindow):
         elif self.dataLocationInput.text().endswith('hdf5'):
             
             #Load events from HDF
-            events,_ = self.timeSliceFromHDF(self.dataLocationInput.text(),requested_start_time_ms = float(timeStretch[0]),requested_end_time_ms=float(timeStretch[0])+float(timeStretch[1]),howOftenCheckHdfTime = 50000,loggingBool=True)
+            events,_ = self.timeSliceFromHDF(self.dataLocationInput.text(),requested_start_time_ms = float(timeStretch[0]),requested_end_time_ms=float(timeStretch[0])+float(timeStretch[1]),howOftenCheckHdfTime = 50000)
             
             #Check if we have at least 1 event:
             if len(events) > 0:
@@ -956,8 +956,21 @@ class MyGUI(QMainWindow):
         self.updateShowPreview(previewEvents=self.previewEvents,timeStretch=timeStretch)
         self.updateLocList()
 
-    def timeSliceFromHDF(self,dataLocation,requested_start_time_ms = 0,requested_end_time_ms=1000,howOftenCheckHdfTime = 100000,loggingBool=True,curr_chunk = 0):
-        
+    def timeSliceFromHDF(self,dataLocation,requested_start_time_ms = 0,requested_end_time_ms=1000,howOftenCheckHdfTime = 100000,loggingBool=False,curr_chunk = 0):
+        """Function that returns all events between start/end time in a HDF5 file. Extremely sped-up since the HDF5 file is time-sorted, and only checked every 100k (howOftenCheckHdfTime) events.
+
+        Args:
+            dataLocation (String): Storage location of the .hdf5 file
+            requested_start_time_ms (int, optional): Start time in milliseconds. Defaults to 0.
+            requested_end_time_ms (int, optional): End time in milliseconds. Defaults to 1000.
+            howOftenCheckHdfTime (int, optional): At which N intervals the time should be checked. This means that HDF event 0,N*howOftenCheckHdfTime,(N+1)*howOftenCheckHdfTime etc will be checked and pre-loaded. After this, all events within the time bounds is loaded. Defaults to 100000.
+            loggingBool (bool, optional): Whether or not logging is activated. Defaults to True.
+            curr_chunk (int, optional): Starting chunk to look at. Normally should be 0. Defaults to 0.
+
+        Returns:
+            events: Events in wanted format
+            latest_chunk: Last chunk that was used. Can be used to run this function more often via curr_chunk. 
+        """
         #Variable starting
         lookup_start_index = -1
         lookup_end_index = -1
@@ -1153,6 +1166,17 @@ class MyGUI(QMainWindow):
         self.buttonReadCSV.clicked.connect(self.open_loclist_csv)
         self.CSVReadLayout.addWidget(self.buttonReadCSV)
         
+        #Add a horizontal divider line
+        horizontal_line = QFrame(self)
+        horizontal_line.setFrameShape(QFrame.VLine)
+        horizontal_line.setFrameShadow(QFrame.Sunken)
+        self.CSVReadLayout.addWidget(horizontal_line)
+        
+        #And add a save CSV button
+        self.buttonSaveCSV = QPushButton("Save CSV")
+        self.buttonSaveCSV.clicked.connect(self.save_loclist_csv)
+        self.CSVReadLayout.addWidget(self.buttonSaveCSV)
+        
         tab4_layout.addLayout(self.CSVReadLayout, 1, 0)
     
     def fileDialogCSVopen(self):
@@ -1160,24 +1184,38 @@ class MyGUI(QMainWindow):
         fname = QFileDialog.getOpenFileName(self, 'Select a localization CSV file', None,"CSV file (*.csv)")
         #Set this selected file as line edit:
         self.CSVlocationLineEdit.setText(fname[0])
+        #Then also read this file:
+        self.open_loclist_csv()
 
+    def save_loclist_csv(self):
+        #Open a file dialog:
+        fname,_ = QFileDialog.getSaveFileName(self, 'Storage location', None,"CSV file (*.csv)")
+        localizations = self.data['FittingResult'][0]
+        #Store the localizations
+        self.storeLocalization(fname,localizations,outputType='thunderstorm')
+        logging.info('Localizations stored to ' + fname)
+        
     def open_loclist_csv(self):
         loclistcsvloc = self.CSVlocationLineEdit.text()
-        #Read the csv:
-        loclist = pd.read_csv(loclistcsvloc)
         
-        #Rename some of the headers:
-        loclist.rename(columns={'x [nm]': 'x'}, inplace=True)
-        loclist.rename(columns={'y [nm]': 'y'}, inplace=True)
-        loclist.rename(columns={'t [ms]': 't'}, inplace=True)
-        
-        #Set this as result:
-        self.data['FittingResult'] = {}
-        self.data['FittingResult'][0] = loclist
-        self.updateLocList()
-        logging.info('CSV loaded, loclist updated')
-        #Also clear the post-processing history since it's a completely new dataset
-        self.postProcessingtab_widget.PostProcessingHistoryGrid.clearHistory()
+        if loclistcsvloc == '': #If it's an empy line, actually go to filedialog
+            self.fileDialogCSVopen() #this contains a new call to open_loclist_csv         
+        else:#if it's actually a file, read it:
+            #Read the csv:
+            loclist = pd.read_csv(loclistcsvloc)
+            
+            #Rename some of the headers:
+            loclist.rename(columns={'x [nm]': 'x'}, inplace=True)
+            loclist.rename(columns={'y [nm]': 'y'}, inplace=True)
+            loclist.rename(columns={'t [ms]': 't'}, inplace=True)
+            
+            #Set this as result:
+            self.data['FittingResult'] = {}
+            self.data['FittingResult'][0] = loclist
+            self.updateLocList()
+            logging.info('CSV loaded, loclist updated')
+            #Also clear the post-processing history since it's a completely new dataset
+            self.postProcessingtab_widget.PostProcessingHistoryGrid.clearHistory()
         
     def setup_visualisationTab(self):
         """
@@ -2179,17 +2217,16 @@ class MyGUI(QMainWindow):
                     self.chunckloading_number_chuck = 0
                     
                     while self.chunckloading_finished_chunking == False:
-                
-                
+                        #Get limits from GUI
                         self.chunckloading_currentLimits = [[(self.chunckloading_number_chuck)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000,(self.chunckloading_number_chuck+1)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000],[(self.chunckloading_number_chuck)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000-float(self.globalSettings['FindingBatchingTimeOverlapMs']['value'])*1000,(self.chunckloading_number_chuck+1)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000+float(self.globalSettings['FindingBatchingTimeOverlapMs']['value'])*1000]]       
                         
                         # Retrieve all entries within the specified bounding box
                         t_min = self.chunckloading_currentLimits[0][0]+float(self.run_startTLineEdit.text())*1000
                         t_max = min(self.chunckloading_currentLimits[1][1],float(self.run_durationTLineEdit.text())*1000)+float(self.run_startTLineEdit.text())*1000
-                        
+                        #Function to get events from HDF
                         events,curr_chunk = self.timeSliceFromHDF(fileToRun,requested_start_time_ms = t_min/1000,requested_end_time_ms=t_max/1000,howOftenCheckHdfTime = 500000,loggingBool=False,curr_chunk = previous_read_hdfChunk)
                                                 
-                        #Store this for the next chunk
+                        #Store this current chunk id for the next chunk
                         previous_read_hdfChunk = curr_chunk-1
                         
                         #Check if any events are still within the range of time we want to assess
@@ -2231,14 +2268,14 @@ class MyGUI(QMainWindow):
                             self.number_finding_found_polarity[polarityVal] = len(self.data['FindingResult'][0])
                             self.chunckloading_finished_chunking = True
                         
-                else: #If we want to pre-load the existing finding info:
+                else:
+                    #We dictate a findingOffset (i.e. nr of positive events if we're running negative events afterwards)
                     findingOffset = 0
                     if polarityVal == 'Neg':
                         findingOffset = self.number_finding_found_polarity['Pos']
-                    
+                    #And actually run the finding/fitting:
                     self.runFindingAndFitting('',runFitting=False,storeFinding=False,polarityVal=polarityVal,findingOffset = findingOffset,fittingOffset=findingOffset)
                     self.number_finding_found_polarity[polarityVal] = len(self.data['FindingResult'][0])
-                    
                     
         else:
             logging.error("Please choose a .raw or .npy or .hdf5 file for previews.")
@@ -2429,15 +2466,10 @@ class MyGUI(QMainWindow):
             storeLocationPartial = self.currentFileInfo['CurrentFileLoc'][:-4]
         return storeLocationPartial     
     
-    def storeLocalizationOutput(self):
-        logging.debug('Attempting to store fitting results output')
-        storeLocation = self.getStoreLocationPartial()+'_FitResults_'+self.storeNameDateTime+'.csv'
-        #Store the localization output
-        localizations = self.data['FittingResult'][0].dropna(axis=0, ignore_index=True)
-        localizations = localizations.drop('fit_info', axis=1)
-        if self.globalSettings['OutputDataFormat']['value'] == 'minimal':
+    def storeLocalization(self,storeLocation,localizations,outputType='thunderstorm'):
+        if outputType == 'minimal':
             localizations.to_csv(storeLocation)
-        elif self.globalSettings['OutputDataFormat']['value'] == 'thunderstorm':
+        elif outputType == 'thunderstorm':
             #Add a frame column to fittingResult:
             localizations['frame'] = localizations['t'].apply(round).astype(int)
             localizations['frame'] -= min(localizations['frame'])-1
@@ -2448,7 +2480,16 @@ class MyGUI(QMainWindow):
         else:
             #default to minimal
             localizations.to_csv(storeLocation)
-            
+        
+    def storeLocalizationOutput(self):
+        logging.debug('Attempting to store fitting results output')
+        storeLocation = self.getStoreLocationPartial()+'_FitResults_'+self.storeNameDateTime+'.csv'
+        #Store the localization output
+        localizations = self.data['FittingResult'][0].dropna(axis=0, ignore_index=True)
+        localizations = localizations.drop('fit_info', axis=1)
+        
+        #Actually store
+        self.storeLocalization(storeLocation,localizations,outputType=self.globalSettings['OutputDataFormat']['value'])
         
         #Also store pickle information:
         #Also save pos and neg seperately if so useful:
