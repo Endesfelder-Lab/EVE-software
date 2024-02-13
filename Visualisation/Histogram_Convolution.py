@@ -53,10 +53,10 @@ def Histogram_convolution(resultArray,settings,**kwargs):
     #Then simply increase the value of the pixels in that array based on resultArray
     
     #Get the min/max bounds in pixel units:
-    xoffset = np.min(resultArray['x']) / settings['PixelSize_nm']['value']
-    maxx = np.max(resultArray['x']) / settings['PixelSize_nm']['value']
-    yoffset = np.min(resultArray['y']) / settings['PixelSize_nm']['value']
-    maxy = np.max(resultArray['y']) / settings['PixelSize_nm']['value']
+    xoffset = np.min(resultArray['x']) / float(settings['PixelSize_nm']['value'])
+    maxx = np.max(resultArray['x']) / float(settings['PixelSize_nm']['value'])
+    yoffset = np.min(resultArray['y']) / float(settings['PixelSize_nm']['value'])
+    maxy = np.max(resultArray['y']) / float(settings['PixelSize_nm']['value'])
     #Scale them so that minx, miny = 0:
     minx = 0
     miny = 0
@@ -64,7 +64,7 @@ def Histogram_convolution(resultArray,settings,**kwargs):
     maxy = maxy - yoffset
     
     #Take resultArray and remove all nan-entries:   
-    data = resultArray[['x','y']].dropna() / settings['PixelSize_nm']['value']
+    data = resultArray[['x','y']].dropna() / float(settings['PixelSize_nm']['value'])
     data['x'] -= xoffset
     data['y'] -= yoffset
     
@@ -83,7 +83,7 @@ def Histogram_convolution(resultArray,settings,**kwargs):
     elapsed_time = end_time - start_time
 
     #Scale should be the scale of pixel - to - um. E.g. a scale of 0.01 means 100 pixels = 1 um
-    scale = (maxx*(settings['PixelSize_nm']['value'])/1000)/np.shape(histogram_convolved)[0]
+    scale = (maxx*(float(settings['PixelSize_nm']['value']))/1000)/np.shape(histogram_convolved)[0]
 
     logging.info('Histogram with convolution created!')
 
