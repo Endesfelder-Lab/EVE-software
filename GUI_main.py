@@ -822,17 +822,31 @@ class MyGUI(QMainWindow):
             events = self.filterEvents_npy_t(data,timeStretch)
             #Check if we have at least 1 event:
             if len(events) > 0:
-                # correct the coordinates and time stamps
-                events['x']-=np.min(events['x'])
-                events['y']-=np.min(events['y'])
-                events['t']-=np.min(events['t'])
+                # # correct the coordinates and time stamps
+                # events['x']-=np.min(events['x'])
+                # events['y']-=np.min(events['y'])
+                # events['t']-=np.min(events['t'])
                 #Log the nr of events found:
                 logging.info(f"Preview - Found {len(events)} events in the chosen time frame.")
             else:
                 logging.error("Preview - No events found in the chosen time frame.")
                 return
+        elif self.dataLocationInput.text().endswith('hdf5'):
+            
+            #Load events from HDF
+            events,_ = self.timeSliceFromHDF(self.dataLocationInput.text(),requested_start_time_ms = float(timeStretch[0]),requested_end_time_ms=float(timeStretch[0])+float(timeStretch[1]),howOftenCheckHdfTime = 50000)
+            
+            #Check if we have at least 1 event:
+            if len(events) > 0:
+                #Log the nr of events found:
+                logging.info(f"Preview - Found {len(events)} events in the chosen time frame.")
+            else:
+                logging.error("Preview - No events found in the chosen time frame.")
+                return
+                    
+            z=3
         else:
-            logging.error("Please choose a .raw or .npy file for previews.")
+            logging.error("Please choose a .raw or .npy or .hdf5 file for previews.")
             return
         
         #Load the events in self memory and filter on XY
@@ -939,7 +953,74 @@ class MyGUI(QMainWindow):
         #Note that self.previewEvents is XYT cut, but NOT p-cut
         self.updateShowPreview(previewEvents=self.previewEvents,timeStretch=timeStretch)
         self.updateLocList()
+
+    def timeSliceFromHDF(self,dataLocation,requested_start_time_ms = 0,requested_end_time_ms=1000,howOftenCheckHdfTime = 100000,loggingBool=False,curr_chunk = 0):
+        """Function that returns all events between start/end time in a HDF5 file. Extremely sped-up since the HDF5 file is time-sorted, and only checked every 100k (howOftenCheckHdfTime) events.
+
+        Args:
+            dataLocation (String): Storage location of the .hdf5 file
+            requested_start_time_ms (int, optional): Start time in milliseconds. Defaults to 0.
+            requested_end_time_ms (int, optional): End time in milliseconds. Defaults to 1000.
+            howOftenCheckHdfTime (int, optional): At which N intervals the time should be checked. This means that HDF event 0,N*howOftenCheckHdfTime,(N+1)*howOftenCheckHdfTime etc will be checked and pre-loaded. After this, all events within the time bounds is loaded. Defaults to 100000.
+            loggingBool (bool, optional): Whether or not logging is activated. Defaults to True.
+            curr_chunk (int, optional): Starting chunk to look at. Normally should be 0. Defaults to 0.
+
+        Returns:
+            events: Events in wanted format
+            latest_chunk: Last chunk that was used. Can be used to run this function more often via curr_chunk. 
+        """
+        #Variable starting
+        lookup_start_index = -1
+        lookup_end_index = -1
+        
     
+        #Load the hdf5 file
+        with h5py.File(dataLocation, mode='r') as file:
+            #Events are here in this file:
+            events_hdf5 = file['CD']['events']
+            
+            #Loop while either start or end index hasn't been found yet
+            while lookup_start_index == -1 or lookup_end_index == -1:
+                index = curr_chunk*howOftenCheckHdfTime
+                
+                
+                if index <= events_hdf5.size:
+                    #Get the time
+                    foundtime = events_hdf5[index]['t']/1000 #in ms
+                    
+                    if loggingBool == True:
+                        logging.info('Loading HDF, currently on chunk '+str(curr_chunk)+', at time: '+str(foundtime))
+                    
+                    #Check if the start time has surpassed
+                    if foundtime > requested_start_time_ms:
+                        if lookup_start_index == -1:
+                            lookup_start_index = max(0,curr_chunk-1)*howOftenCheckHdfTime
+                    #Check if the end-time is surpassed
+                    if foundtime > requested_end_time_ms:
+                        if lookup_end_index == -1:
+                            lookup_end_index = max(1,curr_chunk+1)*howOftenCheckHdfTime
+                    #Increase current chunk
+                    curr_chunk+=1
+                else:
+                    logging.info('End of file reached while chunking HDF5')
+                    if lookup_start_index == -1:
+                        lookup_start_index = events_hdf5.size #Set to end of file
+                    if lookup_end_index == -1:
+                        lookup_end_index = events_hdf5.size #Set to end of file
+            
+            #Properly (32bit) initialise dicts
+            wantedEvents_tooLarge = np.zeros(0, dtype={'names': ['x', 'y', 'p', 't'], 'formats': ['<u2', '<u2', '<i2', '<i8'], 'offsets': [0, 2, 4, 8], 'itemsize': 32})
+            events_output = np.zeros(0, dtype={'names': ['x', 'y', 'p', 't'], 'formats': ['<u2', '<u2', '<i2', '<i8'], 'offsets': [0, 2, 4, 8], 'itemsize': 32})
+            
+            #Now we know the start/end index, so we cut out that area:
+            wantedEvents_tooLarge = events_hdf5[lookup_start_index:lookup_end_index]
+            #And we fully cut it to exact size:
+            events_output = wantedEvents_tooLarge[wantedEvents_tooLarge['t']/1000>=requested_start_time_ms]
+            events_output = events_output[events_output['t']/1000<=requested_end_time_ms]
+        
+        #Return the events
+        return events_output,curr_chunk
+
     def filterEvents_npy_t(self,events,tStretch=(-np.Inf,np.Inf)):
         """
         Filter events that are in a numpy array to a certain time-stretch.
@@ -1066,26 +1147,73 @@ class MyGUI(QMainWindow):
         self.LocListTable = QTableView()
         tab4_layout.addWidget(self.LocListTable, 0, 0)
         
-        #Also add a button to read a csv
+        #Add an empty horizontal widget to load a .csv:
+        self.CSVReadLayout = QHBoxLayout()
+        
+        #Add an empty line edit for a .csv loading string:
+        self.CSVlocationLineEdit = QLineEdit()
+        self.CSVReadLayout.addWidget(self.CSVlocationLineEdit)
+        
+        #Add a ... button that opens a file dialog:
+        self.findCSVlocationButton = QPushButton("...")
+        self.findCSVlocationButton.clicked.connect(self.fileDialogCSVopen)
+        self.CSVReadLayout.addWidget(self.findCSVlocationButton)
+        
+        #Also add a button to read the csv
         self.buttonReadCSV = QPushButton("Read CSV")
-        tab4_layout.addWidget(self.buttonReadCSV, 1, 0)
         self.buttonReadCSV.clicked.connect(self.open_loclist_csv)
+        self.CSVReadLayout.addWidget(self.buttonReadCSV)
+        
+        #Add a horizontal divider line
+        horizontal_line = QFrame(self)
+        horizontal_line.setFrameShape(QFrame.VLine)
+        horizontal_line.setFrameShadow(QFrame.Sunken)
+        self.CSVReadLayout.addWidget(horizontal_line)
+        
+        #And add a save CSV button
+        self.buttonSaveCSV = QPushButton("Save CSV")
+        self.buttonSaveCSV.clicked.connect(self.save_loclist_csv)
+        self.CSVReadLayout.addWidget(self.buttonSaveCSV)
+        
+        tab4_layout.addLayout(self.CSVReadLayout, 1, 0)
     
+    def fileDialogCSVopen(self):
+        #Open a file dialog:
+        fname = QFileDialog.getOpenFileName(self, 'Select a localization CSV file', None,"CSV file (*.csv)")
+        #Set this selected file as line edit:
+        self.CSVlocationLineEdit.setText(fname[0])
+        #Then also read this file:
+        self.open_loclist_csv()
+
+    def save_loclist_csv(self):
+        #Open a file dialog:
+        fname,_ = QFileDialog.getSaveFileName(self, 'Storage location', None,"CSV file (*.csv)")
+        localizations = self.data['FittingResult'][0]
+        #Store the localizations
+        self.storeLocalization(fname,localizations,outputType='thunderstorm')
+        logging.info('Localizations stored to ' + fname)
+        
     def open_loclist_csv(self):
-        loclistcsvloc = '/home/laura/PhD/Event_Based_Sensor_Project/GUI_tests/20240209_DriftCorrection/Tubulin_hdf5._FitResults_20240208_121847.csv'
-        #Read the csv:
-        loclist = pd.read_csv(loclistcsvloc)
+        loclistcsvloc = self.CSVlocationLineEdit.text()
         
-        #Rename some of the headers:
-        loclist.rename(columns={'x [nm]': 'x'}, inplace=True)
-        loclist.rename(columns={'y [nm]': 'y'}, inplace=True)
-        loclist.rename(columns={'t [ms]': 't'}, inplace=True)
-        
-        #Set this as result:
-        self.data['FittingResult'] = {}
-        self.data['FittingResult'][0] = loclist
-        self.updateLocList()
-        logging.info('CSV loaded, loclist updated')
+        if loclistcsvloc == '': #If it's an empy line, actually go to filedialog
+            self.fileDialogCSVopen() #this contains a new call to open_loclist_csv         
+        else:#if it's actually a file, read it:
+            #Read the csv:
+            loclist = pd.read_csv(loclistcsvloc)
+            
+            #Rename some of the headers:
+            loclist.rename(columns={'x [nm]': 'x'}, inplace=True)
+            loclist.rename(columns={'y [nm]': 'y'}, inplace=True)
+            loclist.rename(columns={'t [ms]': 't'}, inplace=True)
+            
+            #Set this as result:
+            self.data['FittingResult'] = {}
+            self.data['FittingResult'][0] = loclist
+            self.updateLocList()
+            logging.info('CSV loaded, loclist updated')
+            #Also clear the post-processing history since it's a completely new dataset
+            self.postProcessingtab_widget.PostProcessingHistoryGrid.clearHistory()
         
     def setup_visualisationTab(self):
         """
@@ -1228,6 +1356,8 @@ class MyGUI(QMainWindow):
     def updateGUIafterNewResults(self,error=None):
         if error == None:
             self.updateLocList()
+            #Also clear the post-processing history since it's a completely new dataset
+            self.postProcessingtab_widget.PostProcessingHistoryGrid.clearHistory()
         else:
             self.open_critical_warning(error)
     
@@ -1872,66 +2002,22 @@ class MyGUI(QMainWindow):
                     self.chunckloading_currentLimits = [[0,0],[0,0]]
                     
                     
-                    previous_read_hdfChunk = 1
+                    previous_read_hdfChunk = 0
                     events_prev = np.zeros(0, dtype={'names': ['x', 'y', 'p', 't'], 'formats': ['<u2', '<u2', '<i2', '<i8'], 'offsets': [0, 2, 4, 8], 'itemsize': 32})
                     self.chunckloading_number_chuck = 0
                     
                     while self.chunckloading_finished_chunking == False:
-                
-                
-                        self.chunckloading_currentLimits = [[(self.chunckloading_number_chuck)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000,(self.chunckloading_number_chuck+1)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000],[(self.chunckloading_number_chuck)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000-float(self.globalSettings['FindingBatchingTimeOverlapMs']['value'])*1000,(self.chunckloading_number_chuck+1)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000+float(self.globalSettings['FindingBatchingTimeOverlapMs']['value'])*1000]]        
-                
-                        current_read_index = 0
-                        hdf5_read_chunk_size = 500000 #nr of entries that are loaded after which it's checked whether T makes sense
+                        #Get limits from GUI
+                        self.chunckloading_currentLimits = [[(self.chunckloading_number_chuck)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000,(self.chunckloading_number_chuck+1)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000],[(self.chunckloading_number_chuck)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000-float(self.globalSettings['FindingBatchingTimeOverlapMs']['value'])*1000,(self.chunckloading_number_chuck+1)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000+float(self.globalSettings['FindingBatchingTimeOverlapMs']['value'])*1000]]       
                         
                         # Retrieve all entries within the specified bounding box
                         t_min = self.chunckloading_currentLimits[0][0]+float(self.run_startTLineEdit.text())*1000
                         t_max = min(self.chunckloading_currentLimits[1][1],float(self.run_durationTLineEdit.text())*1000)+float(self.run_startTLineEdit.text())*1000
-                        
-                        #Load the hdf5 file
-                        with h5py.File(fileToRun, mode='r') as file:
-                            events_hdf5 = file['CD']['events']
-                            
-                            #We start at some chunk in time
-                            n_hdfChunk = previous_read_hdfChunk
-                            #We check if this chunk is fully loaded in hdf5
-                            fullChunkLoaded = False
-                            allhdf5chunkslices = np.zeros(0, dtype={'names': ['x', 'y', 'p', 't'], 'formats': ['<u2', '<u2', '<i2', '<i8'], 'offsets': [0, 2, 4, 8], 'itemsize': 32})
-                            
-                            #First figure out the start/end of this chunk:
-                            startPos = -1
-                            endPos = -1
-                            while (startPos == -1) or (endPos == -1):
-                                #Read a single entry:
-                                if current_read_index*hdf5_read_chunk_size < events_hdf5.size:
-                                    single_entry = events_hdf5[current_read_index*hdf5_read_chunk_size]
-                                    if startPos == -1:
-                                        if single_entry[3] > t_min:
-                                            startPos = current_read_index*hdf5_read_chunk_size
-                                    if endPos == -1:
-                                        if single_entry[3] > t_max:
-                                            endPos = current_read_index*hdf5_read_chunk_size
-                                    current_read_index+=1
-                                else:
-                                    if startPos == -1:
-                                        startPos = events_hdf5.size
-                                    endPos = events_hdf5.size
-                                    logging.info('end of file reached while streaming')
-                            
-                            allhdf5chunkslices = events_hdf5[max(0,startPos-hdf5_read_chunk_size):endPos]
-                            
-                            previous_read_hdfChunk = current_read_index
-                            
-                                        
-                        #Better structure
-                        events = allhdf5chunkslices
-                        # logging.warning(min(events['t']))
-                        # logging.warning(max(events['t']))
-                        #Store this for the next chunk
-                        previous_read_hdfChunk = n_hdfChunk-1
-                        #at this point fullChunkData is a (slightly too big in time) time-slice of the hdf5 file, and previous_read_hdfChunk is set so that next run we continue where we left off.
-                        
-                        events = events[(events['t'] >= t_min) & (events['t'] <= t_max)]
+                        #Function to get events from HDF
+                        events,curr_chunk = self.timeSliceFromHDF(fileToRun,requested_start_time_ms = t_min/1000,requested_end_time_ms=t_max/1000,howOftenCheckHdfTime = 500000,loggingBool=False,curr_chunk = previous_read_hdfChunk)
+                                                
+                        #Store this current chunk id for the next chunk
+                        previous_read_hdfChunk = curr_chunk-1
                         
                         #Check if any events are still within the range of time we want to assess
                         if len(events) > 0:
@@ -1972,14 +2058,14 @@ class MyGUI(QMainWindow):
                             self.number_finding_found_polarity[polarityVal] = len(self.data['FindingResult'][0])
                             self.chunckloading_finished_chunking = True
                         
-                else: #If we want to pre-load the existing finding info:
+                else:
+                    #We dictate a findingOffset (i.e. nr of positive events if we're running negative events afterwards)
                     findingOffset = 0
                     if polarityVal == 'Neg':
                         findingOffset = self.number_finding_found_polarity['Pos']
-                    
+                    #And actually run the finding/fitting:
                     self.runFindingAndFitting('',runFitting=False,storeFinding=False,polarityVal=polarityVal,findingOffset = findingOffset,fittingOffset=findingOffset)
                     self.number_finding_found_polarity[polarityVal] = len(self.data['FindingResult'][0])
-                    
                     
         else:
             logging.error("Please choose a .raw or .npy or .hdf5 file for previews.")
@@ -2170,15 +2256,10 @@ class MyGUI(QMainWindow):
             storeLocationPartial = self.currentFileInfo['CurrentFileLoc'][:-4]
         return storeLocationPartial     
     
-    def storeLocalizationOutput(self):
-        logging.debug('Attempting to store fitting results output')
-        storeLocation = self.getStoreLocationPartial()+'_FitResults_'+self.storeNameDateTime+'.csv'
-        #Store the localization output
-        localizations = self.data['FittingResult'][0].dropna(axis=0, ignore_index=True)
-        localizations = localizations.drop('fit_info', axis=1)
-        if self.globalSettings['OutputDataFormat']['value'] == 'minimal':
+    def storeLocalization(self,storeLocation,localizations,outputType='thunderstorm'):
+        if outputType == 'minimal':
             localizations.to_csv(storeLocation)
-        elif self.globalSettings['OutputDataFormat']['value'] == 'thunderstorm':
+        elif outputType == 'thunderstorm':
             #Add a frame column to fittingResult:
             localizations['frame'] = localizations['t'].apply(round).astype(int)
             localizations['frame'] -= min(localizations['frame'])-1
@@ -2189,7 +2270,16 @@ class MyGUI(QMainWindow):
         else:
             #default to minimal
             localizations.to_csv(storeLocation)
-            
+        
+    def storeLocalizationOutput(self):
+        logging.debug('Attempting to store fitting results output')
+        storeLocation = self.getStoreLocationPartial()+'_FitResults_'+self.storeNameDateTime+'.csv'
+        #Store the localization output
+        localizations = self.data['FittingResult'][0].dropna(axis=0, ignore_index=True)
+        localizations = localizations.drop('fit_info', axis=1)
+        
+        #Actually store
+        self.storeLocalization(storeLocation,localizations,outputType=self.globalSettings['OutputDataFormat']['value'])
         
         #Also store pickle information:
         #Also save pos and neg seperately if so useful:
@@ -3010,7 +3100,7 @@ class VisualisationNapari(QWidget):
         
         #Get the current function callback
         FunctionEvalText = self.getVisFunctionEvalText("parent.data['FittingResult'][0]","parent.globalSettings")
-        print(FunctionEvalText)
+        
         resultImage = eval(FunctionEvalText)
         
         #Clear all existing layers
@@ -3019,8 +3109,11 @@ class VisualisationNapari(QWidget):
             
         #Add a new layer which is this image
         #Dynamically set contrast limits based on percentile to get proper visualisation and not be affected by outliers too much
-        percentile_value_display = 0.5
+        percentile_value_display = 0.01
         contrast_limits = np.percentile(resultImage[0], [percentile_value_display,100-percentile_value_display])
+        #Ensure that contrast_limits maximum value is always higher than the minimum
+        if contrast_limits[1]<=contrast_limits[0]:
+            contrast_limits[1]=contrast_limits[0]+1
         
         #Quick check that the scale value is sensible
         if type(resultImage[1]) == float or type(resultImage[1]) == int or type(resultImage[1]) == np.float64:
@@ -3093,7 +3186,6 @@ class VisualisationNapari(QWidget):
         else:
             return None
 
-
 class PostProcessing(QWidget):
     """
     Class that handles the post-processing
@@ -3158,7 +3250,7 @@ class PostProcessing(QWidget):
         #------------End of GUI dynamic layout -----------------
         
         #Add a vertical spacer to push everything to top and bottom:
-        spacer = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding)
+        spacer = QSpacerItem(0, 1e5, QSizePolicy.Minimum, QSizePolicy.Expanding)
         self.mainlayout.layout().addItem(spacer)
         
         #Add the history grid-layout to the mainlayout:
@@ -3183,7 +3275,8 @@ class PostProcessing(QWidget):
         self.postProcessingHistory[current_postprocessinghistoryid][1] = FunctionEvalText
         self.postProcessingHistory[current_postprocessinghistoryid][2] = [len(self.postProcessingHistory[current_postprocessinghistoryid][0]),-1]
         
-        self.parent.data['FittingResult'][0] = eval(FunctionEvalText)[0]
+        postProcessingResult = eval(FunctionEvalText)
+        self.parent.data['FittingResult'][0] = postProcessingResult[0]
         
         self.postProcessingHistory[current_postprocessinghistoryid][2][1] = len(self.parent.data['FittingResult'][0])
         
@@ -3199,8 +3292,12 @@ class PostProcessing(QWidget):
             self.parent=parent
             # Create a vertical layout to hold the scroll area
             main_layout = QVBoxLayout()
+            
             # Set the main layout of the widget
             self.setLayout(main_layout)
+            
+            groupbox = QGroupBox('PostProcessing history')
+            main_layout.addWidget(groupbox)
             
             #Create a scroll area
             scroll_area = QtWidgets.QScrollArea()
@@ -3208,28 +3305,58 @@ class PostProcessing(QWidget):
             #Give it a container
             container = QtWidgets.QWidget()
             scroll_area.setWidget(container)
+            #Define row heights for the grid
+            gridRowHeights = [30,30,30]
+            #The scroll area needs to be somewhat larger than this
+            scroll_area.setMinimumSize(0,sum(gridRowHeights)+25)
             
             #Create a qgridlayout:
             self.grid_layout = QGridLayout()
-            self.grid_layout.setContentsMargins(0, 0, 0, 0)
-            self.grid_layout.setSpacing(0)  # Set spacing between widgets to 0
+            #Set the minimum size of this grid layout
+            self.grid_layout.setRowMinimumHeight(0,gridRowHeights[0])
+            self.grid_layout.setRowMinimumHeight(1,gridRowHeights[1])
+            self.grid_layout.setRowMinimumHeight(2,gridRowHeights[2])
 
             #Put it inside the container:
             container.setLayout(self.grid_layout)
             
-            main_layout.addWidget(scroll_area)
+            container2 = QVBoxLayout()
+            container2.addWidget(scroll_area)
+            groupbox.setLayout(container2)
+            
+            self.grid_layout.setSizeConstraint(QLayout.SetMinimumSize)
+            main_layout.setSizeConstraint(QLayout.SetMinimumSize)
+            # groupbox.setSizeConstraint(QLayout.SetMinimumSize)
+            container2.setSizeConstraint(QLayout.SetMinimumSize)
+            # container.setSizeConstraint(QLayout.SetMinimumSize)
+            
+            #OK, so now we have a self, which has main_layout, which contains groupbox, which contains container2, which contains scroll_area, which contains container, which contains grid_layout.
             
         def addHistoryEntryToGrid(self,historyId):
-            self.parent.postProcessingHistory[historyId][1]
             
             #Add some entries to the gridlayout:
             #This is the title of what operation we did
-            self.grid_layout.addWidget(QLabel(self.parent.postProcessingHistory[historyId][1]), 0,historyId)
-            #This is the change in number of localizations
+            
+            #We know from earlier that this is the text we always put in:
+            #"parent.data['FittingResult'][0]","parent.data['FindingResult'][0]","parent.globalSettings"
+            #Thus, we can extract the info around this
+            fullText = self.parent.postProcessingHistory[historyId][1]
+            historyText = fullText.split("parent.data[\'FittingResult\'][0],parent.data[\'FindingResult\'][0],parent.globalSettings")
+            #We do a little cleanup:
+            historyText[0] = historyText[0].replace("(","")
+            historyText[1] = historyText[1].replace(")","")[1:]
+            #We create a QLabel from this
+            historyTextLabel = QLabel("<html><b>"+historyText[0]+'</b><br>'+historyText[1]+"</html>")
+            historyTextLabel.setWordWrap(True)
+            self.grid_layout.addWidget(historyTextLabel, 0,historyId)
+            
+            #Then we also show the change in nr of localizations
             self.grid_layout.addWidget(QLabel(str(self.parent.postProcessingHistory[historyId][2][0])+"-->"+str(self.parent.postProcessingHistory[historyId][2][1])+" entries"), 1,historyId)
+            
             #This is a button to restore to before this operation
             button = QPushButton("Restore to before this", self)
             self.grid_layout.addWidget(button, 2,historyId)
+            
             #And add a callback to this:
             button.clicked.connect(lambda text, historyId=historyId: self.historyRestore_callback(historyId))
         
@@ -3252,6 +3379,12 @@ class PostProcessing(QWidget):
             self.parent.parent.updateLocList()
             #Give some info
             logging.info('Restored postprocessing history')
+        
+        def clearHistory(self):
+            for i in reversed(range(self.grid_layout.count())):
+                self.grid_layout.removeWidget(self.grid_layout.itemAt(i).widget())
+            self.parent.postProcessingHistory = {}
+            logging.info('Cleared postprocessing history')
             
     def getPostProcessingFunctionEvalText(self,p1,p2,p3):
         #Get the dropdown info
@@ -3422,7 +3555,7 @@ class PreviewFindingFitting(QWidget):
             
             #Get the fitting result in the current time bin:
             fittingResults_thisbin = fittingResult[(fittingResult['t']>=(float(timeStretch[0])+n*frametime_ms))* (fittingResult['t']<(float(timeStretch[0])+(n+1)*frametime_ms))]
-            self.fitting_overlays.append(self.create_fitting_overlay(fittingResults_thisbin,pxsize=settings['PixelSize_nm']['value']))
+            self.fitting_overlays.append(self.create_fitting_overlay(fittingResults_thisbin,pxsize=float(settings['PixelSize_nm']['value'])))
         
         #Select the original image-layer as selected
         self.napariviewer.layers.selection.active = self.napariviewer.layers[0]
@@ -3485,8 +3618,8 @@ class PreviewFindingFitting(QWidget):
         polygons = []
         
         for f in range(len(fittingResults)):
-            xcoord_pxcoord = fittingResults['x'].iloc[f]/pxsize-self.hist_xy.xlim[0]
-            ycoord_pxcoord = fittingResults['y'].iloc[f]/pxsize-self.hist_xy.ylim[0]
+            xcoord_pxcoord = fittingResults['x'].iloc[f]/float(pxsize)-self.hist_xy.xlim[0]
+            ycoord_pxcoord = fittingResults['y'].iloc[f]/float(pxsize)-self.hist_xy.ylim[0]
             
             polygons.append(np.array([[ycoord_pxcoord-1,xcoord_pxcoord-1],[ycoord_pxcoord+1,xcoord_pxcoord+1]]))
             polygons.append(np.array([[ycoord_pxcoord-1,xcoord_pxcoord+1],[ycoord_pxcoord+1,xcoord_pxcoord-1]]))

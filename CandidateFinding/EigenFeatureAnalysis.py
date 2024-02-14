@@ -387,6 +387,28 @@ def get_events_in_bbox_NE(npyarr,bboxes,ms_to_px):
     
     return candidates
 
+def dbscan_with_trialError(clusterpoints,eps=3,n_neighbours=15):
+    if len(clusterpoints) > 0:
+        logging.info("DBSCANning started")
+        
+        #This seems to fail like 0.1% of the time, but can't replicate it, even with the exact same data, thus:
+        try:
+            #Throw DBSCAN on the 'pre-clustered' data:
+            dbscan = DBSCAN(eps=eps, n_jobs=-1, min_samples=n_neighbours)
+            cluster_labels = dbscan.fit_predict(clusterpoints)
+        except:
+            try:
+                logging.warning("DBSCANning multicore errored on this data, unsure why, trying single-core")
+                dbscan = DBSCAN(eps=eps, n_jobs=1, min_samples=n_neighbours)
+                cluster_labels = dbscan.fit_predict(clusterpoints)
+            except:
+                cluster_labels = [-1]*len(clusterpoints)
+                logging.warning("DBSCANning errored on this data, unsure why")
+        
+        # Print how many clusters are found
+        logging.info("Number of clusters found:"+ str(max(cluster_labels)+1))
+        return cluster_labels
+
 def eigenFeature_analysis(npy_array,settings,**kwargs):
     #Check if we have the required kwargs
     [provided_optional_args, missing_optional_args] = utilsHelper.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
@@ -424,16 +446,9 @@ def eigenFeature_analysis(npy_array,settings,**kwargs):
     clusterpoints = points[(linearity < linearity_cutoff) & (maxeigenval < maxeigenvalcutoff), :]
     noisepoints = points[(linearity >= linearity_cutoff) | (maxeigenval >= maxeigenvalcutoff), :]
 
-
+    cluster_labels = dbscan_with_trialError(clusterpoints,eps=int(kwargs['DBSCAN_eps']),n_neighbours=int(kwargs['DBSCAN_n_neighbours']))
+    
     if len(clusterpoints) > 0:
-        logging.info("DBSCANning started")
-        #Throw DBSCAN on the 'pre-clustered' data:
-        dbscan = DBSCAN(eps=int(kwargs['DBSCAN_eps']), n_jobs=-1, min_samples=int(kwargs['DBSCAN_n_neighbours']))
-        cluster_labels = dbscan.fit_predict(clusterpoints)
-        
-        # Print how many clusters are found
-        logging.info("Number of clusters found:"+ str(max(cluster_labels)))
-        
         candidates = clusterPoints_to_candidates(clusterpoints,cluster_labels,ms_to_px)
     else:
         logging.error("No clusterpoints found via spectral clustering - maximum eigenval probably wrong!")
@@ -485,10 +500,7 @@ def eigenFeature_analysis_and_bbox_finding(npy_array,settings,**kwargs):
     clusterpoints = points[(linearity < linearity_cutoff) & (maxeigenval < maxeigenvalcutoff), :]
     noisepoints = points[(linearity >= linearity_cutoff) | (maxeigenval >= maxeigenvalcutoff), :]
 
-    logging.info("DBSCANning started")
-    #Throw DBSCAN on the 'pre-clustered' data:
-    dbscan = DBSCAN(eps=int(kwargs['DBSCAN_eps']), n_jobs=-1, min_samples=int(kwargs['DBSCAN_n_neighbours']))
-    cluster_labels = dbscan.fit_predict(clusterpoints)
+    cluster_labels = dbscan_with_trialError(clusterpoints,eps=int(kwargs['DBSCAN_eps']),n_neighbours=int(kwargs['DBSCAN_n_neighbours']))
     
     #Now we get BBOXes around each cluster:
     bboxes = get_cluster_bounding_boxes(clusterpoints, cluster_labels,padding_xy=float(kwargs['bbox_padding']),padding_t=float(kwargs['bbox_padding']))
@@ -722,7 +734,7 @@ def eigen_feature_analysis_autoRadiusSelect(npy_array,settings,**kwargs):
     full_data_labels[sphere_indeces] = labels
     
     # Print how many clusters are found
-    logging.info("Number of clusters found:"+ str(max(labels)))
+    logging.info("Number of clusters found:"+ str(max(labels)+1))
     
     candidates = clusterPoints_to_candidates(points_mostly_spher,labels,ms_to_px)
         
@@ -1002,7 +1014,7 @@ def spectral_clustering_showcase(npy_array,settings,**kwargs):
     cluster_labels = dbscan.fit_predict(clusterpoints)
     
     # Print how many clusters are found
-    logging.info("Number of clusters found:"+ str(max(cluster_labels)))
+    logging.info("Number of clusters found:"+ str(max(cluster_labels)+1))
     
     
     clusterpoints_dbscan = clusterpoints[cluster_labels>-1]

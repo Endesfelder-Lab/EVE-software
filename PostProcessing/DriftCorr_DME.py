@@ -51,6 +51,7 @@ def DriftCorr_entropyMin(resultArray,findingResult,settings,**kwargs):
     fov_width = 200 #in pixels
 
     #Obtain the localizations from the resultArray
+    resultArray=resultArray.dropna()
     locs_for_dme = np.column_stack((resultArray['x'].values-min(resultArray['x']),resultArray['y'].values-min(resultArray['y'])))
     #Convert it to pixel-units
     locs_for_dme/=(float(settings['PixelSize_nm']['value']))

@@ -11,7 +11,7 @@ def __function_metadata__():
     return {
         "Regular_filter": {
             "required_kwargs": [
-                {"name": "Filter_text", "description": "Filter text. E.g. \"x < 50 & y > 100\". "}
+                {"name": "Filter_text", "description": "Filter text. E.g. \"x < 50 & y > 100\". ","default":"x>0"},
             ],
             "optional_kwargs": [
             ],
@@ -78,4 +78,5 @@ def Regular_filter(localizations,findingResult,settings,**kwargs):
     
     logging.info(f'Went from {orig_len_localizations} to {new_len_localizations} localizations in {elapsed_time} seconds.')
     #Required output: localizations
-    return localizations
+    metadata = 'Information or so'
+    return localizations,metadata
