@@ -4,6 +4,13 @@ import pandas as pd
 #-------------------------------------------------------------------------------------------------------------------------------
 # Base class definitions
 #-------------------------------------------------------------------------------------------------------------------------------
+class Dist1d():
+    def __init__(self) -> None:
+        pass
+
+class TDist(Dist1d):
+    def __init__(self, events):
+        self.tlim = [np.min(events['t'])*1e-3, np.max(events['t'])*1e-3]
 
 class Dist2d():
     def __init__(self) -> None:
@@ -44,6 +51,28 @@ class TimeDiff(XYDist):
 #-------------------------------------------------------------------------------------------------------------------------------
 # Callable derived classes
 #-------------------------------------------------------------------------------------------------------------------------------
+class Hist1d_t(TDist):
+    def __init__(self, events, **kwargs):
+        super().__init__(events)
+        self.t_bin_width = 10. # in ms
+        self.tlim_upper = np.max(events['t'])*1e-3
+        self.dist1D, self.t_edges = self(events, **kwargs)
+    
+    def set_t_bin_width(self, t_bin_width, events, **kwargs):
+        self.t_bin_width = t_bin_width
+        self.dist1D, self.t_edges = self(events, **kwargs)
+
+    def range(self):
+        return [self.tlim[0], self.tlim_upper]
+    
+    def bins(self):
+        tbins = int(np.ceil((self.tlim[1]-self.tlim[0])/self.t_bin_width))
+        self.tlim_upper = self.tlim[0]+tbins*self.t_bin_width
+        return tbins
+
+    def __call__(self, events, **kwargs):
+        self.dist1D, self.t_edges = np.histogram(events['t']*1e-3, bins = self.bins(), range = self.range(), **kwargs)
+        return self.dist1D, self.t_edges
 
 class Hist2d_tx(XTDist):
     def __init__(self, events, **kwargs):
