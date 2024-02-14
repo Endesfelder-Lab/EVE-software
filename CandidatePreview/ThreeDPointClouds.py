@@ -12,7 +12,7 @@ def __function_metadata__():
     return {
         "ThreeDPointCloud": {
             "required_kwargs": [
-                {"name": "label_first", "description": "Label the first events per pixel","default":"False"},
+                {"name": "show_first", "description": "Label the first events per pixel","default":"False"},
                 {"name": "show_surrounding", "description": "Show surrounding events if set to true, only supported in preview mode","default":"False"},
             ],
             "optional_kwargs": [
@@ -46,7 +46,7 @@ def ThreeDPointCloud(findingResult, fittingResult, previewEvents, figure, settin
     [provided_optional_args, missing_optional_args] = utilsHelper.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
 
     pixel_size = float(settings['PixelSize_nm']['value']) # in nm
-    show_first = utilsHelper.strtobool(kwargs['label_first'])
+    show_first = utilsHelper.strtobool(kwargs['show_first'])
     plot_surrounding = utilsHelper.strtobool(kwargs['show_surrounding'])
     xy_padding = int(kwargs['xy_padding'])
     t_padding = float(kwargs['t_padding'])
