@@ -44,6 +44,7 @@ from CandidateFitting import *
 from CandidateFinding import *
 from Visualisation import *
 from PostProcessing import *
+from CandidatePreview import *
 
 #Obtain the helperfunctions
 from Utils import utils
@@ -263,9 +264,6 @@ class MyGUI(QMainWindow):
         
         #Initialise polarity value thing (only affects very first run I believe):
         self.polarityDropdownChanged()
-
-        #Update the candidate preview to GUI settings
-        self.updateCandidatePreview(init=True)
         
         #Set up worker information:
         # self.worker = Worker()
@@ -1074,7 +1072,7 @@ class MyGUI(QMainWindow):
         self.buttonReadCSV.clicked.connect(self.open_loclist_csv)
     
     def open_loclist_csv(self):
-        loclistcsvloc = 'C:\Data\EBS\Tubulin_hdf5._FitResults_20240208_121847.csv'
+        loclistcsvloc = '/home/laura/PhD/Event_Based_Sensor_Project/GUI_tests/20240209_DriftCorrection/Tubulin_hdf5._FitResults_20240208_121847.csv'
         #Read the csv:
         loclist = pd.read_csv(loclistcsvloc)
         
@@ -1136,220 +1134,12 @@ class MyGUI(QMainWindow):
         Function to setup the Candidate Preview tab
         """
 
-        #Add a vertical layout
-        self.canPreviewtab_vertical_container = QVBoxLayout()
-        self.tab_canPreview.setLayout(self.canPreviewtab_vertical_container)
+        #It's a grid layout
+        self.canPreviewtab_layout = QGridLayout()
+        self.tab_canPreview.setLayout(self.canPreviewtab_layout)
         
-        #Add a horizontal layout to the first row of the vertical layout - this contains the entry fields and the buttons
-        canPreviewtab_horizontal_container = QHBoxLayout()
-        self.canPreviewtab_vertical_container.addLayout(canPreviewtab_horizontal_container)
-        
-        #Add a entry field to type the number of candidate and button to show it
-        canPreviewtab_horizontal_container.addWidget(QLabel("Candidate ID: "))
-        self.entryCanPreview = QLineEdit()
-        onlyInt = QIntValidator()
-        onlyInt.setBottom(0)
-        self.entryCanPreview.setValidator(onlyInt)
-        canPreviewtab_horizontal_container.addWidget(self.entryCanPreview)
-        self.entryCanPreview.returnPressed.connect(lambda: self.updateCandidatePreview())
-        
-        self.buttonCanPreview = QPushButton("Show candidate")
-        canPreviewtab_horizontal_container.addWidget(self.buttonCanPreview)
-
-        #Give it a function on click:
-        self.buttonCanPreview.clicked.connect(lambda: self.updateCandidatePreview())
-
-        self.prev_buttonCan = QPushButton("Previous")
-        self.prev_buttonCan.clicked.connect(lambda: self.prev_candidate())
-
-        self.next_buttonCan = QPushButton("Next")
-        self.next_buttonCan.clicked.connect(lambda: self.next_candidate())
-
-        canPreviewtab_horizontal_container.addWidget(self.prev_buttonCan)
-        canPreviewtab_horizontal_container.addWidget(self.next_buttonCan)
-
-        # Add an advanced settings button that opens a new window when clicked
-        # First initialise (but not show!) advanced window:
-        self.advancedOptionsWindowCanPrev = AdvancedOptionsWindowCanPrev(self)
-        
-        self.advanced_options_button = QPushButton("Advanced Options")
-        canPreviewtab_horizontal_container.addWidget(self.advanced_options_button)
-        self.advanced_options_button.clicked.connect(self.open_advanced_options_CanPreview)
-
-        #Add a horizontal layout to display info about the cluster
-        #self.canPreviewtab_horizontal_container2 = QHBoxLayout()
-        #self.canPreviewtab_vertical_container.addLayout(self.canPreviewtab_horizontal_container2)
-        self.candidate_info = QLabel('')
-        self.canPreviewtab_vertical_container.addWidget(self.candidate_info)
-        self.fit_info = QLabel('')
-        self.fit_info.setStyleSheet("color: red;")
-        self.canPreviewtab_vertical_container.addWidget(self.fit_info)
-
-        #Create an empty figure and store it as self.data:
-        self.data['firstCandidateFigure'] = plt.figure(figsize=(6.8,4))
-        self.data['firstCandidateCanvas'] = FigureCanvas(self.data['firstCandidateFigure'])
-        self.data['firstCandidatePlot'] = ThreeDPointCloud(self.data['firstCandidateFigure'])
-        
-        #Add a navigation toolbar (zoom, pan etc) and canvas to tab
-        self.canPreviewtab_vertical_container.addWidget(NavigationToolbar(self.data['firstCandidateCanvas'], self))
-        self.canPreviewtab_vertical_container.addWidget(self.data['firstCandidateCanvas'])
-
-        #Create a second empty figure and store it as self.data:
-        self.data['secondCandidateFigure'] = plt.figure(figsize=(6.8,4))
-        self.data['secondCandidateCanvas'] = FigureCanvas(self.data['secondCandidateFigure'])
-        self.data['secondCandidatePlot'] = TwoDProjection(self.data['secondCandidateFigure'])
-
-        self.clear_index = [0,0]
-        
-        #Add a navigation toolbar (zoom, pan etc) and canvas to tab
-        self.canPreviewtab_vertical_container.addWidget(NavigationToolbar(self.data['secondCandidateCanvas'], self))
-        self.canPreviewtab_vertical_container.addWidget(self.data['secondCandidateCanvas'])
-
-    def prev_candidate(self):
-        if not self.entryCanPreview.text()=='':
-            if 'FindingMethod' in self.data and int(self.entryCanPreview.text())-1 < len(self.data['FindingResult'][0]):
-                if int(self.entryCanPreview.text())-1 == -1:
-                    max_candidate = len(self.data['FindingResult'][0])-1
-                    self.entryCanPreview.setText(str(max_candidate))
-                else:
-                    self.entryCanPreview.setText(str(int(self.entryCanPreview.text())-1))
-                self.updateCandidatePreview()
-            else:
-                self.candidate_info.setText('Tried to visualise candidate but no data found!')
-                logging.error('Tried to visualise candidate but no data found!')
-        else:
-            self.candidate_info.setText('Tried to visualise candidate, but no ID was given!')
-            logging.error('Tried to visualise candidate, but no ID was given!')
-
-    def next_candidate(self):
-        if not self.entryCanPreview.text()=='':
-            if 'FindingMethod' in self.data and int(self.entryCanPreview.text())+1 <= len(self.data['FindingResult'][0]):
-                if int(self.entryCanPreview.text())+1 == len(self.data['FindingResult'][0]):
-                    self.entryCanPreview.setText('0')
-                else:
-                    self.entryCanPreview.setText(str(int(self.entryCanPreview.text())+1))
-                self.updateCandidatePreview()
-            else:
-                self.candidate_info.setText('Tried to visualise candidate but no data found!')
-                logging.error('Tried to visualise candidate but no data found!')
-        else:
-            self.candidate_info.setText('Tried to visualise candidate, but no ID was given!')
-            logging.error('Tried to visualise candidate, but no ID was given!')
-
-    def open_advanced_options_CanPreview(self):
-        self.advancedOptionsWindowCanPrev.show()
-
-    def updateCandidatePreview(self, reset=False, init=False):
-        """
-        Function that's called when the button to show the candidate is clicked
-        """
-        # Clear text and plots
-        self.candidate_info.setText('')
-        self.fit_info.setText('')
-        self.data['firstCandidatePlot'].reset()
-        self.data['secondCandidatePlot'].reset()
-        self.data['firstCandidateCanvas'].draw()
-        self.data['secondCandidateCanvas'].draw()
-        plot_prefix = ['first', 'second']
-        if init==True:
-            for i in range(len(self.advancedOptionsWindowCanPrev.getCheckedPlotOptionClasses())):
-                if self.advancedOptionsWindowCanPrev.getCheckedPlotOptionClasses()[i] != self.data[plot_prefix[i]+'CandidatePlot'].__class__:
-                    self.data[plot_prefix[i]+'CandidateFigure'].clf()
-                    self.data[plot_prefix[i]+'CandidatePlot'] = self.advancedOptionsWindowCanPrev.getCheckedPlotOptionClasses()[i](self.data[plot_prefix[i]+'CandidateFigure'])    
-                    self.clear_index[i] = 0
-            logging.info('Candidate preview is initialised.')
-        elif reset==False:
-            # Check advanced options
-            if self.advancedOptionsWindowCanPrev.getCheckedPlotOptionClasses() == []:
-                self.candidate_info.setText('Tried to visualise candidate, but no plot options were selected!')
-                self.data['firstCandidateFigure'].clf()
-                self.data['firstCandidateCanvas'].draw()
-                self.data['secondCandidateFigure'].clf()
-                self.data['secondCandidateCanvas'].draw()
-                self.clear_index = [1,1]
-                logging.error('Tried to visualise candidate, but no plot options were selected!')
-            elif len(self.advancedOptionsWindowCanPrev.getCheckedPlotOptionClasses()) <= 2:
-                for i in range(len(self.advancedOptionsWindowCanPrev.getCheckedPlotOptionClasses())):
-                    if self.advancedOptionsWindowCanPrev.getCheckedPlotOptionClasses()[i] != self.data[plot_prefix[i]+'CandidatePlot'].__class__:
-                        self.data[plot_prefix[i]+'CandidateFigure'].clf()
-                        self.data[plot_prefix[i]+'CandidatePlot'] = self.advancedOptionsWindowCanPrev.getCheckedPlotOptionClasses()[i](self.data[plot_prefix[i]+'CandidateFigure'])    
-                        self.clear_index[i] = 0
-                # Check the candidate entry field
-                if self.entryCanPreview.text()=='':
-                    self.candidate_info.setText('Tried to visualise candidate, but no ID was given!')
-                    logging.error('Tried to visualise candidate, but no ID was given!')
-                elif 'FindingMethod' in self.data and int(self.entryCanPreview.text()) < len(self.data['FindingResult'][0]):
-                    self.data['CandidatePreviewID'] = int(self.entryCanPreview.text())
-                    logging.debug(f"Attempting to show candidate {self.data['CandidatePreviewID']}.")
-
-                    # Get all localizations that belong to the candidate
-                    self.data['CandidatePreviewLocs'] = self.data['FittingResult'][0][self.data['FittingResult'][0]['candidate_id'] == self.data['CandidatePreviewID']]
-                    print(self.data['CandidatePreviewLocs']['x'].iloc[0])
-                    if pd.isna(self.data['CandidatePreviewLocs']['x'].iloc[0]):
-                        self.fit_info.setText(f"No localization generated due to {self.data['CandidatePreviewLocs']['fit_info'].iloc[0]}")
-                        print(self.data['CandidatePreviewLocs']['fit_info'].iloc[0])
-                    pixel_size = self.globalSettings['PixelSize_nm']['value']
-
-                    # Get some info about the candidate
-                    N_events = self.data['FindingResult'][0][self.data['CandidatePreviewID']]['N_events']
-                    cluster_size = self.data['FindingResult'][0][self.data['CandidatePreviewID']]['cluster_size']
-                    self.candidate_info.setText(f"This candidate cluster contains {N_events} events and has dimensions ({cluster_size[0]}, {cluster_size[1]}, {cluster_size[2]}).")
-                    
-                    # Check surrounding option
-                    surrounding = pd.DataFrame()
-                    surroundingOptions = self.advancedOptionsWindowCanPrev.getSurroundingAndPaddingValues()
-                    if len(self.previewEvents) != 0 and surroundingOptions[0]==True:
-                        surrounding = self.get_surrounding(self.previewEvents, self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events'], surroundingOptions[1], surroundingOptions[2], surroundingOptions[3])
-                    
-                    # Check if plot was cleared before
-                    if self.clear_index[0] == 1:
-                        self.data[plot_prefix[0]+'CandidatePlot'] = self.advancedOptionsWindowCanPrev.getCheckedPlotOptionClasses()[0](self.data[plot_prefix[0]+'CandidateFigure'])
-                        self.clear_index[0] = 0
-                    
-                    # Plot the first candidate plot
-                    self.data['firstCandidatePlot'].plot(self.data['firstCandidateFigure'], self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events'], surrounding, self.data['CandidatePreviewLocs'], pixel_size)
-                    
-                    # Update the first canvas
-                    self.data['firstCandidateFigure'].tight_layout()
-                    self.data['firstCandidateCanvas'].draw()
-                    logging.info(f"3D scatter plot of candidate {self.data['CandidatePreviewID']} drawn.")
-                    
-                    # Clear second plot if needed
-                    if len(self.advancedOptionsWindowCanPrev.getCheckedPlotOptionClasses()) == 1:
-                        # Clear second plot
-                        self.data['secondCandidateFigure'].clf()
-                        self.data['secondCandidateCanvas'].draw()
-                        self.clear_index[1]=1
-                        logging.info('Clearing second plot.')
-                    
-                    # Plot the second candidate plot
-                    if len(self.advancedOptionsWindowCanPrev.getCheckedPlotOptionClasses()) == 2:
-                        if self.clear_index[1] == 1:
-                            self.data[plot_prefix[1]+'CandidatePlot'] = self.advancedOptionsWindowCanPrev.getCheckedPlotOptionClasses()[1](self.data[plot_prefix[1]+'CandidateFigure'])
-                            self.clear_index[1] = 0
-                        self.data['secondCandidatePlot'].plot(self.data['firstCandidateFigure'], self.data['FindingResult'][0][self.data['CandidatePreviewID']]['events'], surrounding, self.data['CandidatePreviewLocs'], pixel_size)
-                        # Update the second canvas
-                        self.data['secondCandidateFigure'].tight_layout()
-                        self.data['secondCandidateCanvas'].draw()
-                        logging.info(f"2D event-projections of candidate {self.data['CandidatePreviewID']} drawn.")
-
-                else: 
-                    self.candidate_info.setText('Tried to visualise candidate but no data found!')
-                    logging.error('Tried to visualise candidate but no data found!')
-            else:
-                self.candidate_info.setText('Tried to visualise candidate, but no plot options were selected!')
-                logging.error('Tried to visualise candidate, but too many plot options were selected!')
-        else:
-            logging.info('Candidate preview is reset.')
-
-    def get_surrounding(self, events, candidate_events, x_padding, y_padding, t_padding):
-        xlim = [np.min(candidate_events['x'])-x_padding, np.max(candidate_events['x'])+x_padding]
-        ylim = [np.min(candidate_events['y'])-y_padding, np.max(candidate_events['y'])+y_padding]
-        tlim = [np.min(candidate_events['t'])-t_padding*1e3, np.max(candidate_events['t'])+t_padding*1e3]
-        mask = ((events['x'] >= xlim[0]) & (events['x'] <= xlim[1]) & (events['y'] >= ylim[0]) & (events['y'] <= ylim[1]) & (events['t'] >= tlim[0]) & (events['t'] <= tlim[1]))
-        all_events = pd.DataFrame(events[mask])
-        surrounding = all_events.merge(candidate_events, indicator=True, how='outer').query('_merge=="left_only"').drop('_merge', axis=1)
-        return surrounding
+        self.canPreviewtab_widget = CandidatePreview(self)
+        self.canPreviewtab_layout.addWidget(self.canPreviewtab_widget)
 
     def setup_previewTab(self):
         """
@@ -2291,13 +2081,13 @@ class MyGUI(QMainWindow):
         elif self.data['prevNrEvents'] == self.data['NrEvents'] and self.data['prevNrCandidates'] == len(self.data['FindingResult'][0]) and self.data['prevFindingMethod'] == self.data['FindingMethod']:
             # same finding routine ran compared to previous run -> Candidates are unchanged
             logging.info("Candidate preview was updated!")
-            self.updateCandidatePreview()
+            self.canPreviewtab_widget.show_candidate_callback(self, reset=False)
         else: 
             # found candidates have changed -> don't update preview, but update previous run data
             self.data['prevFindingMethod'] = self.data['FindingMethod']
             self.data['prevNrCandidates'] = len(self.data['FindingResult'][0])
             self.data['prevNrEvents'] = self.data['NrEvents']
-            self.updateCandidatePreview(reset=True)
+            self.canPreviewtab_widget.show_candidate_callback(self, reset=True)
         logging.debug(self.data['FittingResult'])
         if len(self.data['FittingResult'][0]) == 0:
             logging.error('No localizations found after fitting!')
@@ -3060,99 +2850,6 @@ class ClickableGroupBox(QGroupBox):
                     widget.setVisible(checked)
             layout.invalidate()
             self.adjustSize()
-
-class AdvancedOptionsWindowCanPrev(QMainWindow):
-    def __init__(self, parent):
-        super().__init__(parent)
-        self.setWindowTitle("Advanced options")
-        self.resize(300, 200)
-
-        self.parent = parent
-        # Set the window icon to the parent's icon
-        self.setWindowIcon(self.parent.windowIcon())
-
-        #Create a vertical layout
-        layout = QVBoxLayout()
-
-        # Add a QGroupBox for "Plots to show"
-        self.plotOptionsGroupBox = QGroupBox("Plots to show")
-        plotOptionsLayout = QGridLayout()
-        
-        # Create and add QCheckboxes for plot options to the grid layout
-        self.plotOptionCheckboxes = []
-        self.currentSelection = []
-        self.plotOptions = {1: {"name": "3D pointcloud", "description": "3D pointcloud of candidate cluster.", "plotclass": ThreeDPointCloud},
-                            2: {"name": "3D pointcloud + first events", "description": "3D pointcloud of candidate cluster, first events per pixel are labeled.", "plotclass": ThreeDPointCloudwFirst},
-                            3: {"name": "2D projections", "description": "2D projections of candidate cluster.", "plotclass": TwoDProjection},
-                            4: {"name": "2D timestamps", "description": "2D timestamps (first, median, mean event) per pixel in candidate cluster.", "plotclass": TwoDTimestamps},
-                            5: {"name": "2D event delays", "description": "2D event delays (min, max, mean) per pixel in candidate cluster.", "plotclass": TwoDDelays}}
-        currentRow=0
-        rowMax = 3
-        curruntCol=0
-        for option_id, option_data in self.plotOptions.items():
-            checkbox = QCheckBox(option_data["name"])
-            checkbox.setToolTip(option_data["description"])  # Set tooltip with description
-            checkbox.setObjectName(f"PlotOption_{option_id}")  # Set object name for identification
-            checkbox.stateChanged.connect(self.handlePlotOptionCheckboxChange)
-            plotOptionsLayout.addWidget(checkbox, currentRow, curruntCol)
-            currentRow += 1
-            if currentRow == rowMax:
-                currentRow = 0
-                curruntCol += 1
-            self.plotOptionCheckboxes.append(checkbox)
-
-        self.plotOptionsGroupBox.setLayout(plotOptionsLayout)
-        layout.addWidget(self.plotOptionsGroupBox)
-        # check first checkbox
-        self.plotOptionCheckboxes[3].setChecked(True)
-
-        #Add a grid layout
-        grid = QGridLayout()
-        layout.addLayout(grid)
-        currentRow = 0
-
-        # show surrounding tick box
-        self.showSurroundingCheckBox = QCheckBox("Show surrounding")
-        self.showSurroundingCheckBox.setObjectName("CanPreview_showSurrounding")
-        self.showSurroundingCheckBox.stateChanged.connect(lambda state: self.showSurrounding_checked(state))
-        grid.addWidget(self.showSurroundingCheckBox, currentRow, 0)
-        # show x,y,t padding line edits if show surrounding is checked make them gray if not checked and unwritable
-        self.xPaddingQLabel = QLabel("x-padding:")
-        self.yPaddingQLabel = QLabel("y-padding:")
-        self.tPaddingQLabel = QLabel("t-padding:")
-        self.xPaddingLineEdit = QLineEdit("10")
-        self.yPaddingLineEdit = QLineEdit("10")
-        self.tPaddingLineEdit = QLineEdit("10")
-        self.xPaddingLineEdit.setObjectName("CanPreview_xPadding")
-        self.yPaddingLineEdit.setObjectName("CanPreview_yPadding")
-        self.tPaddingLineEdit.setObjectName("CanPreview_tPadding")
-        grid.addWidget(self.xPaddingQLabel, currentRow, 1)
-        grid.addWidget(self.xPaddingLineEdit, currentRow, 2)
-        grid.addWidget(self.yPaddingQLabel, currentRow, 3)
-        grid.addWidget(self.yPaddingLineEdit, currentRow, 4)
-        grid.addWidget(self.tPaddingQLabel, currentRow, 5)
-        grid.addWidget(self.tPaddingLineEdit, currentRow, 6)
-        self.showSurrounding_checked(self.showSurroundingCheckBox.checkState())
-
-        # Create a widget and set and add layouts
-        widget = QWidget()
-        widget.setLayout(layout)
-
-        # Set the central widget of the main window
-        self.setCentralWidget(widget)
-
-    def showSurrounding_checked(self, state):
-        if state == 2:  # 2 is Qt.Checked
-            self.xPaddingQLabel.setStyleSheet("")
-            self.yPaddingQLabel.setStyleSheet("")
-            self.tPaddingQLabel.setStyleSheet("")
-            self.xPaddingLineEdit.setStyleSheet("")
-            self.yPaddingLineEdit.setStyleSheet("")
-            self.tPaddingLineEdit.setStyleSheet("")
-            self.xPaddingLineEdit.setReadOnly(False)
-            self.yPaddingLineEdit.setReadOnly(False)
-            self.tPaddingLineEdit.setReadOnly(False)
-        else:
             self.xPaddingQLabel.setStyleSheet("color: #808080;")
             self.yPaddingQLabel.setStyleSheet("color: #808080;")
             self.tPaddingQLabel.setStyleSheet("color: #808080;")
@@ -3189,278 +2886,6 @@ class AdvancedOptionsWindowCanPrev(QMainWindow):
                 option_id = int(checkbox.objectName().split("_")[1])
                 checked_plot_classes.append(self.plotOptions[option_id]["plotclass"])
         return checked_plot_classes
-
-class ThreeDPointCloud:
-    def __init__(self, figure):
-        figure.suptitle("3D pointcloud of candidate cluster")
-        self.ax = figure.add_subplot(111, projection='3d')
-        figure.tight_layout()
-        figure.subplots_adjust(top=0.95)
-
-    def reset(self):
-        self.ax.cla()
-
-    def plot(self, figure, events, surrounding, localizations, pixel_size):
-        pos_events = events[events['p'] == 1]
-        neg_events = events[events['p'] == 0]
-        # Do a 3d scatterplot of the event data
-        if not len(pos_events)==0:
-            self.ax.scatter(pos_events['x'], pos_events['y'], pos_events['t']*1e-3, label='Positive events', color='C0')
-        if not len(neg_events)==0:
-            self.ax.scatter(neg_events['x'], neg_events['y'], neg_events['t']*1e-3, label='Negative events', color='C1')
-        if not len(surrounding)==0:
-            self.ax.scatter(surrounding['x'], surrounding['y'], surrounding['t']*1e-3, label='Surrounding events', color='black')
-        self.ax.set_xlabel('x [px]')
-        self.ax.set_ylabel('y [px]')
-        self.ax.set_zlabel('t [ms]')
-        self.ax.invert_zaxis()
-
-        # Plot the localization(s) of the candidate
-        self.ax.plot(localizations['x']/pixel_size, localizations['y']/pixel_size, localizations['t'], marker='x', c='red', label='Localization(s)')
-        self.ax.legend(loc='upper right', bbox_to_anchor=(1.6, 1))
-
-class ThreeDPointCloudwFirst:
-    def __init__(self, figure):
-        figure.suptitle("3D pointcloud of candidate cluster")
-        self.ax = figure.add_subplot(111, projection='3d')
-        figure.tight_layout()
-        figure.subplots_adjust(top=0.95)
-
-    def reset(self):
-        self.ax.cla()
-
-    def plot(self, figure, events, surrounding, localizations, pixel_size):
-        first_events = eventDistributions.FirstTimestamp(events).get_smallest_t(events)
-        eventsFiltered = events.merge(first_events, indicator=True, how='outer').query('_merge=="left_only"').drop('_merge', axis=1)
-        pos_events = eventsFiltered[eventsFiltered['p'] == 1]
-        neg_events = eventsFiltered[eventsFiltered['p'] == 0]
-        # Do a 3d scatterplot of the event data
-        if not len(first_events)==0:
-            self.ax.scatter(first_events['x'], first_events['y'], first_events['t']*1e-3, label='First events', color='C2')
-        if not len(pos_events)==0:
-            self.ax.scatter(pos_events['x'], pos_events['y'], pos_events['t']*1e-3, label='Positive events', color='C0')
-        if not len(neg_events)==0:
-            self.ax.scatter(neg_events['x'], neg_events['y'], neg_events['t']*1e-3, label='Negative events', color='C1')
-        if not len(surrounding)==0:
-            self.ax.scatter(surrounding['x'], surrounding['y'], surrounding['t']*1e-3, label='Surrounding events', color='black')
-        self.ax.set_xlabel('x [px]')
-        self.ax.set_ylabel('y [px]')
-        self.ax.set_zlabel('t [ms]')
-        self.ax.invert_zaxis()
-
-        # Plot the localization(s) of the candidate
-        self.ax.plot(localizations['x']/pixel_size, localizations['y']/pixel_size, localizations['t'], marker='x', c='red', label='Localization(s)')
-        self.ax.legend(loc='upper right', bbox_to_anchor=(1.6, 1))
-
-class TwoDProjection:
-    def __init__(self, figure):
-        figure.suptitle("2D projections of candidate cluster")
-        self.ax_xy = figure.add_subplot(121)
-        self.ax_xt = figure.add_subplot(222)
-        self.ax_yt = figure.add_subplot(224)
-        figure.tight_layout()
-
-    def reset(self):
-        self.ax_xy.cla()
-        self.ax_xt.cla()
-        self.ax_yt.cla()
-        self.ax_xt.set_aspect('auto')
-        self.ax_yt.set_aspect('auto')
-
-    def plot(self, figure, events, surrounding, localizations, pixel_size):
-        hist_xy = eventDistributions.Hist2d_xy(events)
-        hist_tx = eventDistributions.Hist2d_tx(events)
-        hist_ty = eventDistributions.Hist2d_ty(events)
-
-        x_edges, y_edges, t_edges = hist_xy.x_edges, hist_xy.y_edges, hist_tx.x_edges
-
-        # Compute the 2D histograms (pos)
-        hist_xy_pos = hist_xy(events[events['p'] == 1])[0]
-        hist_tx_pos = hist_tx(events[events['p'] == 1])[0]
-        hist_ty_pos = hist_ty(events[events['p'] == 1])[0]
-        # Compute the 2D histograms (neg)
-        hist_xy_neg = hist_xy(events[events['p'] == 0])[0]
-        hist_tx_neg = hist_tx(events[events['p'] == 0])[0]
-        hist_ty_neg = hist_ty(events[events['p'] == 0])[0]
-
-        # Set goodlooking aspect ratio depending on nr of xyt-bins
-        aspectty = 3. * (len(t_edges)-1) / (len(y_edges)-1)
-        aspecttx = 3. * (len(t_edges)-1) / (len(x_edges)-1)
-
-        # Plot the 2D histograms
-        self.ax_xy.pcolormesh(x_edges, y_edges, hist_xy.dist2D)
-        self.ax_xy.set_aspect('equal')
-        self.ax_xy.format_coord = lambda x,y:self.format_coord_projectionxy(x,y,hist_xy_pos.T, hist_xy_neg.T, x_edges, y_edges)
-        self.ax_xt.pcolormesh(t_edges, x_edges, hist_tx.dist2D)
-        self.ax_xt.set_aspect(aspecttx)
-        self.ax_xt.format_coord = lambda x,y:self.format_coord_projectiontx(x,y,hist_tx_pos.T, hist_tx_neg.T, t_edges, x_edges)
-        self.ax_yt.pcolormesh(t_edges, y_edges, hist_ty.dist2D)
-        self.ax_yt.set_aspect(aspectty)
-        self.ax_yt.format_coord = lambda x,y:self.format_coord_projectionty(x,y,hist_ty_pos.T, hist_ty_neg.T, t_edges, y_edges)
-        self.ax_xy.plot(localizations['x']/pixel_size, localizations['y']/pixel_size, marker='x', c='red')
-        self.ax_xt.plot(localizations['t'], localizations['x']/pixel_size, marker='x', c='red')
-        self.ax_yt.plot(localizations['t'], localizations['y']/pixel_size, marker='x', c='red')
-
-        # Add and set labels
-        self.ax_xy.set_xlabel('x [px]')
-        self.ax_xy.set_ylabel('y [px]')
-        self.ax_xt.set_ylabel('x [px]')
-        self.ax_yt.set_ylabel('y [px]')
-        self.ax_yt.set_xlabel('t [ms]')
-
-    def format_coord_projectionxy(self, x, y, pos_hist, neg_hist, x_edges, y_edges):
-        """
-        Function that formats the coordinates of the mouse cursor in candidate preview xy projection
-        """
-        x_pix = round(x)
-        y_pix = round(y)
-        x_bin = np.digitize(x, x_edges) - 1
-        y_bin = np.digitize(y, y_edges) - 1
-        pos = int(pos_hist[x_bin, y_bin])
-        neg = int(neg_hist[x_bin, y_bin])
-
-        display = f'x={x_pix}, y={y_pix}, events[pos,neg]=[{pos}, {neg}]'
-        return display
-
-    def format_coord_projectiontx(self, x, y, pos_hist, neg_hist, t_edges, x_edges):
-        """
-        Function that formats the coordinates of the mouse cursor in candidate preview xt projection
-        """
-        time = round(x)
-        x_pix = round(y)
-        x_bin = np.digitize(x, t_edges) - 1
-        y_bin = np.digitize(y, x_edges) - 1
-        pos = int(pos_hist[x_bin, y_bin])
-        neg = int(neg_hist[x_bin, y_bin])
-
-        display = f't={time} ms, x={x_pix}, events[pos,neg]=[{pos}, {neg}]'
-        return display
-
-    def format_coord_projectionty(self, x, y, pos_hist, neg_hist, t_edges, y_edges):
-        """
-        Function that formats the coordinates of the mouse cursor in candidate preview yt projection
-        """
-        time = round(x)
-        y_pix = round(y)
-        x_bin = np.digitize(x, t_edges) - 1
-        y_bin = np.digitize(y, y_edges) - 1
-        pos = int(pos_hist[x_bin, y_bin])
-        neg = int(neg_hist[x_bin, y_bin])
-
-        display = f't={time:.2f} ms, y={y_pix}, events[pos,neg]=[{pos}, {neg}]'
-        return display
-
-class TwoDTimestamps:
-    def __init__(self, figure):
-        figure.suptitle("2D timestamps of first, median, mean event per pixel")
-        self.ax_first = figure.add_subplot(131)
-        self.ax_median = figure.add_subplot(132)
-        self.ax_mean = figure.add_subplot(133)
-        figure.tight_layout()
-        self.cb = None
-
-    def reset(self):
-        self.ax_first.cla()
-        self.ax_median.cla()
-        self.ax_mean.cla()
-        self.ax_first.set_aspect('equal')
-        self.ax_median.set_aspect('equal')
-        self.ax_mean.set_aspect('equal')
-
-    def plot(self, figure, events, surrounding, localizations, pixel_size):
-
-        first = eventDistributions.FirstTimestamp(events).dist2D
-        median = eventDistributions.MedianTimestamp(events).dist2D
-        mean = eventDistributions.AverageTimestamp(events).dist2D
-
-        x_edges, y_edges = eventDistributions.Hist2d_xy(events).x_edges, eventDistributions.Hist2d_xy(events).y_edges
-
-        # Plot the 2D histograms
-        first_mesh = self.ax_first.pcolormesh(x_edges, y_edges, first*1e-3)
-        self.ax_first.set_aspect('equal')
-        self.ax_first.format_coord = lambda x,y:self.format_coord_timestamp(x,y,first, x_edges, y_edges)
-        self.ax_median.pcolormesh(x_edges, y_edges, median*1e-3)
-        self.ax_median.set_aspect('equal')
-        self.ax_mean.pcolormesh(x_edges, y_edges, mean*1e-3)
-        self.ax_mean.set_aspect('equal')
-        self.ax_first.plot(localizations['x']/pixel_size, localizations['y']/pixel_size, marker='x', c='red')
-        self.ax_mean.plot(localizations['x']/pixel_size, localizations['y']/pixel_size, marker='x', c='red')
-        self.ax_median.plot(localizations['x']/pixel_size, localizations['y']/pixel_size, marker='x', c='red')
-
-        # Add and set labels
-        self.ax_first.set_xlabel('x [px]')
-        self.ax_first.set_ylabel('y [px]')
-        self.ax_median.set_xlabel('x [px]')
-        self.ax_median.set_ylabel('y [px]')
-        self.ax_mean.set_xlabel('x [px]')
-        self.ax_mean.set_ylabel('y [px]')
-
-        # Add or update colorbar
-        if self.cb is None:
-            divider = make_axes_locatable(self.ax_first)
-            cax = divider.append_axes("right", size="5%", pad=0.05)
-            self.cb = figure.colorbar(first_mesh, cax=cax)
-            self.cb.set_label('time [ms]')
-        else: 
-            self.cb.update_normal(first_mesh)
-
-    def format_coord_timestamp(self, x, y, timedist, x_edges, y_edges):
-        """
-        Function that formats the coordinates of the mouse cursor in candidate preview xy timeplot
-        """
-        x_pix = round(x)
-        y_pix = round(y)
-        x_bin = np.digitize(x, x_edges) - 1
-        y_bin = np.digitize(y, y_edges) - 1
-        time = timedist[y_bin, x_bin]*1e-3
-
-        if time == np.nan:
-            display = f'x={x_pix}, y={y_pix}'
-        else:
-            display = f'x={x_pix}, y={y_pix}, time={time:.2f} ms'
-        return display
-
-class TwoDDelays:
-    def __init__(self, figure):
-        figure.suptitle("2D event delays min, max, mean per pixel in candidate cluster")
-        self.ax_min = figure.add_subplot(131)
-        self.ax_max = figure.add_subplot(132)
-        self.ax_mean = figure.add_subplot(133)
-        figure.tight_layout()
-
-    def reset(self):
-        self.ax_min.cla()
-        self.ax_max.cla()
-        self.ax_mean.cla()
-        self.ax_min.set_aspect('equal')
-        self.ax_max.set_aspect('equal')
-        self.ax_mean.set_aspect('equal')
-
-    def plot(self, figure, events, surrounding, localizations, pixel_size):
-        min = eventDistributions.MinTimeDiff(events).dist2D
-        max = eventDistributions.MaxTimeDiff(events).dist2D
-        mean = eventDistributions.AverageTimeDiff(events).dist2D
-
-        x_edges, y_edges = eventDistributions.Hist2d_xy(events).x_edges, eventDistributions.Hist2d_xy(events).y_edges
-
-        # Plot the 2D histograms
-        self.ax_min.pcolormesh(x_edges, y_edges, min)
-        self.ax_min.set_aspect('equal')
-        self.ax_max.pcolormesh(x_edges, y_edges, max)
-        self.ax_max.set_aspect('equal')
-        self.ax_mean.pcolormesh(x_edges, y_edges, mean)
-        self.ax_mean.set_aspect('equal')
-        self.ax_min.plot(localizations['x']/pixel_size, localizations['y']/pixel_size, marker='x', c='red')
-        self.ax_mean.plot(localizations['x']/pixel_size, localizations['y']/pixel_size, marker='x', c='red')
-        self.ax_max.plot(localizations['x']/pixel_size, localizations['y']/pixel_size, marker='x', c='red')
-
-        # Add and set labels
-        self.ax_min.set_xlabel('x [px]')
-        self.ax_min.set_ylabel('y [px]')
-        self.ax_max.set_xlabel('x [px]')
-        self.ax_max.set_ylabel('y [px]')
-        self.ax_mean.set_xlabel('x [px]')
-        self.ax_mean.set_ylabel('y [px]')
 
 class CriticalWarningWindow(QMainWindow):
     def __init__(self, parent, text):
@@ -4091,6 +3516,278 @@ class PreviewFindingFitting(QWidget):
             
         
         # print('wopp'+str(self.napariviewer.dims.current_step[0]))
+
+class CandidatePreview(QWidget):
+    """
+    Class to visualise the candidates and localizations in different representations, e.g. histograms and pointclouds
+    """
+    def __init__(self, parent):
+        super().__init__(parent)
+        # Members
+        self.CandidatePreviewLocs = pd.DataFrame()
+        self.CandidatePreviewID = None
+        # Create a layout for the main widget
+        self.mainlayout = QVBoxLayout()
+        # Set the layout for the main widget
+        self.setLayout(self.mainlayout)
+
+        #Add a horizontal layout to the first row of the vertical layout - this contains the entry fields and the buttons
+        canPreviewtab_horizontal_container = QHBoxLayout()
+        self.mainlayout.addLayout(canPreviewtab_horizontal_container)
+        
+        #Add a entry field to type the number of candidate and button to show it
+        canPreviewtab_horizontal_container.addWidget(QLabel("Candidate ID: "))
+        self.entryCanPreview = QLineEdit()
+        onlyInt = QIntValidator()
+        onlyInt.setBottom(0)
+        self.entryCanPreview.setValidator(onlyInt)
+        canPreviewtab_horizontal_container.addWidget(self.entryCanPreview)
+        self.entryCanPreview.returnPressed.connect(lambda: self.show_candidate_callback(parent))
+        
+        self.buttonCanPreview = QPushButton("Show candidate")
+        canPreviewtab_horizontal_container.addWidget(self.buttonCanPreview)
+
+        #Give it a function on click:
+        self.buttonCanPreview.clicked.connect(lambda: self.show_candidate_callback(parent))
+
+        self.prev_buttonCan = QPushButton("Previous")
+        self.prev_buttonCan.clicked.connect(lambda: self.prev_candidate_callback(parent))
+
+        self.next_buttonCan = QPushButton("Next")
+        self.next_buttonCan.clicked.connect(lambda: self.next_candidate_callback(parent))
+
+        canPreviewtab_horizontal_container.addWidget(self.prev_buttonCan)
+        canPreviewtab_horizontal_container.addWidget(self.next_buttonCan)
+
+        self.candidate_info = QLabel('')
+        self.mainlayout.addWidget(self.candidate_info)
+        self.fit_info = QLabel('')
+        self.fit_info.setStyleSheet("color: red;")
+        self.mainlayout.addWidget(self.fit_info)
+
+        #------------Start of first candidate plot layout -----------------
+        # create a groupbox for the plot options of the first canvas
+        self.firstCandidatePreviewGroupbox = QGroupBox("First Plot")
+        self.firstCandidatePreviewGroupbox.setLayout(QGridLayout())
+        #Ensure that we have 'KEEP' in the objectname so it's not deleted later
+        self.firstCandidatePreviewGroupbox.setObjectName("firstCanPrevGroupboxKEEP")
+
+        # Add a combobox-dropdown
+        firstCanPrevDropdown = QComboBox(self)
+        firstCanPrevDropdown.setMaxVisibleItems(30)
+        #Ensure that we have 'KEEP' in the objectname so it's not deleted later
+        firstCanPrevDropdown_name = f"firstCanPrevDropdownKEEP"
+        firstCanPrevDropdown.setObjectName(firstCanPrevDropdown_name)
+        firstCanPrev_functionNameToDisplayNameMapping_name = f"firstCanPrev_functionNameToDisplayNameMapping"
+        # Get the options dynamically from the CandidatePreview folder
+        options = utils.functionNamesFromDir('CandidatePreview')
+        #Also find the mapping of 'display name' to 'function name'
+        displaynames, firstCanPrev_functionNameToDisplayNameMapping = utils.displayNamesFromFunctionNames(options,'')
+        #and add this to our self attributes
+        setattr(self, firstCanPrev_functionNameToDisplayNameMapping_name,  firstCanPrev_functionNameToDisplayNameMapping)
+        
+        #Set a current name and add the items
+        firstCanPrevDropdown.addItems(displaynames)
+
+        #Add a callback to the changing of the dropdown:
+        firstCanPrevDropdown.currentTextChanged.connect(lambda text: utils.changeLayout_choice(self.firstCandidatePreviewGroupbox.layout(),firstCanPrevDropdown_name,getattr(self, firstCanPrev_functionNameToDisplayNameMapping_name),parent=self,ignorePolarity=True, maxNrRows=1))
+        self.firstCandidatePreviewGroupbox.layout().addWidget(firstCanPrevDropdown,1,0,1,8)
+
+        #On startup/initiatlisation: also do changeLayout_choice
+        utils.changeLayout_choice(self.firstCandidatePreviewGroupbox.layout(),firstCanPrevDropdown_name,getattr(self, firstCanPrev_functionNameToDisplayNameMapping_name),parent=self,ignorePolarity=True, maxNrRows=1)
+
+        #Add the groupbox to the mainlayout
+        self.mainlayout.layout().addWidget(self.firstCandidatePreviewGroupbox)
+        
+        #Create an empty figure and store it as self.data:
+        self.firstCandidateFigure = plt.figure(figsize=(6.8,4))
+        self.firstCandidateCanvas = FigureCanvas(self.firstCandidateFigure)
+        self.mainlayout.addWidget(self.firstCandidateCanvas)
+        
+        #Add a navigation toolbar (zoom, pan etc) and canvas to tab
+        self.mainlayout.addWidget(NavigationToolbar(self.firstCandidateCanvas, self))
+        #------------End of first candidate plot layout -----------------
+
+        #------------Start of second candidate plot layout -----------------
+        # create a groupbox for the plot options of the first canvas
+        self.secondCandidatePreviewGroupbox = QGroupBox("Second Plot")
+        self.secondCandidatePreviewGroupbox.setLayout(QGridLayout())
+        #Ensure that we have 'KEEP' in the objectname so it's not deleted later
+        self.secondCandidatePreviewGroupbox.setObjectName("secondCanPrevGroupboxKEEP")
+
+        # Add a combobox-dropdown
+        secondCanPrevDropdown = QComboBox(self)
+        secondCanPrevDropdown.setMaxVisibleItems(30)
+        #Ensure that we have 'KEEP' in the objectname so it's not deleted later
+        secondCanPrevDropdown_name = f"secondCanPrevDropdownKEEP"
+        secondCanPrevDropdown.setObjectName(secondCanPrevDropdown_name)
+        secondCanPrev_functionNameToDisplayNameMapping_name = f"secondCanPrev_functionNameToDisplayNameMapping"
+        # Get the options dynamically from the CandidatePreview folder
+        options = utils.functionNamesFromDir('CandidatePreview')
+        #Also find the mapping of 'display name' to 'function name'
+        displaynames, secondCanPrev_functionNameToDisplayNameMapping = utils.displayNamesFromFunctionNames(options,'')
+        #and add this to our self attributes
+        setattr(self, secondCanPrev_functionNameToDisplayNameMapping_name,  secondCanPrev_functionNameToDisplayNameMapping)
+        
+        #Set a current name and add the items
+        secondCanPrevDropdown.addItems(displaynames)
+
+        #Add a callback to the changing of the dropdown:
+        secondCanPrevDropdown.currentTextChanged.connect(lambda text: utils.changeLayout_choice(self.secondCandidatePreviewGroupbox.layout(),secondCanPrevDropdown_name,getattr(self, secondCanPrev_functionNameToDisplayNameMapping_name),parent=self,ignorePolarity=True, maxNrRows=1))
+        self.secondCandidatePreviewGroupbox.layout().addWidget(secondCanPrevDropdown,1,0,1,8)
+
+        #On startup/initiatlisation: also do changeLayout_choice
+        utils.changeLayout_choice(self.secondCandidatePreviewGroupbox.layout(),secondCanPrevDropdown_name,getattr(self, secondCanPrev_functionNameToDisplayNameMapping_name),parent=self,ignorePolarity=True, maxNrRows=1)
+
+        #Add the groupbox to the mainlayout
+        self.mainlayout.layout().addWidget(self.secondCandidatePreviewGroupbox)
+        
+        #Create an empty figure and store it as self.data:
+        self.secondCandidateFigure = plt.figure(figsize=(6.8,4))
+        plt.rcParams.update({'font.size': 9}) # global change of font size for all matplotlib figures
+        self.secondCandidateCanvas = FigureCanvas(self.secondCandidateFigure)
+        self.mainlayout.addWidget(self.secondCandidateCanvas)
+        
+        #Add a navigation toolbar (zoom, pan etc) and canvas to tab
+        self.mainlayout.addWidget(NavigationToolbar(self.secondCandidateCanvas, self))
+        #------------End of second candidate plot layout -----------------
+
+        logging.info('CandidatePreview init')
+
+
+    def show_candidate_callback(self, parent, reset=False):
+        # First clear text and figures
+        self.candidate_info.setText('')
+        self.fit_info.setText('')
+        self.firstCandidateFigure.clf()
+        self.secondCandidateFigure.clf()
+        self.firstCandidateCanvas.draw()
+        self.secondCandidateCanvas.draw()
+
+        if reset==False:
+            # Check candidate entry field
+            if self.entryCanPreview.text() == '':
+                self.candidate_info.setText('Tried to visualise candidate, but no ID was given!')
+                logging.error('Tried to visualise candidate, but no ID was given!')
+            elif 'FindingMethod' in parent.data and int(self.entryCanPreview.text()) < len(parent.data['FindingResult'][0]):
+                self.CandidatePreviewID = int(self.entryCanPreview.text())
+                logging.debug(f"Attempting to show candidate {self.CandidatePreviewID}.")
+                # Get all localizations that belong to the candidate
+                self.CandidatePreviewLocs = parent.data['FittingResult'][0][parent.data['FittingResult'][0]['candidate_id'] == self.CandidatePreviewID]
+                if pd.isna(self.CandidatePreviewLocs['x'].iloc[0]):
+                    self.fit_info.setText(f"No localization generated due to {self.CandidatePreviewLocs['fit_info'].iloc[0]}")
+                
+                # Get some info about the candidate
+                N_events = parent.data['FindingResult'][0][self.CandidatePreviewID]['N_events']
+                cluster_size = parent.data['FindingResult'][0][self.CandidatePreviewID]['cluster_size']
+                self.candidate_info.setText(f"This candidate cluster contains {N_events} events and has dimensions ({cluster_size[0]}, {cluster_size[1]}, {cluster_size[2]}).")
+                FirstFunctionEvalText = self.getCanPrevFunctionEvalText("parent.data['FindingResult'][0][self.CandidatePreviewID]['events']", "self.CandidatePreviewLocs", "parent.previewEvents", "self.firstCandidateFigure","parent.globalSettings")
+                SecondFunctionEvalText = self.getCanPrevFunctionEvalText("parent.data['FindingResult'][0][self.CandidatePreviewID]['events']", "self.CandidatePreviewLocs", "parent.previewEvents", "self.secondCandidateFigure","parent.globalSettings")
+                eval(FirstFunctionEvalText)
+                eval(SecondFunctionEvalText)
+                # Improve figure layout and update the first canvases
+                # self.firstCandidateFigure.tight_layout()
+                self.firstCandidateCanvas.draw()
+                # self.secondCandidateFigure.tight_layout()
+                self.secondCandidateCanvas.draw()
+            else:
+                self.candidate_info.setText('Tried to visualise candidate but no data found!')
+                logging.error('Tried to visualise candidate but no data found!')
+        else:
+            logging.info('Candidate preview is reset.')
+ 
+
+    def prev_candidate_callback(self, parent):
+        if not self.entryCanPreview.text()=='':
+            if 'FindingMethod' in parent.data and int(self.entryCanPreview.text())-1 < len(parent.data['FindingResult'][0]):
+                if int(self.entryCanPreview.text())-1 == -1:
+                    max_candidate = len(parent.data['FindingResult'][0])-1
+                    self.entryCanPreview.setText(str(max_candidate))
+                else:
+                    self.entryCanPreview.setText(str(int(self.entryCanPreview.text())-1))
+                self.show_candidate_callback(parent)
+            else:
+                self.candidate_info.setText('Tried to visualise candidate but no data found!')
+                logging.error('Tried to visualise candidate but no data found!')
+        else:
+            self.candidate_info.setText('Tried to visualise candidate, but no ID was given!')
+            logging.error('Tried to visualise candidate, but no ID was given!')
+
+    def next_candidate_callback(self, parent):
+        if not self.entryCanPreview.text()=='':
+            if 'FindingMethod' in parent.data and int(self.entryCanPreview.text())+1 <= len(parent.data['FindingResult'][0]):
+                if int(self.entryCanPreview.text())+1 == len(parent.data['FindingResult'][0]):
+                    self.entryCanPreview.setText('0')
+                else:
+                    self.entryCanPreview.setText(str(int(self.entryCanPreview.text())+1))
+                self.show_candidate_callback(parent)
+            else:
+                self.candidate_info.setText('Tried to visualise candidate but no data found!')
+                logging.error('Tried to visualise candidate but no data found!')
+        else:
+            self.candidate_info.setText('Tried to visualise candidate, but no ID was given!')
+            logging.error('Tried to visualise candidate, but no ID was given!')
+
+    def getCanPrevFunctionEvalText(self, p1, p2, p3, p4, p5):
+        #Get the dropdown info
+        moduleMethodEvalTexts = []
+        figurePositon = 'first' if 'first' in p4 else 'second' if 'second' in p4 else None
+        groupbox_name = f"{figurePositon}CanPrevGroupboxKEEP"
+        functionNameToDisplayNameMapping = f"{figurePositon}CanPrev_functionNameToDisplayNameMapping"
+        all_layouts = self.findChild(QtWidgets.QGroupBox, groupbox_name).findChildren(QtWidgets.QLayout)
+        # all_layouts = getattr(self, groupbox_name).findChildren(QLayout)
+        
+        methodKwargNames_method = []
+        methodKwargValues_method = []
+        methodName_method = ''
+        # Iterate over the items in the layout
+        for index in range(len(all_layouts)):
+            item = all_layouts[index]
+            widget = item.widget()
+            if isinstance(item, QLayout):
+                for index2 in range(item.count()):
+                    item_sub = item.itemAt(index2)
+                    widget_sub = item_sub.widget()
+                    try:
+                        if ("LineEdit" in widget_sub.objectName()) and widget_sub.isVisibleTo(self.findChild(QtWidgets.QGroupBox, groupbox_name)):
+                            # The objectName will be along the lines of foo#bar#str
+                            #Check if the objectname is part of a method or part of a scoring
+                            split_list = widget_sub.objectName().split('#')
+                            methodName_method = split_list[1]
+                            methodKwargNames_method.append(split_list[2])
+                            
+                            #Widget.text() could contain a file location. Thus, we need to swap out all \ for /:
+                            methodKwargValues_method.append(widget_sub.text().replace('\\','/'))
+                    except:
+                        pass
+        #If at this point there is no methodName_method, it means that the method has exactly 0 req or opt kwargs. Thus, we simply find the value of the QComboBox which should be the methodName:
+        if methodName_method == '':
+            for index in range(len(all_layouts)):
+                item = all_layouts[index]
+                widget = item.widget()
+                if isinstance(item, QLayout):
+                    for index2 in range(item.count()):
+                        item_sub = item.itemAt(index2)
+                        widget_sub = item_sub.widget()
+                        try:
+                            if f"{figurePositon}CanPrevDropdownKEEP"in widget_sub.objectName():
+                                text = widget_sub.currentText()
+                                for i in range(len(getattr(self, functionNameToDisplayNameMapping))):
+                                    if getattr(self, functionNameToDisplayNameMapping)[i][0] == text:
+                                        methodName_method = getattr(self, functionNameToDisplayNameMapping)[i][1]
+                                        break
+                        except:
+                            pass
+        #Function call: get the to-be-evaluated text out, giving the methodName, method KwargNames, methodKwargValues, and 'function Type (i.e. cellSegmentScripts, etc)' - do the same with scoring as with method
+        if methodName_method != '':
+            EvalTextMethod = utils.getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart=str(p1)+','+str(p2)+','+str(p3)+','+str(p4)+','+str(p5))
+            #append this to moduleEvalTexts
+            moduleMethodEvalTexts.append(EvalTextMethod)
+            
+        if moduleMethodEvalTexts is not None and len(moduleMethodEvalTexts) > 0:
+            return moduleMethodEvalTexts[0]
+        else:
+            return None 
 
 class TableModel(QAbstractTableModel):
     """TableModel that heavily speedsup the table view

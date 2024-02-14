@@ -13,6 +13,7 @@ from CandidateFinding import *
 from CandidateFitting import *
 from Visualisation import *
 from PostProcessing import *
+from CandidatePreview import *
 
 #Imports for PyQt5 (GUI)
 from PyQt5 import QtWidgets, QtGui
