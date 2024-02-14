@@ -28,8 +28,8 @@ class XTDist(Dist2d):
 
 class YTDist(Dist2d):
     def __init__(self, events):
-        self.xlim = [np.min(events['x']), np.max(events['x'])]
-        self.tim = [np.min(events['t'])*1e-3, np.max(events['t'])*1e-3]
+        self.ylim = [np.min(events['y']), np.max(events['y'])]
+        self.tlim = [np.min(events['t'])*1e-3, np.max(events['t'])*1e-3]
 
 class TimeStamp(XYDist):
     def __init__(self, events):
