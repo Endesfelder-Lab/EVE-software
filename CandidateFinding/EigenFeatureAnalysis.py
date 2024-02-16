@@ -454,7 +454,7 @@ def eigenFeature_analysis(npy_array,settings,**kwargs):
         logging.error("No clusterpoints found via spectral clustering - maximum eigenval probably wrong!")
         candidates = {}
     
-    #Remove large bounding-box data
+    #Remove small/large bounding-box data
     candidates, _, _ = utilsHelper.removeCandidatesWithLargeSmallBoundingBox(candidates,settings)
 
     performance_metadata = f"SpectralClustering Finding ran for {time.time() - starttime} seconds."
@@ -734,6 +734,9 @@ def eigen_feature_analysis_autoRadiusSelect(npy_array,settings,**kwargs):
     
     candidates = clusterPoints_to_candidates(points_mostly_spher,labels,ms_to_px)
         
+    #Remove small/large bounding-box data
+    candidates, _, _ = utilsHelper.removeCandidatesWithLargeSmallBoundingBox(candidates,settings)
+
     performance_metadata = f"SpectralClustering Finding ran for {time.time() - starttime} seconds."
     
     return candidates, performance_metadata

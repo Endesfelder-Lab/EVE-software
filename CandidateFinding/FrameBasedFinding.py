@@ -250,10 +250,8 @@ def FrameBased_finding(npy_array,settings,**kwargs):
             candidates[index] = candidate[1]
             index+=1
     
-    #Remove large bounding-box data
-    candidates, npopped = utilsHelper.removeCandidatesWithLargeBoundingBox(candidates,settings['MaxFindingBoundingBoxXY']['value'],settings['MaxFindingBoundingBoxT']['value'])
-    if npopped > 0:
-        logging.warning(f"Removed {npopped}/{len(candidates)+npopped} ({npopped/(len(candidates)+npopped)*100}%) candidates due to large bounding boxes")
-    
+    #Remove small/large bounding-box data
+    candidates, _, _ = utilsHelper.removeCandidatesWithLargeSmallBoundingBox(candidates,settings)
+
     performance_metadata = candidates_info
     return candidates, performance_metadata

@@ -342,6 +342,21 @@ def createFunctionWithKwargs(functionname,**kwargs):
     #run the function
     return fullstring
 
+def changeTab(parent,text="Processing"):
+    """
+    Change the tab in the mainTabWidget to the one with the specified text.
+
+    Args:
+        parent: The parent widget containing the mainTabWidget.
+        text (str): The text of the tab to change to. Defaults to "Processing".
+    """
+    for i in range(parent.mainTabWidget.count()):
+        if parent.mainTabWidget.tabText(i) == text:
+            parent.mainTabWidget.setCurrentIndex(i)
+            break
+    import time
+    time.sleep(0.1)
+        
 def defaultValueFromKwarg(functionname,kwargname):
     #Check if the function has a 'default' entry for the specific kwarg. If not, return None. Otherwise, return the default value.
     
