@@ -456,13 +456,7 @@ def eigenFeature_analysis(npy_array,settings,**kwargs):
     
     #Remove large bounding-box data
     candidates, _, _ = utilsHelper.removeCandidatesWithLargeSmallBoundingBox(candidates,settings)
-    
-    # candidates, npopped = utilsHelper.removeCandidatesWithLargeBoundingBox(candidates,settings['MaxFindingBoundingBoxXY']['value'],settings['MaxFindingBoundingBoxT']['value'])
-    # if npoppedSmall > 0:
-    #     logging.warning(f"Removed {npoppedSmall}/{len(candidates)+npoppedSmall} ({npoppedSmall/(len(candidates)+npoppedSmall)*100}%) candidates due to too small bounding boxes")
-    # if npoppedBig > 0:
-    #     logging.warning(f"Removed {npoppedBig}/{len(candidates)+npoppedBig} ({npoppedBig/(len(candidates)+npoppedBig)*100}%) candidates due to too large bounding boxes")
-    
+
     performance_metadata = f"SpectralClustering Finding ran for {time.time() - starttime} seconds."
     
     return candidates, performance_metadata

@@ -1294,7 +1294,7 @@ class MyGUI(QMainWindow):
         self.tab_previewVis.setLayout(self.previewtab_layout)
         
         #And I add the previewfindingfitting class (QWidget extension):
-        self.previewtab_widget = PreviewFindingFitting()
+        self.previewtab_widget = PreviewFindingFitting(parent=self)
         self.previewtab_layout.addWidget(self.previewtab_widget)
 
     def updateShowPreview(self,previewEvents=None,timeStretch=None,frameTime=100):
@@ -3462,12 +3462,13 @@ class PreviewFindingFitting(QWidget):
     """
     Class that runs the GUI of finding/fitting preview (i.e. showing alle vents as an image and overlays with boxes/dots)
     """
-    def __init__(self):
+    def __init__(self,parent=None):
         """
         Initialisation of the PreviewFindingFitting class. Sets up a napari viewer and adds the viewer and viewer control widgets to the main layout.
         Also initialises some empty arrays
         """
         super().__init__()
+        self.parent=parent #get parent info (main GUI)
         # Create a napari viewer
         self.napariviewer = Viewer(show=False)
         # Create a layout for the main widget
@@ -3477,13 +3478,20 @@ class PreviewFindingFitting(QWidget):
         
         self.viewer = QtViewer(self.napariviewer)
         
+        #Create a new 'this is the events under the cursor' textbox
+        self.underCursorInfo = QLabel("")
         
         self.viewer.on_mouse_move = lambda event: self.currently_under_cursor(event)
+        self.viewer.on_mouse_double_click = lambda event: self.napari_doubleClicked(event)
         #Test
         # self.viewer.window.add_plugin_dock_widget('napari-1d', 'napari-1d')
         
-        self.mainlayout.addWidget(self.viewer)
-        self.mainlayout.addWidget(self.viewer.controls)
+        
+        
+        #Add widgets to the main layout
+        self.mainlayout.addWidget(self.underCursorInfo) #Text box with info under cursor
+        self.mainlayout.addWidget(self.viewer) #The view itself
+        self.mainlayout.addWidget(self.viewer.controls) #The controls for the viewer (contrast, time-point, etc)
         # self.mainlayout.addWidget(self.viewer.layers)
         
         # self.mainlayout.addWidget(self.viewer.dockConsole)
@@ -3501,7 +3509,34 @@ class PreviewFindingFitting(QWidget):
         self.events = {}
         self.frametime_ms = 0
         self.maxFrames = 0
+        
+        #An array holding info about what's under the cursor
+        underCursorInfo = {
+            'current_pixel': [[-np.inf,-np.inf]],
+            'current_time': [[-1,-1]],
+            'current_candidate': [[-1]]
+        }
 
+        self.underCursorInfoDF = pd.DataFrame(underCursorInfo)
+
+    def napari_doubleClicked(self, event:Event):
+        """Callback when the mouse is double clicked. Brings someone to the candidate preview tab if a candidate is clicked
+
+        """
+        if self.underCursorInfoDF['current_candidate'][0][0] > -1:
+            print(self.underCursorInfoDF['current_candidate'][0][0])
+            
+            #Set the value of the entry in the candidate preview tab
+            self.parent.canPreviewtab_widget.entryCanPreview.setText(str(self.underCursorInfoDF['current_candidate'][0][0]))
+            #Update the candidate preview tab:
+            self.parent.canPreviewtab_widget.show_candidate_callback(self.parent)
+            #And change the tab
+            for i in range(self.parent.mainTabWidget.count()):
+                if self.parent.mainTabWidget.tabText(i) == "Candidate preview":
+                    self.parent.mainTabWidget.setCurrentIndex(i)
+                    break
+    
+        
     def currently_under_cursor(self,event: Event):
         """
         Class that determines which pixel is currently under the cursor. The main task of this function is to go from cavnas position to image position.
@@ -3524,8 +3559,51 @@ class PreviewFindingFitting(QWidget):
         
         #Here's the calculated pixel index in x,y coordinate.
         pixel_index = np.floor(highlighted_px_index).astype(int)
-        #TODO: usefull info from mouse-over events
-        # print(np.floor(highlighted_px_index))
+        
+        self.underCursorInfoDF['current_pixel'][0] = np.floor(highlighted_px_index)
+        self.updateUnderCursorInfo()
+    
+    def updateUnderCursorInfo(self):
+        self.underCursorInfoDF
+        fullText = ''
+        
+        if self.underCursorInfoDF['current_time'][0][0] > -np.inf:
+            fullText+=f"Time: {self.underCursorInfoDF['current_time'][0][0]} - {self.underCursorInfoDF['current_time'][0][1]} ms"
+            
+        if self.underCursorInfoDF['current_pixel'][0][0] > -np.inf:
+            # fullText+=f"; Current pixel: {self.underCursorInfoDF['current_pixel'][0][0]},{self.underCursorInfoDF['current_pixel'][0][1]}"
+            
+            #Determine how many pos/neg events are in this pixel and time-frame:
+            events=self.events
+            pos_events = len(events[(events['x']-min(events['x']) == self.underCursorInfoDF['current_pixel'][0][0]) & (events['y']-min(events['y']) == self.underCursorInfoDF['current_pixel'][0][1]) & (events['t'] >= self.underCursorInfoDF['current_time'][0][0]*1000) & (events['t'] <= self.underCursorInfoDF['current_time'][0][1]*1000) & (events['p'] == 1)])
+            neg_events = len(events[(events['x']-min(events['x']) == self.underCursorInfoDF['current_pixel'][0][0]) & (events['y']-min(events['y']) == self.underCursorInfoDF['current_pixel'][0][1]) & (events['t'] >= self.underCursorInfoDF['current_time'][0][0]*1000) & (events['t'] <= self.underCursorInfoDF['current_time'][0][1]*1000) & (events['p'] == 0)])
+            #Add it to the text
+            fullText += f"; Pos: {pos_events}; Neg: {neg_events}"
+
+            #Check if we are within the bounding box of a candidate:
+            #Reset to now have any candidate in the dataframe
+            self.underCursorInfoDF['current_candidate'][0][0] = -1
+            #Loop over the frames and check
+            for f in self.findingResult:
+                #Check if this findingResult should be displayed:
+                t_min = min(self.findingResult[f]['events']['t'])/1000
+                t_max = max(self.findingResult[f]['events']['t'])/1000
+                if t_min < self.underCursorInfoDF['current_time'][0][1] and t_max > self.underCursorInfoDF['current_time'][0][0]:
+                    #Get the finding bbox...
+                    x_min = min(self.findingResult[f]['events']['x'])-min(events['x'])
+                    x_max = max(self.findingResult[f]['events']['x'])-min(events['x'])
+                    y_min = min(self.findingResult[f]['events']['y'])-min(events['y'])
+                    y_max = max(self.findingResult[f]['events']['y'])-min(events['y'])
+                
+                    if (x_min <= self.underCursorInfoDF['current_pixel'][0][0] <= x_max) and (y_min <= self.underCursorInfoDF['current_pixel'][0][1] <= y_max):
+                        self.underCursorInfoDF['current_candidate'][0][0] = f
+
+            if self.underCursorInfoDF['current_candidate'][0][0] > -1:
+                fullText += f"; Candidate: {self.underCursorInfoDF['current_candidate'][0][0]}"
+        
+        self.underCursorInfo.setText(fullText)
+    
+        pass
     
     def displayEvents(self,events,frametime_ms=100,findingResult = None,fittingResult=None,settings=None,timeStretch=(0,1000)):
         """
@@ -3658,6 +3736,10 @@ class PreviewFindingFitting(QWidget):
         self.findingFitting_overlay.features = pd.DataFrame(features)
         self.findingFitting_overlay.text = text
         self.findingFitting_overlay.visible=True
+        
+        #Update the informative text
+        self.underCursorInfoDF['current_time'][0] = curr_time_bounds
+        self.updateUnderCursorInfo()
 
 class CandidatePreview(QWidget):
     """
@@ -3963,5 +4045,3 @@ class TableModel(QAbstractTableModel):
     def getColumn(self, col):
         """Get column data"""
         return self.table_data[col]
-    
-    
