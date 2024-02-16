@@ -3,6 +3,7 @@ from Utils import utilsHelper
 import pandas as pd
 import numpy as np
 from scipy.optimize import curve_fit
+from scipy.stats import fit
 import logging
 #Obtain eventdistribution functions
 from EventDistributions import eventDistributions
@@ -34,11 +35,14 @@ def rayleigh_distribution(x, shift, sigma, amplitude, offset):
     result += offset  # Add an additional offset for x greater than the shift
     return result
 
-# Define the modified shifted Rayleigh function with an amplitude parameter
-def rayleigh_distribution_no_offset(x, shift, sigma, amplitude):
-    result = amplitude * (x - shift) * np.exp(-(x - shift)**2 / (2 * sigma**2))
-    result[x < shift] = 0  # Set the function to zero for x less than the shift
-    return result
+from scipy.stats import rv_continuous
+from scipy.stats import rayleigh
+# define discrete rayleigh function for mle fit
+class rayleigh_gen(rv_continuous):
+    "Rayleigh distribution"
+    def _pdf(self, t, shift, sigma, amplitude, offset): # t in µs
+        return rayleigh_distribution(t, shift, sigma, amplitude, offset)
+
 
 #-------------------------------------------------------------------------------------------------------------------------------
 #Callable functions
@@ -65,22 +69,39 @@ def OneDProjection(findingResult, fittingResult, previewEvents, figure, settings
     
     bincentres = (hist_t.t_edges[1:]-hist_t.t_edges[:-1])/2.0 + hist_t.t_edges[:-1]
     # try a Rayleigh fit
-    p0 = [bincentres[0], np.average(bincentres, weights=hist_t.dist1D)-bincentres[0], np.sqrt(np.exp(1))*np.amax(hist_t.dist1D)/np.average(bincentres, weights=hist_t.dist1D), 0]
+    mean = np.average(bincentres, weights=hist_t.dist1D)
+    std = np.sqrt(np.average((bincentres-mean)**2, weights=hist_t.dist1D))
+    shift = mean - 2*std
+    sigma = np.average(bincentres, weights=hist_t.dist1D) - shift
+    amplitude = np.sqrt(np.exp(1))*np.amax(hist_t.dist1D)*sigma # *(np.average(bincentres, weights=hist_t.dist1D)-bincentres[0])
+    p0 = [shift, sigma, amplitude, 0]
     print(f"p0 is {p0}")
-    popt, pcov = curve_fit(rayleigh_distribution, bincentres, hist_t.dist1D, p0=p0, bounds=(0, np.inf))
+    popt, pcov = curve_fit(rayleigh_distribution, bincentres, hist_t.dist1D, p0=p0, bounds=(0, np.inf), method='dogbox')
     perr = np.sqrt(np.diag(pcov))
     print(popt, perr)
     ax.plot(bincentres, rayleigh_distribution(bincentres, *popt), label='Rayleigh fit', color='black')
 
-    # try a Rayleigh fit without offset
-    p0 = [bincentres[0], np.average(bincentres, weights=hist_t.dist1D)-bincentres[0], np.sqrt(np.exp(1))*np.amax(hist_t.dist1D)/np.average(bincentres, weights=hist_t.dist1D)]
+    # try a MLE Rayleigh fit
+    np.save("/home/laura/PhD/Event_Based_Sensor_Project/GUI_tests/MLE_fit/data.npy", findingResult['t'])
+    # custom_rayleigh = rayleigh_gen("custom_rayleigh")
+    # bounds = [(0, np.inf), (0, np.inf), (0, np.inf), (0, np.inf), (0, np.inf)]
+    # mle_rayleigh = fit(custom_rayleigh, findingResult['t'], guess=p0, bounds=bounds)
+    # print(mle_rayleigh.params)
+    # mle_rayleigh.plot()
+
+
+    mean = bincentres[0]
+    shift = mean
+    sigma = np.average(bincentres, weights=hist_t.dist1D) - shift
+    amplitude = np.sqrt(np.exp(1))*np.amax(hist_t.dist1D)*sigma # *(np.average(bincentres, weights=hist_t.dist1D)-bincentres[0])
+    p0 = [shift, sigma, amplitude, 0]
     print(f"p0 is {p0}")
-    popt, pcov = curve_fit(rayleigh_distribution_no_offset, bincentres, hist_t.dist1D, p0=p0, bounds=(0, np.inf))
+    popt, pcov = curve_fit(rayleigh_distribution, bincentres, hist_t.dist1D, p0=p0, bounds=(0, np.inf), method='dogbox')
     perr = np.sqrt(np.diag(pcov))
     print(popt, perr)
-    ax.plot(bincentres, rayleigh_distribution_no_offset(bincentres, *popt), label='Rayleigh fit without offset', color='red')
+    ax.plot(bincentres, rayleigh_distribution(bincentres, *popt), label='Rayleigh fit different inital guess', color='red')
 
-
+    
     # Plot the 2D histograms
     if not len(findingResult[findingResult['p'] == 1]) == 0:
         hist_t_pos = hist_t(findingResult[findingResult['p'] == 1])[0]
@@ -92,8 +113,10 @@ def OneDProjection(findingResult, fittingResult, previewEvents, figure, settings
         hist_t_first = hist_t(first_events)[0]
         # Add a zero bin to the beginning and end of hist_t_first
         # try rayleigh fit of hist_t_first
-        p0 = [bincentres[0], np.average(bincentres, weights=hist_t_first)-bincentres[0], np.sqrt(np.exp(1))*np.amax(hist_t_first)/np.average(bincentres, weights=hist_t_first), 0]
-        print(f"p0 is {p0}")
+        shift = bincentres[0]
+        sigma = np.average(bincentres, weights=hist_t_first) - shift
+        amplitude = np.sqrt(np.exp(1))*np.amax(hist_t_first)*sigma # *(np.average(bincentres, weights=hist_t_first)-bincentres[0])
+        p0 = [shift, sigma, amplitude, 0]
         popt, pcov = curve_fit(rayleigh_distribution, bincentres, hist_t_first, p0=p0, bounds=(0, np.inf))
         perr = np.sqrt(np.diag(pcov))
         print(popt, perr)
