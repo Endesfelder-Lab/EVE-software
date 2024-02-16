@@ -796,6 +796,10 @@ class MyGUI(QMainWindow):
         Returns:
             None
         """
+        #Give a clear logging separation:
+        logging.info("")
+        logging.info("--------------- Preview Run Starting ---------------")
+        
         # Empty the event preview list
         self.previewEvents = []
 
@@ -1633,6 +1637,10 @@ class MyGUI(QMainWindow):
         return
 
     def run_processing(self):
+        #Give a clear logging separation:
+        logging.info("")
+        logging.info("--------------- Full Run Starting ---------------")
+        
         self.globalSettings['StoreFinalOutput']['value'] = True
         # self.run_processing_i()
         # reset previewEvents array, every time run is pressed
