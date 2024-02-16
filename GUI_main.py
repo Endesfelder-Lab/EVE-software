@@ -798,7 +798,10 @@ class MyGUI(QMainWindow):
         """
         #Give a clear logging separation:
         logging.info("")
+        logging.info("")
         logging.info("--------------- Preview Run Starting ---------------")
+        logging.info("")
+        logging.info("")
         
         # Empty the event preview list
         self.previewEvents = []
@@ -1639,7 +1642,10 @@ class MyGUI(QMainWindow):
     def run_processing(self):
         #Give a clear logging separation:
         logging.info("")
+        logging.info("")
         logging.info("--------------- Full Run Starting ---------------")
+        logging.info("")
+        logging.info("")
         
         self.globalSettings['StoreFinalOutput']['value'] = True
         # self.run_processing_i()
@@ -2155,9 +2161,7 @@ class MyGUI(QMainWindow):
                     # self.data['FindingResult'][1] += "Test"+newFindingResult[1]
 
                 self.currentFileInfo['FindingTime'] = time.time() - self.currentFileInfo['FindingTime']
-                logging.info('Number of candidates found: '+str(len(self.data['FindingResult'][0])))
-                logging.info('Candidate finding took '+str(self.currentFileInfo['FindingTime'])+' seconds.')
-                logging.info('Candidate finding done!')
+                logging.info('Candidate finding completed in '+str(round(self.currentFileInfo['FindingTime'],1))+'seconds; '+str(len(self.data['FindingResult'][0].dropna(axis=0))) + ' candidates found')
                 logging.debug(self.data['FindingResult'])
                 if storeFinding:
                     if self.globalSettings['StoreFindingOutput']['value']:
@@ -2175,9 +2179,7 @@ class MyGUI(QMainWindow):
             self.open_critical_warning(f"No Finding evaluation text provided/found")
 
     def updateGUIafterNewFitting(self):
-        logging.info('Number of localizations found: '+str(len(self.data['FittingResult'][0].dropna(axis=0))))
-        logging.info('Candidate fitting took '+str(self.currentFileInfo['FittingTime'])+' seconds.')
-        logging.info('Candidate fitting done!')
+        logging.info('Candidate fitting completed in '+str(round(self.currentFileInfo['FittingTime'],1))+'seconds; '+str(len(self.data['FittingResult'][0].dropna(axis=0))) + ' localizations found')
         self.data['NrEvents'] = 0
         for candidateID, candidate in self.data['FindingResult'][0].items():
                 self.data['NrEvents'] += len(candidate['events'])
