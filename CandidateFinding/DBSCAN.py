@@ -723,11 +723,9 @@ def DBSCAN_allEvents(npy_array,settings,**kwargs):
     performance_metadata = ""
     logging.info('DBSCAN finding done')
     
-    #Remove large bounding-box data
-    candidates, npopped = utilsHelper.removeCandidatesWithLargeBoundingBox(candidates,settings['MaxFindingBoundingBoxXY']['value'],settings['MaxFindingBoundingBoxT']['value'])
-    if npopped > 0:
-        logging.warning(f"Removed {npopped}/{len(candidates)+npopped} ({npopped/(len(candidates)+npopped)*100}%) candidates due to large bounding boxes")
-    
+    #Remove small/large bounding-box data
+    candidates, _, _ = utilsHelper.removeCandidatesWithLargeSmallBoundingBox(candidates,settings)
+
 
     return candidates, performance_metadata
 
@@ -822,11 +820,9 @@ def DBSCAN_onlyHighDensity(npy_array,settings,**kwargs):
     performance_metadata = ""
     logging.info('DBSCAN finding done')
     
-    #Remove large bounding-box data
-    candidates, npopped = utilsHelper.removeCandidatesWithLargeBoundingBox(candidates,settings['MaxFindingBoundingBoxXY']['value'],settings['MaxFindingBoundingBoxT']['value'])
-    if npopped > 0:
-        logging.warning(f"Removed {npopped}/{len(candidates)+npopped} ({npopped/(len(candidates)+npopped)*100}%) candidates due to large bounding boxes")
-    
+    #Remove small/large bounding-box data
+    candidates, _, _ = utilsHelper.removeCandidatesWithLargeSmallBoundingBox(candidates,settings)
+
 
     return candidates, performance_metadata
 
@@ -859,11 +855,9 @@ def DBSCAN_allEvents_remove_outliers(npy_array,settings,**kwargs):
     candidates = get_events_in_bbox_bisect(hotpixel_filtered_events,bboxes,float(kwargs['ratio_ms_to_px']))
     logging.info('Candidates obtained (via bbox bisect)')
     
-    #Remove large bounding-box data
-    candidates, npopped = utilsHelper.removeCandidatesWithLargeBoundingBox(candidates,settings['MaxFindingBoundingBoxXY']['value'],settings['MaxFindingBoundingBoxT']['value'])
-    if npopped > 0:
-        logging.warning(f"Removed {npopped}/{len(candidates)+npopped} ({npopped/(len(candidates)+npopped)*100}%) candidates due to large bounding boxes")
-    
+    #Remove small/large bounding-box data
+    candidates, _, _ = utilsHelper.removeCandidatesWithLargeSmallBoundingBox(candidates,settings)
+
     
     performance_metadata = ""
     return candidates, performance_metadata
