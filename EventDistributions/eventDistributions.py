@@ -182,7 +182,9 @@ class FirstTimestamp(TimeStamp):
         self.dist2D = self(events)
 
     def get_smallest_t(self, events):
-        smallest_t = events.groupby(['x', 'y'])['t'].min().reset_index()
+        smallest_t = events.groupby(['x', 'y'])['t'].agg(['min', 'size']).reset_index()
+        smallest_t.columns = ['x', 'y', 't', 'weight']
+        print(smallest_t)
         return smallest_t
     
     def __call__(self, events):
