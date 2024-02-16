@@ -455,9 +455,13 @@ def eigenFeature_analysis(npy_array,settings,**kwargs):
         candidates = {}
     
     #Remove large bounding-box data
-    candidates, npopped = utilsHelper.removeCandidatesWithLargeBoundingBox(candidates,settings['MaxFindingBoundingBoxXY']['value'],settings['MaxFindingBoundingBoxT']['value'])
-    if npopped > 0:
-        logging.warning(f"Removed {npopped}/{len(candidates)+npopped} ({npopped/(len(candidates)+npopped)*100}%) candidates due to large bounding boxes")
+    candidates, _, _ = utilsHelper.removeCandidatesWithLargeSmallBoundingBox(candidates,settings)
+    
+    # candidates, npopped = utilsHelper.removeCandidatesWithLargeBoundingBox(candidates,settings['MaxFindingBoundingBoxXY']['value'],settings['MaxFindingBoundingBoxT']['value'])
+    # if npoppedSmall > 0:
+    #     logging.warning(f"Removed {npoppedSmall}/{len(candidates)+npoppedSmall} ({npoppedSmall/(len(candidates)+npoppedSmall)*100}%) candidates due to too small bounding boxes")
+    # if npoppedBig > 0:
+    #     logging.warning(f"Removed {npoppedBig}/{len(candidates)+npoppedBig} ({npoppedBig/(len(candidates)+npoppedBig)*100}%) candidates due to too large bounding boxes")
     
     performance_metadata = f"SpectralClustering Finding ran for {time.time() - starttime} seconds."
     
@@ -516,10 +520,8 @@ def eigenFeature_analysis_and_bbox_finding(npy_array,settings,**kwargs):
     
     candidates = get_events_in_bbox_NE(noHotPixelPoints_rec,bboxes,float(kwargs['ratio_ms_to_px']))
     
-    #Remove large bounding-box data
-    candidates, npopped = utilsHelper.removeCandidatesWithLargeBoundingBox(candidates,settings['MaxFindingBoundingBoxXY']['value'],settings['MaxFindingBoundingBoxT']['value'])
-    if npopped > 0:
-        logging.warning(f"Removed {npopped}/{len(candidates)+npopped} ({npopped/(len(candidates)+npopped)*100}%) candidates due to large bounding boxes")
+    #Remove large/small bounding-box data
+    candidates, _, _ = utilsHelper.removeCandidatesWithLargeSmallBoundingBox(candidates,settings)
     
     performance_metadata = f"SpectralClustering Finding ran for {time.time() - starttime} seconds."
     
