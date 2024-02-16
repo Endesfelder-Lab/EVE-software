@@ -803,6 +803,9 @@ class MyGUI(QMainWindow):
         logging.info("")
         logging.info("")
         
+        #Switch the user to the Run info tab
+        utils.changeTab(self, text='Run info')
+
         # Empty the event preview list
         self.previewEvents = []
 
@@ -1647,6 +1650,9 @@ class MyGUI(QMainWindow):
         logging.info("")
         logging.info("")
         
+        #Switch the user to the Run info tab
+        utils.changeTab(self, text='Run info')
+        
         self.globalSettings['StoreFinalOutput']['value'] = True
         # self.run_processing_i()
         # reset previewEvents array, every time run is pressed
@@ -2161,7 +2167,7 @@ class MyGUI(QMainWindow):
                     # self.data['FindingResult'][1] += "Test"+newFindingResult[1]
 
                 self.currentFileInfo['FindingTime'] = time.time() - self.currentFileInfo['FindingTime']
-                logging.info('Candidate finding completed in '+str(round(self.currentFileInfo['FindingTime'],1))+'seconds; '+str(len(self.data['FindingResult'][0])) + ' candidates found')
+                logging.info('Candidate finding completed in '+str(round(self.currentFileInfo['FindingTime'],1))+' seconds; '+str(len(self.data['FindingResult'][0])) + ' candidates found')
                 logging.debug(self.data['FindingResult'])
                 if storeFinding:
                     if self.globalSettings['StoreFindingOutput']['value']:
@@ -2179,7 +2185,7 @@ class MyGUI(QMainWindow):
             self.open_critical_warning(f"No Finding evaluation text provided/found")
 
     def updateGUIafterNewFitting(self):
-        logging.info('Candidate fitting completed in '+str(round(self.currentFileInfo['FittingTime'],1))+'seconds; '+str(len(self.data['FittingResult'][0].dropna(axis=0))) + ' localizations found')
+        logging.info('Candidate fitting completed in '+str(round(self.currentFileInfo['FittingTime'],1))+' seconds; '+str(len(self.data['FittingResult'][0].dropna(axis=0))) + ' localizations found')
         self.data['NrEvents'] = 0
         for candidateID, candidate in self.data['FindingResult'][0].items():
                 self.data['NrEvents'] += len(candidate['events'])
@@ -3542,10 +3548,7 @@ class PreviewFindingFitting(QWidget):
             #Update the candidate preview tab:
             self.parent.canPreviewtab_widget.show_candidate_callback(self.parent)
             #And change the tab
-            for i in range(self.parent.mainTabWidget.count()):
-                if self.parent.mainTabWidget.tabText(i) == "Candidate preview":
-                    self.parent.mainTabWidget.setCurrentIndex(i)
-                    break
+            utils.changeTab(self.parent, text='Candidate preview')
 
     def currently_under_cursor(self,event: Event):
         """
