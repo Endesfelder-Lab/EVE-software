@@ -32,10 +32,31 @@ def strtobool(val):
     else:
         raise ValueError("invalid truth value %r" % (val,))
 
-def removeCandidatesWithLargeBoundingBox(candidates,xymax,tmax):
+def removeCandidatesWithLargeSmallBoundingBox(candidates,settings):
+    nrOrigCandidates = len(candidates)
+    candidates, npoppedLarge = removeCandidatesWithLargeBoundingBox(candidates,xymax=float(settings['MaxFindingBoundingBoxXY']['value']),tmax=float(settings['MaxFindingBoundingBoxT']['value']))
+    if npoppedLarge > 0:
+        logging.warning(f"Removed {npoppedLarge}/{nrOrigCandidates} ({npoppedLarge/(nrOrigCandidates)*100}%) candidates due to too large bounding boxes")
+    candidates, npoppedSmall = removeCandidatesWithSmallBoundingBox(candidates,xymin=float(settings['MinFindingBoundingBoxXY']['value']),tmin=float(settings['MinFindingBoundingBoxT']['value']))
+    if npoppedSmall > 0:
+        logging.warning(f"Removed {npoppedSmall}/{nrOrigCandidates} ({npoppedSmall/(nrOrigCandidates)*100}%) candidates due to too small bounding boxes")
+    
+    return candidates, npoppedSmall, npoppedLarge
+
+def removeCandidatesWithLargeBoundingBox(candidates,xymax=20,tmax=1000):
     npopped = 0
     for candidate in sorted(candidates, reverse=True):
-        if candidates[candidate]['cluster_size'][0] > float(xymax) or candidates[candidate]['cluster_size'][1] > float(xymax) or candidates[candidate]['cluster_size'][2] > float(tmax):
+        if candidates[candidate]['cluster_size'][0] > float(xymax) or candidates[candidate]['cluster_size'][1] > float(xymax) or candidates[candidate]['cluster_size'][2] > float(tmax*1000):
+            candidates.pop(candidate)
+            #set correct numbering of remaining candidates
+            candidates = {index: value for index, value in enumerate(candidates.values(), start=0)}
+            npopped += 1
+    return candidates, npopped
+
+def removeCandidatesWithSmallBoundingBox(candidates,xymin=0,tmin=0):
+    npopped = 0
+    for candidate in sorted(candidates, reverse=True):
+        if candidates[candidate]['cluster_size'][0] < float(xymin) or candidates[candidate]['cluster_size'][1] < float(xymin) or candidates[candidate]['cluster_size'][2] < float(tmin*1000):
             candidates.pop(candidate)
             #set correct numbering of remaining candidates
             candidates = {index: value for index, value in enumerate(candidates.values(), start=0)}
@@ -46,18 +67,21 @@ def removeCandidatesWithLargeBoundingBox(candidates,xymax,tmax):
 def info(candidates, fails):
     nb_candidates = len(candidates)
     fit_info = ''
-    grouped_fails = fails.groupby('fit_info')
-    for fail_reason, count in grouped_fails.size().items():
-        fail_text = f'Removed {count}/{nb_candidates} ({count/(nb_candidates)*100:.2f}%) candidates due to {fail_reason}.'
-        logging.warning(fail_text)
-        fit_info += fail_text + '\n'
-    fit_info += '\n'
-    for fail_reason, candidate_group in grouped_fails:
-        candidate_list = candidate_group['candidate_id'].tolist()
-        if len(candidate_list)>20:
-            fit_info += f'Candidates discarded by {fail_reason}: [{", ".join(map(str, candidate_list[:10]))}, ..., {", ".join(map(str, candidate_list[-10:]))}]\n'
-        else:
-            fit_info += f'Candidates discarded by {fail_reason}: {candidate_list}\n'
+    if len(fails) > 0:
+        grouped_fails = fails.groupby('fit_info')
+        for fail_reason, count in grouped_fails.size().items():
+            fail_text = f'Removed {count}/{nb_candidates} ({count/(nb_candidates)*100:.2f}%) candidates due to {fail_reason}.'
+            logging.warning(fail_text)
+            fit_info += fail_text + '\n'
+        fit_info += '\n'
+        for fail_reason, candidate_group in grouped_fails:
+            candidate_list = candidate_group['candidate_id'].tolist()
+            if len(candidate_list)>20:
+                fit_info += f'Candidates discarded by {fail_reason}: [{", ".join(map(str, candidate_list[:10]))}, ..., {", ".join(map(str, candidate_list[-10:]))}]\n'
+            else:
+                fit_info += f'Candidates discarded by {fail_reason}: {candidate_list}\n'
+    else:
+        fit_info = 'No candidates were discarded due to bad fitting.'
     return fit_info
 
 # calculate number of jobs on CPU for fitting routine

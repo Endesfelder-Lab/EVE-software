@@ -325,14 +325,22 @@ class MyGUI(QMainWindow):
     def initGlobalSettings(self):
         #Initialisation of the global settings - runs on startup to get all these values, then these can be changed later
         globalSettings = {}
+        globalSettings['MinFindingBoundingBoxXY'] = {}
+        globalSettings['MinFindingBoundingBoxXY']['value'] = 3
+        globalSettings['MinFindingBoundingBoxXY']['input'] = float
+        globalSettings['MinFindingBoundingBoxXY']['displayName'] = 'Minimum size of a bounding box in px units'
+        globalSettings['MinFindingBoundingBoxT'] = {}
+        globalSettings['MinFindingBoundingBoxT']['value'] = 10
+        globalSettings['MinFindingBoundingBoxT']['input'] = float
+        globalSettings['MinFindingBoundingBoxT']['displayName'] = 'Minimum size of a bounding box in ms units'
         globalSettings['MaxFindingBoundingBoxXY'] = {}
         globalSettings['MaxFindingBoundingBoxXY']['value'] = 20
         globalSettings['MaxFindingBoundingBoxXY']['input'] = float
         globalSettings['MaxFindingBoundingBoxXY']['displayName'] = 'Maximum size of a bounding box in px units'
         globalSettings['MaxFindingBoundingBoxT'] = {}
-        globalSettings['MaxFindingBoundingBoxT']['value'] = 1000000
+        globalSettings['MaxFindingBoundingBoxT']['value'] = 1000
         globalSettings['MaxFindingBoundingBoxT']['input'] = float
-        globalSettings['MaxFindingBoundingBoxT']['displayName'] = 'Maximum size of a bounding box in us units'
+        globalSettings['MaxFindingBoundingBoxT']['displayName'] = 'Maximum size of a bounding box in ms units'
         globalSettings['PixelSize_nm'] = {}
         globalSettings['PixelSize_nm']['value'] = 80
         globalSettings['PixelSize_nm']['input'] = float
@@ -662,19 +670,25 @@ class MyGUI(QMainWindow):
         tab_layout.addWidget(self.previewLayout, 9, 0)
         
         #Populate with a start time and end time inputs:
-        self.previewLayout.layout().addWidget(QLabel("Start time (ms):"), 0, 0, 1, 2)
-        self.previewLayout.layout().addWidget(QLabel("Duration (ms):"), 0, 2, 1, 2)
+        self.previewLayout.layout().addWidget(QLabel("Start time (ms):"), 0, 0, 1, 1)
+        self.previewLayout.layout().addWidget(QLabel("Duration (ms):"), 0, 1, 1, 1)
+        self.previewLayout.layout().addWidget(QLabel("Display frame time (ms):"), 0,2,1,2)
         #Also the QLineEdits that have useful names:
         self.preview_startTLineEdit = QLineEdit()
         self.preview_startTLineEdit.setObjectName('preview_startTLineEdit')
-        self.previewLayout.layout().addWidget(self.preview_startTLineEdit, 1, 0, 1, 2)
+        self.previewLayout.layout().addWidget(self.preview_startTLineEdit, 1, 0, 1, 1)
         #Give this a default value:
         self.preview_startTLineEdit.setText("0")
         #Same for end time:
         self.preview_durationTLineEdit = QLineEdit()
         self.preview_durationTLineEdit.setObjectName('preview_durationTLineEdit')
-        self.previewLayout.layout().addWidget(self.preview_durationTLineEdit, 1, 2, 1, 2)
+        self.previewLayout.layout().addWidget(self.preview_durationTLineEdit, 1, 1, 1, 1)
         self.preview_durationTLineEdit.setText("1000")
+        #And for display frame time:
+        self.preview_displayFrameTime = QLineEdit()
+        self.preview_displayFrameTime.setObjectName('preview_displayFrameTime')
+        self.previewLayout.layout().addWidget(self.preview_displayFrameTime, 1, 2, 1, 2)
+        self.preview_displayFrameTime.setText("100")
         
         #Also give start/end x/y values:
         self.previewLayout.layout().addWidget(QLabel("Min X (px):"), 2, 0)
@@ -705,7 +719,8 @@ class MyGUI(QMainWindow):
         self.buttonPreview.clicked.connect(lambda: self.previewRun((self.preview_startTLineEdit.text(), 
                 self.preview_durationTLineEdit.text()),
                 (self.preview_minXLineEdit.text(),self.preview_maxXLineEdit.text(),
-                self.preview_minYLineEdit.text(),self.preview_maxYLineEdit.text())))
+                self.preview_minYLineEdit.text(),self.preview_maxYLineEdit.text()),
+                float(self.preview_displayFrameTime.text())))
         #Add the button to the layout:
         self.previewLayout.layout().addWidget(self.buttonPreview, 4, 0)
 
@@ -770,7 +785,7 @@ class MyGUI(QMainWindow):
         
         return
         
-    def previewRun(self,timeStretch=(0,1000),xyStretch=(0,0,0,0)):
+    def previewRun(self,timeStretch=(0,1000),xyStretch=(0,0,0,0),frameTime=100):
         """
         Generates the preview of a run analysis.
 
@@ -951,7 +966,7 @@ class MyGUI(QMainWindow):
         
         #Update the preview panel and localization list:
         #Note that self.previewEvents is XYT cut, but NOT p-cut
-        self.updateShowPreview(previewEvents=self.previewEvents,timeStretch=timeStretch)
+        self.updateShowPreview(previewEvents=self.previewEvents,timeStretch=timeStretch,frameTime=frameTime)
         self.updateLocList()
 
     def timeSliceFromHDF(self,dataLocation,requested_start_time_ms = 0,requested_end_time_ms=1000,howOftenCheckHdfTime = 100000,loggingBool=False,curr_chunk = 0):
@@ -1279,15 +1294,15 @@ class MyGUI(QMainWindow):
         self.tab_previewVis.setLayout(self.previewtab_layout)
         
         #And I add the previewfindingfitting class (QWidget extension):
-        self.previewtab_widget = PreviewFindingFitting()
+        self.previewtab_widget = PreviewFindingFitting(parent=self)
         self.previewtab_layout.addWidget(self.previewtab_widget)
 
-    def updateShowPreview(self,previewEvents=None,timeStretch=None):
+    def updateShowPreview(self,previewEvents=None,timeStretch=None,frameTime=100):
         """
         Function that's called to update the preview (or show it). Requires the previewEvents, or uses the self.previewEvents.
         """
         
-        self.previewtab_widget.displayEvents(previewEvents,frametime_ms=100,findingResult = self.data['FindingResult'][0],fittingResult=self.data['FittingResult'][0],settings=self.globalSettings,timeStretch=timeStretch)
+        self.previewtab_widget.displayEvents(previewEvents,frametime_ms=frameTime,findingResult = self.data['FindingResult'][0],fittingResult=self.data['FittingResult'][0],settings=self.globalSettings,timeStretch=timeStretch)
         
         
         logging.info('UpdateShowPreview ran!')
@@ -3447,12 +3462,13 @@ class PreviewFindingFitting(QWidget):
     """
     Class that runs the GUI of finding/fitting preview (i.e. showing alle vents as an image and overlays with boxes/dots)
     """
-    def __init__(self):
+    def __init__(self,parent=None):
         """
         Initialisation of the PreviewFindingFitting class. Sets up a napari viewer and adds the viewer and viewer control widgets to the main layout.
         Also initialises some empty arrays
         """
         super().__init__()
+        self.parent=parent #get parent info (main GUI)
         # Create a napari viewer
         self.napariviewer = Viewer(show=False)
         # Create a layout for the main widget
@@ -3460,16 +3476,22 @@ class PreviewFindingFitting(QWidget):
         # Set the layout for the main widget
         self.setLayout(self.mainlayout)
         
-        
         self.viewer = QtViewer(self.napariviewer)
         
+        #Create a new 'this is the events under the cursor' textbox
+        self.underCursorInfo = QLabel("")
         
         self.viewer.on_mouse_move = lambda event: self.currently_under_cursor(event)
+        self.viewer.on_mouse_double_click = lambda event: self.napari_doubleClicked(event)
         #Test
         # self.viewer.window.add_plugin_dock_widget('napari-1d', 'napari-1d')
         
-        self.mainlayout.addWidget(self.viewer)
-        self.mainlayout.addWidget(self.viewer.controls)
+        
+        
+        #Add widgets to the main layout
+        self.mainlayout.addWidget(self.underCursorInfo) #Text box with info under cursor
+        self.mainlayout.addWidget(self.viewer) #The view itself
+        self.mainlayout.addWidget(self.viewer.controls) #The controls for the viewer (contrast, time-point, etc)
         # self.mainlayout.addWidget(self.viewer.layers)
         
         # self.mainlayout.addWidget(self.viewer.dockConsole)
@@ -3478,9 +3500,43 @@ class PreviewFindingFitting(QWidget):
         logging.info('PreviewFindingFitting init')
         self.finding_overlays = {}
         self.fitting_overlays = {}
+        self.findingFitting_overlay = self.napariviewer.add_shapes([],visible=False,name='Finding/Fitting Results')
+        self.findingFitting_overlay.opacity = 0.7
+        self.fittingResult = {}
+        self.findingResult = {}
+        self.settings = {}
+        self.timeStretch=[]
+        self.events = {}
+        self.frametime_ms = 0
         self.maxFrames = 0
-        self.napariviewer.dims.events.current_step.connect(self.update_visibility)
+        
+        #An array holding info about what's under the cursor
+        underCursorInfo = {
+            'current_pixel': [[-np.inf,-np.inf]],
+            'current_time': [[-1,-1]],
+            'current_candidate': [[-1]]
+        }
 
+        self.underCursorInfoDF = pd.DataFrame(underCursorInfo)
+
+    def napari_doubleClicked(self, event:Event):
+        """Callback when the mouse is double clicked. Brings someone to the candidate preview tab if a candidate is clicked
+
+        """
+        if self.underCursorInfoDF['current_candidate'][0][0] > -1:
+            print(self.underCursorInfoDF['current_candidate'][0][0])
+            
+            #Set the value of the entry in the candidate preview tab
+            self.parent.canPreviewtab_widget.entryCanPreview.setText(str(self.underCursorInfoDF['current_candidate'][0][0]))
+            #Update the candidate preview tab:
+            self.parent.canPreviewtab_widget.show_candidate_callback(self.parent)
+            #And change the tab
+            for i in range(self.parent.mainTabWidget.count()):
+                if self.parent.mainTabWidget.tabText(i) == "Candidate preview":
+                    self.parent.mainTabWidget.setCurrentIndex(i)
+                    break
+    
+        
     def currently_under_cursor(self,event: Event):
         """
         Class that determines which pixel is currently under the cursor. The main task of this function is to go from cavnas position to image position.
@@ -3503,8 +3559,51 @@ class PreviewFindingFitting(QWidget):
         
         #Here's the calculated pixel index in x,y coordinate.
         pixel_index = np.floor(highlighted_px_index).astype(int)
-        #TODO: usefull info from mouse-over events
-        # print(np.floor(highlighted_px_index))
+        
+        self.underCursorInfoDF['current_pixel'][0] = np.floor(highlighted_px_index)
+        self.updateUnderCursorInfo()
+    
+    def updateUnderCursorInfo(self):
+        self.underCursorInfoDF
+        fullText = ''
+        
+        if self.underCursorInfoDF['current_time'][0][0] > -np.inf:
+            fullText+=f"Time: {self.underCursorInfoDF['current_time'][0][0]} - {self.underCursorInfoDF['current_time'][0][1]} ms"
+            
+        if self.underCursorInfoDF['current_pixel'][0][0] > -np.inf:
+            # fullText+=f"; Current pixel: {self.underCursorInfoDF['current_pixel'][0][0]},{self.underCursorInfoDF['current_pixel'][0][1]}"
+            
+            #Determine how many pos/neg events are in this pixel and time-frame:
+            events=self.events
+            pos_events = len(events[(events['x']-min(events['x']) == self.underCursorInfoDF['current_pixel'][0][0]) & (events['y']-min(events['y']) == self.underCursorInfoDF['current_pixel'][0][1]) & (events['t'] >= self.underCursorInfoDF['current_time'][0][0]*1000) & (events['t'] <= self.underCursorInfoDF['current_time'][0][1]*1000) & (events['p'] == 1)])
+            neg_events = len(events[(events['x']-min(events['x']) == self.underCursorInfoDF['current_pixel'][0][0]) & (events['y']-min(events['y']) == self.underCursorInfoDF['current_pixel'][0][1]) & (events['t'] >= self.underCursorInfoDF['current_time'][0][0]*1000) & (events['t'] <= self.underCursorInfoDF['current_time'][0][1]*1000) & (events['p'] == 0)])
+            #Add it to the text
+            fullText += f"; Pos: {pos_events}; Neg: {neg_events}"
+
+            #Check if we are within the bounding box of a candidate:
+            #Reset to now have any candidate in the dataframe
+            self.underCursorInfoDF['current_candidate'][0][0] = -1
+            #Loop over the frames and check
+            for f in self.findingResult:
+                #Check if this findingResult should be displayed:
+                t_min = min(self.findingResult[f]['events']['t'])/1000
+                t_max = max(self.findingResult[f]['events']['t'])/1000
+                if t_min < self.underCursorInfoDF['current_time'][0][1] and t_max > self.underCursorInfoDF['current_time'][0][0]:
+                    #Get the finding bbox...
+                    x_min = min(self.findingResult[f]['events']['x'])-min(events['x'])
+                    x_max = max(self.findingResult[f]['events']['x'])-min(events['x'])
+                    y_min = min(self.findingResult[f]['events']['y'])-min(events['y'])
+                    y_max = max(self.findingResult[f]['events']['y'])-min(events['y'])
+                
+                    if (x_min <= self.underCursorInfoDF['current_pixel'][0][0] <= x_max) and (y_min <= self.underCursorInfoDF['current_pixel'][0][1] <= y_max):
+                        self.underCursorInfoDF['current_candidate'][0][0] = f
+
+            if self.underCursorInfoDF['current_candidate'][0][0] > -1:
+                fullText += f"; Candidate: {self.underCursorInfoDF['current_candidate'][0][0]}"
+        
+        self.underCursorInfo.setText(fullText)
+    
+        pass
     
     def displayEvents(self,events,frametime_ms=100,findingResult = None,fittingResult=None,settings=None,timeStretch=(0,1000)):
         """
@@ -3518,6 +3617,14 @@ class PreviewFindingFitting(QWidget):
             settings (dict, optional): Settings. Defaults to None.
             timeStretch (tuple, optional): The time stretch to visualise. Defaults to (0,1000).
         """
+        #Add variables to self:
+        self.events = events
+        self.frametime_ms = frametime_ms
+        self.findingResult = findingResult
+        self.fittingResult = fittingResult
+        self.settings = settings
+        self.timeStretch = timeStretch
+        
         #Delete all existing layers:
         for layer in reversed(self.napariviewer.layers):
             self.napariviewer.layers.remove(layer)
@@ -3527,128 +3634,112 @@ class PreviewFindingFitting(QWidget):
         #Loop over the frames:
         n_frames = int(np.ceil(float(timeStretch[1])/(frametime_ms)))
         self.maxFrames = n_frames
+        self.hist_xy = eventDistributions.SumPolarity(events)
         for n in range(0,n_frames):
             #Get the events on this 'frame'
             events_this_frame = events[(events['t']>(float(timeStretch[0])*1000+n*frametime_ms*1000)) & (events['t']<(float(timeStretch[0])*1000+(n+1)*frametime_ms*1000))]
             #Create a 2d histogram out of this
-            self.hist_xy = eventDistributions.SumPolarity(events_this_frame)
+            # thisHist_xy = eventDistributions.SumPolarity(events_this_frame)
+            thisHist_xy = self.hist_xy(events_this_frame)
             #Add it to our image
-            preview_multiD_image.append(self.hist_xy.dist2D)
+            preview_multiD_image.append(thisHist_xy[0])
             
         #add this image to the napariviewer
         self.napariviewer.add_image(np.asarray(preview_multiD_image), multiscale=False)
         
-        #Create the finding/fitting overlays or reset them to zero
-        self.finding_overlays = {}
-        self.fitting_overlays = []
-        #Create an empty finding and fitting result overlay for each layer:
-        for n in range(0,n_frames):
-            logging.info('Creating overlays ' + str(n/n_frames))
-            #Get the finding result in the current time bin:
-            findingResults_thisbin = {}
-            for findres_id in range(len(findingResult)):
-                findres = findingResult[findres_id]
-                if max(findres['events']['t']) >= (float(timeStretch[0])*1000+n*frametime_ms*1000) and min(findres['events']['t']) < (float(timeStretch[0])*1000+(n+1)*frametime_ms*1000):
-                    findingResults_thisbin[findres_id] = findres
-            #Create an overlay from this
-            self.finding_overlays[n] = self.create_finding_overlay(findingResults_thisbin)
-            
-            #Get the fitting result in the current time bin:
-            fittingResults_thisbin = fittingResult[(fittingResult['t']>=(float(timeStretch[0])+n*frametime_ms))* (fittingResult['t']<(float(timeStretch[0])+(n+1)*frametime_ms))]
-            self.fitting_overlays.append(self.create_fitting_overlay(fittingResults_thisbin,pxsize=float(settings['PixelSize_nm']['value'])))
+        #Append the finding/fitting overlay on top of this:
+        self.napariviewer.layers.append(self.findingFitting_overlay)
         
         #Select the original image-layer as selected
         self.napariviewer.layers.selection.active = self.napariviewer.layers[0]
         self.update_visibility()
+        self.napariviewer.dims.events.current_step.connect(self.update_visibility)
 
-    def create_finding_overlay(self,findingResults):
+    def update_visibility(self):
         """
-        Creation of a finding overlay
-
-        Args:
-            findingResults (dict): The finding results as given by Eve
-
-        Returns:
-            self.shapes_layer (napari layer): a napari shapes layer with the finding boxes
+        Function to update visibility based on the current layer
         """
-        #Loop over the finding results, and create a polygon for each, then show these:
-        polygons = []
+        #Reset all data in the findingFitting overlay:
+        self.findingFitting_overlay.data=[]
+        
+        #And re-draw the necessary data only:
+        
+        #Current frame is this:
+        curr_frame = self.napariviewer.dims.current_step[0]
+        
+        #Get current time-bounds:
+        curr_time_bounds = (float(self.timeStretch[0])+(curr_frame)*self.frametime_ms,float(self.timeStretch[0])+(curr_frame+1)*self.frametime_ms)
+        
+        #Get finding results:
+        findingResults = self.findingResult
+        fittingResults = self.fittingResult
+        pxsize = float(self.settings['PixelSize_nm']['value'])
+        candidate_polygons = []
+        unfitted_candidate_polygons = []
+        fitting_polygons = []
         candidates_ids = []
+        unfitted_candidate_ids = []
+        fitting_ids = []
         
         for f in findingResults:
-            #Get the bounding box in xy:
-            y_min = min(findingResults[f]['events']['x']) - self.hist_xy.xlim[0]
-            y_max = max(findingResults[f]['events']['x']) - self.hist_xy.xlim[0]
-            x_min = min(findingResults[f]['events']['y']) - self.hist_xy.ylim[0]
-            x_max = max(findingResults[f]['events']['y']) - self.hist_xy.ylim[0]
-            candidates_ids.append(f)
-
-            polygons.append(np.array([[x_min, y_min], [x_max, y_min], [x_max, y_max], [x_min, y_max]]))
+            #Check if this findingResult should be displayed:
+            t_min = min(findingResults[f]['events']['t'])/1000
+            t_max = max(findingResults[f]['events']['t'])/1000
+            if t_min < curr_time_bounds[1] and t_max > curr_time_bounds[0]:
             
+                #Get the finding info...
+                y_min = min(findingResults[f]['events']['x']) - self.hist_xy.xlim[0]
+                y_max = max(findingResults[f]['events']['x']) - self.hist_xy.xlim[0]
+                x_min = min(findingResults[f]['events']['y']) - self.hist_xy.ylim[0]
+                x_max = max(findingResults[f]['events']['y']) - self.hist_xy.ylim[0]
+                
+                #Check if it succesfully fitted:
+                if not np.isnan(fittingResults['x'].iloc[f]):
+                    candidates_ids.append(str(f))
+                    candidate_polygons.append(np.array([[x_min, y_min], [x_max, y_min], [x_max, y_max], [x_min, y_max]]))
+                else:
+                    unfitted_candidate_ids.append(str(f))
+                    unfitted_candidate_polygons.append(np.array([[x_min, y_min], [x_max, y_min], [x_max, y_max], [x_min, y_max]]))
+
+        #Also add fitting info...
+        for f in range(len(fittingResults)):
+            #Check if this findingResult should be displayed:
+            t = fittingResults['t'].iloc[f]
+            if t > curr_time_bounds[0] and t < curr_time_bounds[1]:
+                xcoord_pxcoord = fittingResults['x'].iloc[f]/float(pxsize)-self.hist_xy.xlim[0]
+                ycoord_pxcoord = fittingResults['y'].iloc[f]/float(pxsize)-self.hist_xy.ylim[0]
+                
+                fitting_polygons.append(np.array([[ycoord_pxcoord-1,xcoord_pxcoord-1],[ycoord_pxcoord+1,xcoord_pxcoord+1]]))
+                fitting_polygons.append(np.array([[ycoord_pxcoord-1,xcoord_pxcoord+1],[ycoord_pxcoord+1,xcoord_pxcoord-1]]))
+                
+                #Need to append empty values:
+                fitting_ids.append("")
+                fitting_ids.append("")
         
+        all_ids = candidates_ids+unfitted_candidate_ids+fitting_ids
         # create features
         features = {
-            'candidate_ids': candidates_ids,
+            'candidate_ids': all_ids,
         }
         text = {
-            'string': '{candidate_ids:0.0f}',
+            'string': '{candidate_ids}',
             'anchor': 'upper_left',
             'translation': [0, 0],
             'size': 8,
-            'color':'coral'
+            'color':'blue'
         }
-        # Initialize an empty shapes layer for annotations
-        self.shapes_layer = self.napariviewer.add_shapes(polygons, shape_type='rectangle', edge_width=1,edge_color='coral',face_color='transparent',visible=False,name='Finding Results',features=features,text=text)
-        self.shapes_layer.opacity = 0.7
         
-        return self.shapes_layer
+        #Add the finding result
+        self.findingFitting_overlay.add_rectangles(candidate_polygons, edge_width=1,edge_color='coral',face_color='transparent')
+        self.findingFitting_overlay.add_rectangles(unfitted_candidate_polygons, edge_width=1,edge_color='red',face_color='transparent')
+        self.findingFitting_overlay.add_lines(fitting_polygons, edge_width=0.5,edge_color='red',face_color='transparent')
+        self.findingFitting_overlay.features = pd.DataFrame(features)
+        self.findingFitting_overlay.text = text
+        self.findingFitting_overlay.visible=True
         
-    def create_fitting_overlay(self,fittingResults,pxsize=80):
-        """
-        Creation of a fitting overlay
-
-        Args:
-            fittingResults (dict): The fitting results as given by Eve
-            pxsize (float): The pixel size in nm. Defaulta to 80
-
-        Returns:
-            self.shapes_layer (napari layer): a napari shapes layer with the fitting crosses
-        """
-        
-        polygons = []
-        
-        for f in range(len(fittingResults)):
-            xcoord_pxcoord = fittingResults['x'].iloc[f]/float(pxsize)-self.hist_xy.xlim[0]
-            ycoord_pxcoord = fittingResults['y'].iloc[f]/float(pxsize)-self.hist_xy.ylim[0]
-            
-            polygons.append(np.array([[ycoord_pxcoord-1,xcoord_pxcoord-1],[ycoord_pxcoord+1,xcoord_pxcoord+1]]))
-            polygons.append(np.array([[ycoord_pxcoord-1,xcoord_pxcoord+1],[ycoord_pxcoord+1,xcoord_pxcoord-1]]))
-            
-        
-        
-        # Initialize an empty shapes layer for annotations
-        self.shapes_layer = self.napariviewer.add_shapes(polygons, shape_type='line', edge_width=1,edge_color='red',face_color='transparent',visible=False,name='Fitting Results')
-        self.shapes_layer.opacity = 0.7
-        
-        return self.shapes_layer
-    
-    def update_visibility(self):
-        """
-        Function to update visibility based on the current layer - the finding/fitting overlays are one for each time-step. All are hidden except the one that's wanted
-        """
-        #Disable all
-        if not not self.finding_overlays: #worst syntax ever to check if a dictionary is empty or not
-            for n in range(self.maxFrames):
-                if self.finding_overlays[n].visible:
-                    self.finding_overlays[n].visible = False
-                if self.fitting_overlays[n].visible:
-                    self.fitting_overlays[n].visible = False
-            #Set current dim visible
-            self.finding_overlays[self.napariviewer.dims.current_step[0]].visible=True
-            self.fitting_overlays[self.napariviewer.dims.current_step[0]].visible=True
-            
-        
-        # print('wopp'+str(self.napariviewer.dims.current_step[0]))
+        #Update the informative text
+        self.underCursorInfoDF['current_time'][0] = curr_time_bounds
+        self.updateUnderCursorInfo()
 
 class CandidatePreview(QWidget):
     """
@@ -3954,5 +4045,3 @@ class TableModel(QAbstractTableModel):
     def getColumn(self, col):
         """Get column data"""
         return self.table_data[col]
-    
-    
