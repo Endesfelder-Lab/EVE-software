@@ -2161,7 +2161,7 @@ class MyGUI(QMainWindow):
                     # self.data['FindingResult'][1] += "Test"+newFindingResult[1]
 
                 self.currentFileInfo['FindingTime'] = time.time() - self.currentFileInfo['FindingTime']
-                logging.info('Candidate finding completed in '+str(round(self.currentFileInfo['FindingTime'],1))+'seconds; '+str(len(self.data['FindingResult'][0].dropna(axis=0))) + ' candidates found')
+                logging.info('Candidate finding completed in '+str(round(self.currentFileInfo['FindingTime'],1))+'seconds; '+str(len(self.data['FindingResult'][0])) + ' candidates found')
                 logging.debug(self.data['FindingResult'])
                 if storeFinding:
                     if self.globalSettings['StoreFindingOutput']['value']:
