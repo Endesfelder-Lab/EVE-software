@@ -3526,6 +3526,8 @@ class PreviewFindingFitting(QWidget):
         self.events = {}
         self.frametime_ms = 0
         self.maxFrames = 0
+        
+        self.timeOfLastCursorUpdate = 0
 
         #An array holding info about what's under the cursor
         underCursorInfo = {
@@ -3559,27 +3561,30 @@ class PreviewFindingFitting(QWidget):
         """
         #Vispy mouse position
 
-        #We get the canvas size/position in image pixel units
-        canvas_size_in_px_units = event.source.size/self.napariviewer.camera.zoom
-        camera_coords = [self.napariviewer.camera.center[2]+.5, self.napariviewer.camera.center[1]+.5]
-        canvas_pos = np.vstack([camera_coords-(canvas_size_in_px_units/2),camera_coords+(canvas_size_in_px_units/2)])
-        #And we can normalize the cursor position to image pixels
-        cursor_unit_norm = event._pos/event.source.size
-        #Thus, we can find the pixel index - at the moment we simply calculate this and not do anything with it
-        highlighted_px_index=np.zeros((2,))
-        highlighted_px_index[0] = cursor_unit_norm[0]*canvas_size_in_px_units[0]+canvas_pos[0][0]
-        highlighted_px_index[1] = cursor_unit_norm[1]*canvas_size_in_px_units[1]+canvas_pos[0][1]
+        timeBetweenCursorUpdates = 0.0 #in seconds
+        if self.timeOfLastCursorUpdate == 0 or (time.time() - self.timeOfLastCursorUpdate) >= timeBetweenCursorUpdates:
+            #We get the canvas size/position in image pixel units
+            canvas_size_in_px_units = event.source.size/self.napariviewer.camera.zoom
+            camera_coords = [self.napariviewer.camera.center[2]+.5, self.napariviewer.camera.center[1]+.5]
+            canvas_pos = np.vstack([camera_coords-(canvas_size_in_px_units/2),camera_coords+(canvas_size_in_px_units/2)])
+            #And we can normalize the cursor position to image pixels
+            cursor_unit_norm = event._pos/event.source.size
+            #Thus, we can find the pixel index - at the moment we simply calculate this
+            highlighted_px_index=np.zeros((2,))
+            highlighted_px_index[0] = (cursor_unit_norm[0]*canvas_size_in_px_units[0]+canvas_pos[0][0])/((float(self.settings['PixelSize_nm']['value']))/1000)-(100*((float(self.settings['PixelSize_nm']['value']))/1000)) #Not fully sure why I need the 100*, but seems to work
+            highlighted_px_index[1] = (cursor_unit_norm[1]*canvas_size_in_px_units[1]+canvas_pos[0][1])/((float(self.settings['PixelSize_nm']['value']))/1000)-(100*((float(self.settings['PixelSize_nm']['value']))/1000)) #Not fully sure why I need the 100*, but seems to work
 
-        #Here's the calculated pixel index in x,y coordinate.
-        pixel_index = np.floor(highlighted_px_index).astype(int)
+            #Here's the calculated pixel index in x,y coordinate.
+            pixel_index = np.floor(highlighted_px_index).astype(int)
 
-        self.underCursorInfoDF['current_pixel'][0] = np.floor(highlighted_px_index)
-        self.updateUnderCursorInfo()
+            self.underCursorInfoDF['current_pixel'][0] = np.floor(highlighted_px_index)
+            self.updateUnderCursorInfo()
+            self.timeOfLastCursorUpdate = time.time()
 
     def updateUnderCursorInfo(self):
         self.underCursorInfoDF
         fullText = ''
-
+        
         if self.underCursorInfoDF['current_time'][0][0] > -np.inf:
             fullText+=f"Time: {self.underCursorInfoDF['current_time'][0][0]} - {self.underCursorInfoDF['current_time'][0][1]} ms"
 
@@ -3593,6 +3598,8 @@ class PreviewFindingFitting(QWidget):
             #Add it to the text
             fullText += f"; Pos: {pos_events}; Neg: {neg_events}"
 
+            minx = min(events['x'])
+            miny = min(events['y'])
             #Check if we are within the bounding box of a candidate:
             #Reset to now have any candidate in the dataframe
             self.underCursorInfoDF['current_candidate'][0][0] = -1
@@ -3603,10 +3610,10 @@ class PreviewFindingFitting(QWidget):
                 t_max = max(self.findingResult[f]['events']['t'])/1000
                 if t_min < self.underCursorInfoDF['current_time'][0][1] and t_max > self.underCursorInfoDF['current_time'][0][0]:
                     #Get the finding bbox...
-                    x_min = min(self.findingResult[f]['events']['x'])-min(events['x'])
-                    x_max = max(self.findingResult[f]['events']['x'])-min(events['x'])
-                    y_min = min(self.findingResult[f]['events']['y'])-min(events['y'])
-                    y_max = max(self.findingResult[f]['events']['y'])-min(events['y'])
+                    x_min = min(self.findingResult[f]['events']['x'])-minx
+                    x_max = max(self.findingResult[f]['events']['x'])-minx
+                    y_min = min(self.findingResult[f]['events']['y'])-miny
+                    y_max = max(self.findingResult[f]['events']['y'])-miny
 
                     if (x_min <= self.underCursorInfoDF['current_pixel'][0][0] <= x_max) and (y_min <= self.underCursorInfoDF['current_pixel'][0][1] <= y_max):
                         self.underCursorInfoDF['current_candidate'][0][0] = f
@@ -3657,12 +3664,20 @@ class PreviewFindingFitting(QWidget):
             #Add it to our image
             preview_multiD_image.append(thisHist_xy[0])
 
+        #Scale should be the scale of pixel - to - um. E.g. a scale of 0.01 means 100 pixels = 1 um
+        scale = ((float(settings['PixelSize_nm']['value']))/1000)
+    
         #add this image to the napariviewer
-        self.napariviewer.add_image(np.asarray(preview_multiD_image), multiscale=False)
+        self.napariviewer.add_image(np.asarray(preview_multiD_image), multiscale=False,scale=(1,scale,scale))
+        # self.napariviewer.add_image(np.asarray(preview_multiD_image), multiscale=False)
 
         #Append the finding/fitting overlay on top of this:
         self.napariviewer.layers.append(self.findingFitting_overlay)
 
+        #Add a scalebar
+        self.napariviewer.scale_bar.visible = True
+        self.napariviewer.scale_bar.unit = "um"
+        
         #Select the original image-layer as selected
         self.napariviewer.layers.selection.active = self.napariviewer.layers[0]
         self.update_visibility()
@@ -3674,6 +3689,8 @@ class PreviewFindingFitting(QWidget):
         """
         #Reset all data in the findingFitting overlay:
         self.findingFitting_overlay.data=[]
+        
+        settings=self.settings
 
         #And re-draw the necessary data only:
 
@@ -3701,10 +3718,10 @@ class PreviewFindingFitting(QWidget):
             if t_min < curr_time_bounds[1] and t_max > curr_time_bounds[0]:
 
                 #Get the finding info...
-                y_min = min(findingResults[f]['events']['x']) - self.hist_xy.xlim[0]
-                y_max = max(findingResults[f]['events']['x']) - self.hist_xy.xlim[0]
-                x_min = min(findingResults[f]['events']['y']) - self.hist_xy.ylim[0]
-                x_max = max(findingResults[f]['events']['y']) - self.hist_xy.ylim[0]
+                y_min = (min(findingResults[f]['events']['x']) - self.hist_xy.xlim[0])*(pxsize/1000)
+                y_max = (max(findingResults[f]['events']['x']) - self.hist_xy.xlim[0])*(pxsize/1000)
+                x_min = (min(findingResults[f]['events']['y']) - self.hist_xy.ylim[0])*(pxsize/1000)
+                x_max = (max(findingResults[f]['events']['y']) - self.hist_xy.ylim[0])*(pxsize/1000)
 
                 #Check if it succesfully fitted:
                 if not np.isnan(fittingResults['x'].iloc[f]):
@@ -3719,13 +3736,17 @@ class PreviewFindingFitting(QWidget):
             #Check if this findingResult should be displayed:
             t = fittingResults['t'].iloc[f]
             if t > curr_time_bounds[0] and t < curr_time_bounds[1]:
-                xcoord_pxcoord = fittingResults['x'].iloc[f]/float(pxsize)-self.hist_xy.xlim[0]
-                ycoord_pxcoord = fittingResults['y'].iloc[f]/float(pxsize)-self.hist_xy.ylim[0]
+                #Getting the x,y coordinates
+                xcoord_pxcoord = (fittingResults['x'].iloc[f]/float(pxsize)-self.hist_xy.xlim[0])*(pxsize/1000)
+                ycoord_pxcoord = (fittingResults['y'].iloc[f]/float(pxsize)-self.hist_xy.ylim[0])*(pxsize/1000)
 
-                fitting_polygons.append(np.array([[ycoord_pxcoord-1,xcoord_pxcoord-1],[ycoord_pxcoord+1,xcoord_pxcoord+1]]))
-                fitting_polygons.append(np.array([[ycoord_pxcoord-1,xcoord_pxcoord+1],[ycoord_pxcoord+1,xcoord_pxcoord-1]]))
+                #Variable for how big the cross itself should be drawn at
+                fitting_cross_size = 1*(pxsize/1000)
+                #Drawing the crosses
+                fitting_polygons.append(np.array([[ycoord_pxcoord-fitting_cross_size,xcoord_pxcoord-fitting_cross_size],[ycoord_pxcoord+fitting_cross_size,xcoord_pxcoord+fitting_cross_size]]))
+                fitting_polygons.append(np.array([[ycoord_pxcoord-fitting_cross_size,xcoord_pxcoord+fitting_cross_size],[ycoord_pxcoord+fitting_cross_size,xcoord_pxcoord-fitting_cross_size]]))
 
-                #Need to append empty values:
+                #Need to append empty values to prevent NaNs to show up text-wise.
                 fitting_ids.append("")
                 fitting_ids.append("")
 
@@ -3743,9 +3764,9 @@ class PreviewFindingFitting(QWidget):
         }
 
         #Add the finding result
-        self.findingFitting_overlay.add_rectangles(candidate_polygons, edge_width=1,edge_color='coral',face_color='transparent')
-        self.findingFitting_overlay.add_rectangles(unfitted_candidate_polygons, edge_width=1,edge_color='red',face_color='transparent')
-        self.findingFitting_overlay.add_lines(fitting_polygons, edge_width=0.5,edge_color='red',face_color='transparent')
+        self.findingFitting_overlay.add_rectangles(candidate_polygons, edge_width=1*((float(settings['PixelSize_nm']['value']))/1000),edge_color='coral',face_color='transparent')
+        self.findingFitting_overlay.add_rectangles(unfitted_candidate_polygons, edge_width=1*((float(settings['PixelSize_nm']['value']))/1000),edge_color='red',face_color='transparent')
+        self.findingFitting_overlay.add_lines(fitting_polygons, edge_width=0.5*((float(settings['PixelSize_nm']['value']))/1000),edge_color='red',face_color='transparent')
         self.findingFitting_overlay.features = pd.DataFrame(features)
         self.findingFitting_overlay.text = text
         self.findingFitting_overlay.visible=True
