@@ -30,12 +30,15 @@ def get_stylesheet():
     padding_medium = '2px'#'4px'
     padding_large = '3px'#'6px'
     margin_small = '1px'#'2px'
-    margin_medium = '1px'#'5px'
+    margin_medium = '3px'#'5px'
     margin_between_groupbox_and_entry = '8px'  # Adjust as needed
 
     # Stylesheet
     stylesheet = (
-        f"QWidget {{ background-color: {background_color}; margin: {margin_small}; }}"
+        #f"QWidget {{ background-color: {background_color}; margin: {margin_small}; }}"
+        f"QGroupBox {{ background-color: {background_color}; }}"
+        f"QLayout {{ background-color: {background_color}; }}"
+
         f"QLabel, QLineEdit, QComboBox, QCheckBox {{ color: {text_color}; }}"
         f"QPushButton {{ background-color: {accent_color}; color: {text_color}; "
         f"border: {border_width} solid {accent_color}; border-radius: {border_radius}; padding: {padding_large}; }}"
@@ -55,7 +58,7 @@ def get_stylesheet():
     )
 
     return stylesheet
- 
+
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     

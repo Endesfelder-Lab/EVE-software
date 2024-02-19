@@ -3488,7 +3488,7 @@ class PreviewFindingFitting(QWidget):
         # Create a napari viewer
         self.napariviewer = Viewer(show=False)
         # Create a layout for the main widget
-        self.mainlayout = QVBoxLayout()
+        self.mainlayout = QGridLayout()
         # Set the layout for the main widget
         self.setLayout(self.mainlayout)
 
@@ -3505,10 +3505,10 @@ class PreviewFindingFitting(QWidget):
 
 
         #Add widgets to the main layout
-        self.mainlayout.addWidget(self.underCursorInfo) #Text box with info under cursor
-        self.mainlayout.addWidget(self.viewer) #The view itself
+        self.mainlayout.addWidget(self.underCursorInfo,1,2,1,1) #Text box with info under cursor
+        self.mainlayout.addWidget(self.viewer,2,2,1,1) #The view itself
         self.viewer.controls.setAutoFillBackground(True)
-        self.mainlayout.addWidget(self.viewer.controls) #The controls for the viewer (contrast, time-point, etc)
+        self.mainlayout.addWidget(self.viewer.controls,2,1,2,1) #The controls for the viewer (contrast, time-point, etc)
         # self.mainlayout.addWidget(self.viewer.layers)
 
         # self.mainlayout.addWidget(self.viewer.dockConsole)
