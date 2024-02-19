@@ -61,33 +61,28 @@ def PolarityMatching(localizations,findingResult,settings,**kwargs):
             negEventsWithinDistance = negEventsInTime[distance < float(kwargs['Max_xyDistance'])]
 
             if not negEventsWithinDistance.empty:
-                negEventFound = negEventsWithinDistance.iloc[0]
+                # negEventFound = negEventsWithinDistance.iloc[0]
 
-                pos_index = localizations.index[localizations['candidate_id'] == posEvent.candidate_id].tolist()[0]
-                neg_index = (localizations.index[localizations['candidate_id'] == negEventFound.candidate_id]).tolist()[0]
+                # pos_index = localizations.index[localizations['candidate_id'] == posEvent.candidate_id].tolist()[0]
+                # neg_index = (localizations.index[localizations['candidate_id'] == negEventFound.candidate_id]).tolist()[0]
                 
-                localizations.at[pos_index, 'polarity_linked_id'] = negEventFound.candidate_id
-                localizations.at[pos_index, 'polarity_linked_time'] = negEventFound.t - posEvent.t
+                # localizations.at[pos_index, 'polarity_linked_id'] = negEventFound.candidate_id
+                # localizations.at[pos_index, 'polarity_linked_time'] = negEventFound.t - posEvent.t
 
-                localizations.at[neg_index, 'polarity_linked_id'] = posEvent.candidate_id
-                localizations.at[neg_index, 'polarity_linked_time'] = posEvent.t - negEventFound.t
-                
-                
-                
-                
-                
+                # localizations.at[neg_index, 'polarity_linked_id'] = posEvent.candidate_id
+                # localizations.at[neg_index, 'polarity_linked_time'] = posEvent.t - negEventFound.t
                 
                 # if len(negEventsWithinDistance) > 0:
                     
-                #     negEventFound = negEventsWithinDistance.iloc[0] #Always the first
-                    
-                #     #Update the positive candidate
-                #     localizations.loc[localizations['candidate_id'] == posEvent.candidate_id,'polarity_linked_id'] = (negEventFound.candidate_id)
-                #     localizations.loc[localizations['candidate_id'] == posEvent.candidate_id,'polarity_linked_time'] = (negEventFound.t - posEvent.t)
-                    
-                #     #And update the negative candidate
-                #     localizations.loc[localizations['candidate_id'] == negEventFound.candidate_id,'polarity_linked_id'] = (posEvent.candidate_id)
-                #     localizations.loc[localizations['candidate_id'] == negEventFound.candidate_id,'polarity_linked_time'] = (posEvent.t-negEventFound.t)
+                negEventFound = negEventsWithinDistance.iloc[0] #Always the first
+                
+                #Update the positive candidate
+                localizations.loc[localizations['candidate_id'] == posEvent.candidate_id,'polarity_linked_id'] = (negEventFound.candidate_id)
+                localizations.loc[localizations['candidate_id'] == posEvent.candidate_id,'polarity_linked_time'] = (negEventFound.t - posEvent.t)
+                
+                #And update the negative candidate
+                localizations.loc[localizations['candidate_id'] == negEventFound.candidate_id,'polarity_linked_id'] = (posEvent.candidate_id)
+                localizations.loc[localizations['candidate_id'] == negEventFound.candidate_id,'polarity_linked_time'] = (posEvent.t-negEventFound.t)
                 
                 
                 
