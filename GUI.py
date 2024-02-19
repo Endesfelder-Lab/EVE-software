@@ -35,7 +35,7 @@ def get_stylesheet():
 
     # Stylesheet
     stylesheet = (
-        #f"QWidget {{ background-color: {background_color}; margin: {margin_small}; }}"
+        f"QWidget {{ margin: {margin_small}; }}"
         f"QGroupBox {{ background-color: {background_color}; }}"
         f"QLayout {{ background-color: {background_color}; }}"
 
