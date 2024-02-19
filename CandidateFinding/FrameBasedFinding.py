@@ -17,15 +17,15 @@ def __function_metadata__():
     return {
         "FrameBased_finding": {
             "required_kwargs": [
-                {"name": "threshold_detection", "description": "Threshold for wavelet detection","default":3.},
-                {"name": "exclusion_radius", "description": "Radius of the exclusion area (if two or more PSFs are closer than twice the value, they will all be discarded) (in pixels)","default":4.},
-                {"name": "min_diameter", "description": "Minimum radius of the thresholded area (in pixels)","default":1.25},
-                {"name": "max_diameter", "description": "Maximum radius of the thresholded area (in pixels)","default":4.},
-                {"name": "frame_time", "description": "frame time in (ms)", "default":100.},
-                {"name": "candidate_radius", "description": "Radius of the area around the localization (in px)","default":4.},
+                {"name": "threshold_detection", "description": "Threshold for wavelet detection","default":3.,"display_text":"Detection threshold"},
+                {"name": "exclusion_radius", "description": "Radius of the exclusion area (if two or more PSFs are closer than twice the value, they will all be discarded) (in pixels)","default":4.,"display_text":"Exclusion radius"},
+                {"name": "min_diameter", "description": "Minimum radius of the thresholded area (in pixels)","default":1.25,"display_text":"Min. radius"},
+                {"name": "max_diameter", "description": "Maximum radius of the thresholded area (in pixels)","default":4.,"display_text":"Max. radius"},
+                {"name": "frame_time", "description": "frame time in (ms)", "default":100.,"display_text":"Frame time (ms)"},
+                {"name": "candidate_radius", "description": "Radius of the area around the localization (in px)","default":4.,"display_text":"Candidate radius"},
             ],
             "optional_kwargs": [
-                {"name": "multithread","description": "True to use multithread parallelization; False not to.","default":True},
+                {"name": "multithread","description": "True to use multithread parallelization; False not to.","default":True,"display_text":"Multithreading"},
             ],
             "help_string": "Convert event data to frames and do finding via wavelet detection",
             "display_name": "Frame Based finding"

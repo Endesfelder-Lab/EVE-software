@@ -23,47 +23,47 @@ def __function_metadata__():
     return {
         "DBSCAN_onlyHighDensity": {
             "required_kwargs": [
-                {"name": "min_cluster_size", "description": "Required number of neighbouring events in spatiotemporal voxel","default":17,"type":int},
-                {"name": "distance_radius_lookup", "description": "Outer radius (in px) to count the neighbours in.","default":7,"type":int},
-                {"name": "density_multiplier", "description": "Distance multiplier","default":1.5,"type":float},
-                {"name": "ratio_ms_to_px", "description": "Ratio of milliseconds to pixels.","default":35.0,"type":float},
-                {"name": "DBSCAN_eps", "description": "Eps of DBSCAN.","default":6,"type":int},
+                {"name": "min_cluster_size", "description": "Required number of neighbouring events in spatiotemporal voxel","default":17,"type":int,"display_text":"Minimum cluster size"},
+                {"name": "distance_radius_lookup", "description": "Outer radius (in px) to count the neighbours in.","default":7,"type":int,"display_text":"Distance radius lookup"},
+                {"name": "density_multiplier", "description": "Distance multiplier","default":1.5,"type":float,"display_text":"Density multiplier"},
+                {"name": "ratio_ms_to_px", "description": "Ratio of milliseconds to pixels.","default":35.0,"type":float,"display_text":"Ratio ms to px"},
+                {"name": "DBSCAN_eps", "description": "Eps of DBSCAN.","default":6,"type":int,"display_text":"DBSCAN epsilon"},
             ],
             "optional_kwargs": [
-               {"name": "min_consec", "description": "Minimum number of consecutive events","default":1,"type":int},
-               {"name": "max_consec", "description": "Maximum number of consecutive events, discards hot pixels","default":30,"type":int},
+               {"name": "min_consec", "description": "Minimum number of consecutive events","default":1,"type":int,"display_text":"Min. consec"},
+               {"name": "max_consec", "description": "Maximum number of consecutive events, discards hot pixels","default":30,"type":int,"display_text":"Max. consec"},
             ],
             "help_string": "DBSCAN, only return events that are considered high-density.",
             "display_name": "DBSCAN returning high-density events"
         },
         "DBSCAN_allEvents": {
             "required_kwargs": [
-                {"name": "min_cluster_size", "description": "Required number of neighbouring events in spatiotemporal voxel","default":17,"type":int},
-                {"name": "distance_radius_lookup", "description": "Outer radius (in px) to count the neighbours in.","default":7,"type":int},
-                {"name": "density_multiplier", "description": "Distance multiplier","default":1.5,"type":float},
-                {"name": "ratio_ms_to_px", "description": "Ratio of milliseconds to pixels.","default":35.0,"type":float},
-                {"name": "DBSCAN_eps", "description": "Eps of DBSCAN.","default":6,"type":int},
-                {"name": "padding_xy", "description": "Result padding in x,y pixels.","default":0,"type":int},
+                {"name": "min_cluster_size", "description": "Required number of neighbouring events in spatiotemporal voxel","default":17,"type":int,"display_text":"Minimum cluster size"},
+                {"name": "distance_radius_lookup", "description": "Outer radius (in px) to count the neighbours in.","default":7,"type":int,"display_text":"Distance radius lookup"},
+                {"name": "density_multiplier", "description": "Distance multiplier","default":1.5,"type":float,"display_text":"Density multiplier"},
+                {"name": "ratio_ms_to_px", "description": "Ratio of milliseconds to pixels.","default":35.0,"type":float,"display_text":"Ratio ms to px"},
+                {"name": "DBSCAN_eps", "description": "Eps of DBSCAN.","default":6,"type":int,"display_text":"DBSCAN epsilon"},
+                {"name": "padding_xy", "description": "Result padding in x,y pixels.","default":0,"type":int,"display_text":"XY padding"},
             ],
             "optional_kwargs": [
-               {"name": "min_consec", "description": "Minimum number of consecutive events","default":1,"type":int},
-               {"name": "max_consec", "description": "Maximum number of consecutive events, discards hot pixels","default":30,"type":int},
+               {"name": "min_consec", "description": "Minimum number of consecutive events","default":1,"type":int,"display_text":"Min. consec"},
+               {"name": "max_consec", "description": "Maximum number of consecutive events, discards hot pixels","default":30,"type":int,"display_text":"Max. consec"},
             ],
             "help_string": "DBSCAN on high-density, but returns all events in the bounding box specified by DBSCAN.",
             "display_name": "DBSCAN returning all events"
         },
         "DBSCAN_allEvents_remove_outliers": {
             "required_kwargs": [
-                {"name": "neighbour_points", "description": "Removes points that has less than this number of neighbours in neighbour_radius","default":30,"type":int},
-                {"name": "neighbour_radius", "description": "Removes points that has less than neighbour_points in this radius","default":3.0,"type":float},
-                {"name": "min_cluster_size", "description": "Required number of neighbouring events in spatiotemporal voxel","default":17,"type":int},
-                {"name": "ratio_ms_to_px", "description": "Ratio of milliseconds to pixels.","default":35.0,"type":float},
-                {"name": "DBSCAN_eps", "description": "Eps of DBSCAN.","default":3,"type":int},
-                {"name": "padding_xy", "description": "Result padding in x,y pixels.","default":2,"type":int},
+                {"name": "neighbour_points", "description": "Removes points that has less than this number of neighbours in neighbour_radius","default":30,"type":int,"display_text":"Minimum neighbours"},
+                {"name": "neighbour_radius", "description": "Removes points that has less than neighbour_points in this radius","default":3.0,"type":float,"display_text":"Neighbour radius"},
+                {"name": "min_cluster_size", "description": "Required number of neighbouring events in spatiotemporal voxel","default":17,"type":int,"display_text":"Minimum cluster size"},
+                {"name": "ratio_ms_to_px", "description": "Ratio of milliseconds to pixels.","default":35.0,"type":float,"display_text":"Ratio ms to px"},
+                {"name": "DBSCAN_eps", "description": "Eps of DBSCAN.","default":3,"type":int,"display_text":"DBSCAN epsilon"},
+                {"name": "padding_xy", "description": "Result padding in x,y pixels.","default":2,"type":int,"display_text":"XY padding"},
             ],
             "optional_kwargs": [
-               {"name": "min_consec", "description": "Minimum number of consecutive events","default":1,"type":int},
-               {"name": "max_consec", "description": "Maximum number of consecutive events, discards hot pixels","default":30,"type":int},
+               {"name": "min_consec", "description": "Minimum number of consecutive events","default":1,"type":int,"display_text":"Min. consec"},
+               {"name": "max_consec", "description": "Maximum number of consecutive events, discards hot pixels","default":30,"type":int,"display_text":"Max. consec"},
             ],
             "help_string": "Removes outliers via o3d's remove_radius_outlier.",
             "display_name": "DBSCAN returning all events, using radius outlier removal"

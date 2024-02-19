@@ -12,10 +12,10 @@ def __function_metadata__():
     return {
         "DriftCorr_entropyMin": {
             "required_kwargs": [
-                {"name": "frame_time_for_dme", "description": "Frame-time used for drift-correction (in ms)","default":100.,"type":float},
-                {"name": "frames_per_bin", "description": "Number of frames in every bin for dme drift correction ","default":50,"type":int},
-                {"name": "use_cuda", "description": "Use CUDA-GPU rather than CPU.","default":False},
-                {"name": "visualisation", "description": "Visualisation of the drift traces.","default":True},
+                {"name": "frame_time_for_dme", "description": "Frame-time used for drift-correction (in ms)","default":100.,"type":float,"display_text":"Frame time used in DME"},
+                {"name": "frames_per_bin", "description": "Number of frames in every bin for dme drift correction ","default":50,"type":int,"display_text":"Frames per bin"},
+                {"name": "use_cuda", "description": "Use CUDA-GPU rather than CPU.","default":False,"display_text":"Use CUDA"},
+                {"name": "visualisation", "description": "Visualisation of the drift traces.","default":True,"display_text":"Visualisation"},
             ],
             "optional_kwargs": [
             ],

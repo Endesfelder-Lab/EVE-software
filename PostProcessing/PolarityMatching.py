@@ -11,8 +11,8 @@ def __function_metadata__():
     return {
         "PolarityMatching": {
             "required_kwargs": [
-                {"name": "Max_xyDistance", "description": "Maximum distance in x,y in nm units (nm)","default":"50","type":float},
-                {"name": "Max_tDistance", "description": "Maximum time distance in ms (between positive and negative)","default":"500","type":float},
+                {"name": "Max_xyDistance", "description": "Maximum distance in x,y in nm units (nm)","default":"50","type":float,"display_text":"Max. XY distance (nm)"},
+                {"name": "Max_tDistance", "description": "Maximum time distance in ms (between positive and negative)","default":"500","type":float,"display_text":"Max time distance (ms)"},
             ],
             "optional_kwargs": [
             ],

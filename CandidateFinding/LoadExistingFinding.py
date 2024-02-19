@@ -8,7 +8,7 @@ def __function_metadata__():
     return {
         "LoadExistingFinding": {
             "required_kwargs": [
-                {"name": "File_Location", "description": "Location of a FindingResults .pickle file","type":"fileLoc"},
+                {"name": "File_Location", "description": "Location of a FindingResults .pickle file","type":"fileLoc","display_text":"File location"},
             ],
             "optional_kwargs": [
             ],
