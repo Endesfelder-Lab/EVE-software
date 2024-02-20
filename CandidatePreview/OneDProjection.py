@@ -18,9 +18,9 @@ def __function_metadata__():
     return {
         "OneDProjection": {
             "required_kwargs": [
-                {"name": "t_bin_width", "description": "Temporal bin width (in ms)", "default":"1"},
-                {"name": "show_first", "description": "Plot the first events per pixel","default":"False"},
-                {"name": "weigh_first", "description": "Weigh first events per pixel with number of events/pixel","default":"False"}
+                {"name": "t_bin_width","display_text":"temporal bin width", "description": "Temporal bin width (in ms)", "default":"1"},
+                {"name": "show_first", "display_text":"show first events", "description": "Plot the first events per pixel","default":"False"},
+                {"name": "weigh_first", "display_text":"weigh first events", "description": "Weigh first events per pixel with number of events/pixel","default":"False"}
             ],
             "optional_kwargs": [
             ],

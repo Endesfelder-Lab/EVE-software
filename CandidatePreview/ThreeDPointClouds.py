@@ -12,12 +12,12 @@ def __function_metadata__():
     return {
         "ThreeDPointCloud": {
             "required_kwargs": [
-                {"name": "show_first", "description": "Label the first events per pixel","default":"False"},
-                {"name": "show_surrounding", "description": "Show surrounding events if set to true, only supported in preview mode","default":"False"},
+                {"name": "show_first", "display_text":"show first events", "description": "Label the first events per pixel","default":"False"},
+                {"name": "show_surrounding", "display_text":"show surrounding", "description": "Show surrounding events if set to true, only supported in preview mode","default":"False"},
             ],
             "optional_kwargs": [
-                {"name": "xy_padding", "description": "Padding in x and y direction (in px)", "default":"0"},
-                {"name": "t_padding", "description": "Padding in t direction (in ms)", "default":"0"}
+                {"name": "xy_padding", "display_text":"xy-padding", "description": "Padding in x and y direction (in px)", "default":"0"},
+                {"name": "t_padding", "display_text":"t-padding", "description": "Padding in t direction (in ms)", "default":"0"}
             ],
             "help_string": "Draws a 3D point cloud of the candidate cluster.",
             "display_name": "3D point cloud of the candidate cluster"

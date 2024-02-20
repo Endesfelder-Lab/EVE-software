@@ -19,8 +19,8 @@ def __function_metadata__():
     return {
         "Spline1D": {
             "required_kwargs": [
-                 {"name": "smoothing_factor", "description": "Smoothing factor controls interplay of smoothness and approximation quality of the fit, increasing leads to smoother fits ","default":0.07},
-                 {"name": "localization_sampling", "description": "Time intervals to sample localizations from spline fit (in ms)","default":10.},
+                 {"name": "smoothing_factor", "display_text":"smoothing factor", "description": "Smoothing factor controls interplay of smoothness and approximation quality of the fit, increasing leads to smoother fits ","default":0.07},
+                 {"name": "localization_sampling", "display_text":"temporal sampling", "description": "Time intervals to sample localizations from spline fit (in ms)","default":10.},
             ],
             "optional_kwargs": [
                 {"name": "degree", "description": "Degree of smoothing spline, must be in the range 1 to 5.", "default":3},

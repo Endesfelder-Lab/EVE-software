@@ -14,7 +14,7 @@ def __function_metadata__():
             "required_kwargs": [
             ],
             "optional_kwargs": [
-                {"name": "t_bin_width", "description": "Padding in t direction (in ms)", "default":"10"}
+                {"name": "t_bin_width", "display_text":"temporal bin width", "description": "Padding in t direction (in ms)", "default":"10"}
             ],
             "help_string": "Draws xy, xt and yt projections of the candidate cluster.",
             "display_name": "2D projections of candidate cluster"
