@@ -3527,7 +3527,7 @@ class PreviewFindingFitting(QWidget):
         self.findingFitting_overlay.opacity = 0.7
         self.fittingResult = {}
         self.findingResult = {}
-        self.settings = {}
+        self.settings = self.parent.globalSettings
         self.timeStretch=[]
         self.events = {}
         self.frametime_ms = 0
@@ -3588,46 +3588,50 @@ class PreviewFindingFitting(QWidget):
             self.timeOfLastCursorUpdate = time.time()
 
     def updateUnderCursorInfo(self):
+        """
+        Updates the under cursor information with details about time, pixel, and events. 
+        """
         self.underCursorInfoDF
         fullText = ''
-        
-        if self.underCursorInfoDF['current_time'][0][0] > -np.inf:
-            fullText+=f"Time: {self.underCursorInfoDF['current_time'][0][0]} - {self.underCursorInfoDF['current_time'][0][1]} ms"
+        #Only update info if there are events
+        if len(self.events)>0:
+            if self.underCursorInfoDF['current_time'][0][0] > -np.inf:
+                fullText+=f"Time: {self.underCursorInfoDF['current_time'][0][0]} - {self.underCursorInfoDF['current_time'][0][1]} ms"
 
-        if self.underCursorInfoDF['current_pixel'][0][0] > -np.inf:
-            # fullText+=f"; Current pixel: {self.underCursorInfoDF['current_pixel'][0][0]},{self.underCursorInfoDF['current_pixel'][0][1]}"
+            if self.underCursorInfoDF['current_pixel'][0][0] > -np.inf:
+                # fullText+=f"; Current pixel: {self.underCursorInfoDF['current_pixel'][0][0]},{self.underCursorInfoDF['current_pixel'][0][1]}"
 
-            #Determine how many pos/neg events are in this pixel and time-frame:
-            events=self.events
-            pos_events = len(events[(events['x']-min(events['x']) == self.underCursorInfoDF['current_pixel'][0][0]) & (events['y']-min(events['y']) == self.underCursorInfoDF['current_pixel'][0][1]) & (events['t'] >= self.underCursorInfoDF['current_time'][0][0]*1000) & (events['t'] <= self.underCursorInfoDF['current_time'][0][1]*1000) & (events['p'] == 1)])
-            neg_events = len(events[(events['x']-min(events['x']) == self.underCursorInfoDF['current_pixel'][0][0]) & (events['y']-min(events['y']) == self.underCursorInfoDF['current_pixel'][0][1]) & (events['t'] >= self.underCursorInfoDF['current_time'][0][0]*1000) & (events['t'] <= self.underCursorInfoDF['current_time'][0][1]*1000) & (events['p'] == 0)])
-            #Add it to the text
-            fullText += f"; Pos: {pos_events}; Neg: {neg_events}"
+                #Determine how many pos/neg events are in this pixel and time-frame:
+                events=self.events
+                pos_events = len(events[(events['x']-min(events['x']) == self.underCursorInfoDF['current_pixel'][0][0]) & (events['y']-min(events['y']) == self.underCursorInfoDF['current_pixel'][0][1]) & (events['t'] >= self.underCursorInfoDF['current_time'][0][0]*1000) & (events['t'] <= self.underCursorInfoDF['current_time'][0][1]*1000) & (events['p'] == 1)])
+                neg_events = len(events[(events['x']-min(events['x']) == self.underCursorInfoDF['current_pixel'][0][0]) & (events['y']-min(events['y']) == self.underCursorInfoDF['current_pixel'][0][1]) & (events['t'] >= self.underCursorInfoDF['current_time'][0][0]*1000) & (events['t'] <= self.underCursorInfoDF['current_time'][0][1]*1000) & (events['p'] == 0)])
+                #Add it to the text
+                fullText += f"; Pos: {pos_events}; Neg: {neg_events}"
 
-            minx = min(events['x'])
-            miny = min(events['y'])
-            #Check if we are within the bounding box of a candidate:
-            #Reset to now have any candidate in the dataframe
-            self.underCursorInfoDF['current_candidate'][0][0] = -1
-            #Loop over the frames and check
-            for f in self.findingResult:
-                #Check if this findingResult should be displayed:
-                t_min = min(self.findingResult[f]['events']['t'])/1000
-                t_max = max(self.findingResult[f]['events']['t'])/1000
-                if t_min < self.underCursorInfoDF['current_time'][0][1] and t_max > self.underCursorInfoDF['current_time'][0][0]:
-                    #Get the finding bbox...
-                    x_min = min(self.findingResult[f]['events']['x'])-minx
-                    x_max = max(self.findingResult[f]['events']['x'])-minx
-                    y_min = min(self.findingResult[f]['events']['y'])-miny
-                    y_max = max(self.findingResult[f]['events']['y'])-miny
+                minx = min(events['x'])
+                miny = min(events['y'])
+                #Check if we are within the bounding box of a candidate:
+                #Reset to now have any candidate in the dataframe
+                self.underCursorInfoDF['current_candidate'][0][0] = -1
+                #Loop over the frames and check
+                for f in self.findingResult:
+                    #Check if this findingResult should be displayed:
+                    t_min = min(self.findingResult[f]['events']['t'])/1000
+                    t_max = max(self.findingResult[f]['events']['t'])/1000
+                    if t_min < self.underCursorInfoDF['current_time'][0][1] and t_max > self.underCursorInfoDF['current_time'][0][0]:
+                        #Get the finding bbox...
+                        x_min = min(self.findingResult[f]['events']['x'])-minx
+                        x_max = max(self.findingResult[f]['events']['x'])-minx
+                        y_min = min(self.findingResult[f]['events']['y'])-miny
+                        y_max = max(self.findingResult[f]['events']['y'])-miny
 
-                    if (x_min <= self.underCursorInfoDF['current_pixel'][0][0] <= x_max) and (y_min <= self.underCursorInfoDF['current_pixel'][0][1] <= y_max):
-                        self.underCursorInfoDF['current_candidate'][0][0] = f
+                        if (x_min <= self.underCursorInfoDF['current_pixel'][0][0] <= x_max) and (y_min <= self.underCursorInfoDF['current_pixel'][0][1] <= y_max):
+                            self.underCursorInfoDF['current_candidate'][0][0] = f
 
-            if self.underCursorInfoDF['current_candidate'][0][0] > -1:
-                fullText += f"; Candidate: {self.underCursorInfoDF['current_candidate'][0][0]}"
+                if self.underCursorInfoDF['current_candidate'][0][0] > -1:
+                    fullText += f"; Candidate: {self.underCursorInfoDF['current_candidate'][0][0]}"
 
-        self.underCursorInfo.setText(fullText)
+            self.underCursorInfo.setText(fullText)
 
         pass
 
@@ -3660,6 +3664,7 @@ class PreviewFindingFitting(QWidget):
         #Loop over the frames:
         n_frames = int(np.ceil(float(timeStretch[1])/(frametime_ms)))
         self.maxFrames = n_frames
+        #Create a fullh istogram to get the min/max xy pos and such
         self.hist_xy = eventDistributions.SumPolarity(events)
         for n in range(0,n_frames):
             #Get the events on this 'frame'

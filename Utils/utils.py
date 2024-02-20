@@ -424,16 +424,16 @@ def displayNamesFromFunctionNames(functionName, polval):
             displayName = functionMetadata[singlefunctiondata]['display_name']
             #Add the polarity info between brackets if required
             if polval != '':
-                displayName+=" ("+polval+")"
+                displayName += " ("+polval+")"
         else:
             displayName = subroutineName+': '+singlefunctiondata
             #Add the polarity info between brackets if required
             if polval != '':
-                displayName+=" ("+polval+")"
+                displayName += " ("+polval+")"
         displaynames.append(displayName)
         functionName_to_displayName_map.append((displayName,function))
+        
     #Check for ambiguity in both columns:
-    
     # if not len(np.unique(list(set(functionName_to_displayName_map)))) == len(list(itertools.chain.from_iterable(functionName_to_displayName_map))):
     #     raise Exception('Ambiguous display names in functions!! Please check all function names and display names for uniqueness!')
         
