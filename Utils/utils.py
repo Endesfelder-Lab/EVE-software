@@ -421,9 +421,15 @@ def displayNamesFromFunctionNames(functionName, polval):
         #Check if the subroutine has a display name - if so, use that, otherwise use the subroutineName
         functionMetadata = eval(f'{str(subroutineName)}.__function_metadata__()')
         if 'display_name' in functionMetadata[singlefunctiondata]:
-            displayName = functionMetadata[singlefunctiondata]['display_name']+" ("+polval+")"
+            displayName = functionMetadata[singlefunctiondata]['display_name']
+            #Add the polarity info between brackets if required
+            if polval != '':
+                displayName+=" ("+polval+")"
         else:
-            displayName = subroutineName+': '+singlefunctiondata+" ("+polval+")"
+            displayName = subroutineName+': '+singlefunctiondata
+            #Add the polarity info between brackets if required
+            if polval != '':
+                displayName+=" ("+polval+")"
         displaynames.append(displayName)
         functionName_to_displayName_map.append((displayName,function))
     #Check for ambiguity in both columns:
