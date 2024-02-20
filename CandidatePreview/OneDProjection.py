@@ -160,12 +160,12 @@ def OneDProjection(findingResult, fittingResult, previewEvents, figure, settings
     t_first_events = hist_t_edges[0]
 
     bincentres = (hist_t_edges[1:]-hist_t_edges[:-1])/2.0 + hist_t_edges[:-1]
-    t = np.linspace(np.min(findingResult['t']*1e-3), np.max(findingResult['t']*1e-3), 100)
+    
     # try a Rayleigh fit
-    rayleigh_fit_all = rayleigh(findingResult['t']*1e-3, bins='auto')
-    rayleigh_edges = rayleigh_fit_all.hist_edges
+    rayleigh_fit_all = rayleigh(findingResult['t']*1e-3, bins=hist_t_edges)
     all_events_fit = rayleigh_fit_all(findingResult['t']*1e-3, fittingResult)
     if not np.isnan(all_events_fit[0]).any():
+        t = np.linspace(np.min([np.min(findingResult['t']*1e-3), all_events_fit[1]]), np.max(findingResult['t']*1e-3), 100)
         ax.plot(t, rayleigh_distribution(t, *all_events_fit[0]), label='Rayleigh fit', color='black')
         ax.axvline(x=all_events_fit[1], color='red')
         t_all_events = all_events_fit[1]
@@ -199,9 +199,10 @@ def OneDProjection(findingResult, fittingResult, previewEvents, figure, settings
             label_fit = 'Rayleigh fit first events'
         hist_t_first = np.histogram(first_events['t']*1e-3, weights=weights, bins=hist_t_edges)[0]
 
-        rayleigh_fit_first = rayleigh(first_events['t']*1e-3, weights=weights, bins=rayleigh_edges)
+        rayleigh_fit_first = rayleigh(first_events['t']*1e-3, weights=weights, bins=hist_t_edges)
         first_events_fit = rayleigh_fit_first(first_events['t']*1e-3, fittingResult)
         if not np.isnan(first_events_fit[0]).any():
+            t = np.linspace(np.min([np.min(findingResult['t']*1e-3), first_events_fit[1]]), np.max(findingResult['t']*1e-3), 100)
             ax.plot(t, rayleigh_distribution(t, *first_events_fit[0]), label=label_fit, color='darkgreen')
             ax.axvline(x=first_events_fit[1], color='darkred', linestyle='dashed')
             t_first_events = first_events_fit[1]
