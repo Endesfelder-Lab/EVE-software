@@ -93,6 +93,38 @@ def reqKwargsFromFunction(functionname):
     names = re.findall(name_pattern, allkwarginfo[0][0])
     return names
 
+#Returns a display name (if available) of an individual kwarg name, from a specific function:
+def displayNameFromKwarg(functionname,name):
+    #Get all kwarg info
+    allkwarginfo = kwargsFromFunction(functionname)
+    
+    #Look through optional args first, then req. kwargs (so that req. kwargs have priority in case something weirdi s happening):
+    for optOrReq in range(1,-1,-1):
+    
+        #Perform a regex match on 'name'
+        name_pattern = r"name:\s*(\S+)"
+        
+        names = re.findall(name_pattern, allkwarginfo[optOrReq][0])
+        instances = re.split(r'(?=name: )', allkwarginfo[optOrReq][0])[1:]
+
+        #Find which instance this name belongs to:
+        name_id = -1
+        for i,namef in enumerate(names):
+            if namef == name:
+                name_id = i
+        
+        if name_id > -1:
+            curr_instance = instances[name_id]
+            displayText_pattern = r"display_text: (.*?)\n"
+            displaytext = re.findall(displayText_pattern, curr_instance)
+            if len(displaytext) > 0:
+                displayName = displaytext[0]
+            else:
+                displayName = name
+    
+    return displayName
+    
+
 #Returns the 'names' of the optional kwargs of a function
 def optKwargsFromFunction(functionname):
     #Get all kwarg info
@@ -389,13 +421,19 @@ def displayNamesFromFunctionNames(functionName, polval):
         #Check if the subroutine has a display name - if so, use that, otherwise use the subroutineName
         functionMetadata = eval(f'{str(subroutineName)}.__function_metadata__()')
         if 'display_name' in functionMetadata[singlefunctiondata]:
-            displayName = functionMetadata[singlefunctiondata]['display_name']+" ("+polval+")"
+            displayName = functionMetadata[singlefunctiondata]['display_name']
+            #Add the polarity info between brackets if required
+            if polval != '':
+                displayName += " ("+polval+")"
         else:
-            displayName = subroutineName+': '+singlefunctiondata+" ("+polval+")"
+            displayName = subroutineName+': '+singlefunctiondata
+            #Add the polarity info between brackets if required
+            if polval != '':
+                displayName += " ("+polval+")"
         displaynames.append(displayName)
         functionName_to_displayName_map.append((displayName,function))
+        
     #Check for ambiguity in both columns:
-    
     # if not len(np.unique(list(set(functionName_to_displayName_map)))) == len(list(itertools.chain.from_iterable(functionName_to_displayName_map))):
     #     raise Exception('Ambiguous display names in functions!! Please check all function names and display names for uniqueness!')
         
@@ -506,12 +544,13 @@ def changeLayout_choice(curr_layout,className,displayNameToFunctionNameMap,paren
             labelposoffset += 1
             
         reqKwargs = reqKwargsFromFunction(current_selected_function)
+        
         #Add a widget-pair for every kw-arg
         
         for k in range(len(reqKwargs)):
             #Value is used for scoring, and takes the output of the method
             if reqKwargs[k] != 'methodValue':
-                label = QLabel(f"<b>{reqKwargs[k]}</b>")
+                label = QLabel(f"<b>{displayNameFromKwarg(current_selected_function,reqKwargs[k])}</b>")
                 label.setObjectName(f"Label#{current_selected_function}#{reqKwargs[k]}#{current_selected_polarity}")
                 if checkAndShowWidget(curr_layout,label.objectName()) == False:
                     label.setToolTip(infoFromMetadata(current_selected_function,specificKwarg=reqKwargs[k]))
@@ -565,7 +604,7 @@ def changeLayout_choice(curr_layout,className,displayNameToFunctionNameMap,paren
         optKwargs = optKwargsFromFunction(current_selected_function)
         #Add a widget-pair for every kwarg
         for k in range(len(optKwargs)):
-            label = QLabel(f"<i>{optKwargs[k]}</i>")
+            label = QLabel(f"<i>{displayNameFromKwarg(current_selected_function,optKwargs[k])}</i>")
             label.setObjectName(f"Label#{current_selected_function}#{optKwargs[k]}#{current_selected_polarity}")
             if checkAndShowWidget(curr_layout,label.objectName()) == False:
                 label.setToolTip(infoFromMetadata(current_selected_function,specificKwarg=optKwargs[k]))

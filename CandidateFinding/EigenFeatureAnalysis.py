@@ -30,48 +30,48 @@ def __function_metadata__():
     return {
         "eigenFeature_analysis": {
             "required_kwargs": [
-                {"name": "linearity_cutoff", "description": "Linearity (0-1) cutoff","default":0.7,"type":float},
-                {"name": "max_eigenval_cutoff", "description": "Cutoff of maximum eigenvalue. Set to zero to auto-determine this!","default":0.0,"type":float},
-                {"name": "search_n_neighbours", "description": "Number of (closest) neighbours for the covariance determination","default":50,"type":int},
-                {"name": "ratio_ms_to_px", "description": "Ratio of milliseconds to pixels.","default":20.0,"type":float},
-                {"name": "DBSCAN_eps", "description": "Eps of DBSCAN.","default":4,"type":int},
-                {"name": "DBSCAN_n_neighbours", "description": "Minimum nr of points for DBSCAN cluster.","default":20,"type":int},
+                {"name": "linearity_cutoff","display_text":"Linearity cutoff", "description": "Linearity (0-1) cutoff","default":0.7,"type":float},
+                {"name": "max_eigenval_cutoff","display_text":"Maximum Eigenvalue cutoff", "description": "Cutoff of maximum eigenvalue. Set to zero to auto-determine this!","default":0.0,"type":float},
+                {"name": "search_n_neighbours","display_text":"Number of neighbours", "description": "Number of (closest) neighbours for the covariance determination","default":50,"type":int},
+                {"name": "ratio_ms_to_px","display_text":"Ratio ms to px", "description": "Ratio of milliseconds to pixels.","default":20.0,"type":float},
+                {"name": "DBSCAN_eps","display_text":"DBSCAN epsilon", "description": "Eps of DBSCAN.","default":4,"type":int},
+                {"name": "DBSCAN_n_neighbours","display_text":"DBSCAN nr. neighbours", "description": "Minimum nr of points for DBSCAN cluster.","default":20,"type":int},
                 
             ],
             "optional_kwargs": [
-                {"name": "debug", "description": "Get some debug info.","default":False},
+                {"name": "debug", "display_text":"Debug Boolean", "description": "Get some debug info.","default":False},
             ],
             "help_string": "Eigen-feature analysis",
             "display_name": "Eigen-feature analysis"
         },
         "eigen_feature_analysis_autoRadiusSelect": {
             "required_kwargs": [
-                {"name": "linearity_cutoff", "description": "Cutoff of normalized eigenvalues","default":0.6,"type":float},
-                {"name": "max_eigenval_cutoff", "description": "Cutoff of maximum eigenvalue. Set to zero to auto-determine this!","default":0.0,"type":float},
-                {"name": "min_radius", "description": "Minimal radius","default":4,"type":float},
-                {"name": "max_radius", "description": "Maximum radius","default":10,"type":float},
-                {"name": "ratio_ms_to_px", "description": "Ratio of milliseconds to pixels.","default":35.0,"type":float},
-                {"name": "DBSCAN_eps", "description": "Eps of DBSCAN.","default":3,"type":int},
-                {"name": "DBSCAN_n_neighbours", "description": "Minimum nr of points for DBSCAN cluster.","default":17,"type":int},
+                {"name": "linearity_cutoff","display_text":"Linearity cutoff", "description": "Cutoff of normalized eigenvalues","default":0.6,"type":float},
+                {"name": "max_eigenval_cutoff","display_text":"Maximum Eigenvalue cutoff", "description": "Cutoff of maximum eigenvalue. Set to zero to auto-determine this!","default":0.0,"type":float},
+                {"name": "min_radius","display_text":"Minimum radius", "description": "Minimal radius","default":4,"type":float},
+                {"name": "max_radius","display_text":"Maximum radius", "description": "Maximum radius","default":10,"type":float},
+                {"name": "ratio_ms_to_px","display_text":"Ratio ms to px", "description": "Ratio of milliseconds to pixels.","default":35.0,"type":float},
+                {"name": "DBSCAN_eps","display_text":"DBSCAN epsilon", "description": "Eps of DBSCAN.","default":3,"type":int},
+                {"name": "DBSCAN_n_neighbours","display_text":"DBSCAN nr. neighbours", "description": "Minimum nr of points for DBSCAN cluster.","default":17,"type":int},
             ],
             "optional_kwargs": [
-                {"name": "debug", "description": "Get some debug info.","default":False},
+                {"name": "debug", "display_text":"Debug Boolean", "description": "Get some debug info.","default":False},
             ],
             "help_string": "Eigen-feature analysis with entropy-baed radius finding.",
             "display_name": "Eigen-feature analysis, automatic radius finding"
         },
         "eigenFeature_analysis_and_bbox_finding": {
             "required_kwargs": [
-                {"name": "norm_eigenval_cutoff", "description": "Cutoff of normalized eigenvalues","default":0.7,"type":float},
-                {"name": "max_eigenval_cutoff", "description": "Cutoff of maximum eigenvalue. Set to zero to auto-determine this!","default":0.0,"type":float},
-                {"name": "search_n_neighbours", "description": "Number of (closest) neighbours for the covariance determination","default":50,"type":int},
-                {"name": "ratio_ms_to_px", "description": "Ratio of milliseconds to pixels.","default":20.0,"type":float},
-                {"name": "DBSCAN_eps", "description": "Eps of DBSCAN.","default":3,"type":int},
-                {"name": "DBSCAN_n_neighbours", "description": "Minimum nr of points for DBSCAN cluster.","default":20,"type":int},
-                {"name": "bbox_padding", "description": "Padding of the bounding box (in px equivalents).","default":1,"type":int},
+                {"name": "norm_eigenval_cutoff","display_text":"Normalized Eigenvalue cutoff", "description": "Cutoff of normalized eigenvalues","default":0.7,"type":float},
+                {"name": "max_eigenval_cutoff","display_text":"Maximum Eigenvalue cutoff", "description": "Cutoff of maximum eigenvalue. Set to zero to auto-determine this!","default":0.0,"type":float},
+                {"name": "search_n_neighbours","display_text":"Number of neighbours", "description": "Number of (closest) neighbours for the covariance determination","default":50,"type":int},
+                {"name": "ratio_ms_to_px","display_text":"Ratio ms to px", "description": "Ratio of milliseconds to pixels.","default":20.0,"type":float},
+                {"name": "DBSCAN_eps","display_text":"DBSCAN epsilon", "description": "Eps of DBSCAN.","default":3,"type":int},
+                {"name": "DBSCAN_n_neighbours","display_text":"DBSCAN nr. neighbours", "description": "Minimum nr of points for DBSCAN cluster.","default":20,"type":int},
+                {"name": "bbox_padding","display_text":"Bounding-box padding", "description": "Padding of the bounding box (in px equivalents).","default":1,"type":int},
             ],
             "optional_kwargs": [
-                {"name": "debug", "description": "Get some debug info.","default":False},
+                {"name": "debug", "display_text":"Debug Boolean", "description": "Get some debug info.","default":False},
             ],
             "help_string": "Eigen-feature analysis with bbox finding.",
             "display_name": "Eigen-feature analysis with bbox finding"

@@ -3061,7 +3061,7 @@ class VisualisationNapari(QWidget):
     def __init__(self,parent):
         super().__init__()
         # Create a layout for the main widget
-        self.mainlayout = QVBoxLayout()
+        self.mainlayout = QGridLayout()
         # Set the layout for the main widget
         self.setLayout(self.mainlayout)
 
@@ -3111,7 +3111,7 @@ class VisualisationNapari(QWidget):
         button.clicked.connect(lambda text, parent=parent: self.visualise_callback(parent))
 
         #Add the groupbox to the mainlayout
-        self.mainlayout.layout().addWidget(self.VisualisationGroupbox)
+        self.mainlayout.layout().addWidget(self.VisualisationGroupbox,1,1,1,2)
 
         #------------End of GUI dynamic layout -----------------
 
@@ -3120,8 +3120,10 @@ class VisualisationNapari(QWidget):
         self.napariviewer = Viewer(show=False)
         #Add a napariViewer to the layout
         self.viewer = QtViewer(self.napariviewer)
-        self.mainlayout.addWidget(self.viewer)
-        self.mainlayout.addWidget(self.viewer.controls)
+        self.viewer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.mainlayout.addWidget(self.viewer.controls,2,1,1,1)
+        self.viewer.controls.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self.mainlayout.addWidget(self.viewer,2,2,1,1)
 
         logging.info('VisualisationNapari init')
 
@@ -3488,7 +3490,8 @@ class PreviewFindingFitting(QWidget):
         # Create a napari viewer
         self.napariviewer = Viewer(show=False)
         # Create a layout for the main widget
-        self.mainlayout = QVBoxLayout()
+        self.mainlayout = QGridLayout()
+        self.mainRightlayout = QVBoxLayout()
         # Set the layout for the main widget
         self.setLayout(self.mainlayout)
 
@@ -3499,16 +3502,21 @@ class PreviewFindingFitting(QWidget):
 
         self.viewer.on_mouse_move = lambda event: self.currently_under_cursor(event)
         self.viewer.on_mouse_double_click = lambda event: self.napari_doubleClicked(event)
+        
         #Test
         # self.viewer.window.add_plugin_dock_widget('napari-1d', 'napari-1d')
 
 
 
         #Add widgets to the main layout
-        self.mainlayout.addWidget(self.underCursorInfo) #Text box with info under cursor
-        self.mainlayout.addWidget(self.viewer) #The view itself
-        self.viewer.controls.setAutoFillBackground(True)
-        self.mainlayout.addWidget(self.viewer.controls) #The controls for the viewer (contrast, time-point, etc)
+        self.mainRightlayout.addWidget(self.underCursorInfo) #Text box with info under cursor
+        #Make it expand:
+        self.viewer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.underCursorInfo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.mainRightlayout.addWidget(self.viewer) #The view itself
+        self.mainlayout.addWidget(self.viewer.controls,1,1) #The controls for the viewer (contrast, etc)
+        self.viewer.controls.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self.mainlayout.addLayout(self.mainRightlayout,1,2)
         # self.mainlayout.addWidget(self.viewer.layers)
 
         # self.mainlayout.addWidget(self.viewer.dockConsole)
@@ -3521,11 +3529,13 @@ class PreviewFindingFitting(QWidget):
         self.findingFitting_overlay.opacity = 0.7
         self.fittingResult = {}
         self.findingResult = {}
-        self.settings = {}
+        self.settings = self.parent.globalSettings
         self.timeStretch=[]
         self.events = {}
         self.frametime_ms = 0
         self.maxFrames = 0
+        
+        self.timeOfLastCursorUpdate = 0
 
         #An array holding info about what's under the cursor
         underCursorInfo = {
@@ -3559,62 +3569,71 @@ class PreviewFindingFitting(QWidget):
         """
         #Vispy mouse position
 
-        #We get the canvas size/position in image pixel units
-        canvas_size_in_px_units = event.source.size/self.napariviewer.camera.zoom
-        camera_coords = [self.napariviewer.camera.center[2]+.5, self.napariviewer.camera.center[1]+.5]
-        canvas_pos = np.vstack([camera_coords-(canvas_size_in_px_units/2),camera_coords+(canvas_size_in_px_units/2)])
-        #And we can normalize the cursor position to image pixels
-        cursor_unit_norm = event._pos/event.source.size
-        #Thus, we can find the pixel index - at the moment we simply calculate this and not do anything with it
-        highlighted_px_index=np.zeros((2,))
-        highlighted_px_index[0] = cursor_unit_norm[0]*canvas_size_in_px_units[0]+canvas_pos[0][0]
-        highlighted_px_index[1] = cursor_unit_norm[1]*canvas_size_in_px_units[1]+canvas_pos[0][1]
+        timeBetweenCursorUpdates = 0.0 #in seconds
+        if self.timeOfLastCursorUpdate == 0 or (time.time() - self.timeOfLastCursorUpdate) >= timeBetweenCursorUpdates:
+            #We get the canvas size/position in image pixel units
+            canvas_size_in_px_units = event.source.size/self.napariviewer.camera.zoom
+            camera_coords = [self.napariviewer.camera.center[2]+.5, self.napariviewer.camera.center[1]+.5]
+            canvas_pos = np.vstack([camera_coords-(canvas_size_in_px_units/2),camera_coords+(canvas_size_in_px_units/2)])
+            #And we can normalize the cursor position to image pixels
+            cursor_unit_norm = event._pos/event.source.size
+            #Thus, we can find the pixel index - at the moment we simply calculate this
+            highlighted_px_index=np.zeros((2,))
+            highlighted_px_index[0] = (cursor_unit_norm[0]*canvas_size_in_px_units[0]+canvas_pos[0][0])/((float(self.settings['PixelSize_nm']['value']))/1000)-(100*((float(self.settings['PixelSize_nm']['value']))/1000)) #Not fully sure why I need the 100*, but seems to work
+            highlighted_px_index[1] = (cursor_unit_norm[1]*canvas_size_in_px_units[1]+canvas_pos[0][1])/((float(self.settings['PixelSize_nm']['value']))/1000)-(100*((float(self.settings['PixelSize_nm']['value']))/1000)) #Not fully sure why I need the 100*, but seems to work
 
-        #Here's the calculated pixel index in x,y coordinate.
-        pixel_index = np.floor(highlighted_px_index).astype(int)
+            #Here's the calculated pixel index in x,y coordinate.
+            pixel_index = np.floor(highlighted_px_index).astype(int)
 
-        self.underCursorInfoDF['current_pixel'][0] = np.floor(highlighted_px_index)
-        self.updateUnderCursorInfo()
+            self.underCursorInfoDF['current_pixel'][0] = np.floor(highlighted_px_index)
+            self.updateUnderCursorInfo()
+            self.timeOfLastCursorUpdate = time.time()
 
     def updateUnderCursorInfo(self):
+        """
+        Updates the under cursor information with details about time, pixel, and events. 
+        """
         self.underCursorInfoDF
         fullText = ''
+        #Only update info if there are events
+        if len(self.events)>0:
+            if self.underCursorInfoDF['current_time'][0][0] > -np.inf:
+                fullText+=f"Time: {self.underCursorInfoDF['current_time'][0][0]} - {self.underCursorInfoDF['current_time'][0][1]} ms"
 
-        if self.underCursorInfoDF['current_time'][0][0] > -np.inf:
-            fullText+=f"Time: {self.underCursorInfoDF['current_time'][0][0]} - {self.underCursorInfoDF['current_time'][0][1]} ms"
+            if self.underCursorInfoDF['current_pixel'][0][0] > -np.inf:
+                # fullText+=f"; Current pixel: {self.underCursorInfoDF['current_pixel'][0][0]},{self.underCursorInfoDF['current_pixel'][0][1]}"
 
-        if self.underCursorInfoDF['current_pixel'][0][0] > -np.inf:
-            # fullText+=f"; Current pixel: {self.underCursorInfoDF['current_pixel'][0][0]},{self.underCursorInfoDF['current_pixel'][0][1]}"
+                #Determine how many pos/neg events are in this pixel and time-frame:
+                events=self.events
+                pos_events = len(events[(events['x']-min(events['x']) == self.underCursorInfoDF['current_pixel'][0][0]) & (events['y']-min(events['y']) == self.underCursorInfoDF['current_pixel'][0][1]) & (events['t'] >= self.underCursorInfoDF['current_time'][0][0]*1000) & (events['t'] <= self.underCursorInfoDF['current_time'][0][1]*1000) & (events['p'] == 1)])
+                neg_events = len(events[(events['x']-min(events['x']) == self.underCursorInfoDF['current_pixel'][0][0]) & (events['y']-min(events['y']) == self.underCursorInfoDF['current_pixel'][0][1]) & (events['t'] >= self.underCursorInfoDF['current_time'][0][0]*1000) & (events['t'] <= self.underCursorInfoDF['current_time'][0][1]*1000) & (events['p'] == 0)])
+                #Add it to the text
+                fullText += f"; Pos: {pos_events}; Neg: {neg_events}"
 
-            #Determine how many pos/neg events are in this pixel and time-frame:
-            events=self.events
-            pos_events = len(events[(events['x']-min(events['x']) == self.underCursorInfoDF['current_pixel'][0][0]) & (events['y']-min(events['y']) == self.underCursorInfoDF['current_pixel'][0][1]) & (events['t'] >= self.underCursorInfoDF['current_time'][0][0]*1000) & (events['t'] <= self.underCursorInfoDF['current_time'][0][1]*1000) & (events['p'] == 1)])
-            neg_events = len(events[(events['x']-min(events['x']) == self.underCursorInfoDF['current_pixel'][0][0]) & (events['y']-min(events['y']) == self.underCursorInfoDF['current_pixel'][0][1]) & (events['t'] >= self.underCursorInfoDF['current_time'][0][0]*1000) & (events['t'] <= self.underCursorInfoDF['current_time'][0][1]*1000) & (events['p'] == 0)])
-            #Add it to the text
-            fullText += f"; Pos: {pos_events}; Neg: {neg_events}"
+                minx = min(events['x'])
+                miny = min(events['y'])
+                #Check if we are within the bounding box of a candidate:
+                #Reset to now have any candidate in the dataframe
+                self.underCursorInfoDF['current_candidate'][0][0] = -1
+                #Loop over the frames and check
+                for f in self.findingResult:
+                    #Check if this findingResult should be displayed:
+                    t_min = min(self.findingResult[f]['events']['t'])/1000
+                    t_max = max(self.findingResult[f]['events']['t'])/1000
+                    if t_min < self.underCursorInfoDF['current_time'][0][1] and t_max > self.underCursorInfoDF['current_time'][0][0]:
+                        #Get the finding bbox...
+                        x_min = min(self.findingResult[f]['events']['x'])-minx
+                        x_max = max(self.findingResult[f]['events']['x'])-minx
+                        y_min = min(self.findingResult[f]['events']['y'])-miny
+                        y_max = max(self.findingResult[f]['events']['y'])-miny
 
-            #Check if we are within the bounding box of a candidate:
-            #Reset to now have any candidate in the dataframe
-            self.underCursorInfoDF['current_candidate'][0][0] = -1
-            #Loop over the frames and check
-            for f in self.findingResult:
-                #Check if this findingResult should be displayed:
-                t_min = min(self.findingResult[f]['events']['t'])/1000
-                t_max = max(self.findingResult[f]['events']['t'])/1000
-                if t_min < self.underCursorInfoDF['current_time'][0][1] and t_max > self.underCursorInfoDF['current_time'][0][0]:
-                    #Get the finding bbox...
-                    x_min = min(self.findingResult[f]['events']['x'])-min(events['x'])
-                    x_max = max(self.findingResult[f]['events']['x'])-min(events['x'])
-                    y_min = min(self.findingResult[f]['events']['y'])-min(events['y'])
-                    y_max = max(self.findingResult[f]['events']['y'])-min(events['y'])
+                        if (x_min <= self.underCursorInfoDF['current_pixel'][0][0] <= x_max) and (y_min <= self.underCursorInfoDF['current_pixel'][0][1] <= y_max):
+                            self.underCursorInfoDF['current_candidate'][0][0] = f
 
-                    if (x_min <= self.underCursorInfoDF['current_pixel'][0][0] <= x_max) and (y_min <= self.underCursorInfoDF['current_pixel'][0][1] <= y_max):
-                        self.underCursorInfoDF['current_candidate'][0][0] = f
+                if self.underCursorInfoDF['current_candidate'][0][0] > -1:
+                    fullText += f"; Candidate: {self.underCursorInfoDF['current_candidate'][0][0]}"
 
-            if self.underCursorInfoDF['current_candidate'][0][0] > -1:
-                fullText += f"; Candidate: {self.underCursorInfoDF['current_candidate'][0][0]}"
-
-        self.underCursorInfo.setText(fullText)
+            self.underCursorInfo.setText(fullText)
 
         pass
 
@@ -3647,6 +3666,7 @@ class PreviewFindingFitting(QWidget):
         #Loop over the frames:
         n_frames = int(np.ceil(float(timeStretch[1])/(frametime_ms)))
         self.maxFrames = n_frames
+        #Create a fullh istogram to get the min/max xy pos and such
         self.hist_xy = eventDistributions.SumPolarity(events)
         for n in range(0,n_frames):
             #Get the events on this 'frame'
@@ -3657,12 +3677,20 @@ class PreviewFindingFitting(QWidget):
             #Add it to our image
             preview_multiD_image.append(thisHist_xy[0])
 
+        #Scale should be the scale of pixel - to - um. E.g. a scale of 0.01 means 100 pixels = 1 um
+        scale = ((float(settings['PixelSize_nm']['value']))/1000)
+    
         #add this image to the napariviewer
-        self.napariviewer.add_image(np.asarray(preview_multiD_image), multiscale=False)
+        self.napariviewer.add_image(np.asarray(preview_multiD_image), multiscale=False,scale=(1,scale,scale))
+        # self.napariviewer.add_image(np.asarray(preview_multiD_image), multiscale=False)
 
         #Append the finding/fitting overlay on top of this:
         self.napariviewer.layers.append(self.findingFitting_overlay)
 
+        #Add a scalebar
+        self.napariviewer.scale_bar.visible = True
+        self.napariviewer.scale_bar.unit = "um"
+        
         #Select the original image-layer as selected
         self.napariviewer.layers.selection.active = self.napariviewer.layers[0]
         self.update_visibility()
@@ -3674,6 +3702,8 @@ class PreviewFindingFitting(QWidget):
         """
         #Reset all data in the findingFitting overlay:
         self.findingFitting_overlay.data=[]
+        
+        settings=self.settings
 
         #And re-draw the necessary data only:
 
@@ -3701,10 +3731,10 @@ class PreviewFindingFitting(QWidget):
             if t_min < curr_time_bounds[1] and t_max > curr_time_bounds[0]:
 
                 #Get the finding info...
-                y_min = min(findingResults[f]['events']['x']) - self.hist_xy.xlim[0]
-                y_max = max(findingResults[f]['events']['x']) - self.hist_xy.xlim[0]
-                x_min = min(findingResults[f]['events']['y']) - self.hist_xy.ylim[0]
-                x_max = max(findingResults[f]['events']['y']) - self.hist_xy.ylim[0]
+                y_min = (min(findingResults[f]['events']['x']) - self.hist_xy.xlim[0])*(pxsize/1000)
+                y_max = (max(findingResults[f]['events']['x']) - self.hist_xy.xlim[0])*(pxsize/1000)
+                x_min = (min(findingResults[f]['events']['y']) - self.hist_xy.ylim[0])*(pxsize/1000)
+                x_max = (max(findingResults[f]['events']['y']) - self.hist_xy.ylim[0])*(pxsize/1000)
 
                 #Check if it succesfully fitted:
                 if not np.isnan(fittingResults['x'].iloc[f]):
@@ -3719,13 +3749,17 @@ class PreviewFindingFitting(QWidget):
             #Check if this findingResult should be displayed:
             t = fittingResults['t'].iloc[f]
             if t > curr_time_bounds[0] and t < curr_time_bounds[1]:
-                xcoord_pxcoord = fittingResults['x'].iloc[f]/float(pxsize)-self.hist_xy.xlim[0]
-                ycoord_pxcoord = fittingResults['y'].iloc[f]/float(pxsize)-self.hist_xy.ylim[0]
+                #Getting the x,y coordinates
+                xcoord_pxcoord = (fittingResults['x'].iloc[f]/float(pxsize)-self.hist_xy.xlim[0])*(pxsize/1000)
+                ycoord_pxcoord = (fittingResults['y'].iloc[f]/float(pxsize)-self.hist_xy.ylim[0])*(pxsize/1000)
 
-                fitting_polygons.append(np.array([[ycoord_pxcoord-1,xcoord_pxcoord-1],[ycoord_pxcoord+1,xcoord_pxcoord+1]]))
-                fitting_polygons.append(np.array([[ycoord_pxcoord-1,xcoord_pxcoord+1],[ycoord_pxcoord+1,xcoord_pxcoord-1]]))
+                #Variable for how big the cross itself should be drawn at
+                fitting_cross_size = 1*(pxsize/1000)
+                #Drawing the crosses
+                fitting_polygons.append(np.array([[ycoord_pxcoord-fitting_cross_size,xcoord_pxcoord-fitting_cross_size],[ycoord_pxcoord+fitting_cross_size,xcoord_pxcoord+fitting_cross_size]]))
+                fitting_polygons.append(np.array([[ycoord_pxcoord-fitting_cross_size,xcoord_pxcoord+fitting_cross_size],[ycoord_pxcoord+fitting_cross_size,xcoord_pxcoord-fitting_cross_size]]))
 
-                #Need to append empty values:
+                #Need to append empty values to prevent NaNs to show up text-wise.
                 fitting_ids.append("")
                 fitting_ids.append("")
 
@@ -3743,9 +3777,9 @@ class PreviewFindingFitting(QWidget):
         }
 
         #Add the finding result
-        self.findingFitting_overlay.add_rectangles(candidate_polygons, edge_width=1,edge_color='coral',face_color='transparent')
-        self.findingFitting_overlay.add_rectangles(unfitted_candidate_polygons, edge_width=1,edge_color='red',face_color='transparent')
-        self.findingFitting_overlay.add_lines(fitting_polygons, edge_width=0.5,edge_color='red',face_color='transparent')
+        self.findingFitting_overlay.add_rectangles(candidate_polygons, edge_width=1*((float(settings['PixelSize_nm']['value']))/1000),edge_color='coral',face_color='transparent')
+        self.findingFitting_overlay.add_rectangles(unfitted_candidate_polygons, edge_width=1*((float(settings['PixelSize_nm']['value']))/1000),edge_color='red',face_color='transparent')
+        self.findingFitting_overlay.add_lines(fitting_polygons, edge_width=0.5*((float(settings['PixelSize_nm']['value']))/1000),edge_color='red',face_color='transparent')
         self.findingFitting_overlay.features = pd.DataFrame(features)
         self.findingFitting_overlay.text = text
         self.findingFitting_overlay.visible=True
