@@ -35,6 +35,7 @@ def PolarityMatching(localizations,findingResult,settings,**kwargs):
     #Check if we have the required kwargs
     [provided_optional_args, missing_optional_args] = utilsHelper.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
     
+    start_time = time.time()
     #Error message and early exit if there isn't both pos and neg events
     if not np.array_equal(np.unique(localizations['p']), [0, 1]) or np.array_equal(np.unique(localizations['p']), [1, 0]):
         logging.error('PolarityMatching requires both positive and negative events!')
@@ -48,6 +49,7 @@ def PolarityMatching(localizations,findingResult,settings,**kwargs):
         #Get the pos and neg events
         posEvents = localizations[localizations['p']==1]
         negEvents = localizations[localizations['p']==0]
+        
         
         mininAll = np.searchsorted(negEvents['t'], posEvents['t'])
         maxinAll = np.searchsorted(negEvents['t'], posEvents['t'] + float(kwargs['Max_tDistance']))
@@ -94,20 +96,35 @@ def PolarityMatching(localizations,findingResult,settings,**kwargs):
                 #Renaming
                 negEventFound = negEventsWithinDistance
                 
+                negEventId = negEventFound._name
+                
                 #Update the positive candidate
-                localizations.loc[localizations['candidate_id'] == posEvent.candidate_id,'pol_link_id'] = (negEventFound.candidate_id)
-                localizations.loc[localizations['candidate_id'] == posEvent.candidate_id,'pol_link_time'] = (negEventFound.t - posEvent.t)
-                localizations.loc[localizations['candidate_id'] == posEvent.candidate_id,'pol_link_xy'] = eventDistance
+                posEvents.loc[posEventId,'pol_link_id'] = (negEventFound.candidate_id)
+                posEvents.loc[posEventId,'pol_link_time'] = (negEventFound.t - posEvent.t)
+                posEvents.loc[posEventId,'pol_link_xy'] = eventDistance
                 
                 #And update the negative candidate
-                localizations.loc[localizations['candidate_id'] == negEventFound.candidate_id,'pol_link_id'] = (posEvent.candidate_id)
-                localizations.loc[localizations['candidate_id'] == negEventFound.candidate_id,'pol_link_time'] = (posEvent.t-negEventFound.t)
-                localizations.loc[localizations['candidate_id'] == negEventFound.candidate_id,'pol_link_xy'] = eventDistance
+                negEvents.loc[negEventId,'pol_link_id'] = (posEvent.candidate_id)
+                negEvents.loc[negEventId,'pol_link_time'] = (posEvent.t-negEventFound.t)
+                negEvents.loc[negEventId,'pol_link_xy'] = eventDistance
                 
                 
+                # #Update the positive candidate
+                # localizations.loc[localizations['candidate_id'] == posEvent.candidate_id,'pol_link_id'] = (negEventFound.candidate_id)
+                # localizations.loc[localizations['candidate_id'] == posEvent.candidate_id,'pol_link_time'] = (negEventFound.t - posEvent.t)
+                # localizations.loc[localizations['candidate_id'] == posEvent.candidate_id,'pol_link_xy'] = eventDistance
+                
+                # #And update the negative candidate
+                # localizations.loc[localizations['candidate_id'] == negEventFound.candidate_id,'pol_link_id'] = (posEvent.candidate_id)
+                # localizations.loc[localizations['candidate_id'] == negEventFound.candidate_id,'pol_link_time'] = (posEvent.t-negEventFound.t)
+                # localizations.loc[localizations['candidate_id'] == negEventFound.candidate_id,'pol_link_xy'] = eventDistance
                 
                 
+            
                 
+                
+        #re-create localizations by adding these below one another again:
+        localizations = pd.concat([posEvents, negEvents])
                 
                 # print(f"{posEvent.id} links with {negEventsWithinDistance.id}")
             
@@ -124,6 +141,9 @@ def PolarityMatching(localizations,findingResult,settings,**kwargs):
             
             #We find all negative events with distance within Max_xyDistance:
             # negEventsWithinDistance = negEventsWithinTime[(negEventsWithinTime['x']-posEvent['x'])**2+(negEventsWithinTime['y']-posEvent['y'])**2<kwargs['Max_xyDistance']**2]
+    
+    end_time = time.time()
+    logging.info(f'Polarity Matching took {end_time-start_time} seconds')
     
     #Required output: localizations
     metadata = 'Information or so'
