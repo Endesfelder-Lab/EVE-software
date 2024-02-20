@@ -1,5 +1,6 @@
 import inspect
 from Utils import utilsHelper
+from CandidateFitting.TemporalFitting import timeDistributions
 from EventDistributions import eventDistributions
 import pandas as pd
 import numpy as np
@@ -137,7 +138,9 @@ class gauss2D(fit):
                 del_y = np.nan
                 t = np.nan
             else:
-                t = np.mean(events['t'])/1000. # in ms
+                time_fit = timeDistributions.rayleigh(events['t']*1e-3, bins='auto')
+                time_fit_results = time_fit(events['t']*1e-3)
+                t = time_fit_results[0]
             mean_polarity = events['p'].mean()
             p = int(mean_polarity == 1) + int(mean_polarity == 0) * 0 + int(mean_polarity > 0 and mean_polarity < 1) * 2
         loc_df = pd.DataFrame({'candidate_id': self.candidateID, 'x': x, 'y': y, 'del_x': del_x, 'del_y': del_y, 'p': p, 't': t, 'fit_info': self.fit_info}, index=[0])
