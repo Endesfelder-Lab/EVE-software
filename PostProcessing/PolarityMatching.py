@@ -17,6 +17,13 @@ def __function_metadata__():
             "optional_kwargs": [
             ],
             "help_string": "Link and filter on positive and negative events."
+        },
+        "PolarityMatching_NeNA": {
+            "required_kwargs": [
+            ],
+            "optional_kwargs": [
+            ],
+            "help_string": "Perform NeNA on the matched polarities."
         }
     }
 
@@ -34,8 +41,9 @@ def PolarityMatching(localizations,findingResult,settings,**kwargs):
         return localizations, 'PolarityMatching requires both positive and negative events!'
     else:
         #add empty columns to localizations:
-        localizations['polarity_linked_id'] = -1
-        localizations['polarity_linked_time'] = 0
+        localizations['pol_link_id'] = -1
+        localizations['pol_link_time'] = 0
+        localizations['pol_link_xy'] = 0
         
         #Get the pos and neg events
         posEvents = localizations[localizations['p']==1]
@@ -58,9 +66,18 @@ def PolarityMatching(localizations,findingResult,settings,**kwargs):
             y_diff = negEventsInTime['y'].values - posEvent['y']
             distance = np.sqrt(x_diff**2 + y_diff**2)
 
-            negEventsWithinDistance = negEventsInTime[distance < float(kwargs['Max_xyDistance'])]
+            foundNegEventId = distance < float(kwargs['Max_xyDistance'])
 
-            if not negEventsWithinDistance.empty:
+            #If we found at least one:
+            if sum(foundNegEventId) > 0:
+                #Find the first id of True (the closest in time)
+                foundNegEventId = np.argmax(foundNegEventId)
+                #Find the corresponding event
+                negEventsWithinDistance = negEventsInTime.iloc[foundNegEventId]
+                #And find the event distance belonging to it
+                eventDistance = distance[foundNegEventId]
+                
+                
                 # negEventFound = negEventsWithinDistance.iloc[0]
 
                 # pos_index = localizations.index[localizations['candidate_id'] == posEvent.candidate_id].tolist()[0]
@@ -73,16 +90,19 @@ def PolarityMatching(localizations,findingResult,settings,**kwargs):
                 # localizations.at[neg_index, 'polarity_linked_time'] = posEvent.t - negEventFound.t
                 
                 # if len(negEventsWithinDistance) > 0:
-                    
-                negEventFound = negEventsWithinDistance.iloc[0] #Always the first
+                
+                #Renaming
+                negEventFound = negEventsWithinDistance
                 
                 #Update the positive candidate
-                localizations.loc[localizations['candidate_id'] == posEvent.candidate_id,'polarity_linked_id'] = (negEventFound.candidate_id)
-                localizations.loc[localizations['candidate_id'] == posEvent.candidate_id,'polarity_linked_time'] = (negEventFound.t - posEvent.t)
+                localizations.loc[localizations['candidate_id'] == posEvent.candidate_id,'pol_link_id'] = (negEventFound.candidate_id)
+                localizations.loc[localizations['candidate_id'] == posEvent.candidate_id,'pol_link_time'] = (negEventFound.t - posEvent.t)
+                localizations.loc[localizations['candidate_id'] == posEvent.candidate_id,'pol_link_xy'] = eventDistance
                 
                 #And update the negative candidate
-                localizations.loc[localizations['candidate_id'] == negEventFound.candidate_id,'polarity_linked_id'] = (posEvent.candidate_id)
-                localizations.loc[localizations['candidate_id'] == negEventFound.candidate_id,'polarity_linked_time'] = (posEvent.t-negEventFound.t)
+                localizations.loc[localizations['candidate_id'] == negEventFound.candidate_id,'pol_link_id'] = (posEvent.candidate_id)
+                localizations.loc[localizations['candidate_id'] == negEventFound.candidate_id,'pol_link_time'] = (posEvent.t-negEventFound.t)
+                localizations.loc[localizations['candidate_id'] == negEventFound.candidate_id,'pol_link_xy'] = eventDistance
                 
                 
                 
@@ -108,3 +128,20 @@ def PolarityMatching(localizations,findingResult,settings,**kwargs):
     #Required output: localizations
     metadata = 'Information or so'
     return localizations,metadata
+
+def PolarityMatching_NeNA(localizations,findingResult,settings,**kwargs):
+    #Check if we have the pre-run polarity matching:
+    if not ('pol_link_id' in localizations.columns and 'pol_link_time' in localizations.columns and 'pol_link_xy' in localizations.columns):
+        logging.error('PolarityMatching-NeNA requires to first run Polarity Matching!')
+    else:
+        #Create a new figure and plot the polarity_linked_xy as a histogram:
+        #Pre-filter to only positive events (to only have all links once)
+        sublocs = localizations[localizations['p'] == 1]
+        #Also remove all -1 pol link xy:
+        sublocs = sublocs[sublocs['pol_link_xy']>0]
+        
+        import matplotlib.pyplot as plt
+        fig, ax = plt.subplots()
+        ax.hist(sublocs['pol_link_xy'],bins=100)
+        plt.show()
+    
