@@ -183,10 +183,10 @@ def OneDProjection(findingResult, fittingResult, previewEvents, figure, settings
   
     # Plot the 2D histograms
     if not len(findingResult[findingResult['p'] == 1]) == 0:
-        hist_t_pos = np.histogram(findingResult[findingResult['p'] == 1]['t']*1e-3, bins=rayleigh_edges)[0]
+        hist_t_pos = np.histogram(findingResult[findingResult['p'] == 1]['t']*1e-3, bins=hist_t_edges)[0]
         ax.bar(hist_t_edges[:-1], hist_t_pos, width=t_bin_width,  label='Positive events', color='C0', alpha=0.5, align='edge')
     if not len(findingResult[findingResult['p'] == 0]) == 0:
-        hist_t_neg = np.histogram(findingResult[findingResult['p'] == 1]['t']*1e-3, bins=rayleigh_edges)[0]
+        hist_t_neg = np.histogram(findingResult[findingResult['p'] == 1]['t']*1e-3, bins=hist_t_edges)[0]
         ax.bar(hist_t_edges[:-1], hist_t_neg, width=t_bin_width,  label='Negative events', color='C1', alpha=0.5, align='edge')
     if not len(first_events) == 0:
         if weigh_first:
@@ -199,7 +199,7 @@ def OneDProjection(findingResult, fittingResult, previewEvents, figure, settings
             label_fit = 'Rayleigh fit first events'
         hist_t_first = np.histogram(first_events['t']*1e-3, weights=weights, bins=hist_t_edges)[0]
 
-        rayleigh_fit_first = rayleigh(first_events['t']*1e-3, weights=weights, bins=hist_t_edges)
+        rayleigh_fit_first = rayleigh(first_events['t']*1e-3, weights=weights, bins=rayleigh_edges)
         first_events_fit = rayleigh_fit_first(first_events['t']*1e-3, fittingResult)
         if not np.isnan(first_events_fit[0]).any():
             ax.plot(t, rayleigh_distribution(t, *first_events_fit[0]), label=label_fit, color='darkgreen')
@@ -217,7 +217,7 @@ def OneDProjection(findingResult, fittingResult, previewEvents, figure, settings
         
 
     # Add and set labels
-    ax.set_xlim(np.nanmin([hist_t_edges[0], t_first_events, t_all_events]), hist_t_edges[-1])
+    ax.set_xlim(np.nanmin([hist_t_edges[0], t_first_events-1, t_all_events-1]), hist_t_edges[-1])
     ax.set_xlabel('t [ms]')
     ax.set_ylabel('number of events')
     ax.legend(loc='upper left')
