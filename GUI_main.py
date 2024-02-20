@@ -3061,7 +3061,7 @@ class VisualisationNapari(QWidget):
     def __init__(self,parent):
         super().__init__()
         # Create a layout for the main widget
-        self.mainlayout = QVBoxLayout()
+        self.mainlayout = QGridLayout()
         # Set the layout for the main widget
         self.setLayout(self.mainlayout)
 
@@ -3111,7 +3111,7 @@ class VisualisationNapari(QWidget):
         button.clicked.connect(lambda text, parent=parent: self.visualise_callback(parent))
 
         #Add the groupbox to the mainlayout
-        self.mainlayout.layout().addWidget(self.VisualisationGroupbox)
+        self.mainlayout.layout().addWidget(self.VisualisationGroupbox,1,1,1,2)
 
         #------------End of GUI dynamic layout -----------------
 
@@ -3120,8 +3120,10 @@ class VisualisationNapari(QWidget):
         self.napariviewer = Viewer(show=False)
         #Add a napariViewer to the layout
         self.viewer = QtViewer(self.napariviewer)
-        self.mainlayout.addWidget(self.viewer)
-        self.mainlayout.addWidget(self.viewer.controls)
+        self.viewer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.mainlayout.addWidget(self.viewer.controls,2,1,1,1)
+        self.viewer.controls.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self.mainlayout.addWidget(self.viewer,2,2,1,1)
 
         logging.info('VisualisationNapari init')
 
@@ -3488,7 +3490,7 @@ class PreviewFindingFitting(QWidget):
         # Create a napari viewer
         self.napariviewer = Viewer(show=False)
         # Create a layout for the main widget
-        self.mainlayout = QHBoxLayout()
+        self.mainlayout = QGridLayout()
         self.mainRightlayout = QVBoxLayout()
         # Set the layout for the main widget
         self.setLayout(self.mainlayout)
@@ -3511,10 +3513,9 @@ class PreviewFindingFitting(QWidget):
         #Add widgets to the main layout
         self.mainRightlayout.addWidget(self.underCursorInfo) #Text box with info under cursor
         self.mainRightlayout.addWidget(self.viewer) #The view itself
-        self.viewer.controls.setAutoFillBackground(True)
+        self.mainlayout.addWidget(self.viewer.controls,1,1) #The controls for the viewer (contrast, time-point, etc)
         self.viewer.controls.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-        self.mainlayout.addWidget(self.viewer.controls) #The controls for the viewer (contrast, time-point, etc)
-        self.mainlayout.addLayout(self.mainRightlayout)
+        self.mainlayout.addLayout(self.mainRightlayout,1,2)
         # self.mainlayout.addWidget(self.viewer.layers)
 
         # self.mainlayout.addWidget(self.viewer.dockConsole)
