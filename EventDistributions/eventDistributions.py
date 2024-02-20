@@ -52,37 +52,43 @@ class TimeDiff(XYDist):
 # Callable derived classes
 #-------------------------------------------------------------------------------------------------------------------------------
 class Hist1d_t(TDist):
-    def __init__(self, events, **kwargs):
+    def __init__(self, events, t_bin_width = 10., **kwargs):
         super().__init__(events)
-        self.t_bin_width = 10. # in ms
-        self.tlim_upper = np.max(events['t'])*1e-3
+        self.t_bin_width = t_bin_width # in ms
+        self.range = self.range()
+        self.bins = self.bins()
         self.dist1D, self.t_edges = self(events, **kwargs)
     
     def set_t_bin_width(self, t_bin_width, events, **kwargs):
         self.t_bin_width = t_bin_width
+        self.bins = self.bins()
         self.dist1D, self.t_edges = self(events, **kwargs)
 
     def range(self):
-        return [self.tlim[0], self.tlim_upper]
+        return [self.tlim[0], self.tlim[1]]
     
     def bins(self):
         tbins = int(np.ceil((self.tlim[1]-self.tlim[0])/self.t_bin_width))
-        self.tlim_upper = self.tlim[0]+tbins*self.t_bin_width
+        self.range[1] = self.tlim[0]+tbins*self.t_bin_width
         return tbins
 
     def __call__(self, events, **kwargs):
-        self.dist1D, self.t_edges = np.histogram(events['t']*1e-3, bins = self.bins(), range = self.range(), **kwargs)
+        self.dist1D, self.t_edges = np.histogram(events['t']*1e-3, bins = self.bins, range = tuple(self.range), **kwargs)
         return self.dist1D, self.t_edges
 
 class Hist2d_tx(XTDist):
-    def __init__(self, events, **kwargs):
+    def __init__(self, events, t_bin_width = 10.,**kwargs):
         super().__init__(events)
         self.x_bin_width = 1. # in px
-        self.t_bin_width = 10. # in ms
+        self.t_bin_width = t_bin_width # in ms
+        self.range = self.range()
+        self.bins = self.bins()
         self.dist2D, self.x_edges, self.y_edges = self(events, **kwargs)
 
-    def set_t_bin_width(self, t_bin_width):
+    def set_t_bin_width(self, t_bin_width, events, **kwargs):
         self.t_bin_width = t_bin_width
+        self.bins = self.bins()
+        self.dist2D, self.x_edges, self.y_edges = self(events, **kwargs)
 
     def range(self):
         xrange = self.tlim
@@ -92,23 +98,27 @@ class Hist2d_tx(XTDist):
     def bins(self): 
         xbins = int(np.ceil((self.tlim[1]-self.tlim[0])/self.t_bin_width))
         ybins = int((self.xlim[1]-self.xlim[0]+1)/self.x_bin_width)
-        self.tlim[1] = self.tlim[0]+xbins*self.t_bin_width
+        self.range[0][1] = self.tlim[0]+xbins*self.t_bin_width
         return (xbins, ybins)
 
     def __call__(self, events, **kwargs):
-        hist_tx, x_edges, y_edges = np.histogram2d(events['t']*1e-3, events['x'], bins = self.bins(), range = self.range(), **kwargs)
+        hist_tx, x_edges, y_edges = np.histogram2d(events['t']*1e-3, events['x'], bins = self.bins, range = tuple(self.range), **kwargs)
         return hist_tx.T, x_edges, y_edges
     
 
 class Hist2d_ty(YTDist):
-    def __init__(self, events, **kwargs):
+    def __init__(self, events, t_bin_width = 10., **kwargs):
         super().__init__(events)
         self.y_bin_width = 1. # in px
-        self.t_bin_width = 10. # in ms
+        self.t_bin_width = t_bin_width # in ms
+        self.range = self.range()
+        self.bins = self.bins()
         self.dist2D, self.x_edges, self.y_edges = self(events, **kwargs)
 
-    def set_t_bin_width(self, t_bin_width):
+    def set_t_bin_width(self, t_bin_width, events, **kwargs):
         self.t_bin_width = t_bin_width
+        self.bins = self.bins()
+        self.dist2D, self.x_edges, self.y_edges = self(events, **kwargs)
 
     def range(self):
         xrange = self.tlim
@@ -118,11 +128,11 @@ class Hist2d_ty(YTDist):
     def bins(self): 
         xbins = int(np.ceil((self.tlim[1]-self.tlim[0])/self.t_bin_width))
         ybins = int((self.ylim[1]-self.ylim[0]+1)/self.y_bin_width)
-        self.tlim[1] = self.tlim[0]+xbins*self.t_bin_width
+        self.range[0][1] = self.tlim[0]+xbins*self.t_bin_width
         return (xbins, ybins)
 
     def __call__(self, events, **kwargs):
-        hist_ty, x_edges, y_edges = np.histogram2d(events['t']*1e-3, events['y'], bins = self.bins(), range = self.range(), **kwargs)
+        hist_ty, x_edges, y_edges = np.histogram2d(events['t']*1e-3, events['y'], bins = self.bins, range = tuple(self.range), **kwargs)
         return hist_ty.T, x_edges, y_edges
 
 class Hist2d_xy(XYDist):
@@ -130,6 +140,8 @@ class Hist2d_xy(XYDist):
     def __init__(self, events, **kwargs):
         super().__init__(events)
         self.xy_bin_width = 1. # in px
+        self.range = self.range()
+        self.bins = self.bins()
         self.dist2D, self.x_edges, self.y_edges = self(events, **kwargs)
 
     def range(self):
@@ -143,7 +155,7 @@ class Hist2d_xy(XYDist):
         return (xbins, ybins)
 
     def __call__(self, events, **kwargs):
-        hist_xy, x_edges, y_edges = np.histogram2d(events['x'], events['y'], bins = self.bins(), range = self.range(), **kwargs)
+        hist_xy, x_edges, y_edges = np.histogram2d(events['x'], events['y'], bins = self.bins, range = tuple(self.range), **kwargs)
         return hist_xy.T, x_edges, y_edges
     
 class SumPolarity(XYDist):
@@ -151,6 +163,8 @@ class SumPolarity(XYDist):
     def __init__(self, events):
         super().__init__(events)
         self.xy_bin_width = 1. # in px
+        self.range = self.range()
+        self.bins = self.bins()
         self.dist2D, self.x_edges, self.y_edges = self(events)
         
     def range(self):
@@ -166,10 +180,10 @@ class SumPolarity(XYDist):
     def __call__(self, events):
         #Create a histogram of positive events
         pos_events = events[events['p']==1]
-        histPos_xy, x_edges, y_edges = np.histogram2d(pos_events['x'], pos_events['y'], bins = self.bins(), range = self.range())
+        histPos_xy, x_edges, y_edges = np.histogram2d(pos_events['x'], pos_events['y'], bins = self.bins, range = self.range)
         #Create a histogram of negative events
         neg_events = events[events['p']==0]
-        histNeg_xy, x_edges, y_edges = np.histogram2d(neg_events['x'], neg_events['y'], bins = self.bins(), range = self.range())
+        histNeg_xy, x_edges, y_edges = np.histogram2d(neg_events['x'], neg_events['y'], bins = self.bins, range = self.range)
         #The sum of the polarities of all events for each pixel
         histxy = histPos_xy-histNeg_xy
         
@@ -184,7 +198,6 @@ class FirstTimestamp(TimeStamp):
     def get_smallest_t(self, events):
         smallest_t = events.groupby(['x', 'y'])['t'].agg(['min', 'size']).reset_index()
         smallest_t.columns = ['x', 'y', 't', 'weight']
-        print(smallest_t)
         return smallest_t
     
     def __call__(self, events):

@@ -14,7 +14,7 @@ def __function_metadata__():
             "required_kwargs": [
             ],
             "optional_kwargs": [
-                {"name": "t_bin_width", "description": "Padding in t direction (in ms)", "default":"0"}
+                {"name": "t_bin_width", "description": "Padding in t direction (in ms)", "default":"10"}
             ],
             "help_string": "Draws xy, xt and yt projections of the candidate cluster.",
             "display_name": "2D projections of candidate cluster"
@@ -49,7 +49,7 @@ def format_coord_projectiontx(x, y, pos_hist, neg_hist, t_edges, x_edges):
     pos = int(pos_hist[x_bin, y_bin])
     neg = int(neg_hist[x_bin, y_bin])
 
-    display = f't={time} ms, x={x_pix}, events[pos,neg]=[{pos}, {neg}]'
+    display = f't={time:.2f} ms, x={x_pix}, events[pos,neg]=[{pos}, {neg}]'
     return display
 
 def format_coord_projectionty(x, y, pos_hist, neg_hist, t_edges, y_edges):
@@ -84,8 +84,8 @@ def TwoDProjection(findingResult, fittingResult, previewEvents, figure, settings
     figure.subplots_adjust(top=0.955,bottom=0.190)
 
     hist_xy = eventDistributions.Hist2d_xy(findingResult)
-    hist_tx = eventDistributions.Hist2d_tx(findingResult)
-    hist_ty = eventDistributions.Hist2d_ty(findingResult)
+    hist_tx = eventDistributions.Hist2d_tx(findingResult, t_bin_width=t_bin_width)
+    hist_ty = eventDistributions.Hist2d_ty(findingResult, t_bin_width=t_bin_width)
 
     x_edges, y_edges, t_edges = hist_xy.x_edges, hist_xy.y_edges, hist_tx.x_edges
 
