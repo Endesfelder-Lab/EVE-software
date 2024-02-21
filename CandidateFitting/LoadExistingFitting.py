@@ -6,14 +6,14 @@ import pickle
 # Should have an entry for every function in this file
 def __function_metadata__():
     return {
-        "LoadExistingFinding": {
+        "LoadExistingFitting": {
             "required_kwargs": [
-                {"name": "File_Location", "description": "Location of a FindingResults .pickle file","type":"fileLoc","display_text":"File location"},
+                {"name": "File_Location", "display_text":"file location", "description": "Location of a FittingResults .pickle file","type":"fileLoc"},
             ],
             "optional_kwargs": [
-            ],
-            "help_string": "Loads a previously created FindingResults and only runs fitting routine on this.",
-            "display_name": "Load an existing Finding Result"
+             ],
+            "help_string": "Loads a previously created FittingResults and doesn't run finding and fitting.",
+            "display_name": "Load an existing Fitting Result"
         }
     }
 
@@ -21,7 +21,7 @@ def __function_metadata__():
 #-------------------------------------------------------------------------------------------------------------------------------
 #Callable functions
 #-------------------------------------------------------------------------------------------------------------------------------
-def LoadExistingFinding(npy_array,settings,**kwargs):
+def LoadExistingFitting(candidate_dic,settings,**kwargs):
     #Check if we have the required kwargs
     [provided_optional_args, missing_optional_args] = utilsHelper.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
 
@@ -31,11 +31,12 @@ def LoadExistingFinding(npy_array,settings,**kwargs):
             kwargs['File_Location'] = kwargs['File_Location']+'.pickle'
 
         with open(kwargs['File_Location'], 'rb') as file:
-            candidates = pickle.load(file)
+            candidateRef = pickle.load(file)
+            localizations = pickle.load(file)
         performance_metadata = f"Loaded file {kwargs['File_Location']}."
-        logging.info('Existing Finding result correctly loaded')
+        logging.info('Existing Fitting result correctly loaded')
     except:
-        logging.error('Issue with loading an existing finding!')
-        candidates = None
+        logging.error('Issue with loading an existing fitting!')
+        localizations = None
         performance_metadata = None
-    return candidates, performance_metadata
+    return localizations, performance_metadata

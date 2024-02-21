@@ -14,59 +14,41 @@ from functools import partial
 import open3d as o3d
 from joblib import Parallel, delayed
 import multiprocessing
-import bisect
-import numexpr as ne
+import matplotlib.pyplot as plt
+from matplotlib import colormaps
 
 # Required function __function_metadata__
 # Should have an entry for every function in this file
 def __function_metadata__():
     return {
-        "DBSCAN_onlyHighDensity": {
+        "DBSCAN_o3d_onlyHighDensity": {
             "required_kwargs": [
-                {"name": "min_cluster_size", "description": "Required number of neighbouring events in spatiotemporal voxel","default":17,"type":int,"display_text":"Minimum cluster size"},
-                {"name": "distance_radius_lookup", "description": "Outer radius (in px) to count the neighbours in.","default":7,"type":int,"display_text":"Distance radius lookup"},
-                {"name": "density_multiplier", "description": "Distance multiplier","default":1.5,"type":float,"display_text":"Density multiplier"},
-                {"name": "ratio_ms_to_px", "description": "Ratio of milliseconds to pixels.","default":35.0,"type":float,"display_text":"Ratio ms to px"},
-                {"name": "DBSCAN_eps", "description": "Eps of DBSCAN.","default":6,"type":int,"display_text":"DBSCAN epsilon"},
+                {"name": "min_cluster_size", "description": "Required number of neighbouring events in spatiotemporal voxel","default":17,"type":int},
+                {"name": "distance_radius_lookup", "description": "Outer radius (in px) to count the neighbours in.","default":7,"type":int},
+                {"name": "density_multiplier", "description": "Distance multiplier","default":1.5,"type":float},
+                {"name": "ratio_ms_to_px", "description": "Ratio of milliseconds to pixels.","default":35.0,"type":float},
+                {"name": "DBSCAN_eps", "description": "Eps of DBSCAN.","default":6,"type":int},
             ],
             "optional_kwargs": [
-               {"name": "min_consec", "description": "Minimum number of consecutive events","default":1,"type":int,"display_text":"Min. consec"},
-               {"name": "max_consec", "description": "Maximum number of consecutive events, discards hot pixels","default":30,"type":int,"display_text":"Max. consec"},
+               {"name": "min_consec", "description": "Minimum number of consecutive events","default":1,"type":int},
+               {"name": "max_consec", "description": "Maximum number of consecutive events, discards hot pixels","default":30,"type":int},
             ],
-            "help_string": "DBSCAN, only return events that are considered high-density.",
-            "display_name": "DBSCAN returning high-density events"
+            "help_string": "DBSCAN, only return events that are considered high-density."
         },
-        "DBSCAN_allEvents": {
+        "DBSCAN_o3d_allEvents": {
             "required_kwargs": [
-                {"name": "min_cluster_size", "description": "Required number of neighbouring events in spatiotemporal voxel","default":17,"type":int,"display_text":"Minimum cluster size"},
-                {"name": "distance_radius_lookup", "description": "Outer radius (in px) to count the neighbours in.","default":7,"type":int,"display_text":"Distance radius lookup"},
-                {"name": "density_multiplier", "description": "Distance multiplier","default":1.5,"type":float,"display_text":"Density multiplier"},
-                {"name": "ratio_ms_to_px", "description": "Ratio of milliseconds to pixels.","default":35.0,"type":float,"display_text":"Ratio ms to px"},
-                {"name": "DBSCAN_eps", "description": "Eps of DBSCAN.","default":6,"type":int,"display_text":"DBSCAN epsilon"},
-                {"name": "padding_xy", "description": "Result padding in x,y pixels.","default":0,"type":int,"display_text":"XY padding"},
+                {"name": "min_cluster_size", "description": "Required number of neighbouring events in spatiotemporal voxel","default":17,"type":int},
+                {"name": "distance_radius_lookup", "description": "Outer radius (in px) to count the neighbours in.","default":7,"type":int},
+                {"name": "density_multiplier", "description": "Distance multiplier","default":1.5,"type":float},
+                {"name": "ratio_ms_to_px", "description": "Ratio of milliseconds to pixels.","default":35.0,"type":float},
+                {"name": "DBSCAN_eps", "description": "Eps of DBSCAN.","default":6,"type":int},
+                {"name": "padding_xy", "description": "Result padding in x,y pixels.","default":2,"type":int},
             ],
             "optional_kwargs": [
-               {"name": "min_consec", "description": "Minimum number of consecutive events","default":1,"type":int,"display_text":"Min. consec"},
-               {"name": "max_consec", "description": "Maximum number of consecutive events, discards hot pixels","default":30,"type":int,"display_text":"Max. consec"},
+               {"name": "min_consec", "description": "Minimum number of consecutive events","default":1,"type":int},
+               {"name": "max_consec", "description": "Maximum number of consecutive events, discards hot pixels","default":30,"type":int},
             ],
-            "help_string": "DBSCAN on high-density, but returns all events in the bounding box specified by DBSCAN.",
-            "display_name": "DBSCAN returning all events"
-        },
-        "DBSCAN_allEvents_remove_outliers": {
-            "required_kwargs": [
-                {"name": "neighbour_points", "description": "Removes points that has less than this number of neighbours in neighbour_radius","default":30,"type":int,"display_text":"Minimum neighbours"},
-                {"name": "neighbour_radius", "description": "Removes points that has less than neighbour_points in this radius","default":3.0,"type":float,"display_text":"Neighbour radius"},
-                {"name": "min_cluster_size", "description": "Required number of neighbouring events in spatiotemporal voxel","default":17,"type":int,"display_text":"Minimum cluster size"},
-                {"name": "ratio_ms_to_px", "description": "Ratio of milliseconds to pixels.","default":35.0,"type":float,"display_text":"Ratio ms to px"},
-                {"name": "DBSCAN_eps", "description": "Eps of DBSCAN.","default":3,"type":int,"display_text":"DBSCAN epsilon"},
-                {"name": "padding_xy", "description": "Result padding in x,y pixels.","default":2,"type":int,"display_text":"XY padding"},
-            ],
-            "optional_kwargs": [
-               {"name": "min_consec", "description": "Minimum number of consecutive events","default":1,"type":int,"display_text":"Min. consec"},
-               {"name": "max_consec", "description": "Maximum number of consecutive events, discards hot pixels","default":30,"type":int,"display_text":"Max. consec"},
-            ],
-            "help_string": "Removes outliers via o3d's remove_radius_outlier.",
-            "display_name": "DBSCAN returning all events, using radius outlier removal"
+            "help_string": "DBSCAN on high-density, but returns all events in the bounding box specified by DBSCAN."
         }
     }
 
@@ -74,30 +56,6 @@ def __function_metadata__():
 #Helper functions
 #-------------------------------------------------------------------------------------------------------------------------------
 
-
-def remove_radius_outlier_o3d(events,nb_points=30,radius=3,print_progress=True,ms_to_px=35):
-    polarities = events['p']
-    
-    data_for_o3d = events
-    start_time = time.time()
-    point_cloud = o3d.geometry.PointCloud()
-    point_cloud.points = o3d.utility.Vector3dVector(zip(data_for_o3d['x'],data_for_o3d['y'],data_for_o3d['t']/(1000*ms_to_px)))
-    
-    cleaned_pcp =point_cloud.remove_radius_outlier(30, 3, print_progress=True)
-    
-    pcp = np.asarray(cleaned_pcp[0].points)
-    #change columns 0 and 1 to integer values:
-    pcp[:,0] = pcp[:,0].astype(np.int64)
-    pcp[:,1] = pcp[:,1].astype(np.int64)
-    
-    polarities_remaining=polarities[cleaned_pcp[1]]
-    
-    #transform back to titled columns:
-    # events_remaining = pd.DataFrame({'x': pcp[:, 0], 'y': pcp[:, 1], 't': pcp[:, 2], 'p': polarities_remaining})
-    
-    logging.info(str(len(pcp))+"/"+str(len(events))+":"+str(len(pcp)/len(events)*100)+" % of data kept after remove-radius-outlier")
-    return pcp, polarities_remaining
-    
 def determineWeights(events):
     # df creation and sorting (sufficient and faster for sort by only x,y)
     df_events = pd.DataFrame(events)
@@ -125,15 +83,8 @@ def consec_filter(events, min_consec, max_consec,weights = None,df_events=None):
     # This function filters out events with a minimum and maximum number of consecutive events
     if weights is None:
         weights,df_events = determineWeights(events)
-    # filtering out events with a minimum number of consecutive events
-    df_events = df_events[(df_events['w']>=min_consec)]
-
-    # filtering out pixels that have more than max_consec number of consecutive events
-    high_consec_events = df_events[(df_events['w']>max_consec)]
-    hotPixels = high_consec_events[['x','y']].values.tolist()
-    unique_hotPixels = set(map(tuple, hotPixels))
-    mask = df_events[['x', 'y']].apply(tuple, axis=1).isin(unique_hotPixels)
-    df_events = df_events[~mask]
+    # filtering out events with a minimum and maximum number of consecutive events
+    df_events = df_events[(df_events['w']>=min_consec) & (df_events['w']<=max_consec)]
 
     # convert df back to structured numpy array
     consec_events = df_events.to_records(index=False)
@@ -145,12 +96,8 @@ def hotPixel_filter(events, max_consec, weights=None,df_events=None):
     if weights is None:
         weights,df_events = determineWeights(events)
     
-    # filtering out pixels that have more than max_consec number of consecutive events
-    high_consec_events = df_events[(df_events['w']>max_consec)]
-    hotPixels = high_consec_events[['x','y']].values.tolist()
-    unique_hotPixels = set(map(tuple, hotPixels))
-    mask = df_events[['x', 'y']].apply(tuple, axis=1).isin(unique_hotPixels)
-    df_events = df_events[~mask]
+    # filtering out events with a minimum and maximum number of consecutive events
+    df_events = df_events[(df_events['w']<=max_consec)]
 
     # convert df back to structured numpy array
     filtered_events = df_events.to_records(index=False)
@@ -338,32 +285,52 @@ def kdtree_assisted_lookup(bbox_bunch,ms_to_px,kdtree1d,lookup_list,npyarr):
     
     return filtered_df2
 
-def get_events_in_bbox(npyarr,bboxes,ms_to_px,multiThread=True):
+def o3d_bbox_lookup_parr(bbox_bunch,ms_to_px,point_cloud_data,npyarr):
+    point_cloud = o3d.geometry.PointCloud()
+    point_cloud.points = o3d.utility.Vector3dVector(point_cloud_data)
+    filtered_df2={}
+    for bboxid, _ in bbox_bunch.items():
+        bbox = bbox_bunch[bboxid]
+        # Create the axis-aligned bounding box with the specified dimensions
+        aabb = o3d.geometry.AxisAlignedBoundingBox(min_bound=(bbox[0], bbox[2], bbox[4]*1000*ms_to_px), max_bound=(bbox[1], bbox[3], bbox[5]*1000*ms_to_px))
+
+        # Get the indices of points within the bounding box
+        indices = aabb.get_point_indices_within_bounding_box(point_cloud.points)
+        filtered_array = npyarr[indices]
+        #Change filtered_array to a pd dataframe:
+        filtered_df2[bboxid] = pd.DataFrame(filtered_array)
+        
+    return filtered_df2
+
+def get_events_in_bbox(npyarr,bboxes,ms_to_px,multiThread=False):
     #Get empty candidate dictionary
     candidates = {}
     if multiThread == False:      
-        start_time = time.time()
-        #Loop over all bboxes:
-        for bboxid, _ in bboxes.items():
-            bbox = bboxes[bboxid]
-            conditions = [
-                npyarr['x'] >= bbox[0],
-                npyarr['x'] <= bbox[1],
-                npyarr['y'] >= bbox[2],
-                npyarr['y'] <= bbox[3],
-                npyarr['t'] >= bbox[4]*1000*ms_to_px,
-                npyarr['t'] <= bbox[5]*1000*ms_to_px
-            ]
-            filtered_array = npyarr[np.logical_and.reduce(conditions)]
-            #Change filtered_array to a pd dataframe:
-            filtered_df = pd.DataFrame(filtered_array)
+        # start_time = time.time()
+        # #Loop over all bboxes:
+        # for bboxid, _ in bboxes.items():
+        #     bbox = bboxes[bboxid]
+        #     conditions = [
+        #         npyarr['x'] >= bbox[0],
+        #         npyarr['x'] <= bbox[1],
+        #         npyarr['y'] >= bbox[2],
+        #         npyarr['y'] <= bbox[3],
+        #         npyarr['t'] >= bbox[4]*1000*ms_to_px,
+        #         npyarr['t'] <= bbox[5]*1000*ms_to_px
+        #     ]
+        #     filtered_array = npyarr[np.logical_and.reduce(conditions)]
+        #     #Change filtered_array to a pd dataframe:
+        #     filtered_df = pd.DataFrame(filtered_array)
             
-            candidates[bboxid] = {}
-            candidates[bboxid]['events'] = filtered_df
-            candidates[bboxid]['cluster_size'] = [np.max(filtered_array['y'])-np.min(filtered_array['y'])+1, np.max(filtered_array['x'])-np.min(filtered_array['x'])+1, np.max(filtered_array['t'])-np.min(filtered_array['t'])]
-            candidates[bboxid]['N_events'] = len(filtered_array)
-        end_time = time.time()
-        logging.info('Time to get bounding boxes: '+str(end_time-start_time))
+        #     candidates[bboxid] = {}
+        #     candidates[bboxid]['events'] = filtered_df
+        #     candidates[bboxid]['cluster_size'] = [np.max(filtered_array['y'])-np.min(filtered_array['y']), np.max(filtered_array['x'])-np.min(filtered_array['x']), np.max(filtered_array['t'])-np.min(filtered_array['t'])]
+        #     candidates[bboxid]['N_events'] = len(filtered_array)
+        # end_time = time.time()
+        # logging.info('Time to get bounding boxes: '+str(end_time-start_time))
+        
+        import numpy as np
+        import pandas as pd
         
         
         candidates2 = {}
@@ -387,44 +354,203 @@ def get_events_in_bbox(npyarr,bboxes,ms_to_px,multiThread=True):
             candidates2[bboxid]['cluster_size'] = [np.max(filtered_array['y'])-np.min(filtered_array['y']), np.max(filtered_array['x'])-np.min(filtered_array['x']), np.max(filtered_array['t'])-np.min(filtered_array['t'])]
             candidates2[bboxid]['N_events'] = len(filtered_array)
         end_time = time.time()
-        logging.info('Time to get bounding boxes o3d: '+str(end_time-start_time))
+        logging.info('Time to get bounding boxes o3d single-core: '+str(end_time-start_time))
+        candidates = candidates2
+        
 
-        
-    elif multiThread == True:
-        time_start = time.time()
-        
-        candidates = {}
-        #Create a 1d kdtree of the x-values of npyarr:
-        lookup_list = {}
-        kdtree1d = {}
+        start_time = time.time()
+        point_cloud_data = np.column_stack((npyarr['x'], npyarr['y'], npyarr['t']))
 
+
+
+        #only get data between 150-200 and 150-200 in 0, 1st column:
+        data_for_o3d = npyarr[(npyarr['x'] > 00) & (npyarr['x'] < 200) & (npyarr['y'] > 00) & (npyarr['y'] < 200)]
+        point_cloud = o3d.geometry.PointCloud()
+        point_cloud.points = o3d.utility.Vector3dVector(zip(data_for_o3d['x'],data_for_o3d['y'],data_for_o3d['t']/(1000*ms_to_px)))
+        # dbscan = point_cloud.cluster_dbscan(3, 10, print_progress=True)
+        # print(max(dbscan))
         
-        bunch_size = 50
-        num_splits = max(1,int(np.ceil(len(bboxes)/bunch_size)))
-                
-        #Run kdtrees on x and y:
-        datax = np.zeros((len(npyarr),2))
-        datax[:, 0] = npyarr['x']
-        datax[:, 1] = npyarr['x']
-        lookup_list['x'] = np.argsort(datax[:, 0])
-        kdtree1d['x'] = spatial.cKDTree(datax)
-        datay = np.zeros((len(npyarr),2))
-        datay[:, 0] = npyarr['y']
-        datay[:, 1] = npyarr['y']
-        lookup_list['y'] = np.argsort(datay[:, 0])
-        kdtree1d['y'] = spatial.cKDTree(datay)
+        #------------------Start intermezzo https://sebastianraschka.com/Articles/2015_pca_in_3_steps.html --------
+        import pandas as pd
+
+        df = pd.read_csv(
+            filepath_or_buffer='https://archive.ics.uci.edu/ml/machine-learning-databases/iris/iris.data',
+            header=None,
+            sep=',')
+
+        df.columns=['sepal_len', 'sepal_wid', 'petal_len', 'petal_wid', 'class']
+        df.dropna(how="all", inplace=True) # drops the empty line at file-end
+
+        df.tail()
+        X = df[['sepal_len', 'sepal_wid', 'petal_len', 'petal_wid']].values
+        from sklearn.preprocessing import StandardScaler
+        X_std = StandardScaler().fit_transform(X)
         
-        #Split bboxes into bunches:
-        bbox_bunches = split_dict(bboxes, num_splits)
+        import numpy as np
+        cov_mat = np.cov(X_std.T)
+        eig_vals, eig_vecs = np.linalg.eig(cov_mat)
+
+        print('Eigenvectors \n%s' %eig_vecs)
+        print('\nEigenvalues \n%s' %eig_vals)
+        
+        # Make a list of (eigenvalue, eigenvector) tuples
+        eig_pairs = [(np.abs(eig_vals[i]), eig_vecs[:,i]) for i in range(len(eig_vals))]
+
+        # Sort the (eigenvalue, eigenvector) tuples from high to low
+        eig_pairs.sort(key=lambda x: x[0], reverse=True)
+
+        tot = sum(eig_vals)
+        var_exp = [(i / tot)*100 for i in sorted(eig_vals, reverse=True)]
+        cum_var_exp = np.cumsum(var_exp)
+        
+        matrix_w = np.hstack((eig_pairs[0][1].reshape(4,1),
+                      eig_pairs[1][1].reshape(4,1)))
+
+        print('Matrix W:\n', matrix_w)
+        
+        Y = X_std.dot(matrix_w)
+        
+        
+        
+        from sklearn.decomposition import PCA as sklearnPCA
+        sklearn_pca = sklearnPCA(n_components=2)
+        Y_sklearn = sklearn_pca.fit_transform(X_std)
+
+        # -------------------------------End intermezzo-------------------
+        
+        
+
+        #only get data between 150-200 and 150-200 in 0, 1st column:
+        # data_for_o3d = npyarr[(npyarr['x'] > 00) & (npyarr['x'] < 200) & (npyarr['y'] > 00) & (npyarr['y'] < 200)]
+        # import numpy as np
+        # normal_array = np.zeros((len(data_for_o3d),3))
+        # normal_array[:,0] = data_for_o3d['x']
+        # normal_array[:,1] = data_for_o3d['y']
+        # normal_array[:,2] = data_for_o3d['t']
+        
+        # X_std = StandardScaler().fit_transform(normal_array)
+        
+        # from sklearn.decomposition import PCA as sklearnPCA
+        # sklearn_pca = sklearnPCA(n_components=2)
+        # Y_sklearn = sklearn_pca.fit_transform(X_std)
+        
+        
+        # import matplotlib.pyplot as plt
+        # from matplotlib import colormaps
+        # #Display the point cloud points in a 3d scatter:
+        # plt.figure()
+        # plt.scatter(Y_sklearn[:,0], Y_sklearn[:,1])
+        # plt.show()
+        
+        point_cloud.estimate_covariances(search_param=o3d.geometry.KDTreeSearchParamKNN(knn=100))
+        pcc = np.asarray(point_cloud.covariances)
+        
+        eig_valso3d, eig_vecso3d = np.linalg.eig(pcc)
+        sort_order_eig_val = np.argsort(eig_valso3d)[::-1]
+        # sortOrder = np.zeros((len(pcc),3))
+        # for k in range(3):
+        #     for i in range(3):
+        #         sortOrder[sort_order_eig_val[:, i] == k][:][k] = 1
+        n_sort_dim = 2;
+        matrix_w = np.zeros((len(pcc),3,n_sort_dim))
+        
+        pcamatrix = np.zeros((len(pcc),2))
+        
+        matrix_w_full = np.zeros((len(pcc),3,2))
+        spectral_gap = np.zeros((len(pcc),1))
+        
+        for i in range(len(pcc)):
+            #find the eigenvector with the highest eigenvalue:
+            sortorder = np.argsort(eig_valso3d[i])[::-1]
+            
+            ev = eig_vecso3d[i]
+            
+            #twice because n_sort_dim = 2
+            matrix_w = np.hstack((ev[:,sortorder[0]].reshape(3,1),
+                      ev[:,sortorder[1]].reshape(3,1)))
+            
+            matrix_w_full[i,:,:] = matrix_w
+            
+            spectral_gap[i] = (eig_valso3d[i][sortorder[0]] - eig_valso3d[i][sortorder[1]])/(sum(eig_valso3d[i]))
+
+            pcamatrix[i,:] = np.asarray(point_cloud.points)[i].dot(matrix_w)
+
+        plt.figure()
+        plt.scatter(pcamatrix[:,0], pcamatrix[:,1])
+        plt.show()
+
+        matrix_w = np.hstack((eig_pairs[0][1].reshape(3,1),
+                            eig_pairs[1][1].reshape(3,1)))
+
+        print('Matrix W:\n', matrix_w)
+    
+        point_cloud.estimate_normals()
+        pcn = np.asarray(point_cloud.normals)
+        
+        meanpcn = pcn[:,2]
+        
+        
+        maxeigenval = np.max(eig_valso3d,axis=1)
+        mideigenval = np.median(eig_valso3d, axis=1)
+        mineigenval = np.min(eig_valso3d,axis=1)
+        sumeigenval = np.sum(eig_valso3d,axis=1)
+        
+        meanpcn = pcc[:,0,0]
+        #Display the point cloud points in a 3d scatter:
+        fig = plt.figure()
+        ax = fig.add_subplot(projection='3d')
+        #plot only clx.labels > -1:
+        pcp = np.asarray(point_cloud.points)
+        # scatter  = ax.scatter(pcp[:,0], pcp[:,1],pcp[:,2], c=np.max(eig_valso3d,axis=1),alpha=0.1,cmap='hsv')
+        scatter  = ax.scatter(pcp[:,0], pcp[:,1],pcp[:,2], c=mideigenval,alpha=0.1,cmap='hsv')
+        #show the colorbar:
+        cbar = plt.colorbar(scatter)
+        # ax.scatter(data_for_clx[clx.labels_>-1,0], data_for_clx[clx.labels_>-1,1],  data_for_clx[clx.labels_>-1,2], c=clx.labels_[clx.labels_>-1],cmap='Set1')
+        plt.show()
+        
+        
+        #Display the point cloud points in a 3d scatter:
+        fig = plt.figure()
+        ax = fig.add_subplot(projection='3d')
+        #plot only clx.labels > -1:
+        pcp = np.asarray(point_cloud.points)
+        maxeigenval = np.max(eig_valso3d,axis=1)
+        # scatter  = ax.scatter(pcp[:,0], pcp[:,1],pcp[:,2], c=np.max(eig_valso3d,axis=1),alpha=0.1,cmap='hsv')
+        mevcutoff = 5
+        scatter  = ax.scatter(pcp[maxeigenval>=mevcutoff,0], pcp[maxeigenval>=mevcutoff,1],pcp[maxeigenval>=mevcutoff,2], alpha=0.05,c='k',s=1)
+        scatter  = ax.scatter(pcp[maxeigenval<mevcutoff,0], pcp[maxeigenval<mevcutoff,1],pcp[maxeigenval<mevcutoff,2],alpha=0.1,c='r')
+        #show the colorbar:
+        cbar = plt.colorbar(scatter)
+        # ax.scatter(data_for_clx[clx.labels_>-1,0], data_for_clx[clx.labels_>-1,1],  data_for_clx[clx.labels_>-1,2], c=clx.labels_[clx.labels_>-1],cmap='Set1')
+        plt.show()
+        
+        
+        
+        fig = plt.figure()
+        # plt.hist(np.max(eig_valso3d,axis=1),bins=100)
+        plt.hist(maxeigenval,bins=100)
+        plt.xlabel('Maximum Eigenvalue')
+        plt.ylabel('Frequency')
+        plt.title('Histogram of Maximum Eigenvalues')
+        plt.show()
+        
+        
+        bunch_size = 500
         num_cores = multiprocessing.cpu_count()
+        num_splits = num_cores#max(1,int(np.ceil(len(bboxes)/bunch_size)))
         
-        RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(kdtree_assisted_lookup)(bbox_bunches[r],ms_to_px,kdtree1d,lookup_list,npyarr) for r in range(len(bbox_bunches)))
+        bbox_bunches = split_dict(bboxes, num_splits)
+        
+        # o3d_bbox_lookup_parr(bbox_bunches[0],ms_to_px,point_cloud_data,npyarr)
+        
+        RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(o3d_bbox_lookup_parr)(bbox_bunches[r],ms_to_px,point_cloud_data,npyarr) for r in range(len(bbox_bunches)))
         result = [res for res in RES]
         
+        candidates={}
         counter = 0
         for r in range(len(result)):
-            for b in range(len(result[r])):
-                filtered_array = result[r][b]
+            for b in result[r].items():
+                filtered_array = b[1]
                 filtered_df2 = pd.DataFrame(filtered_array)
                 
                 indexv = counter
@@ -433,147 +559,12 @@ def get_events_in_bbox(npyarr,bboxes,ms_to_px,multiThread=True):
                 candidates[indexv]['cluster_size'] = [np.max(filtered_array['y'])-np.min(filtered_array['y']), np.max(filtered_array['x'])-np.min(filtered_array['x']), np.max(filtered_array['t'])-np.min(filtered_array['t'])]
                 candidates[indexv]['N_events'] = len(filtered_array)
                 counter+=1
-        
-        time_end = time.time()
-        print(time_end-time_start)
                 
+        end_time = time.time()
+        logging.info('Time to get bounding boxes o3d multi-core: '+str(end_time-start_time))
         
-             
-        
-        # start_time = time.time()
-        # num_cores = multiprocessing.cpu_count()
-        # logging.info("Bounding box finding split on "+str(num_cores)+" cores.")
-        
-        # #Sort the bounding boxes by start-time:
-        # sorted_bboxes = sorted(bboxes.values(), key=lambda bbox: bbox[4])
-        
-        # #Split into num_cores sections:
-        # bboxes_split = np.array_split(sorted_bboxes, num_cores)
-        
-        # #Split the npyarr based on the min, max time of bboxes_split:
-        # npyarr_split={}
-        # for i in range(0,num_cores):
-        #     selectionArea = (npyarr['t'] >= np.min(bboxes_split[i][:,4])*1000*ms_to_px) & (npyarr['t'] <= np.max(bboxes_split[i][:,5])*1000*ms_to_px)
-        #     npyarr_split[i] = npyarr[selectionArea]
-
-        # RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(findbboxeso3d)(npyarr_split[i],bboxes_split[i],ms_to_px) for i in range(num_cores))
-        
-        # #res in RES contains an array of arrays, where e.g. res[0] is the indeces of the events that belong to bbox 0, etc
-        # result = [res for res in RES]
-        
-        # #Get all results as candidates dataframes as wanted:
-        # candidates = {}
-        # counter = 0
-        # for r in range(len(result)):
-        #     for b in range(len(result[r])):
-        #         filtered_array = npyarr_split[r][result[r][b]]
-        #         filtered_df2 = pd.DataFrame(filtered_array)
-        #         candidates[counter] = {}
-        #         candidates[counter]['events'] = filtered_df2
-        #         candidates[counter]['cluster_size'] = [np.max(filtered_array['y'])-np.min(filtered_array['y']), np.max(filtered_array['x'])-np.min(filtered_array['x']), np.max(filtered_array['t'])-np.min(filtered_array['t'])]
-        #         candidates[counter]['N_events'] = len(filtered_array)
-        #         counter +=1
-                
-        # end_time = time.time()
-        # logging.info('Time to get bounding boxes o3d: '+str(end_time-start_time))
-        
-    
-        print('Done')
     return candidates
 
-def get_events_in_bbox_bisect(npyarr,bboxes,ms_to_px):
-    
-    #Sort on t:
-    npy_sort_t = np.zeros((len(npyarr),2))
-    #First column is the order:
-    npy_sort_t[:,0] = np.argsort(npyarr['t'])
-    #second column is the time:
-    npy_sort_t[:,1] = np.sort(npyarr, order='t')['t']
-    
-    #Sort on x:
-    npy_sort_x = np.zeros((len(npyarr),2))
-    #First column is the order:
-    npy_sort_x[:,0] = np.argsort(npyarr['x'])
-    #second column is the time:
-    npy_sort_x[:,1] = np.sort(npyarr, order='x')['x']
-    
-    npy_sort_y = np.zeros((len(npyarr),2))
-    #First column is the order:
-    npy_sort_y[:,0] = np.argsort(npyarr['y'])
-    #second column is the time:
-    npy_sort_y[:,1] = np.sort(npyarr, order='y')['y']
-    
-    candidates = {} 
-    start_time = time.time()
-    #Loop over all bboxes:
-    for bboxid, _ in bboxes.items():
-        bbox = bboxes[bboxid]
-        startindex_x = bisect.bisect_left(npy_sort_x[:,1],bbox[0])
-        endindex_x = bisect.bisect_right(npy_sort_x[:,1],bbox[1])
-        startindex_y = bisect.bisect_left(npy_sort_y[:,1],bbox[2])
-        endindex_y = bisect.bisect_right(npy_sort_y[:,1],bbox[3])
-        startindex_t = bisect.bisect_left(npy_sort_t[:,1],bbox[4]*1000*ms_to_px)
-        endindex_t = bisect.bisect_right(npy_sort_t[:,1],bbox[5]*1000*ms_to_px)
-        
-        valid_indeces_x = npy_sort_x[startindex_x:endindex_x,0]
-        valid_indeces_y = npy_sort_y[startindex_y:endindex_y,0]
-        valid_indeces_t = npy_sort_t[startindex_t:endindex_t,0]
-        
-        #find the indeces where all of those is true:
-        common_values = np.intersect1d(np.intersect1d(valid_indeces_x, valid_indeces_y), valid_indeces_t)
-
-        filtered_array = npyarr[common_values.astype(np.int64)]
-        #Change filtered_array to a pd dataframe:
-        filtered_df = pd.DataFrame(filtered_array)
-        
-        candidates[bboxid] = {}
-        candidates[bboxid]['events'] = filtered_df
-        candidates[bboxid]['cluster_size'] = [np.max(filtered_array['y'])-np.min(filtered_array['y']), np.max(filtered_array['x'])-np.min(filtered_array['x']), np.max(filtered_array['t'])-np.min(filtered_array['t'])]
-        candidates[bboxid]['N_events'] = len(filtered_array)
-    end_time = time.time()
-    
-    logging.info('Time to get bounding boxesBisect: '+str(end_time-start_time))
-    return candidates
-
-def get_events_in_bbox_NE(npyarr,bboxes,ms_to_px):
-    #Faster bbox-finding than bisect or single/multi-thread above:
-    #First, get all events within the biggest 3D sphere around the bbox via NE (numexpr)
-    candidates={}
-    xdata = npyarr['x']
-    ydata = npyarr['y']
-    tdata = npyarr['t']/(1000*ms_to_px)
-    for bboxid, _ in bboxes.items():
-        bbox = bboxes[bboxid]
-        
-        #Idea: via ne, get all locs in a circle around the bbox, then filter the events in that circle
-        bbox_midpoint = (np.mean([bbox[0],bbox[1]]),np.mean([bbox[2],bbox[3]]),np.mean([bbox[4],bbox[5]]))
-        cx = bbox_midpoint[0]
-        cy = bbox_midpoint[1]
-        ct = bbox_midpoint[2]
-        bbox_radius = np.max([bbox[1]-bbox[0],bbox[3]-bbox[2],bbox[5]-bbox[4]])
-        
-        res = ne.evaluate('((xdata-cx)**2 + (ydata-cy)**2 + (tdata-ct))<bbox_radius**2')
-        
-        firstFilter = npyarr[res]
-        
-        #Then perform a 'normal' bbox filter which is now much faster since we already filtered out 99% of data
-        conditions = [
-            firstFilter['x'] >= bbox[0],
-            firstFilter['x'] <= bbox[1],
-            firstFilter['y'] >= bbox[2],
-            firstFilter['y'] <= bbox[3],
-            firstFilter['t'] >= bbox[4]*(1000*ms_to_px),
-            firstFilter['t'] <= bbox[5]*(1000*ms_to_px)
-        ]
-        filtered_array = firstFilter[np.logical_and.reduce(conditions)]
-        #Change filtered_array to a pd dataframe:
-        filtered_df = pd.DataFrame(filtered_array)
-        candidates[bboxid] = {}
-        candidates[bboxid]['events'] = filtered_df
-        candidates[bboxid]['cluster_size'] = [np.max(filtered_array['y'])-np.min(filtered_array['y'])+1, np.max(filtered_array['x'])-np.min(filtered_array['x'])+1, np.max(filtered_array['t'])-np.min(filtered_array['t'])]
-        candidates[bboxid]['N_events'] = len(filtered_array)
-    
-    return candidates
         
 def split_dict(dictionary, num_splits):
     keys = list(dictionary.keys())
@@ -639,6 +630,8 @@ def findbboxnew(npyarr, min_x=-np.inf, max_x=np.inf, min_y=-np.inf,
     filtered_df = pd.DataFrame(npyarr[bb_filter])
     return filtered_df
 
+
+
 def process_bbox(args):
     bbox, npyarr, ms_to_px = args
     filtered_array = npyarr[(npyarr['x'] >= bbox[0]) & (npyarr['x'] <= bbox[1]) & (npyarr['y'] >= bbox[2]) & (npyarr['y'] <= bbox[3]) & (npyarr['t'] >= bbox[4]*1000*ms_to_px) & (npyarr['t'] <= bbox[5]*1000*ms_to_px)]
@@ -646,6 +639,7 @@ def process_bbox(args):
     cluster_size = [np.max(filtered_array['y'])-np.min(filtered_array['y']), np.max(filtered_array['x'])-np.min(filtered_array['x']), np.max(filtered_array['t'])-np.min(filtered_array['t'])]
     N_events = len(filtered_array)
     return filtered_df, cluster_size, N_events
+
 
 def o3d_getclusterbounding_boxes(events, cluster_labels,padding_xy = 0,padding_t = 0):
     x=3
@@ -676,10 +670,89 @@ def o3d_getclusterbounding_boxes(events, cluster_labels,padding_xy = 0,padding_t
     end_time = time.time()
     logging.info('Time to get bounding boxes o3d: '+str(end_time-start_time))
 
+
+# def parrallell_o3dkdtreelookup(tarr,pcd_tree3,distance_lookup):
+def parrallell_o3dkdtreelookup(args):
+    import numpy as np
+    import open3d as o3d
+    
+    tarr, pcd_tree3, distance_lookup = args
+    dist_arr = np.zeros(len(tarr))
+    #Loop over all points and get the number of neighbours in a certain radius:
+    for i in range(len(tarr)):#len(consec_events_arr)):
+        [k, _, _] = pcd_tree3.search_radius_vector_3d(tarr[i], distance_lookup)
+        # [k, idx, _] = pcd_tree3.search_hybrid_vector_3d(consec_events_arr[i], distance_lookup,100)
+        dist_arr[i] = k-1  # Subtract 1 to exclude the point itself
+        # print(f"Number of points in radius {distance_lookup} from point {i}: {k}")
+    return np.array(dist_arr)
+
+def filter_density_o3d(consec_events,temporal_duration_ms=35,distance_lookup = 4, densityMultiplier = 1.5):
+    import open3d as o3d
+    
+    consec_events_x = consec_events['x']  # Extract 'x' field
+    consec_events_y = consec_events['y']  # Extract 'y' field
+    consec_events_t = consec_events['t']/(temporal_duration_ms*1000)  # Extract 't' field
+
+    consec_events_arr = np.column_stack((consec_events_x, consec_events_y, consec_events_t))
+    #create a point cloud from consec_events:
+    # pcd_consec_events = o3d.t.geometry.PointCloud(np.array(consec_events_arr, dtype=np.float64))
+    
+    
+    time_start = time.time()
+    searcham = 1000000
+    temparr=  consec_events_arr[0:searcham]
+    
+    #Create a kd-tree from this:
+    pcd3 = o3d.geometry.PointCloud()
+    pcd3.points = o3d.utility.Vector3dVector(temparr)
+    pcd_tree3 = o3d.geometry.KDTreeFlann(pcd3)
+
+    import multiprocessing
+    num_cores = multiprocessing.cpu_count()
+    
+    slices = []
+    start = 0
+
+    part_size = temparr.shape[0] // num_cores
+    remainder = temparr.shape[0] % num_cores
+    for i in range(num_cores):
+        end = start + part_size + (i < remainder)
+        slices.append(temparr[start:end])
+        start = end
+    
+    # # t = parrallell_o3dkdtreelookup(slices[0], pcd_tree3, distance_lookup)
+    # # Create a multiprocessing Pool with the desired number of worker processes
+    # with multiprocessing.Pool() as pool:
+    #     # Prepare the arguments for parallel execution
+    #     args = [(slices[i], pcd_tree3, distance_lookup) for i in range(len(slices))]
+
+    #     # Map the function to the pool of worker processes
+    #     results = pool.map(parrallell_o3dkdtreelookup, args)
+
+
+    import concurrent.futures
+    # Create a ThreadPoolExecutor with the desired number of worker threads
+    with concurrent.futures.ThreadPoolExecutor(max_workers=None) as executor:
+        # Submit the tasks to the executor
+        futures = [
+            executor.submit(parrallell_o3dkdtreelookup, slices[i], pcd_tree3, distance_lookup)
+            for i in range(len(slices))
+        ]
+
+        # Retrieve the results as they become available
+        RES = [future.result() for future in concurrent.futures.as_completed(futures)]
+    
+    # Flatten the RES array into a single 1D array
+    nr_neighbours = np.concatenate(RES)
+    
+    time_end = time.time()
+    print("Time taken: ", time_end - time_start)
+    print("Expected total time taken: ", (time_end - time_start)*(len(consec_events_arr)/searcham))
+    
 #-------------------------------------------------------------------------------------------------------------------------------
 #Callable functions
 #-------------------------------------------------------------------------------------------------------------------------------
-def DBSCAN_allEvents(npy_array,settings,**kwargs):
+def DBSCAN_o3d_allEvents(npy_array,settings,**kwargs):
     [provided_optional_args, missing_optional_args] = utilsHelper.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
     if "min_consec" in provided_optional_args:
         min_consec_ev = float(kwargs["min_consec"])
@@ -699,6 +772,9 @@ def DBSCAN_allEvents(npy_array,settings,**kwargs):
     weights,df_events = determineWeights(npy_array)
     consec_events = consec_filter(npy_array, min_consec_ev, max_consec_ev,weights=weights,df_events=df_events)
     logging.info('Consec filtering done')
+    
+    # filter_density_o3d(consec_events,temporal_duration_ms=float(kwargs['ratio_ms_to_px']),distance_lookup = float(kwargs['distance_radius_lookup']), densityMultiplier = float(kwargs['density_multiplier']))
+    
     polarities = consec_events['p']
     consec_event_tree, nparrfordens = make_kdtree(consec_events,temporal_duration_ms=float(kwargs['ratio_ms_to_px']),nleaves=64)
     logging.info('KDtree made done')
@@ -710,26 +786,18 @@ def DBSCAN_allEvents(npy_array,settings,**kwargs):
     bboxes = get_cluster_bounding_boxes(clustersHD, cluster_labels,padding_xy = int(kwargs['padding_xy']),padding_t = int(kwargs['padding_xy']))
     logging.info('Getting bounding boxes done')
     hotpixel_filtered_events = hotPixel_filter(npy_array,max_consec_ev,weights=weights,df_events=df_events)
-    logging.info('Hotpixel filtering completed')
-    # candidates = get_events_in_bbox(hotpixel_filtered_events,bboxes,float(kwargs['ratio_ms_to_px']))
-    # logging.info('Candidates obtained')
-    # candidates = get_events_in_bbox_bisect(hotpixel_filtered_events,bboxes,float(kwargs['ratio_ms_to_px']))
-    candidates = get_events_in_bbox_NE(hotpixel_filtered_events,bboxes,float(kwargs['ratio_ms_to_px']))
-    logging.info('Candidates obtained (via bbox NE)')
+    candidates = get_events_in_bbox(hotpixel_filtered_events,bboxes,float(kwargs['ratio_ms_to_px']))
+    logging.info('Candidates obtained')
     
     end_time = time.time()
     elapsed_time = end_time - start_time
     
-    performance_metadata = ""
+    performance_metadata = f"DBSCAN Finding ran for {elapsed_time} seconds."
     logging.info('DBSCAN finding done')
-    
-    #Remove small/large bounding-box data
-    candidates, _, _ = utilsHelper.removeCandidatesWithLargeSmallBoundingBox(candidates,settings)
-
 
     return candidates, performance_metadata
 
-def DBSCAN_onlyHighDensity(npy_array,settings,**kwargs):
+def DBSCAN_o3d_onlyHighDensity(npy_array,settings,**kwargs):
     #Check if we have the required kwargs
     [provided_optional_args, missing_optional_args] = utilsHelper.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
     if "min_consec" in provided_optional_args:
@@ -754,13 +822,14 @@ def DBSCAN_onlyHighDensity(npy_array,settings,**kwargs):
     logging.info('KDtree made done')
     high_density_events, polarities = filter_density(consec_event_tree, nparrfordens, polarities, distance_lookup = float(kwargs['distance_radius_lookup']), densityMultiplier = float(kwargs['density_multiplier']))
     logging.info('high density events obtained done')
+    
+    
     # Minimum number of points within a cluster
     clusters, cluster_labels = clustering(high_density_events, polarities, eps = float(kwargs['DBSCAN_eps']), min_points_per_cluster = int(kwargs['min_cluster_size']))
     logging.info('DBSCAN done')
-    if len(clusters)>0:
-        #Re-correct for z to time:
-        clusters.loc[:,'t'] = clusters['t']*(float(kwargs['ratio_ms_to_px'])*1000)
-        logging.info('re-corrected for z')
+    #Re-correct for z to time:
+    clusters.loc[:,'t'] = clusters['t']*(float(kwargs['ratio_ms_to_px'])*1000)
+    logging.info('re-corrected for z')
     
     #old version kept here, since I haven't 100% stress-tested new method, but seems to be fine
     starttime = time.time()
@@ -778,87 +847,14 @@ def DBSCAN_onlyHighDensity(npy_array,settings,**kwargs):
     print(f"Candidateforming1: {elapsed_time} seconds.")
 
 
-    #New method that is faster but not working correctly (but almost)
-    # starttime = time.time()
-    # #New method - via external ordering and lookup (Accumarray from MATLAB)
-    # #get some sorting info
-    # order_array = np.argsort(cluster_labels)
-    # #Sort cluster labels on this
-    # cluster_labelsSort = cluster_labels[order_array]
-    # #sort the clusters pd on this - very convoluted
-    # clustersSorted = clusters.assign(P=order_array)
-    # clustersSorted.sort_values('P')
-    # clustersSorted.drop('P', axis=1, inplace=True)
-    # #Get the bincounts - know that clusters start at -1, so add 1 to srart at 0
-    # accarr = np.bincount(cluster_labelsSort+1)
 
-    # candidates = {}
-    # unique_labels = np.unique(cluster_labelsSort)
-    # for cl in unique_labels:
-    #     if cl > -1:
-    #         # clusterEvents = clustersSorted[cluster_labelsSort == cl]
-    #         clusterEvents = clustersSorted[sum(accarr[0:cl+1]):sum(accarr[0:cl+1])+accarr[cl+1]]
-    #         cluster_size = np.array([
-    #             np.max(clusterEvents['y']) - np.min(clusterEvents['y']),
-    #             np.max(clusterEvents['x']) - np.min(clusterEvents['x']),
-    #             np.max(clusterEvents['t']) - np.min(clusterEvents['t'])
-    #         ])
-    #         candidates[cl] = {
-    #             'events': clusterEvents,
-    #             'cluster_size': cluster_size,
-    #             'N_events': len(clusterEvents)
-    #         }
-    # endtime = time.time()
-    # # Print the elapsed time:
-    # elapsed_time = endtime - starttime
-    # logging.info(f"Candidateforming: {elapsed_time} seconds.")
-    # Stop the timer
+
     end_time = time.time()
  
     # Calculate the elapsed time
     elapsed_time = end_time - start_time
 
-    performance_metadata = ""
+    performance_metadata = f"DBSCAN Finding ran for {elapsed_time} seconds."
     logging.info('DBSCAN finding done')
-    
-    #Remove small/large bounding-box data
-    candidates, _, _ = utilsHelper.removeCandidatesWithLargeSmallBoundingBox(candidates,settings)
 
-
-    return candidates, performance_metadata
-
-def DBSCAN_allEvents_remove_outliers(npy_array,settings,**kwargs):
-    #Check if we have the required kwargs
-    [provided_optional_args, missing_optional_args] = utilsHelper.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
-    if "min_consec" in provided_optional_args:
-        min_consec_ev = float(kwargs["min_consec"])
-    else:
-        # Default value for min number of consecutive events
-        min_consec_ev = 1
-    if "max_consec" in provided_optional_args:
-        max_consec_ev = float(kwargs["max_consec"])
-    else:
-        # Default value for max number of consecutive events
-        max_consec_ev = 30
-    
-    
-    weights,df_events = determineWeights(npy_array)
-    hotpixel_filtered_events = hotPixel_filter(npy_array,max_consec_ev,weights=weights,df_events=df_events)
-    logging.info('Hotpixel filtering completed')
-    filtered_events, polarities = remove_radius_outlier_o3d(hotpixel_filtered_events,nb_points=30,radius=3,print_progress=True,ms_to_px=float(kwargs['ratio_ms_to_px']))
-    
-    
-    clustersHD, cluster_labels = clustering(filtered_events, polarities, eps = float(kwargs['DBSCAN_eps']), min_points_per_cluster = int(kwargs['min_cluster_size']))
-    logging.info('DBSCAN done')
-    bboxes = get_cluster_bounding_boxes(clustersHD, cluster_labels,padding_xy = int(kwargs['padding_xy']),padding_t = int(kwargs['padding_xy']))
-    logging.info('Getting bounding boxes done')
-    
-    candidates = get_events_in_bbox_bisect(hotpixel_filtered_events,bboxes,float(kwargs['ratio_ms_to_px']))
-    logging.info('Candidates obtained (via bbox bisect)')
-    
-    #Remove small/large bounding-box data
-    candidates, _, _ = utilsHelper.removeCandidatesWithLargeSmallBoundingBox(candidates,settings)
-
-    
-    performance_metadata = ""
     return candidates, performance_metadata

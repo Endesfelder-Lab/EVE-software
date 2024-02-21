@@ -17,16 +17,15 @@ def __function_metadata__():
     return {
         "FrameBased_finding": {
             "required_kwargs": [
-                {"name": "threshold_detection", "description": "Threshold for wavelet detection","default":3.},
-                {"name": "exclusion_radius", "description": "Radius of the exclusion area (if two or more PSFs are closer than twice the value, they will all be discarded) (in pixels)","default":4.},
-                {"name": "min_diameter", "description": "Minimum radius of the thresholded area (in pixels)","default":1.25},
-                {"name": "max_diameter", "description": "Maximum radius of the thresholded area (in pixels)","default":4.},
-                {"name": "frame_time", "description": "frame time in (ms)", "default":100.},
-                {"name": "candidate_radius", "description": "Radius of the area around the localization (in px)","default":4.},
+                {"name": "threshold_detection", "description": "Threshold for wavelet detection","default":3.,"display_text":"Detection threshold"},
+                {"name": "exclusion_radius", "description": "Radius of the exclusion area (if two or more PSFs are closer than twice the value, they will all be discarded) (in pixels)","default":4.,"display_text":"Exclusion radius"},
+                {"name": "min_diameter", "description": "Minimum radius of the thresholded area (in pixels)","default":1.25,"display_text":"Min. radius"},
+                {"name": "max_diameter", "description": "Maximum radius of the thresholded area (in pixels)","default":4.,"display_text":"Max. radius"},
+                {"name": "frame_time", "description": "frame time in (ms)", "default":100.,"display_text":"Frame time (ms)"},
+                {"name": "candidate_radius", "description": "Radius of the area around the localization (in px)","default":4.,"display_text":"Candidate radius"},
             ],
             "optional_kwargs": [
-                {"name": "polarity","description": "Polarity of the events","default":1},
-                {"name": "multithread","description": "True to use multithread parallelization; False not to.","default":True},
+                {"name": "multithread","description": "True to use multithread parallelization; False not to.","default":True,"display_text":"Multithreading"},
             ],
             "help_string": "Convert event data to frames and do finding via wavelet detection",
             "display_name": "Frame Based finding"
@@ -37,15 +36,29 @@ def __function_metadata__():
 #Helper functions
 #-------------------------------------------------------------------------------------------------------------------------------
 
-# Frames generation
-def generate_single_frame(events, times, frame_size):
-    frame=np.zeros((int(np.ceil(frame_size[0])),int(np.ceil(frame_size[1]))))
-    msk=(events['t']>=times[0])*(events['t']<times[1])
-    sub_events=events[msk]
-    for k in np.arange(len(sub_events)):
-        xycoords=[int(np.floor(sub_events['y'][k])),int(np.floor(sub_events['x'][k]))]
-        frame[xycoords[0],xycoords[1]]+=1
-    return frame
+class Frame():
+    def __init__(self, events):
+        self.xlim = [np.min(events['x']), np.max(events['x'])]
+        self.ylim = [np.min(events['y']), np.max(events['y'])]
+        self.xy_bin_width = 1. # in px
+        self.range = self.range()
+        self.bins = self.bins()
+
+    def range(self):
+        xrange = [self.xlim[0]-0.5, self.xlim[1]+0.5]
+        yrange = [self.ylim[0]-0.5, self.ylim[1]+0.5]
+        return [xrange, yrange]
+    
+    def bins(self): 
+        xbins = int((self.xlim[1]-self.xlim[0]+1)/self.xy_bin_width)
+        ybins = int((self.ylim[1]-self.ylim[0]+1)/self.xy_bin_width)
+        return (xbins, ybins)
+
+    def __call__(self, events, times, **kwargs):
+        msk=(events['t']>=times[0])*(events['t']<times[1])
+        sub_events=events[msk]
+        frame, x_edges, y_edges = np.histogram2d(sub_events['x'], sub_events['y'], bins = self.bins, range = self.range, **kwargs)
+        return frame.T
     
 # wavelet detection
 def wavelet_detection(frame, kernel1, kernel2, kernel, threshold_detection):
@@ -58,7 +71,7 @@ def wavelet_detection(frame, kernel1, kernel2, kernel, threshold_detection):
     return image_to_label
 
 # PSF detection
-def detect_PSFs(frame, min_diameter, max_diameter, exclusion_radius, candidate_radius, kernel1, kernel2, kernel, threshold_detection):# verify exceptions for zero detections
+def detect_PSFs(frame, x0, y0, min_diameter, max_diameter, exclusion_radius, candidate_radius, kernel1, kernel2, kernel, threshold_detection):# verify exceptions for zero detections
     
     # Generate image to label
     image_to_label=wavelet_detection(frame, kernel1, kernel2, kernel, threshold_detection)
@@ -110,14 +123,14 @@ def detect_PSFs(frame, min_diameter, max_diameter, exclusion_radius, candidate_r
     x=coordinates_COM[:,1]
     y=coordinates_COM[:,0]
     ROIs=np.zeros((np.shape(x)[0],3))
-    ROIs[:,0]=y
-    ROIs[:,1]=x
+    ROIs[:,0]=y+y0
+    ROIs[:,1]=x+x0
     
     return ROIs
 
 # Process frame (get all ROIs in frame)
-def process_frame(frame, times, min_diameter, max_diameter, exclusion_radius, candidate_radius, kernel1, kernel2, kernel, threshold_detection):    
-    ROIs=detect_PSFs(frame, min_diameter, max_diameter, exclusion_radius, candidate_radius, kernel1, kernel2, kernel, threshold_detection)
+def process_frame(frame, x0, y0, times, min_diameter, max_diameter, exclusion_radius, candidate_radius, kernel1, kernel2, kernel, threshold_detection):    
+    ROIs=detect_PSFs(frame, x0, y0, min_diameter, max_diameter, exclusion_radius, candidate_radius, kernel1, kernel2, kernel, threshold_detection)
     ROIs[:,2]=times[0]
     return ROIs
 
@@ -129,7 +142,7 @@ def generate_candidate(events, ROI, frame_time, candidate_radius):
     sub_events=events[msk]
     candidate = {}
     candidate['events'] = pd.DataFrame(sub_events)
-    candidate['cluster_size'] = [np.max(sub_events['y'])-np.min(sub_events['y']), np.max(sub_events['x'])-np.min(sub_events['x']), np.max(sub_events['t'])-np.min(sub_events['t'])]
+    candidate['cluster_size'] = [np.max(sub_events['y'])-np.min(sub_events['y'])+1, np.max(sub_events['x'])-np.min(sub_events['x'])+1, np.max(sub_events['t'])-np.min(sub_events['t'])]
     candidate['N_events'] = len(sub_events)
     return candidate
 
@@ -161,7 +174,7 @@ def slice_data(events, num_cores, frame_time):
     return data_split, njobs, num_cores
 
 # Candidate finding routine on a single core
-def compute_thread(i, sub_events, frame_time, candidate_radius, min_diameter, max_diameter, exclusion_radius, kernel1, kernel2, kernel, threshold_detection, frame_size):
+def compute_thread(i, sub_events, frame_time, candidate_radius, min_diameter, max_diameter, exclusion_radius, kernel1, kernel2, kernel, threshold_detection, single_frame):
     print('Finding candidates (thread '+str(i)+')...')
     time_max=np.max(sub_events['t'])
     time_min=np.min(sub_events['t'])
@@ -173,8 +186,9 @@ def compute_thread(i, sub_events, frame_time, candidate_radius, min_diameter, ma
         msk=(sub_events['t']>=times[0])*(sub_events['t']<times[1])
         events_loaded=sub_events[msk]
         # Detect PSFs
-        frame=generate_single_frame(events_loaded, times, frame_size)
-        ROIs.append(process_frame(frame, times, min_diameter, max_diameter, exclusion_radius, candidate_radius, kernel1, kernel2, kernel, threshold_detection))
+        frame=single_frame(events_loaded, times)
+        x0,y0=single_frame.xlim[0],single_frame.ylim[0]
+        ROIs.append(process_frame(frame, x0, y0, times, min_diameter, max_diameter, exclusion_radius, candidate_radius, kernel1, kernel2, kernel, threshold_detection))
     ROIs=np.vstack(ROIs)
     gc.collect()
     
@@ -210,7 +224,6 @@ def FrameBased_finding(npy_array,settings,**kwargs):
     candidate_radius = float(kwargs['candidate_radius'])
 
     # Load the optional kwargs
-    polarity = int(kwargs['polarity'])
     multithread = utilsHelper.strtobool(kwargs['multithread'])
 
     # Initializations - general
@@ -227,47 +240,18 @@ def FrameBased_finding(npy_array,settings,**kwargs):
     candidates = {}
     index = 0
     candidates_info = ''
-    if polarity==0 or polarity==1:
-        events = npy_array[npy_array['p']==polarity]
-        frame_size=[np.max(events['y'])+1,np.max(events['x'])+1]
-        events_split, njobs, num_cores = slice_data(events, num_cores, frame_time)
-        print("Candidate fitting split in "+str(njobs)+" job(s) and divided on "+str(num_cores)+" core(s).")
-        RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(compute_thread)(i, events_split[i], frame_time, candidate_radius, min_diameter, max_diameter, exclusion_radius, kernel1, kernel2, kernel, threshold_detection, frame_size) for i in range(len(events_split)))
-        for i in range(len(RES)):
-            for candidate in RES[i].items():
-                candidates[index] = candidate[1]
-                index+=1
-        candidates_info += f'Number of candidates found: {len(candidates)}'
 
-    elif polarity==2:
-        # Do first negative events...
-        events = npy_array[npy_array['p']==0]
-        frame_size=[np.max(events['y'])+1,np.max(events['x'])+1]
-        events_split, njobs, num_cores = slice_data(events, num_cores, frame_time)
-        print("Candidate fitting split in "+str(njobs)+" job(s) and divided on "+str(num_cores)+" core(s).")
-        RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(compute_thread)(i, events_split[i], frame_time, candidate_radius, min_diameter, max_diameter, exclusion_radius, kernel1, kernel2, kernel, threshold_detection, frame_size) for i in range(len(events_split)))
-        for i in range(len(RES)):
-            for candidate in RES[i].items():
-                candidates[index] = candidate[1]
-                index+=1
-        Nb_neg_candidates = len(candidates)
-        candidates_info = f'Number of negative candidates found: {Nb_neg_candidates}\n'
-
-        # ... and then positive events.
-        events = npy_array[npy_array['p']==1]
-        frame_size=[np.max(events['y'])+1,np.max(events['x'])+1]
-        events_split, njobs, num_cores = slice_data(events, num_cores, frame_time)
-        print("Candidate fitting split in "+str(njobs)+" job(s) and divided on "+str(num_cores)+" core(s).")
-        RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(compute_thread)(i, events_split[i], frame_time, candidate_radius, min_diameter, max_diameter, exclusion_radius, kernel1, kernel2, kernel, threshold_detection, frame_size) for i in range(len(events_split)))
-        for i in range(len(RES)):
-            for candidate in RES[i].items():
-                candidates[index] = candidate[1]
-                index+=1
-        Nb_pos_candidates = len(candidates)-Nb_neg_candidates
-        candidates_info += f'Number of positive candidates found: {Nb_pos_candidates}'
-                
-    else: logging.error('Polarity must be 0, 1 or 2.')
-    logging.info(candidates_info)
+    single_frame = Frame(npy_array)
+    events_split, njobs, num_cores = slice_data(npy_array, num_cores, frame_time)
+    print("Candidate fitting split in "+str(njobs)+" job(s) and divided on "+str(num_cores)+" core(s).")
+    RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(compute_thread)(i, events_split[i], frame_time, candidate_radius, min_diameter, max_diameter, exclusion_radius, kernel1, kernel2, kernel, threshold_detection, single_frame) for i in range(len(events_split)))
+    for i in range(len(RES)):
+        for candidate in RES[i].items():
+            candidates[index] = candidate[1]
+            index+=1
     
-    performance_metadata = ''
+    #Remove small/large bounding-box data
+    candidates, _, _ = utilsHelper.removeCandidatesWithLargeSmallBoundingBox(candidates,settings)
+
+    performance_metadata = candidates_info
     return candidates, performance_metadata
