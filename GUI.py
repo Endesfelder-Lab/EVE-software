@@ -2,8 +2,6 @@ from GUI_main import MyGUI
 import sys,argparse,colorsys
 from PyQt5.QtWidgets import QApplication
 import multiprocessing
-from PyQt5.QtGui import QIcon
-import os
 
 def adjust_color_brightness(hex_color, percent):
     # Convert hexadecimal color to RGB
@@ -30,16 +28,13 @@ def get_stylesheet():
     padding_medium = '2px'#'4px'
     padding_large = '3px'#'6px'
     margin_small = '1px'#'2px'
-    margin_medium = '3px'#'5px'
+    margin_medium = '1px'#'5px'
     margin_between_groupbox_and_entry = '8px'  # Adjust as needed
 
     # Stylesheet
     stylesheet = (
-        f"QWidget {{ margin: {margin_small}; }}"
-        f"QGroupBox {{ background-color: {background_color}; }}"
-        f"QLayout {{ background-color: {background_color}; }}"
-
-        f"QLabel, QLineEdit, QComboBox, QCheckBox {{ color: {text_color}; }}"
+        f"QWidget {{ background-color: {background_color}; margin: {margin_small}; }}"
+        f"QLabel, QLineEdit {{ color: {text_color}; }}"
         f"QPushButton {{ background-color: {accent_color}; color: {text_color}; "
         f"border: {border_width} solid {accent_color}; border-radius: {border_radius}; padding: {padding_large}; }}"
         f"QPushButton:hover {{ background-color: {accent_color_darker}; }}"
@@ -47,7 +42,7 @@ def get_stylesheet():
         f"QLineEdit {{ border: {border_width} solid {accent_color}; border-radius: {border_radius}; padding: {padding_small}; }}"
         f"QComboBox {{ border: {border_width} solid {accent_color}; border-radius: {border_radius}; padding: {padding_small}; }}"
         f"QComboBox::drop-down {{ subcontrol-origin: padding; subcontrol-position: top right;}}"
-        f"QComboBox QAbstractItemView {{ selection-background-color: #0078D7; selection-color: {text_color};}}" 
+        f"QComboBox QAbstractItemView {{ selection-background-color: #0078D7; }}" 
         f"QTabWidget::pane {{ border: {border_width} solid {accent_color}; border-radius: {border_radius}; margin: 0; }}"
         f"QTabBar::tab {{ background-color: {background_color}; color: {text_color}; border: {border_width} solid {accent_color}; border-top: none; border-bottom-left-radius: {border_radius}; border-bottom-right-radius: {border_radius}; padding: {padding_medium}; margin-right: {margin_small}; }}"
         f"QTabBar::tab:selected {{ background-color: {accent_color_darker}; color: {text_color}; border-top: {border_width} solid {accent_color}; }}"
@@ -59,12 +54,23 @@ def get_stylesheet():
 
     return stylesheet
 
+
+
+
+
+
+
+
+
+
+
+
+ 
 if __name__ == "__main__":
+    multiprocessing.freeze_support()
     app = QApplication(sys.argv)
     
     gui = MyGUI()
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    gui.setWindowIcon(QIcon(current_dir + os.sep + 'Eve.png'))
     gui.setStyleSheet(get_stylesheet())
     gui.show()
     sys.exit(app.exec_())

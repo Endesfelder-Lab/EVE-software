@@ -6,20 +6,11 @@ import re
 import warnings, logging
 import numpy as np
 import itertools
-from EventDistributions import eventDistributions
+from Utils import utilsHelper
 
 #Import all scripts in the custom script folders
 from CandidateFinding import *
 from CandidateFitting import *
-from Visualisation import *
-from PostProcessing import *
-from CandidatePreview import *
-
-#Imports for PyQt5 (GUI)
-from PyQt5 import QtWidgets, QtGui
-from PyQt5.QtGui import QCursor, QTextCursor, QIntValidator
-from PyQt5.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QTableWidget, QTableWidgetItem, QLayout, QMainWindow, QLabel, QPushButton, QSizePolicy, QGroupBox, QTabWidget, QGridLayout, QWidget, QComboBox, QLineEdit, QFileDialog, QToolBar, QCheckBox,QDesktopWidget, QMessageBox, QTextEdit, QSlider, QSpacerItem
-from PyQt5.QtCore import Qt, QPoint, QProcess, QCoreApplication, QTimer, QFileSystemWatcher, QFile, QThread, pyqtSignal, QObject
 
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
@@ -93,38 +84,6 @@ def reqKwargsFromFunction(functionname):
     names = re.findall(name_pattern, allkwarginfo[0][0])
     return names
 
-#Returns a display name (if available) of an individual kwarg name, from a specific function:
-def displayNameFromKwarg(functionname,name):
-    #Get all kwarg info
-    allkwarginfo = kwargsFromFunction(functionname)
-    
-    #Look through optional args first, then req. kwargs (so that req. kwargs have priority in case something weirdi s happening):
-    for optOrReq in range(1,-1,-1):
-    
-        #Perform a regex match on 'name'
-        name_pattern = r"name:\s*(\S+)"
-        
-        names = re.findall(name_pattern, allkwarginfo[optOrReq][0])
-        instances = re.split(r'(?=name: )', allkwarginfo[optOrReq][0])[1:]
-
-        #Find which instance this name belongs to:
-        name_id = -1
-        for i,namef in enumerate(names):
-            if namef == name:
-                name_id = i
-        
-        if name_id > -1:
-            curr_instance = instances[name_id]
-            displayText_pattern = r"display_text: (.*?)\n"
-            displaytext = re.findall(displayText_pattern, curr_instance)
-            if len(displaytext) > 0:
-                displayName = displaytext[0]
-            else:
-                displayName = name
-    
-    return displayName
-    
-
 #Returns the 'names' of the optional kwargs of a function
 def optKwargsFromFunction(functionname):
     #Get all kwarg info
@@ -134,47 +93,6 @@ def optKwargsFromFunction(functionname):
     #Get the names of the optional kwargs (allkwarginfo[1])
     names = re.findall(name_pattern, allkwarginfo[1][0])
     return names
-
-def distKwargValuesFromFittingFunction(functionname):
-    #Get all kwarg info
-    allkwarginfo = kwargsFromFunction(functionname)
-    derivedClasses = []
-    if allkwarginfo[2] != []:
-        base_pattern = r"base:\s*(\S+)"
-        base_name = re.findall(base_pattern, allkwarginfo[2][0])[0]
-        # get base class
-        baseClass = getattr(eventDistributions, base_name, None)
-        if not baseClass == None:
-            # get all derived classes that share common base
-            for name, obj in inspect.getmembers(eventDistributions):
-                if inspect.isclass(obj) and issubclass(obj, baseClass) and obj != baseClass:
-                    derivedClasses.append(name)
-    return derivedClasses
-
-def defaultOptionFromDistKwarg(functionname):
-    #Check if the function has a 'default' option for the distribution kwarg. 
-    defaultOption=None
-    functionparent = functionname.split('.')[0]
-    #Get the full function metadata
-    functionMetadata = eval(f'{str(functionparent)}.__function_metadata__()')[functionname.split('.')[1]]
-    if "dist_kwarg" in functionMetadata:
-        if "default_option" in functionMetadata["dist_kwarg"]:
-            defaultOption = functionMetadata["dist_kwarg"]["default_option"]
-            # check if defaultOption is a valid option
-            defaultOption = getattr(eventDistributions, defaultOption, None)
-            if defaultOption != None:
-                defaultOption = defaultOption.__name__
-    return defaultOption
-
-def getInfoFromDistribution(distribution):
-    description = None
-    distClass = getattr(eventDistributions, distribution, None)
-    if not distClass == None:
-        try:
-            description = distClass.description
-        except AttributeError:
-            pass
-    return description
 
 #Obtain the kwargs from a function. Results in an array with entries
 def kwargsFromFunction(functionname):
@@ -195,7 +113,6 @@ def kwargsFromFunction(functionname):
         help_arr = []
         rkwarr_arr = []
         okwarr_arr = []
-        dist_kwarg = []
         loopindex = 0
         for i in looprange:
             #Get name text for all entries
@@ -218,20 +135,13 @@ def kwargsFromFunction(functionname):
                 for key, value in functionMetadata[list(functionMetadata.keys())[i]]["optional_kwargs"][k].items():
                     txt += f"{key}: {value}\n"
             okwarr_arr.append(txt)
-            #Get text for distribution kwargs
-            txt = ""
-            if "dist_kwarg" in functionMetadata[list(functionMetadata.keys())[i]]:
-                for key, value in functionMetadata[list(functionMetadata.keys())[i]]["dist_kwarg"].items():
-                    txt += f"{key}: {value}\n"
-                dist_kwarg.append(txt)
     #Error handling if __function_metadata__ doesn't exist
     except AttributeError:
         rkwarr_arr = []
         okwarr_arr = []
-        dist_kwarg = []
         return f"No __function_metadata__ in {functionname}"
             
-    return [rkwarr_arr, okwarr_arr, dist_kwarg]
+    return [rkwarr_arr, okwarr_arr]
 
 #Obtain the help-file and info on kwargs on a specific function
 #Optional: Boolean kwarg showKwargs & Boolean kwarg showHelp
@@ -278,9 +188,6 @@ def infoFromMetadata(functionname,**kwargs):
                 for k in range(0,len(functionMetadata[functionname.split('.')[1]]["required_kwargs"])):
                     if functionMetadata[functionname.split('.')[1]]["required_kwargs"][k]['name'] == specificKwarg:
                         helptext = functionMetadata[functionname.split('.')[1]]["required_kwargs"][k]['description']
-                # for distribution kwarg
-                if specificKwarg == 'dist_kwarg':
-                    helptext = functionMetadata[functionname.split('.')[1]]["dist_kwarg"]['description']
                 finaltext = helptext
                 skipfinalline = True
                 looprange = range(0,0)
@@ -374,21 +281,6 @@ def createFunctionWithKwargs(functionname,**kwargs):
     #run the function
     return fullstring
 
-def changeTab(parent,text="Processing"):
-    """
-    Change the tab in the mainTabWidget to the one with the specified text.
-
-    Args:
-        parent: The parent widget containing the mainTabWidget.
-        text (str): The text of the tab to change to. Defaults to "Processing".
-    """
-    for i in range(parent.mainTabWidget.count()):
-        if parent.mainTabWidget.tabText(i) == text:
-            parent.mainTabWidget.setCurrentIndex(i)
-            break
-    import time
-    time.sleep(0.1)
-        
 def defaultValueFromKwarg(functionname,kwargname):
     #Check if the function has a 'default' entry for the specific kwarg. If not, return None. Otherwise, return the default value.
     
@@ -411,7 +303,7 @@ def defaultValueFromKwarg(functionname,kwargname):
     return defaultEntry
 
 
-def displayNamesFromFunctionNames(functionName, polval):
+def displayNamesFromFunctionNames(functionName):
     displaynames = []
     functionName_to_displayName_map = []
     for function in functionName:
@@ -422,37 +314,24 @@ def displayNamesFromFunctionNames(functionName, polval):
         functionMetadata = eval(f'{str(subroutineName)}.__function_metadata__()')
         if 'display_name' in functionMetadata[singlefunctiondata]:
             displayName = functionMetadata[singlefunctiondata]['display_name']
-            #Add the polarity info between brackets if required
-            if polval != '':
-                displayName += " ("+polval+")"
         else:
             displayName = subroutineName+': '+singlefunctiondata
-            #Add the polarity info between brackets if required
-            if polval != '':
-                displayName += " ("+polval+")"
         displaynames.append(displayName)
         functionName_to_displayName_map.append((displayName,function))
-        
     #Check for ambiguity in both columns:
-    # if not len(np.unique(list(set(functionName_to_displayName_map)))) == len(list(itertools.chain.from_iterable(functionName_to_displayName_map))):
-    #     raise Exception('Ambiguous display names in functions!! Please check all function names and display names for uniqueness!')
+    
+    if not len(np.unique(list(set(functionName_to_displayName_map)))) == len(list(itertools.chain.from_iterable(functionName_to_displayName_map))):
+        raise Exception('Ambiguous display names in functions!! Please check all function names and display names for uniqueness!')
         
     return displaynames, functionName_to_displayName_map
-
-def polaritySelectedFromDisplayName(displayname):
-    if '(pos)' in displayname:
-        return 'pos'
-    elif '(neg)' in displayname:
-        return 'neg'
-    elif '(mix)' in displayname:
-        return 'mix'
-
 
 def functionNameFromDisplayName(displayname,map):
     for pair in map:
         if pair[0] == displayname:
+            print(pair[1])
             return pair[1]
         
+
 def typeFromKwarg(functionname,kwargname):
     #Check if the function has a 'type' entry for the specific kwarg. If not, return None. Otherwise, return the type value.
     typing=None
@@ -473,371 +352,3 @@ def typeFromKwarg(functionname,kwargname):
     
     return typing
 
-
-
-
-def changeLayout_choice(curr_layout,className,displayNameToFunctionNameMap,parent=None,ignorePolarity=False,maxNrRows=4):
-    logging.debug('Changing layout '+curr_layout.parent().objectName())
-    #This removes everything except the first entry (i.e. the drop-down menu)
-    resetLayout(curr_layout,className)
-    #Get the dropdown info
-    curr_dropdown = getMethodDropdownInfo(curr_layout,className)
-    if len(curr_dropdown) > 0:
-        #Get the kw-arguments from the current dropdown.
-        current_selected_function = functionNameFromDisplayName(curr_dropdown.currentText(),displayNameToFunctionNameMap)
-        logging.debug('current selected function: '+current_selected_function)
-        if not ignorePolarity:
-            current_selected_polarity = polaritySelectedFromDisplayName(curr_dropdown.currentText())
-            
-            #Classname should always end in pos/neg/mix!
-            wantedPolarity = className[-3:].lower()
-            
-            #Hide dropdown entries that are not part of the current_selected property
-            model = curr_dropdown.model()
-            totalNrRows = model.rowCount()
-            for rowId in range(totalNrRows):
-                #First show all rows:
-                curr_dropdown.view().setRowHidden(rowId, False)
-                item = model.item(rowId)
-                item.setFlags(item.flags() | Qt.ItemIsEnabled)
-                
-                #Then hide based on the row name
-                rowName = model.item(rowId,0).text()
-                if polaritySelectedFromDisplayName(rowName) != wantedPolarity:
-                    item = model.item(rowId)
-                    item.setFlags(item.flags() & ~Qt.ItemIsEnabled)
-                    curr_dropdown.view().setRowHidden(rowId, True)
-        else:
-            #Unhide everything
-            model = curr_dropdown.model()
-            totalNrRows = model.rowCount()
-            for rowId in range(totalNrRows):
-                #First show all rows:
-                curr_dropdown.view().setRowHidden(rowId, False)
-                item = model.item(rowId)
-                item.setFlags(item.flags() | Qt.ItemIsEnabled)
-            current_selected_polarity = 'None'
-    
-        #Visual max number of rows before a 2nd column is started.
-        labelposoffset = 0
-
-        #Add a widget-pair for the distribution
-        distKwargValues = distKwargValuesFromFittingFunction(current_selected_function)
-        if len(distKwargValues) != 0:
-            # Add a combobox containing all the possible kw-args
-            label = QLabel("<b>distribution</b>")
-            label.setObjectName(f"Label#{current_selected_function}#dist_kwarg#{current_selected_polarity}")
-            if checkAndShowWidget(curr_layout,label.objectName()) == False:
-                label.setToolTip(infoFromMetadata(current_selected_function,specificKwarg='dist_kwarg'))
-                curr_layout.addWidget(label,2,0)
-            combobox = QComboBox()
-            combobox.addItems(distKwargValues)
-            combobox.setObjectName(f"ComboBox#{current_selected_function}#dist_kwarg#{current_selected_polarity}")
-            defaultOption = defaultOptionFromDistKwarg(current_selected_function)
-            if defaultOption != None:
-                combobox.setCurrentText(defaultOption)
-            test = combobox.currentText()
-            combobox.setToolTip(getInfoFromDistribution(combobox.currentText()))
-            combobox.currentTextChanged.connect(lambda text: combobox.setToolTip(getInfoFromDistribution(text)))
-            if checkAndShowWidget(curr_layout,combobox.objectName()) == False:
-                curr_layout.addWidget(combobox,2,1)
-            labelposoffset += 1
-            
-        reqKwargs = reqKwargsFromFunction(current_selected_function)
-        
-        #Add a widget-pair for every kw-arg
-        
-        for k in range(len(reqKwargs)):
-            #Value is used for scoring, and takes the output of the method
-            if reqKwargs[k] != 'methodValue':
-                label = QLabel(f"<b>{displayNameFromKwarg(current_selected_function,reqKwargs[k])}</b>")
-                label.setObjectName(f"Label#{current_selected_function}#{reqKwargs[k]}#{current_selected_polarity}")
-                if checkAndShowWidget(curr_layout,label.objectName()) == False:
-                    label.setToolTip(infoFromMetadata(current_selected_function,specificKwarg=reqKwargs[k]))
-                    curr_layout.addWidget(label,2+((k+labelposoffset))%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+0)
-                #Check if we want to add a fileLoc-input:
-                if typeFromKwarg(current_selected_function,reqKwargs[k]) == 'fileLoc':
-                    #Create a new qhboxlayout:
-                    hor_boxLayout = QHBoxLayout()
-                    #Add a line_edit to this:
-                    line_edit = QLineEdit()
-                    line_edit.setObjectName(f"LineEdit#{current_selected_function}#{reqKwargs[k]}#{current_selected_polarity}")
-                    defaultValue = defaultValueFromKwarg(current_selected_function,reqKwargs[k])
-                    hor_boxLayout.addWidget(line_edit)
-                    #Also add a QButton with ...:
-                    line_edit_lookup = QPushButton()
-                    line_edit_lookup.setText('...')
-                    line_edit_lookup.setObjectName(f"PushButton#{current_selected_function}#{reqKwargs[k]}#{current_selected_polarity}")
-                    hor_boxLayout.addWidget(line_edit_lookup)
-                    
-                    #Actually placing it in the layout
-                    checkAndShowWidget(curr_layout,line_edit.objectName())
-                    checkAndShowWidget(curr_layout,line_edit_lookup.objectName())
-                    if checkAndShowWidget(curr_layout,line_edit.objectName()) == False:
-                        line_edit.setToolTip(infoFromMetadata(current_selected_function,specificKwarg=reqKwargs[k]))
-                        if defaultValue is not None:
-                            line_edit.setText(str(defaultValue))
-                        curr_layout.addLayout(hor_boxLayout,2+((k+labelposoffset))%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+1)
-                        #Add a on-change listener:
-                        line_edit.textChanged.connect(lambda text,line_edit=line_edit: kwargValueInputChanged(line_edit))
-                        
-                        #Add an listener when the pushButton is pressed
-                        line_edit_lookup.clicked.connect(lambda text2,line_edit_change_objName = line_edit,text="Select file",filter="*.*": lineEditFileLookup(line_edit_change_objName, text, filter,parent=parent))
-                        
-                else: #'normal' type - int, float, string, whatever
-                    #Creating a line-edit...
-                    line_edit = QLineEdit()
-                    line_edit.setObjectName(f"LineEdit#{current_selected_function}#{reqKwargs[k]}#{current_selected_polarity}")
-                    defaultValue = defaultValueFromKwarg(current_selected_function,reqKwargs[k])
-                    #Actually placing it in the layout
-                    if checkAndShowWidget(curr_layout,line_edit.objectName()) == False:
-                        line_edit.setToolTip(infoFromMetadata(current_selected_function,specificKwarg=reqKwargs[k]))
-                        if defaultValue is not None:
-                            line_edit.setText(str(defaultValue))
-                        curr_layout.addWidget(line_edit,2+((k+labelposoffset))%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+1)
-                        #Add a on-change listener:
-                        line_edit.textChanged.connect(lambda text,line_edit=line_edit: kwargValueInputChanged(line_edit))
-            else:
-                labelposoffset -= 1
-            
-        #Get the optional kw-arguments from the current dropdown.
-        optKwargs = optKwargsFromFunction(current_selected_function)
-        #Add a widget-pair for every kwarg
-        for k in range(len(optKwargs)):
-            label = QLabel(f"<i>{displayNameFromKwarg(current_selected_function,optKwargs[k])}</i>")
-            label.setObjectName(f"Label#{current_selected_function}#{optKwargs[k]}#{current_selected_polarity}")
-            if checkAndShowWidget(curr_layout,label.objectName()) == False:
-                label.setToolTip(infoFromMetadata(current_selected_function,specificKwarg=optKwargs[k]))
-                curr_layout.addWidget(label,2+((k+labelposoffset+len(reqKwargs)))%maxNrRows,(((k+labelposoffset+len(reqKwargs)))//maxNrRows)*2+0)
-            #Check if we want to add a fileLoc-input:
-            if typeFromKwarg(current_selected_function,optKwargs[k]) == 'fileLoc':
-                #Create a new qhboxlayout:
-                hor_boxLayout = QHBoxLayout()
-                #Add a line_edit to this:
-                line_edit = QLineEdit()
-                line_edit.setObjectName(f"LineEdit#{current_selected_function}#{optKwargs[k]}#{current_selected_polarity}")
-                defaultValue = defaultValueFromKwarg(current_selected_function,optKwargs[k])
-                hor_boxLayout.addWidget(line_edit)
-                #Also add a QButton with ...:
-                line_edit_lookup = QPushButton()
-                line_edit_lookup.setText('...')
-                line_edit_lookup.setObjectName(f"PushButton#{current_selected_function}#{optKwargs[k]}#{current_selected_polarity}")
-                hor_boxLayout.addWidget(line_edit_lookup)
-                
-                #Actually placing it in the layout
-                checkAndShowWidget(curr_layout,line_edit.objectName())
-                checkAndShowWidget(curr_layout,line_edit_lookup.objectName())
-                if checkAndShowWidget(curr_layout,line_edit.objectName()) == False:
-                    line_edit.setToolTip(infoFromMetadata(current_selected_function,specificKwarg=optKwargs[k]))
-                    if defaultValue is not None:
-                        line_edit.setText(str(defaultValue))
-                    curr_layout.addLayout(hor_boxLayout,2+((k+labelposoffset))%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+1)
-                    #Add a on-change listener:
-                    line_edit.textChanged.connect(lambda text,line_edit=line_edit: kwargValueInputChanged(line_edit))
-                    
-                    #Add an listener when the pushButton is pressed
-                    line_edit_lookup.clicked.connect(lambda text2,line_edit_change_objName = line_edit,text="Select file",filter="*.*": lineEditFileLookup(line_edit_change_objName, text, filter,parent=parent))
-                        
-            else:
-                line_edit = QLineEdit()
-                line_edit.setObjectName(f"LineEdit#{current_selected_function}#{optKwargs[k]}#{current_selected_polarity}")
-                defaultValue = defaultValueFromKwarg(current_selected_function,optKwargs[k])
-                if checkAndShowWidget(curr_layout,line_edit.objectName()) == False:
-                    line_edit.setToolTip(infoFromMetadata(current_selected_function,specificKwarg=optKwargs[k]))
-                    if defaultValue is not None:
-                        line_edit.setText(str(defaultValue))
-                    curr_layout.addWidget(line_edit,2+((k+labelposoffset+len(reqKwargs)))%maxNrRows,(((k+labelposoffset+len(reqKwargs)))//maxNrRows)*2+1)
-                    #Add a on-change listener:
-                    line_edit.textChanged.connect(lambda text,line_edit=line_edit: kwargValueInputChanged(line_edit))
-
-def kwargValueInputChanged(line_edit):
-    #Get the function name
-    function = line_edit.objectName().split("#")[1]
-    #Get the kwarg
-    kwarg = line_edit.objectName().split("#")[2]
-    #Get the value
-    value = line_edit.text()
-    expectedType = typeFromKwarg(function,kwarg)
-    if expectedType == 'fileLoc':
-        expectedType=str
-    if expectedType is not None:
-        if expectedType is str:
-            try:
-                value = str(line_edit.text())
-                setLineEditStyle(line_edit,type='Normal')
-            except:
-                #Show as warning
-                setLineEditStyle(line_edit,type='Warning')
-        elif expectedType is not str:
-            try:
-                value = eval(line_edit.text())
-                if expectedType == float:
-                    if isinstance(value,int) or isinstance(value,float):
-                        setLineEditStyle(line_edit,type='Normal')
-                    else:
-                        setLineEditStyle(line_edit,type='Warning')
-                else:
-                    if isinstance(value,expectedType):
-                        setLineEditStyle(line_edit,type='Normal')
-                    else:
-                        setLineEditStyle(line_edit,type='Warning')
-            except:
-                #Show as warning
-                setLineEditStyle(line_edit,type='Warning')
-    else:
-        setLineEditStyle(line_edit,type='Normal')
-    pass
-
-def setLineEditStyle(line_edit,type='Normal'):
-    if type == 'Normal':
-        line_edit.setStyleSheet("border: 1px  solid #D5D5E5;")
-    elif type == 'Warning':
-        line_edit.setStyleSheet("border: 1px solid red;")
-
-def checkAndShowWidget(layout, widgetName):
-    # Iterate over the layout's items
-    for index in range(layout.count()):
-        item = layout.itemAt(index)
-        # Check if the item is a widget
-        if item.widget() is not None:
-            widget = item.widget()
-            # Check if the widget has the desired name
-            if widget.objectName() == widgetName:
-                # Widget already exists, unhide it
-                widget.show()
-                return
-        else:
-            for index2 in range(item.count()):
-                item_sub = item.itemAt(index2)
-                # Check if the item is a widget
-                if item_sub.widget() is not None:
-                    widget = item_sub.widget()
-                    # Check if the widget has the desired name
-                    if widget.objectName() == widgetName:
-                        # Widget already exists, unhide it
-                        widget.show()
-                        return
-    return False
-
-#Remove everythign in this layout except className_dropdown
-def resetLayout(curr_layout,className):
-    for index in range(curr_layout.count()):
-        widget_item = curr_layout.itemAt(index)
-        # Check if the item is a widget (as opposed to a layout)
-        if widget_item.widget() is not None:
-            widget = widget_item.widget()
-            #If it's the dropdown segment, label it as such
-            if not ("CandidateFindingDropdown" in widget.objectName()) and not ("CandidateFittingDropdown" in widget.objectName()) and widget.objectName() != f"titleLabel_{className}" and not ("KEEP" in widget.objectName()):
-                logging.debug(f"Hiding {widget.objectName()}")
-                widget.hide()
-        else:
-            for index2 in range(widget_item.count()):
-                widget_sub_item = widget_item.itemAt(index2)
-                # Check if the item is a widget (as opposed to a layout)
-                if widget_sub_item.widget() is not None:
-                    widget = widget_sub_item.widget()
-                    #If it's the dropdown segment, label it as such
-                    if not ("CandidateFindingDropdown" in widget.objectName()) and not ("CandidateFittingDropdown" in widget.objectName()) and widget.objectName() != f"titleLabel_{className}" and not ("KEEP" in widget.objectName()):
-                        logging.debug(f"Hiding {widget.objectName()}")
-                        widget.hide()
-
-def getMethodDropdownInfo(curr_layout,className):
-    curr_dropdown = []
-    #Look through all widgets in the current layout
-    for index in range(curr_layout.count()):
-        widget_item = curr_layout.itemAt(index)
-        #Check if it's fair to check
-        if widget_item.widget() is not None:
-            widget = widget_item.widget()
-            #If it's the dropdown segment, label it as such
-            if (className in widget.objectName()) and ("Dropdown" in widget.objectName()):
-                curr_dropdown = widget
-    #Return the dropdown
-    return curr_dropdown
-
-
-def lineEditFileLookup(line_edit_objName, text, filter,parent=None):
-    file_path = generalFileSearchButtonAction(parent=parent,text=text,filter=filter)
-    line_edit_objName.setText(file_path)
-        
-def generalFileSearchButtonAction(parent=None,text='Select File',filter='*.txt'):
-    file_path, _ = QFileDialog.getOpenFileName(parent,text,filter=filter)
-    return file_path
-
-    
-def getEvalTextFromGUIFunction(methodName, methodKwargNames, methodKwargValues, partialStringStart=None, removeKwargs=None):
-    #--------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    #methodName: the physical name of the method, i.e. StarDist.StarDistSegment
-    #methodKwargNames: found kwarg NAMES from the GUI
-    #methodKwargValues: found kwarg VALUES from the GUI
-    #methodTypeString: type of method, i.e. 'function Type' (e.g. CellSegmentScripts, CellScoringScripts etc)'
-    #Optionals: partialStringStart: gives a different start to the partial eval-string
-    #Optionals: removeKwargs: removes kwargs from assessment (i.e. for scoring script, where this should always be changed by partialStringStart)
-    #--------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    specialcaseKwarg = [] #Kwarg where the special case is used
-    specialcaseKwargPartialStringAddition = [] #text to be eval-ed in case this kwarg is found
-    #We have the method name and all its kwargs, so:
-    if len(methodName)>0: #if the method exists
-        #Check if all req. kwargs have some value
-        reqKwargs = reqKwargsFromFunction(methodName)
-        #Remove values from this array if wanted
-        if removeKwargs is not None:
-            for removeKwarg in removeKwargs:
-                if removeKwarg in reqKwargs:
-                    reqKwargs.remove(removeKwarg)
-                else:
-                    #nothing, but want to make a note of this (log message)
-                    reqKwargs = reqKwargs
-        #Stupid dummy-check whether we have the reqKwargs in the methodKwargNames, which we should (basically by definition)
-
-        if all(elem in set(methodKwargNames) for elem in reqKwargs):
-            allreqKwargsHaveValue = True
-            for id in range(0,len(reqKwargs)):
-                #First find the index of the function-based reqKwargs in the GUI-based methodKwargNames. 
-                GUIbasedIndex = methodKwargNames.index(reqKwargs[id])
-                #Get the value of the kwarg - we know the name already now due to reqKwargs.
-                kwargvalue = methodKwargValues[GUIbasedIndex]
-                if kwargvalue == '':
-                    allreqKwargsHaveValue = False
-                    logging.error(f'Missing required keyword argument in {methodName}: {reqKwargs[id]}, NOT CONTINUING')
-            if allreqKwargsHaveValue:
-                #If we're at this point, all req kwargs have a value, so we can run!
-                #Get the string for the required kwargs
-                if partialStringStart is not None:
-                    partialString = partialStringStart
-                else:
-                    partialString = ''
-                for id in range(0,len(reqKwargs)):
-                    #First find the index of the function-based reqKwargs in the GUI-based methodKwargNames. 
-                    GUIbasedIndex = methodKwargNames.index(reqKwargs[id])
-                    #Get the value of the kwarg - we know the name already now due to reqKwargs.
-                    kwargvalue = methodKwargValues[GUIbasedIndex]
-                    #Add a comma if there is some info in the partialString already
-                    if partialString != '':
-                        partialString+=","
-                    #Check for special requests of kwargs, this is normally used when pointing to the output of a different value
-                    if reqKwargs[id] in specialcaseKwarg:
-                        #Get the index
-                        ps_index = specialcaseKwarg.index(reqKwargs[id])
-                        #Change the partialString with the special case
-                        partialString+=eval(specialcaseKwargPartialStringAddition[ps_index])
-                    else:
-                        partialString+=reqKwargs[id]+"=\""+kwargvalue+"\""
-                #Add the optional kwargs if they have a value
-                optKwargs = optKwargsFromFunction(methodName)
-                for id in range(0,len(optKwargs)):
-                    if methodKwargValues[id+len(reqKwargs)] != '':
-                        if partialString != '':
-                            partialString+=","
-                        partialString+=optKwargs[id]+"=\""+methodKwargValues[methodKwargNames.index(optKwargs[id])]+"\""
-                #Add the distribution kwarg if it exists
-                if 'dist_kwarg' in methodKwargNames:
-                    partialString += ",dist_kwarg=\""+methodKwargValues[methodKwargNames.index('dist_kwarg')]+"\""
-                segmentEval = methodName+"("+partialString+")"
-                return segmentEval
-            else:
-                logging.error('NOT ALL KWARGS PROVIDED!')
-                return None
-        else:
-            logging.error('SOMETHING VERY STUPID HAPPENED')
-            return None

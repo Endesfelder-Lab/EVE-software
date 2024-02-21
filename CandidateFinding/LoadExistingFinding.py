@@ -8,12 +8,11 @@ def __function_metadata__():
     return {
         "LoadExistingFinding": {
             "required_kwargs": [
-                {"name": "File_Location", "description": "Location of a FindingResults .pickle file","type":"fileLoc","display_text":"File location"},
+                {"name": "File_Location", "description": "Location of a FindingResults .pickle file"},
             ],
             "optional_kwargs": [
-            ],
-            "help_string": "Loads a previously created FindingResults and only runs fitting routine on this.",
-            "display_name": "Load an existing Finding Result"
+             ],
+            "help_string": "Loads a previously created FindingResults and only runs fitting routine on this."
         }
     }
 
