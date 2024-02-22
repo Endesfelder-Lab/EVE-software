@@ -32,6 +32,27 @@ def strtobool(val):
     else:
         raise ValueError("invalid truth value %r" % (val,))
 
+
+def removeCandidates_xytoutliers(candidates,settings,x_std_mult = 2.5, y_std_mult = 2.5, t_std_mult = 2.5):
+    nrOrigCandidates = len(candidates)
+    nchanged = 0
+    for candidate in sorted(candidates, reverse=True):
+        candidate_mean_x = np.mean(candidates[candidate]['events']['x'])
+        candidate_std_x = np.std(candidates[candidate]['events']['x'])
+        candidate_mean_y = np.mean(candidates[candidate]['events']['y'])
+        candidate_std_y = np.std(candidates[candidate]['events']['y'])
+        candidate_mean_t = np.mean(candidates[candidate]['events']['t'])
+        candidate_std_t = np.std(candidates[candidate]['events']['t'])
+        #Determine which events are outside the standard deviation:
+        x_std_outliers = np.abs(candidates[candidate]['events']['x']-candidate_mean_x) > x_std_mult*candidate_std_x
+        y_std_outliers = np.abs(candidates[candidate]['events']['y']-candidate_mean_y) > y_std_mult*candidate_std_y
+        t_std_outliers = np.abs(candidates[candidate]['events']['t']-candidate_mean_t) > t_std_mult*candidate_std_t
+        #Remove the outliers:
+        candidates[candidate]['events'] = candidates[candidate]['events'][~(x_std_outliers | y_std_outliers | t_std_outliers)]
+
+    return candidates
+
+
 def removeCandidatesWithLargeSmallBoundingBox(candidates,settings):
     nrOrigCandidates = len(candidates)
     candidates, npoppedLarge = removeCandidatesWithLargeBoundingBox(candidates,xymax=float(settings['MaxFindingBoundingBoxXY']['value']),tmax=float(settings['MaxFindingBoundingBoxT']['value']))
