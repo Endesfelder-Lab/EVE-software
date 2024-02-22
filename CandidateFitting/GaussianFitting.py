@@ -64,7 +64,15 @@ class fit:
         self.ylim, self.xlim = dist.dist2D.shape
         self.xmean = np.average(np.arange(1,self.xlim+1), weights=np.nansum(dist.dist2D, axis=0))-1. 
         self.ymean = np.average(np.arange(1,self.ylim+1), weights=np.nansum(dist.dist2D, axis=1))-1.
+        self.dist = dist
         self.image = dist.dist2D.ravel()
+        if hasattr(dist, 'weights'):
+            self.weights = dist.weights.ravel()
+            max_weight = np.nanmax(self.weights)
+            self.sigma = (max_weight - self.weights + 1)/max_weight # Is this right?
+            # self.weights = np.ones_like(self.weights)
+        else:
+            self.weights = np.ones_like(self.image)
         self.imstats = [np.nanmax(self.image), np.nanmedian(self.image)]
         self.mesh = self.meshgrid()
         self.fit_info = ''
@@ -77,7 +85,7 @@ class fit:
     
     def __call__(self, func, **kwargs):
         try:
-            popt, pcov = optimize.curve_fit(func, self.mesh, self.image, nan_policy='omit', **kwargs) #, gtol=1e-4,ftol=1e-4
+            popt, pcov = optimize.curve_fit(func, self.mesh, self.image, sigma=self.weights, nan_policy='omit', **kwargs) #, gtol=1e-4,ftol=1e-4
             perr = np.sqrt(np.diag(pcov))
         except RuntimeError as warning:
             self.fit_info += 'RuntimeError: ' + str(warning)
@@ -97,14 +105,32 @@ class fit:
 class gauss2D(fit):
 
     def __init__(self, dist, candidateID, width, fitting_tolerance, pixel_size):
+        if hasattr(dist, 'trafo_gauss'):
+            dist.trafo_gauss()
         super().__init__(dist, candidateID)
+        q1 = np.percentile(self.image, 5)
+        q3 = np.percentile(self.image, 95)
+
+        # Calculate the interquartile range (IQR)
+        iqr = q3 - q1
+
+        # Define the outlier range
+        lower_bound = q1 - 1.5 * iqr
+        upper_bound = q3 + 1.5 * iqr
+
+        # Replace outliers in self.image with NaN
+        mask = (self.image < lower_bound) | (self.image > upper_bound)
+        self.image[mask] = np.nan
+        self.weights[mask] = np.nan
+        self.weights = self.weights[~np.isnan(self.weights)]
+
         self.bounds = self.bounds()
         self.p0 = self.p0(width)
         self.fitting_tolerance = fitting_tolerance
         self.pixel_size = pixel_size
 
     def bounds(self):
-        bounds = ([0., 0., 0., 0., 0., 0.], [self.xlim, self.ylim, np.inf, np.inf, np.inf, np.inf])
+        bounds = ([0., 0., 0., 0., 0., -np.inf], [self.xlim, self.ylim, np.inf, np.inf, np.inf, np.inf])
         return bounds
     
     def p0(self, width):
@@ -139,8 +165,10 @@ class gauss2D(fit):
                 t = np.nan
             else:
                 time_fit = timeDistributions.rayleigh(events['t']*1e-3, bins='auto')
-                time_fit_results = time_fit(events['t']*1e-3)
-                t = time_fit_results[0]
+                t = self.func((opt[0], opt[1]), *opt)
+                t = self.dist.undo_trafo_gauss(t)*1e-3
+                #time_fit_results = time_fit(events['t']*1e-3)
+                #t = time_fit_results[0]
             mean_polarity = events['p'].mean()
             p = int(mean_polarity == 1) + int(mean_polarity == 0) * 0 + int(mean_polarity > 0 and mean_polarity < 1) * 2
         loc_df = pd.DataFrame({'candidate_id': self.candidateID, 'x': x, 'y': y, 'del_x': del_x, 'del_y': del_y, 'p': p, 't': t, 'fit_info': self.fit_info}, index=[0])

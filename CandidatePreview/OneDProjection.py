@@ -146,7 +146,8 @@ def OneDProjection(findingResult, fittingResult, previewEvents, figure, settings
     ax = figure.add_subplot(111)
     figure.tight_layout()
     figure.subplots_adjust(top=0.95,bottom=0.190,left=0.080)
-
+    # print('Min, mean, 5th percentile, max:\n')
+    # print(np.min(findingResult['t'].diff())*1e-3, np.mean(findingResult['t'].diff())*1e-3, np.percentile(findingResult['t'].diff(), 10)*1e-3, np.max(findingResult['t'].diff())*1e-3)
     # hist_t = eventDistributions.Hist1d_t(findingResult)
     # hist_t.set_t_bin_width(t_bin_width, findingResult)
     if t_bin_width is not None:
@@ -185,8 +186,22 @@ def OneDProjection(findingResult, fittingResult, previewEvents, figure, settings
     if not len(findingResult[findingResult['p'] == 1]) == 0:
         hist_t_pos = np.histogram(findingResult[findingResult['p'] == 1]['t']*1e-3, bins=hist_t_edges)[0]
         ax.bar(hist_t_edges[:-1], hist_t_pos, width=t_bin_width,  label='Positive events', color='C0', alpha=0.5, align='edge')
+        cumsum = np.cumsum(findingResult[findingResult['p'] == 1]['t']*1e-3)
+        normed_cumsum = cumsum/cumsum.iloc[-1]
+        # plot derivative of cumsum
+        derivative = normed_cumsum.diff()/(findingResult[findingResult['p'] == 1]['t'].diff()*1e-3)
+        derivative = derivative/np.max(derivative)*np.max(hist_t_pos)
+        ax.plot(findingResult[findingResult['p'] == 1]['t']*1e-3, derivative, color='C0', linestyle='dashed', label='PDF positive events')
+        ax.plot(findingResult[findingResult['p'] == 1]['t']*1e-3, normed_cumsum*np.max(hist_t_pos), color='C0', label='Cumulative positive events')
     if not len(findingResult[findingResult['p'] == 0]) == 0:
-        hist_t_neg = np.histogram(findingResult[findingResult['p'] == 1]['t']*1e-3, bins=hist_t_edges)[0]
+        hist_t_neg = np.histogram(findingResult[findingResult['p'] == 0]['t']*1e-3, bins=hist_t_edges)[0]
+        cumsum = np.cumsum(findingResult[findingResult['p'] == 0]['t']*1e-3)
+        normed_cumsum = cumsum/cumsum.iloc[-1]
+        ax.plot(findingResult[findingResult['p'] == 0]['t']*1e-3, normed_cumsum*np.max(hist_t_neg), color='C1', label='Cumulative negative events')
+        # plot derivative of cumsum
+        derivative = normed_cumsum.diff()/(findingResult[findingResult['p'] == 0]['t'].diff()*1e-3)
+        derivative = derivative/np.max(derivative)*np.max(hist_t_neg)
+        ax.plot(findingResult[findingResult['p'] == 0]['t']*1e-3, derivative, color='C1', linestyle='dashed', label='PDF negative events')
         ax.bar(hist_t_edges[:-1], hist_t_neg, width=t_bin_width,  label='Negative events', color='C1', alpha=0.5, align='edge')
     if not len(first_events) == 0:
         if weigh_first:
@@ -198,7 +213,10 @@ def OneDProjection(findingResult, fittingResult, previewEvents, figure, settings
             label_data = 'First events'
             label_fit = 'Rayleigh fit first events'
         hist_t_first = np.histogram(first_events['t']*1e-3, weights=weights, bins=hist_t_edges)[0]
-
+        first_events = first_events.sort_values(by=['t'])
+        cumsum = np.cumsum(first_events['t']*1e-3)
+        normed_cumsum = cumsum/cumsum.iloc[-1]
+        ax.plot(first_events['t']*1e-3, normed_cumsum*np.max(hist_t_first), color='darkred', label=label_data)
         rayleigh_fit_first = rayleigh(first_events['t']*1e-3, weights=weights, bins=hist_t_edges)
         first_events_fit = rayleigh_fit_first(first_events['t']*1e-3, fittingResult)
         if not np.isnan(first_events_fit[0]).any():
@@ -215,13 +233,16 @@ def OneDProjection(findingResult, fittingResult, previewEvents, figure, settings
 
         bincentres = (t_edges[1:]-t_edges[:-1])/2.+t_edges[:-1] 
         ax.step(bincentres,hist_t_first,where='mid',color='C2', label=label_data,linewidth=1.5)
-        
+
+    # plot cumulative distribution
+    # ax.plot(hist_t_edges[:-1], np.cumsum(hist_t_neg), color='C1', label='Cumulative negative events')
 
     # Add and set labels
     ax.set_xlim(np.nanmin([hist_t_edges[0], t_first_events-1, t_all_events-1]), hist_t_edges[-1])
     ax.set_xlabel('t [ms]')
     ax.set_ylabel('number of events')
-    ax.legend(loc='upper left')
+    ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+    figure.tight_layout()
     
     # required output none
     return 1
