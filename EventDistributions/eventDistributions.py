@@ -21,11 +21,11 @@ class XYDist(Dist2d):
         self.xlim = [np.min(events['x']), np.max(events['x'])]
         self.ylim = [np.min(events['y']), np.max(events['y'])]
 
-    def __call__(self, xyEventMeasure):
+    def measure(self, xyEventMeasure, measure='t'):
         # The value of pixels missing xyMeasure is set to np.nan
         dist2d=np.ones((self.ylim[1]-self.ylim[0]+1,self.xlim[1]-self.xlim[0]+1))*np.nan
         for index, event in xyEventMeasure.iterrows():
-            dist2d[int(event['y']-self.ylim[0]),int(event['x']-self.xlim[0])]=event['t']
+            dist2d[int(event['y']-self.ylim[0]),int(event['x']-self.xlim[0])]=event[measure]
         return dist2d
 
 class XTDist(Dist2d):
@@ -37,14 +37,6 @@ class YTDist(Dist2d):
     def __init__(self, events):
         self.ylim = [np.min(events['y']), np.max(events['y'])]
         self.tlim = [np.min(events['t'])*1e-3, np.max(events['t'])*1e-3]
-
-class TimeStamp(XYDist):
-    def __init__(self, events):
-        super().__init__(events)
-
-class TimeDiff(XYDist):
-    def __init__(self, events):
-        super().__init__(events)
 
 # ToDo: Write a function that checks if a class is in the correct format and all used functions are defined
 
@@ -189,50 +181,64 @@ class SumPolarity(XYDist):
         
         return histxy.T, x_edges, y_edges
 
-class FirstTimestamp(TimeStamp):
+class FirstTimestamp(XYDist):
     description = "The timestamp of the first event for each pixel."
     def __init__(self, events):
         super().__init__(events)
+        self.weights = None
         self.dist2D = self(events)
+        self.max = 0.
 
     def get_smallest_t(self, events):
         smallest_t = events.groupby(['x', 'y'])['t'].agg(['min', 'size']).reset_index()
         smallest_t.columns = ['x', 'y', 't', 'weight']
         return smallest_t
     
+    def trafo_gauss(self):
+        self.max = np.nanmax(self.dist2D)
+        self.dist2D = self.dist2D*(-1) + self.max
+    
+    def undo_trafo_gauss(self, times):
+        times = times - self.max
+        times = times*(-1)
+        return times
+    
     def __call__(self, events):
         smallest_t = self.get_smallest_t(events)
-        return super().__call__(smallest_t)
+        self.weights = super().measure(smallest_t, measure='weight')
+        return super().measure(smallest_t)
 
-class AverageTimestamp(TimeStamp):
+class AverageTimestamp(XYDist):
     description = "The average timestamp of all events for each pixel."
     def __init__(self, events):
         super().__init__(events)
         self.dist2D = self(events)
 
     def get_average_t(self, events):
-        average_t = events.groupby(['x', 'y'])['t'].mean().reset_index()
+        average_t = events.groupby(['x', 'y'])['t'].agg(['mean', 'size']).reset_index()
+        average_t.columns = ['x', 'y', 't', 'weight']
         return average_t
     
     def __call__(self, events):
         average_t = self.get_average_t(events)
-        return super().__call__(average_t)
+        return super().measure(average_t)
     
-class MedianTimestamp(TimeStamp):
+class MedianTimestamp(XYDist):
     description = "The median timestamp of all events for each pixel."
     def __init__(self, events):
         super().__init__(events)
         self.dist2D = self(events)
 
     def get_median_t(self, events):
-        median_t = events.groupby(['x', 'y'])['t'].median().reset_index()
+        median_t = events.groupby(['x', 'y'])['t'].agg(['median', 'size']).reset_index()
+        median_t.columns = ['x', 'y', 't', 'weight']
         return median_t
     
     def __call__(self, events):
         median_t = self.get_median_t(events)
-        return super().__call__(median_t)
+        return super().measure(median_t)
     
-class AverageTimeDiff(TimeDiff):
+class AverageTimeDiff(XYDist):
     description = "The average time difference between events for each pixel."
     def __init__(self, events):
         super().__init__(events)
@@ -242,14 +248,15 @@ class AverageTimeDiff(TimeDiff):
         TimeDiff = events.groupby(['x', 'y'])['t'].diff().to_frame()
         TimeDiff['x'] = events['x']
         TimeDiff['y'] = events['y']
-        averageTimeDiff = TimeDiff.groupby(['x', 'y'])['t'].mean().reset_index()
+        averageTimeDiff = TimeDiff.groupby(['x', 'y'])['t'].agg(['mean', 'size']).reset_index()
+        averageTimeDiff = averageTimeDiff.rename(columns = {'mean': 't', 'size': 'weight'})
         return averageTimeDiff
     
     def __call__(self, events):
         averageTimeDiff = self.get_averageTimeDiff(events)
-        return super().__call__(averageTimeDiff)
+        return super().measure(averageTimeDiff)
     
-class MinTimeDiff(TimeDiff):
+class MinTimeDiff(XYDist):
     description = "The minimum time difference between events for each pixel."
     def __init__(self, events):
         super().__init__(events)
@@ -259,14 +266,15 @@ class MinTimeDiff(TimeDiff):
         TimeDiff = events.groupby(['x', 'y'])['t'].diff().to_frame()
         TimeDiff['x'] = events['x']
         TimeDiff['y'] = events['y']
-        minTimeDiff = TimeDiff.groupby(['x', 'y'])['t'].min().reset_index()
+        minTimeDiff = TimeDiff.groupby(['x', 'y'])['t'].agg(['min', 'size']).reset_index()
+        minTimeDiff = minTimeDiff.rename(columns = {'min': 't', 'size': 'weight'})
         return minTimeDiff
     
     def __call__(self, events):
         minTimeDiff = self.get_minTimeDiff(events)
-        return super().__call__(minTimeDiff)
+        return super().measure(minTimeDiff)
     
-class MaxTimeDiff(TimeDiff):
+class MaxTimeDiff(XYDist):
     description = "The maximum time difference between events for each pixel."
     def __init__(self, events):
         super().__init__(events)
@@ -276,9 +284,10 @@ class MaxTimeDiff(TimeDiff):
         TimeDiff = events.groupby(['x', 'y'])['t'].diff().to_frame()
         TimeDiff['x'] = events['x']
         TimeDiff['y'] = events['y']
-        maxTimeDiff = TimeDiff.groupby(['x', 'y'])['t'].max().reset_index()
+        maxTimeDiff = TimeDiff.groupby(['x', 'y'])['t'].agg(['max', 'size']).reset_index()
+        maxTimeDiff = maxTimeDiff.rename(columns = {'max': 't', 'size': 'weight'})
         return maxTimeDiff
     
     def __call__(self, events):
         maxTimeDiff = self.get_maxTimeDiff(events)
-        return super().__call__(maxTimeDiff)
+        return super().measure(maxTimeDiff)
