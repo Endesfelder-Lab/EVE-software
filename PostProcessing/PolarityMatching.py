@@ -69,7 +69,8 @@ def PolarityMatching(localizations,findingResult,settings,**kwargs):
     
     start_time = time.time()
     #Error message and early exit if there isn't both pos and neg events
-    if not np.array_equal(np.unique(localizations['p']), [0, 1]) or np.array_equal(np.unique(localizations['p']), [1, 0]):
+    pols = np.unique(localizations['p'])
+    if not np.array_equal(pols[~np.isnan(pols)], [0, 1]) or np.array_equal(pols[~np.isnan(pols)], [1, 0]):
         logging.error('PolarityMatching requires both positive and negative events!')
         return localizations, 'PolarityMatching requires both positive and negative events!'
     else:
