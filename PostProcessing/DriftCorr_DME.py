@@ -57,9 +57,31 @@ def DriftCorr_entropyMin(resultArray,findingResult,settings,**kwargs):
     locs_for_dme/=(float(settings['PixelSize_nm']['value']))
     
     #Get the 'frame' for each localization based on user-defined frame_time_for_dme
-    framenum = np.floor(np.array(resultArray['t'].values)/(frame_time_for_dme))
+    framenumFull = np.floor(np.array(resultArray['t'].values)/(frame_time_for_dme))
+    #Pop -1 entries:
+    locs_for_dme = locs_for_dme[framenumFull != -1]
+    framenum = framenumFull[framenumFull != -1]
     framenum -= min(framenum)
     framenum = framenum.astype(int)
+    
+    
+    
+    #to prevent unexpected errors: remove the bottom and top 0.1 percentile:
+    bottom_percentile = np.percentile(framenum, 0.1)
+    top_percentile = np.percentile(framenum, 99.9)
+    locs_for_dme = locs_for_dme[(framenum > bottom_percentile) & (framenum < top_percentile)]
+    framenum = framenum[(framenum > bottom_percentile) & (framenum < top_percentile)]
+    
+    framenum -= min(framenum)
+    
+    # #Histogram the framenrs and show:
+    #     import matplotlib.pyplot as plt
+    #     #Create a new figure
+    #     plt.figure(88)
+    #     #Plot the drift traces
+    #     plt.plot(np.arange(int(len(framenum)))*(frame_time_for_dme),framenum)
+    #     plt.show()
+        
     
     #CRLB is hardcoded at half a pixel in x,y. Probably not the best implementation, but it seems to work
     crlb = np.ones(locs_for_dme.shape) * np.array((0.5,0.5))[None]
@@ -69,7 +91,7 @@ def DriftCorr_entropyMin(resultArray,findingResult,settings,**kwargs):
                 crlb, 
                 framesperbin = framesperbinv, 
                 imgshape=[fov_width, fov_width], 
-                coarseFramesPerBin=min(framesperbinv*10,max(framenum)/10),
+                coarseFramesPerBin=int(np.floor(min(framesperbinv*10,max(framenum)/20))),
                 coarseSigma=[0.2,0.2],
                 useCuda=use_cuda,
                 useDebugLibrary=False,
@@ -95,8 +117,12 @@ def DriftCorr_entropyMin(resultArray,findingResult,settings,**kwargs):
         plt.title('Drift Estimation')
         plt.show()
 
+
+    framenumFull = np.floor(np.array(resultArray['t'].values)/(frame_time_for_dme))
+    framenumFull -= min(framenumFull)
+    framenumFull = framenumFull.astype(int)
     #Get the drift of every localization - note the back-conversion from px to nm
-    drift_locs = ([estimated_drift[i][0]*(float(settings['PixelSize_nm']['value'])) for i in framenum],[estimated_drift[i][1]*(float(settings['PixelSize_nm']['value'])) for i in framenum])
+    drift_locs = ([estimated_drift[min(i,len(estimated_drift)-1)][0]*(float(settings['PixelSize_nm']['value'])) for i in framenumFull],[estimated_drift[min(i,len(estimated_drift)-1)][1]*(float(settings['PixelSize_nm']['value'])) for i in framenumFull])
     
     #Correct the resultarray for the drift
     drift_corr_locs = resultArray
