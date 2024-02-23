@@ -32,7 +32,6 @@ def strtobool(val):
     else:
         raise ValueError("invalid truth value %r" % (val,))
 
-
 def removeCandidates_xytoutliers(candidates,settings,x_std_mult = 2.5, y_std_mult = 2.5, t_std_mult = 2.5):
     nrOrigCandidates = len(candidates)
     nchanged = 0
