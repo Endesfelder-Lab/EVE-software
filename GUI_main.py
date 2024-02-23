@@ -1643,6 +1643,8 @@ class MyGUI(QMainWindow):
         return
 
     def run_processing(self):
+        thread = threading.Thread(target=self.run_processing_i)
+        thread.start()
         #Give a clear logging separation:
         logging.info("")
         logging.info("")
@@ -1657,8 +1659,6 @@ class MyGUI(QMainWindow):
         # self.run_processing_i()
         # reset previewEvents array, every time run is pressed
         self.previewEvents = []
-        thread = threading.Thread(target=self.run_processing_i)
-        thread.start()
 
     def updateGUIafterNewResults(self,error=None):
         if error == None:
@@ -2291,13 +2291,22 @@ class MyGUI(QMainWindow):
         if outputType == 'minimal':
             localizations.to_csv(storeLocation)
         elif outputType == 'thunderstorm':
+            localizations = localizations.copy()
+            #remove all entries that have a nan somewhere:
+            localizations = localizations.dropna()
+            
+            #ensure that every entry that is currently empty will be populated by '1':
+            localizations = localizations.applymap(lambda x: '1' if x == '' else x)
+            
             #Add a frame column to fittingResult:
             localizations['frame'] = localizations['t'].apply(round).astype(int)
             localizations['frame'] -= min(localizations['frame'])-1
             #Create thunderstorm headers
             headers = list(localizations.columns)
             headers = ['\"x [nm]\"' if header == 'x' else '\"y [nm]\"' if header == 'y' else '\"z [nm]\"' if header == 'z' else '\"t [ms]\"' if header == 't' else header for header in headers]
-            localizations.rename_axis('\"id\"').to_csv(storeLocation, header=headers, quoting=csv.QUOTE_NONE)
+                        
+            #Store the csv with ID as index:
+            localizations.to_csv(storeLocation, header=headers, quoting=csv.QUOTE_NONE, index=False, index_label='\"id\"')
         else:
             #default to minimal
             localizations.to_csv(storeLocation)
