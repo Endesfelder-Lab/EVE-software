@@ -27,6 +27,13 @@ def __function_metadata__():
             ],
             "help_string": "Perform NeNA on the matched polarities."
         },
+        "PolarityMatching_NeNASpatial": {
+            "required_kwargs": [
+            ],
+            "optional_kwargs": [
+            ],
+            "help_string": "Perform NeNA on the matched polarities."
+        },
         "PolarityMatching_time": {
             "required_kwargs": [
             ],
@@ -219,4 +226,16 @@ def PolarityMatching_time(localizations,findingResult,settings,**kwargs):
     ax2.set_xscale('log')
     plt.xlabel('Time between pos/neg events (ms)')
     plt.show()
+
+def PolarityMatching_NeNASpatial(localizations,findingResult,settings,**kwargs):
     
+    #import spatial:
+    import scipy.spatial
+    #Create a kdtree:
+    tree = scipy.spatial.KDTree(localizations[['x', 'y', 't']].values, leafsize=16)
+    #Get all localizations within leaf 1:
+    localizations_in_leaf1 = tree.query_ball_tree(tree, 1)
+    
+    #Required output: localizations
+    metadata = 'Information or so'
+    return localizations,metadata
