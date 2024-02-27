@@ -21,7 +21,7 @@ from joblib import Parallel, delayed
 #Imports for PyQt5 (GUI)
 from PyQt5 import QtWidgets, QtGui
 from PyQt5.QtGui import QCursor, QTextCursor, QIntValidator
-from PyQt5.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QTableWidget, QTableWidgetItem, QLayout, QMainWindow, QLabel, QPushButton, QSizePolicy, QGroupBox, QTabWidget, QGridLayout, QWidget, QComboBox, QLineEdit, QFileDialog, QToolBar, QCheckBox,QDesktopWidget, QMessageBox, QTextEdit, QSlider, QSpacerItem, QTableView, QFrame, QScrollArea
+from PyQt5.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QTableWidget, QTableWidgetItem, QLayout, QMainWindow, QLabel, QPushButton, QSizePolicy, QGroupBox, QTabWidget, QGridLayout, QWidget, QComboBox, QLineEdit, QFileDialog, QToolBar, QCheckBox,QDesktopWidget, QMessageBox, QTextEdit, QSlider, QSpacerItem, QTableView, QFrame, QScrollArea, QProgressBar
 from PyQt5.QtCore import Qt, QPoint, QProcess, QCoreApplication, QTimer, QFileSystemWatcher, QFile, QThread, pyqtSignal, QObject
 import sys
 import typing
@@ -885,6 +885,11 @@ class MyGUI(QMainWindow):
         self.timer.start(1000)  # Check every second
 
         self.update_log()
+        
+        #Add an analysis-progress-bar
+        self.analysis_progressbar = QProgressBar()
+        self.analysis_progressbar.setValue(100)
+        tab_layout.addWidget(self.analysis_progressbar, 1, 0)
 
     def check_logfile_modification(self):
         """
@@ -1377,6 +1382,8 @@ class MyGUI(QMainWindow):
         logging.info("")
         logging.info("")
         
+        self.analysis_progressbar.setValue(0)
+        
         #Switch the user to the Run info tab
         utils.changeTab(self, text='Run info')
         
@@ -1392,6 +1399,7 @@ class MyGUI(QMainWindow):
         #Create the finding structure:
         self.FittingCompleted = False
         self.fittingAnalysis = FittingAnalysis()
+        self.signalEmitArray = None
         
         #Prepare for saving/storing results later...
         self.currentFileInfo['CurrentFileLoc'] = self.dataLocationInput.text()
@@ -1401,14 +1409,22 @@ class MyGUI(QMainWindow):
         thread = threading.Thread(target=self.run_processing_i)
         thread.start()
         
+        #Visually show we're started by updating the progress bar to 5%
+        self.updateProgressBar(overwriteValue = 5)
+        
         self.analysisStartTime = time.time()
         #Await completion of finding  - i need to do this, since calling/emitting requires a QObject, which cannot be pickled for threading.
         while self.FindingCompleted == False:
+            self.updateProgressBar(findorfit='find')
             QApplication.processEvents() #continue as normal
         self.findingAnalysisComplete() #Run this function once finding is completed
+        self.updateProgressBar(findorfit='find')
+        
         while self.FittingCompleted == False:
+            self.updateProgressBar(findorfit='fit')
             QApplication.processEvents() #continue as normal
         self.fittingAnalysisComplete() #Run this function once fitting is completed
+        self.updateProgressBar(findorfit='fit')
     
     def run_preview_i(self,error=None):
         #Get polarity info:
@@ -1553,15 +1569,34 @@ class MyGUI(QMainWindow):
         self.updateShowPreview(previewEvents=self.previewEvents,timeStretch=timeStretch,frameTime=frameTime)
         self.updateLocList()
 
+    def updateProgressBar(self,overwriteValue = None,findorfit='fit'):
+        #self.signalEmitArray is an array, which looks like this:
+        #[current_pol_run, total_number_pol_run, progress_of_this_pol_run]
+        #This is separate for finding and fitting.
+        #E.g. a finding can give [1,1,0.5], which would mean that it's 50% complete of the second pol run of two total pol runs
+        if overwriteValue == None:
+            if self.signalEmitArray is not None:
+                if findorfit == 'find': #We're still in finding!, thus 0-50 range
+                    self.analysis_progressbar.setValue(self.signalEmitArray[2]*((self.signalEmitArray[0]+1)/(self.signalEmitArray[1]+1))*100*0.5)
+                else:#We're in fitting, thus 50-100 range
+                    self.analysis_progressbar.setValue(self.signalEmitArray[2]*((self.signalEmitArray[0]+1)/(self.signalEmitArray[1]+1))*100*0.5+50)
+                    
+                QApplication.processEvents() #progress the changes to the gui
+                
+                self.signalEmitArray = None
+        else:
+            self.analysis_progressbar.setValue(overwriteValue)
+            QApplication.processEvents() #progress the changes to the gui
+        
+
     def findingAnalysisComplete(self):
         #Function is run as soon as finding is completed
-        print('EMIT of finding analysis is completed@!')
         self.currentFileInfo['FindingTime'] = time.time() - self.analysisStartTime 
     
     def fittingAnalysisComplete(self):
         #Function is run as soon as fitting is completed
         #Perfect time to save data and such :)
-        print('EMIT of fitting analysis is completed@!')
+        self.updateProgressBar(overwriteValue = 95)
         self.currentFileInfo['FittingTime'] = time.time() - self.currentFileInfo['FindingTime']
         #Update the GUI results
         self.updateGUIafterNewResults()
@@ -1570,10 +1605,11 @@ class MyGUI(QMainWindow):
         self.storeLocalizationOutput()
         self.storeFindingOutput()
         self.createAndStoreFileMetadata()
-        print('all saved')
         
         #restore global settings (can be changed in run_processing_i)
         self.globalSettings = self.globalSettingsBeforeRun
+        self.updateProgressBar(overwriteValue = 100)
+        logging.info('Analysis completed!')
 
     def updateGUIafterNewResults(self,error=None):
         if error == None:
@@ -2048,7 +2084,9 @@ class FindingFittingAnalysis():
         self.EvalText = '' #Textual string of what function to run, including all params
         self.Results = {} #Where the fitting/finding results will be stored eventually
         self.disableRun = False #Set to True if you want to skip the run entirely.
-        
+        self.currentProgress = 0 #Progress of only this step from 0-1
+        self.currentProgressStep = 0 #To do with progress
+        self.totalProgressNrSteps = 1#To do with progress - current step, e.g. finding1-finding2 is 2 steps-  WHICH is 1 in python-counting
     
     #Some functions to set variables/values:
     def set_polarityAnalysis(self,polarityAnalysis):
@@ -2144,6 +2182,10 @@ class FindingFittingAnalysis():
         else:
             return None
 
+    def setProgressInfo(self,progressInfo):
+        self.progressInfo = progressInfo
+        self.GUIinfo.signalEmitArray = [self.currentProgressStep, self.totalProgressNrSteps, self.progressInfo]
+
 class FindingAnalysis(FindingFittingAnalysis):
     """
     General class that runs the finding analysis. Should take in parameters, based on the file location (NOT the events), and spit out the finding results. Should handle all file loading/data handling, splitting of data, multiprocessing, etc etc.
@@ -2184,20 +2226,32 @@ class FindingAnalysis(FindingFittingAnalysis):
     Callable functions
     """
     def analyse(self):
+        logging.info(f"--- Starting finding analysis ---")
         #First, check on which polarities we should run:
         if self.polarityAnalysis == 'Pos':
+            self.totalProgressNrSteps = 0
+            self.currentProgressStep = 0
             self.runFindingOnPolarity('Pos')
         elif self.polarityAnalysis == 'Neg':
+            self.totalProgressNrSteps = 0
+            self.currentProgressStep = 0
             self.runFindingOnPolarity('Neg')
         elif self.polarityAnalysis == 'Mix':
+            self.totalProgressNrSteps = 0
+            self.currentProgressStep = 0
             self.runFindingOnPolarity('Mix')
         elif self.polarityAnalysis == 'Both':
+            self.totalProgressNrSteps = 1
+            self.currentProgressStep = 0
             self.runFindingOnPolarity('Pos')
+            self.setProgressInfo(1)
+            self.currentProgressStep = 1
             self.runFindingOnPolarity('Neg')
         else:
             logging.error('Polarity analysis must be either Pos, Neg, Mix, or Both')
         
         #Tell the GUI the finding is complete!
+        self.setProgressInfo(1)
         self.GUIinfo.FindingCompleted = True
         pass
     
@@ -2236,6 +2290,7 @@ class FindingAnalysis(FindingFittingAnalysis):
                 self.disableRun = True
     
     def runFindingOnPolarity(self,singlePolarity):
+        logging.info(f"Starting finding of polarity {singlePolarity}")
         #check for disabling the run
         self.checkForRunDisableLoadPickleMismatch(singlePolarity)
         
@@ -2289,6 +2344,7 @@ class FindingAnalysis(FindingFittingAnalysis):
                     totalFindingResults[0] = {}
                     totalFindingResults[1]=''
                     for chunk in range(len(hdf5_startstopindeces)):
+                        self.setProgressInfo(chunk/len(hdf5_startstopindeces))
                         #Get the events from these indeces:
                         self.events = utils.timeSliceFromHDFFromIndeces(self.fileLocation,hdf5_startstopindeces,index=chunk)
                         
@@ -2463,8 +2519,7 @@ class FindingAnalysis(FindingFittingAnalysis):
                     self.GUIinfo = {}
                     
                     #Run the analysis in parallel over all cpu cores
-                    import multiprocessing
-                    results = Parallel(n_jobs=multiprocessing.cpu_count())(delayed(self.process_hdf5_chunk_joblib)(n, hdf5_startstopindeces,singlePolarity) for n in range(0,len(hdf5_startstopindeces)))
+                    results = Parallel(n_jobs=-1)(delayed(self.process_hdf5_chunk_joblib)(n, hdf5_startstopindeces,singlePolarity) for n in range(0,len(hdf5_startstopindeces)))
                     
                     #reset GUIinfo in case we need it:
                     self.GUIinfo = GUIinfo
@@ -2637,7 +2692,7 @@ class FindingAnalysis(FindingFittingAnalysis):
 
     def process_hdf5_chunk_joblib(self,n,hdf5startstopindeces,singlePolarity):
         #Allowing for multicore hdf5 chunking, or single-core
-        print('Running finding chunk '+str(n)+' of '+str(len(hdf5startstopindeces)))
+        logging.info('Running finding chunk '+str(n)+' of '+str(len(hdf5startstopindeces)))
         #Get the events from these indeces (example at 0):
         self.events = utils.timeSliceFromHDFFromIndeces(self.fileLocation,hdf5startstopindeces,index=n)
         
@@ -2667,24 +2722,39 @@ class FittingAnalysis(FindingFittingAnalysis):
         self.findingResult = findingResult
         
     def analyse(self):
+        logging.info(f"--- Starting fitting analysis ---")
         #First, check on which polarities we should run:
         if self.polarityAnalysis == 'Pos':
+            self.totalProgressNrSteps = 0
+            self.currentProgressStep = 0
             self.runFittingOnPolarity('Pos')
         elif self.polarityAnalysis == 'Neg':
+            self.totalProgressNrSteps = 0
+            self.currentProgressStep = 0
             self.runFittingOnPolarity('Neg')
         elif self.polarityAnalysis == 'Mix':
+            self.totalProgressNrSteps = 0
+            self.currentProgressStep = 0
             self.runFittingOnPolarity('Mix')
         elif self.polarityAnalysis == 'Both':
+            self.totalProgressNrSteps = 1
+            self.currentProgressStep = 0
             self.runFittingOnPolarity('Pos')
+            print('Pos done')
+            self.setProgressInfo(1)
+            self.currentProgressStep = 1
             self.runFittingOnPolarity('Neg')
+            print('Neg done')
         else:
             logging.error('Polarity analysis must be either Pos, Neg, Mix, or Both')
         
         #Tell the GUI the fitting is complete!
+        self.setProgressInfo(1)
         self.GUIinfo.FittingCompleted = True
         pass
         
     def runFittingOnPolarity(self,singlePolarity):
+        logging.info(f"Starting fitting of polarity {singlePolarity}")
         #Run the finding on a single polarity
         
         if len(self.findingResult[0]) > 0:
