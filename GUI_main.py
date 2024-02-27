@@ -16,6 +16,7 @@ from textwrap import dedent
 import h5py
 import traceback
 import re
+from joblib import Parallel, delayed
 
 #Imports for PyQt5 (GUI)
 from PyQt5 import QtWidgets, QtGui
@@ -47,7 +48,7 @@ from PostProcessing import *
 from CandidatePreview import *
 
 #Obtain the helperfunctions
-from Utils import utils
+from Utils import utils, utilsHelper
 
 #Obtain eventdistribution functions
 from EventDistributions import eventDistributions
@@ -57,60 +58,6 @@ from EventDistributions import eventDistributions
 # Main script
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
-class ProcessingThread(QThread):
-    finished = pyqtSignal()
-
-    def __init__(self):
-        super().__init__()
-        self.FindingEvalText = None
-        self.FittingEvalText = None
-        self.runFitting = None
-        self.storeFinding = None
-        self.polarityVal = None
-        self.npyData = None
-        self.GUIinfo = None
-        self.typeOfThread = None
-
-    def run(self):
-        # Perform your processing here
-        if self.typeOfThread == "Finding":
-            result = eval(self.FindingEvalText)
-        self.finished.emit()
-
-    def setTypeOfThread(self,typeOfThread):
-        self.typeOfThread = typeOfThread
-    def setFindingEvalText(self,FindingEvalText):
-        self.FindingEvalText = FindingEvalText
-    def setFittingEvalText(self,FittingEvalText):
-        self.FittingEvalText = FittingEvalText
-    def setrunFitting(self,runFitting):
-        self.runFitting = runFitting
-    def setstoreFinding(self,storeFinding):
-        self.storeFinding = storeFinding
-    def setpolarityVal(self,polarityVal):
-        self.polarityVal = polarityVal
-    def setnpyData(self,npyData):
-        self.npyData = npyData
-    def setGUIinfo(self,GUIinfo):
-        self.GUIinfo = GUIinfo
-        self.data = self.GUIinfo.data
-        self.globalSettings = self.GUIinfo.globalSettings
-        self.currentFileInfo = self.GUIinfo.currentFileInfo
-        self.logger = self.GUIinfo.logger
-
-class Worker(QObject):
-    finished = pyqtSignal()
-    progress = pyqtSignal(int)
-
-    def __init__(self):
-        super().__init__()
-
-    def do_work(self):
-        for i in range(1, 11):
-            time.sleep(1)  # Simulate time-consuming task
-            self.progress.emit(i * 10)  # Emit progress (10%, 20%, ..., 100%)
-        self.finished.emit()  # Emit finished signal when the task is done
-
 class MyGUI(QMainWindow):
 #GUI class - needs to be initialised and is initalised in gui.py
     def __init__(self):
@@ -285,8 +232,8 @@ class MyGUI(QMainWindow):
         self.data['FittingResult'][1] = []
 
 
-        self.thread = ProcessingThread()
-        self.thread.finished.connect(self.thread.quit)
+        # self.thread = ProcessingThread()
+        # self.thread.finished.connect(self.thread.quit)
         # self.thread.progress.connect(self.QThreadEmitCatcher)
 
 
@@ -784,201 +731,7 @@ class MyGUI(QMainWindow):
 
 
         return
-
-    def previewRun(self,timeStretch=(0,1000),xyStretch=(0,0,0,0),frameTime=100):
-        """
-        Generates the preview of a run analysis.
-
-        Parameters:
-            timeStretch (tuple): A tuple containing the start and end times for the preview.
-            xyStretch (tuple): A tuple containing the minimum and maximum x and y coordinates for the preview.
-
-        Returns:
-            None
-        """
-        #Give a clear logging separation:
-        logging.info("")
-        logging.info("")
-        logging.info("--------------- Preview Run Starting ---------------")
-        logging.info("")
-        logging.info("")
-        
-        #Switch the user to the Run info tab
-        utils.changeTab(self, text='Run info')
-
-        # Empty the event preview list
-        self.previewEvents = []
-
-        #Checking if a file is selected rather than a folder:
-        if not os.path.isfile(self.dataLocationInput.text()):
-            logging.error("Please choose a file rather than a folder for previews.")
-            return
-
-        #Specifically for preview runs, we don't need to load the whole data, only between preview_startT and preview_endT. This is handled differently for RAW or NPY files:
-        #Thus, we check if it's raw or npy:
-        if self.dataLocationInput.text().endswith('.raw'):
-            sys.path.append(self.globalSettings['MetaVisionPath']['value'])
-            from metavision_core.event_io.raw_reader import RawReader
-            record_raw = RawReader(self.dataLocationInput.text())
-
-            #Seek to the start time if the start time is > 0:
-            if int(timeStretch[0]) > 0:
-                record_raw.seek_time(int(timeStretch[0])*1000)
-
-            #Load all events
-            events=np.empty
-            events = record_raw.load_delta_t(int(timeStretch[1])*1000)
-            #Check if we have at least 1 event:
-            if len(events) > 0:
-                # correct the coordinates and time stamps
-                # events['x']-=np.min(events['x'])
-                # events['y']-=np.min(events['y'])
-                # events['t']-=np.min(events['t'])
-                #Log the nr of events found:
-                logging.info(f"Preview - Found {len(events)} events in the chosen time frame.")
-            else:
-                logging.error("Preview - No events found in the chosen time frame.")
-                return
-        #Logic if a numpy file is selected:
-        elif self.dataLocationInput.text().endswith('.npy'):
-            #For npy, load the events in memory
-            data = np.load(self.dataLocationInput.text(), mmap_mode='r')
-            #Filter them on time:
-            events = self.filterEvents_npy_t(data,timeStretch)
-            #Check if we have at least 1 event:
-            if len(events) > 0:
-                # # correct the coordinates and time stamps
-                # events['x']-=np.min(events['x'])
-                # events['y']-=np.min(events['y'])
-                # events['t']-=np.min(events['t'])
-                #Log the nr of events found:
-                logging.info(f"Preview - Found {len(events)} events in the chosen time frame.")
-            else:
-                logging.error("Preview - No events found in the chosen time frame.")
-                return
-        elif self.dataLocationInput.text().endswith('hdf5'):
-
-            #Load events from HDF
-            events,_ = self.timeSliceFromHDF(self.dataLocationInput.text(),requested_start_time_ms = float(timeStretch[0]),requested_end_time_ms=float(timeStretch[0])+float(timeStretch[1]),howOftenCheckHdfTime = 50000)
-
-            #Check if we have at least 1 event:
-            if len(events) > 0:
-                #Log the nr of events found:
-                logging.info(f"Preview - Found {len(events)} events in the chosen time frame.")
-            else:
-                logging.error("Preview - No events found in the chosen time frame.")
-                return
-
-            z=3
-        else:
-            logging.error("Please choose a .raw or .npy or .hdf5 file for previews.")
-            return
-
-        #Load the events in self memory and filter on XY
-        self.previewEvents = events
-        self.previewEvents = self.filterEvents_xy(self.previewEvents,xyStretch)
-
-        self.previewEventsDict = []
-
-        #filter on polarity:
-        if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[3]:
-            #Run everything twice
-            #Get positive events only:
-            npyevents_pos = self.filterEvents_npy_p(self.previewEvents,pValue=1)
-            self.previewEventsDict.append(npyevents_pos)
-            #Get negative events only:
-            npyevents_neg = self.filterEvents_npy_p(self.previewEvents,pValue=0)
-            self.previewEventsDict.append(npyevents_neg)
-        #Only positive
-        elif self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[1]:
-            #Run everything once
-            npyevents_pos = self.filterEvents_npy_p(self.previewEvents,pValue=1)
-            self.previewEventsDict.append(npyevents_pos)
-            polarityVal = 'Pos'
-        #Only negative
-        elif self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[2]:
-            #Run everything once
-            npyevents_neg = self.filterEvents_npy_p(self.previewEvents,pValue=0)
-            self.previewEventsDict.append(npyevents_neg)
-            polarityVal = 'Neg'
-        #No discrimination
-        elif self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[0]:
-            #Don't do any filtering
-            self.previewEventsDict.append(self.previewEvents)
-            polarityVal = 'Mix'
-
-        #Change global values so nothing is stored - we just want a preview run. This is later set back to orig values (globalSettingsOrig):
-        globalSettingsOrig = copy.deepcopy(self.globalSettings)
-        self.globalSettings['StoreConvertedRawData']['value'] = False
-        self.globalSettings['StoreFileMetadata']['value'] = False
-        # self.globalSettings['StoreFinalOutput']['StoreFinalOutput']['value'] = False
-        self.globalSettings['StoreFinalOutput']['value'] = False
-        self.globalSettings['StoreFindingOutput']['value'] = False
-        self.globalSettings['StoreFittingOutput']['value'] = False
-
-        events_id = 0
-        partialFinding = {}
-        partialFitting = {}
-        for events in self.previewEventsDict:
-            if self.dataSelectionPolarityDropdown.currentText() != self.polarityDropdownNames[3]:
-                #Run the current finding and fitting routine only on these events:
-                self.runFindingAndFitting(events,runFitting=True,storeFinding=False,polarityVal=polarityVal)
-            else:
-                #Run the current finding and fitting routine only on these events:
-                #Should be once positive, once negative
-                if all(events['p'] == 1):
-                    polarityVal = 'Pos'
-                elif all(events['p'] == 0):
-                    polarityVal = 'Neg'
-                #run the finding/fitting
-                self.runFindingAndFitting(events,runFitting=True,storeFinding=False,polarityVal=polarityVal)
-                #we store our finding and fitting results like this:
-                partialFinding[events_id] = self.data['FindingResult']
-                partialFitting[events_id] = self.data['FittingResult']
-
-            events_id+=1
-
-        #If the data was split in two parts... (or more)
-        if events_id > 1:
-            updated_partialFinding = []
-            updated_partialFindingMetadatastring = ''
-            updated_partialFitting = []
-            updated_partialFittingMetadatastring = ''
-            totNrFindingIncrease = 0
-            for i in range(events_id):
-                updated_partialFindingMetadatastring = updated_partialFindingMetadatastring+partialFinding[i][1]+'\n'
-                updated_partialFittingMetadatastring = updated_partialFittingMetadatastring+partialFitting[i][1]+'\n'
-                for eachEntry in partialFinding[i][0].items():
-                    updated_partialFinding.append(eachEntry[1])
-                for index,row in partialFitting[i][0].iterrows():
-                    row.candidate_id+=totNrFindingIncrease
-                    updated_partialFitting.append(row)
-
-
-                #increase the total number of findings
-                totNrFindingIncrease+=eachEntry[0]+1
-
-            #Store them again in the self.data['FindingResult']
-            self.data['FindingResult']={}
-            self.data['FindingResult'][0] = dict(zip(range(len(updated_partialFinding)), updated_partialFinding))
-            self.data['FindingResult'][1] = updated_partialFindingMetadatastring
-            #Fitting should be changed to pd df
-            res_dict_fitting = pd.DataFrame(updated_partialFitting)
-            #Store them again in the self.data['FindingResult']
-            self.data['FittingResult']={}
-            self.data['FittingResult'][0] = res_dict_fitting
-            self.data['FittingResult'][1] = updated_partialFittingMetadatastring
-
-            #To test: np.shape(self.data['FittingResult'][0])[0]
-
-        #Reset global settings
-        self.globalSettings = globalSettingsOrig
-
-        #Update the preview panel and localization list:
-        #Note that self.previewEvents is XYT cut, but NOT p-cut
-        self.updateShowPreview(previewEvents=self.previewEvents,timeStretch=timeStretch,frameTime=frameTime)
-        self.updateLocList()
-
+    
     def timeSliceFromHDF(self,dataLocation,requested_start_time_ms = 0,requested_end_time_ms=1000,howOftenCheckHdfTime = 100000,loggingBool=False,curr_chunk = 0):
         """Function that returns all events between start/end time in a HDF5 file. Extremely sped-up since the HDF5 file is time-sorted, and only checked every 100k (howOftenCheckHdfTime) events.
 
@@ -1367,6 +1120,7 @@ class MyGUI(QMainWindow):
         """
         #Add the text!
         fig.text(max(data['x']),max(data['y']),str(strv),color=col)
+    
     def find_raw_npy_files(self,directory):
         raw_files = glob.glob(os.path.join(directory, "*.raw"))
         npy_files = glob.glob(os.path.join(directory, "*.npy"))
@@ -1511,7 +1265,7 @@ class MyGUI(QMainWindow):
             # events['x']-=np.min(events['x'])
             # events['y']-=np.min(events['y'])
             # events['t']-=np.min(events['t'])
-            if self.globalSettings['StoreConvertedRawData']['value']:
+            if self.globalSettings['StoreConvertedRawData']['value'] > 0:
                 np.save(filepath[:-4]+'.npy',events)
                 logging.debug('NPY file created')
             logging.info('Raw data loaded')
@@ -1533,123 +1287,89 @@ class MyGUI(QMainWindow):
 
         return unique_files
 
-    def run_processing_i(self,error=None):
-        logging.info('Processing started...')
-        #Get the polarity:
+    def removeStorageBasedOnPickle(self,polarityVal):
+        #Remove the self.store option when pickle is loaded
+        #FINDING:  if ALL polarity finding routines are loading pickle, the intermediate finding saving is disabled
+        #Check if all (both pos and neg if needed) finding is loading pickles:
+        if polarityVal != 'Both':
+            if 'LoadExistingFinding' in self.getFunctionEvalText('Finding','','',polarityVal):
+                self.globalSettings['StoreFindingOutput']['value'] = 0
+                logging.info('Disabled findingoutput storage because pickle is loaded')
+        elif polarityVal == 'Both':
+            if 'LoadExistingFinding' in self.getFunctionEvalText('Finding','','','Neg') and 'LoadExistingFinding' in self.getFunctionEvalText('Finding','','','Pos'):
+                self.globalSettings['StoreFindingOutput']['value'] = 0
+                logging.info('Disabled findingoutput storage because pickle is loaded')
+        
+        #FITTING: if ALL polarity finding AND fitting routines are loading pickle, the final fitting saving is disabled
+        if polarityVal != 'Both':
+            if 'LoadExistingFinding' in self.getFunctionEvalText('Finding','','',polarityVal):
+                if 'LoadExistingFitting' in self.getFunctionEvalText('Fitting','','',polarityVal):
+                    self.globalSettings['StoreFittingOutput']['value'] = 0
+                    self.globalSettings['StoreFinalOutput']['value'] = 0
+                    self.globalSettings['StoreFileMetadata']['value'] = 0
+                    logging.info('Disabled fittingoutput storage because pickle is loaded')
+        elif polarityVal == 'Both':
+            if 'LoadExistingFinding' in self.getFunctionEvalText('Finding','','','Neg') and 'LoadExistingFinding' in self.getFunctionEvalText('Finding','','','Pos'):
+                if 'LoadExistingFitting' in self.getFunctionEvalText('Fitting','','','Neg') and 'LoadExistingFitting' in self.getFunctionEvalText('Fitting','','','Pos'):
+                    self.globalSettings['StoreFittingOutput']['value'] = 0
+                    self.globalSettings['StoreFinalOutput']['value'] = 0
+                    self.globalSettings['StoreFileMetadata']['value'] = 0
+                    logging.info('Disabled fittingoutput storage because pickle is loaded')
+
+    def run_processing_i(self):
+        self.globalSettingsBeforeRun = copy.deepcopy(self.globalSettings)
+        
+        #Get polarity info:
         if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[0]:
             polarityVal = 'Mix'
-        if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[1]:
+        elif self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[1]:
             polarityVal = 'Pos'
-        if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[2]:
+        elif self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[2]:
             polarityVal = 'Neg'
-        if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[3]:
-            #TODO: BOTH OF THEM AFTER ONE ANOTHER
-            polarityVal = 'Mix'
-        #Check if a folder or file is selected:
-        if os.path.isdir(self.dataLocationInput.text()):
-            #Find all .raw or .npy files that have unique names except for the extension (and prefer .npy):
-            allFiles = self.find_raw_npy_files(self.dataLocationInput.text())
-            logging.debug('Running folder analysis on files :')
-            logging.debug(allFiles)
-            for file in allFiles:
-                try:
-                    self.storeNameDateTime = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-                    logging.info('Starting to process file '+file)
-                    self.processSingleFile(file,polarityVal=polarityVal)
-                    logging.info('Successfully processed file '+file)
-                except:
-                    logging.error('Error in processing file '+file)
-        #If it's a file...
-        elif os.path.isfile(self.dataLocationInput.text()):
-            self.storeNameDateTime = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            #Find polarity:
-            #Check if we are loading existing fitting
-            if 'ExistingFitting' in getattr(self,f"CandidateFittingDropdown{polarityVal}").currentText() or 'existing Fitting' in getattr(self,f"CandidateFittingDropdown{polarityVal}").currentText():
-                logging.info('Skipping finding and fitting processing')
-                # compare filenames of finding and fitting here? Following code is not yet adapted
-                FittingEvalText = self.getFunctionEvalText('Fitting',"self.data['FindingResult'][0]","self.globalSettings",polarityVal)
-                match = re.search(r'File_Location="([^"]+)"', FittingEvalText)
-                FittingResults = match.group(1)
-                with open(FittingResults, 'rb') as file:
-                    FindingRef = pickle.load(file)
-                if FindingRef == '':
-                    logging.error('No finding results are stored for these fitting results, please check the global settings and re-run finding and fitting.')
-                    error = 'No finding results are stored for fitting results trying to load.'
-                elif not os.path.exists(FindingRef):
-                    logging.error('Cannot find finding results, please re-run finding and fitting and save corresponding results.')
-                    error = 'FileNotFound: Cannot find finding results.'
-                else:
-                    if 'ExistingFinding' in getattr(self,f"CandidateFindingDropdown{polarityVal}").currentText() or 'existing Finding' in getattr(self,f"CandidateFindingDropdown{polarityVal}").currentText():
-                        FindingEvalText = self.getFunctionEvalText('Finding',"npyData","self.globalSettings",polarityVal)
-                        emptyPath = "File_Location=\"\""
-                        if FindingEvalText == None:
-                            FindingResults = ''
-                        if FindingEvalText != None:
-                            match = re.search(r'File_Location="([^"]+)"', FindingEvalText)
-                            if match:
-                                FindingResults = match.group(1)
-                        if FindingResults != FindingRef:
-                            logging.warning('Existing finding and fitting do not match, try to reset finding path to correct file.')
-                            self.setFilepathExisting("Finding", polarityVal, FindingRef)
-                    else:
-                        logging.warning("Existing finding and fitting do not match, try to reset finding routine.")
-                        print(self.getFunctionEvalText('Finding',"npyData","self.globalSettings",polarityVal))
-                        self.setMethod("Finding", polarityVal, "Load an existing Finding Result")
-                        # reset comboboxes
-                        self.reset_single_combobox_states()
-                        print(self.getFunctionEvalText('Finding',"npyData","self.globalSettings",polarityVal))
-                        self.setFilepathExisting("Finding", polarityVal, FindingRef)
+        elif self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[3]:
+            polarityVal = 'Both'
+            
+        #Change savingbehaviour based on pickle loading
+        self.removeStorageBasedOnPickle(polarityVal)
+        
+        #Add relevant info:
+        self.findingAnalysis.set_globalSettings(self.globalSettings)
+        self.findingAnalysis.set_GPU(False)
+        self.findingAnalysis.set_parrallellized(utilsHelper.strtobool(self.globalSettings['Multithread']['value']))
+        self.findingAnalysis.set_fileLocation(self.dataLocationInput.text())
+        self.findingAnalysis.set_GUIinfo(self) #Pass the GUI info to the finding analysis
+        self.findingAnalysis.set_chunkingTime([float(self.globalSettings['FindingBatchingTimeMs']['value']),float(self.globalSettings['FindingBatchingTimeOverlapMs']['value'])])
 
-                    # Ensure that we don't store the finding result
-                    origStoreFindingSetting=self.globalSettings['StoreFindingOutput']['value']
-                    self.globalSettings['StoreFindingOutput']['value'] = False
-                    # Ensure that we don't store fitting result
-                    origStoreFittingSetting=self.globalSettings['StoreFittingOutput']['value']
-                    self.globalSettings['StoreFittingOutput']['value'] = False
-                    self.processSingleFile(self.dataLocationInput.text(),noFindingFitting=True,polarityVal=polarityVal)
-
-                    #Reset the global setting:
-                    self.globalSettings['StoreFindingOutput']['value']=origStoreFindingSetting
-                    self.globalSettings['StoreFittingOutput']['value']=origStoreFittingSetting
-
-            else:
-                if 'ExistingFinding' in getattr(self,f"CandidateFindingDropdown{polarityVal}").currentText() or 'existing Finding' in getattr(self,f"CandidateFindingDropdown{polarityVal}").currentText():
-                    logging.info('Skipping finding processing, going to fitting')
-                    FindingEvalText = self.getFunctionEvalText('Finding',"npyData","self.globalSettings",polarityVal)
-                    emptyPath = "File_Location=\"\""
-                    if FindingEvalText == None:
-                        FindingResults = ''
-                    if FindingEvalText != None:
-                        match = re.search(r'File_Location="([^"]+)"', FindingEvalText)
-                        if match:
-                            FindingResults = match.group(1)
-                    if polarityVal == 'Pos':
-                        self.data['refFindingFilepos'] = FindingResults
-                    if polarityVal == 'Neg':
-                        self.data['refFindingFileneg'] = FindingResults
-                    else:
-                        self.data['refFindingFile'] = FindingResults
-                    #Ensure that we don't store the finding result
-                    origStoreFindingSetting=self.globalSettings['StoreFindingOutput']['value']
-                    self.globalSettings['StoreFindingOutput']['value'] = False
-
-                    self.processSingleFile(self.dataLocationInput.text(),onlyFitting=True,polarityVal=polarityVal)
-
-                    #Reset the global setting:
-                    self.globalSettings['StoreFindingOutput']['value']=origStoreFindingSetting
-                else:
-                    #Otherwise normally process a single file
-                    self.processSingleFile(self.dataLocationInput.text(),polarityVal=polarityVal)
-        #if it's neither a file nor a folder
-        else:
-            logging.error('Input file/folder is not correct! Please check.')
-            error = 'Input file/folder is not correct! Please check.'
-        self.updateGUIafterNewResults(error)
+        self.findingAnalysis.set_polarityAnalysis(polarityVal)
+        
+        
+        #'Run', not 'preview'
+        self.findingAnalysis.set_timeStretchMs([float(self.run_startTLineEdit.text()),float(self.run_startTLineEdit.text())+float(self.run_durationTLineEdit.text())])
+        self.findingAnalysis.set_xyStretch([[float(self.run_minXLineEdit.text()),float(self.run_maxXLineEdit.text())],[float(self.run_minYLineEdit.text()),float(self.run_maxYLineEdit.text())]])
+        
+        #Run the analysis
+        self.findingAnalysis.analyse()
+        
+        #Access the results and store
+        self.data['FindingResult'] = self.findingAnalysis.Results
+        
+        #Next, all fitting:
+        #Add relevant info:
+        self.fittingAnalysis.set_globalSettings(self.globalSettings)
+        self.fittingAnalysis.set_GPU(False)
+        self.fittingAnalysis.set_parrallellized(utilsHelper.strtobool(self.globalSettings['Multithread']['value']))
+        self.fittingAnalysis.set_polarityAnalysis(polarityVal)
+        self.fittingAnalysis.set_findingResult(self.findingAnalysis.Results)
+        self.fittingAnalysis.set_GUIinfo(self) #Pass the GUI info to the finding analysis
+        #Run the analysis
+        self.fittingAnalysis.analyse()
+        #Access the results and store
+        self.data['FittingResult'] = self.fittingAnalysis.Results
+        
+        # self.updateGUIafterNewResults(error)
         return
 
-    def run_processing(self):
-        thread = threading.Thread(target=self.run_processing_i)
-        thread.start()
+    def run_processing(self,error=None):
         #Give a clear logging separation:
         logging.info("")
         logging.info("")
@@ -1660,10 +1380,200 @@ class MyGUI(QMainWindow):
         #Switch the user to the Run info tab
         utils.changeTab(self, text='Run info')
         
+        #Ensure final output is stored
         self.globalSettings['StoreFinalOutput']['value'] = True
-        # self.run_processing_i()
+
         # reset previewEvents array, every time run is pressed
         self.previewEvents = []
+        
+        #Create the finding structure:
+        self.FindingCompleted = False
+        self.findingAnalysis = FindingAnalysis()
+        #Create the finding structure:
+        self.FittingCompleted = False
+        self.fittingAnalysis = FittingAnalysis()
+        
+        #Prepare for saving/storing results later...
+        self.currentFileInfo['CurrentFileLoc'] = self.dataLocationInput.text()
+        self.storeNameDateTime = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            
+        #Run the processing on a different thread for GUI proper working
+        thread = threading.Thread(target=self.run_processing_i)
+        thread.start()
+        
+        self.analysisStartTime = time.time()
+        #Await completion of finding  - i need to do this, since calling/emitting requires a QObject, which cannot be pickled for threading.
+        while self.FindingCompleted == False:
+            QApplication.processEvents() #continue as normal
+        self.findingAnalysisComplete() #Run this function once finding is completed
+        while self.FittingCompleted == False:
+            QApplication.processEvents() #continue as normal
+        self.fittingAnalysisComplete() #Run this function once fitting is completed
+    
+    def run_preview_i(self,error=None):
+        #Get polarity info:
+        if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[0]:
+            polarityVal = 'Mix'
+        elif self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[1]:
+            polarityVal = 'Pos'
+        elif self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[2]:
+            polarityVal = 'Neg'
+        elif self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[3]:
+            polarityVal = 'Both'
+        
+        #Add relevant info:
+        self.findingAnalysis.set_globalSettings(self.globalSettings)
+        self.findingAnalysis.set_GPU(False)
+        self.findingAnalysis.set_parrallellized(utilsHelper.strtobool(self.globalSettings['Multithread']['value']))
+        self.findingAnalysis.set_fileLocation(self.dataLocationInput.text())
+        self.findingAnalysis.set_GUIinfo(self) #Pass the GUI info to the finding analysis
+        self.findingAnalysis.set_chunkingTime([float(self.globalSettings['FindingBatchingTimeMs']['value']),float(self.globalSettings['FindingBatchingTimeOverlapMs']['value'])])
+        
+        self.findingAnalysis.set_polarityAnalysis(polarityVal)
+        
+        #'preview', not 'run'
+        self.findingAnalysis.set_timeStretchMs([float(self.previewTimeStretch[0]),float(self.previewTimeStretch[0])+float(self.previewTimeStretch[1])])
+        self.findingAnalysis.set_xyStretch([[float(self.previewXYStretch[0]),float(self.previewXYStretch[1])],[float(self.previewXYStretch[2]),float(self.previewXYStretch[3])]])
+        
+        #Run the analysis
+        self.findingAnalysis.analyse()
+        
+        #Access the results and store
+        self.data['FindingResult'] = self.findingAnalysis.Results
+        
+        #Next, all fitting:
+        #Add relevant info:
+        self.fittingAnalysis.set_globalSettings(self.globalSettings)
+        self.fittingAnalysis.set_GPU(False)
+        self.fittingAnalysis.set_parrallellized(utilsHelper.strtobool(self.globalSettings['Multithread']['value']))
+        self.fittingAnalysis.set_polarityAnalysis(polarityVal)
+        self.fittingAnalysis.set_findingResult(self.findingAnalysis.Results)
+        self.fittingAnalysis.set_GUIinfo(self) #Pass the GUI info to the finding analysis
+        #Run the analysis
+        self.fittingAnalysis.analyse()
+        #Access the results and store
+        self.data['FittingResult'] = self.fittingAnalysis.Results
+        
+    def previewRun(self,timeStretch=(0,1000),xyStretch=(0,0,0,0),frameTime=100):
+        """
+        Generates the preview of a run analysis.
+
+        Parameters:
+            timeStretch (tuple): A tuple containing the start and end times for the preview.
+            xyStretch (tuple): A tuple containing the minimum and maximum x and y coordinates for the preview.
+
+        Returns:
+            None
+        """
+        
+        #Switch the user to the Run info tab
+        utils.changeTab(self, text='Run info')
+
+        # Empty the event preview list
+        self.previewEvents = []
+
+        #Checking if a file is selected rather than a folder:
+        if not os.path.isfile(self.dataLocationInput.text()):
+            logging.error("Please choose a file rather than a folder for previews.")
+            return
+        
+        #Give a clear logging separation:
+        logging.info("")
+        logging.info("")
+        logging.info("--------------- Preview Run Starting ---------------")
+        logging.info("")
+        logging.info("")
+        
+        #Ensure final output is stored
+        self.globalSettings['StoreFinalOutput']['value'] = False
+
+        # reset previewEvents array, every time run is pressed
+        self.previewEvents = []
+        
+        #Create the finding structure:
+        self.FindingCompleted = False
+        self.findingAnalysis = FindingAnalysis()
+        #Create the finding structure:
+        self.FittingCompleted = False
+        self.fittingAnalysis = FittingAnalysis()
+        
+        #Change global values so nothing is stored - we just want a preview run. This is later set back to orig values (globalSettingsOrig):
+        globalSettingsOrig = copy.deepcopy(self.globalSettings)
+        self.globalSettings['StoreConvertedRawData']['value'] = False
+        self.globalSettings['StoreFileMetadata']['value'] = False
+        # self.globalSettings['StoreFinalOutput']['StoreFinalOutput']['value'] = False
+        self.globalSettings['StoreFinalOutput']['value'] = False
+        self.globalSettings['StoreFindingOutput']['value'] = False
+        self.globalSettings['StoreFittingOutput']['value'] = False
+        
+        self.FindingCompleted = False
+        self.FittingCompleted = False
+        
+        self.previewTimeStretch = timeStretch
+        self.previewXYStretch = xyStretch
+        
+        #Run the processing on a different thread for GUI proper working
+        thread = threading.Thread(target=self.run_preview_i)
+        thread.start()
+
+        #Await completion of finding  - i need to do this, since calling/emitting requires a QObject, which cannot be pickled for threading.
+        while self.FindingCompleted == False:
+            QApplication.processEvents() #continue as normal
+        while self.FittingCompleted == False:
+            QApplication.processEvents() #continue as normal
+        
+        print('previewing finished')
+        #Reset global settings
+        self.globalSettings = globalSettingsOrig
+
+        #we need to find the events to display in the preview:
+        if self.dataLocationInput.text().endswith('.hdf5'):
+            previewEvents,_ = self.timeSliceFromHDF(self.dataLocationInput.text(),requested_start_time_ms = float(timeStretch[0]),requested_end_time_ms=float(timeStretch[0])+float(timeStretch[1]),howOftenCheckHdfTime = 50000)
+        elif self.dataLocationInput.text().endswith('.raw'):
+            previewEvents = utils.readRawTimeStretch(self.dataLocationInput.text(),self.globalSettings['MetaVisionPath']['value'],buffer_size = 5e7, n_batches=5e7, timeStretchMs=[float(timeStretch[0])*1000,float(timeStretch[1])*1000])
+        elif self.dataLocationInput.text().endswith('.npy'):
+            #Load the data:
+            previewEvents = np.load(self.dataLocationInput.text())
+            #constrict to correct time:
+            previewEvents = self.filterEvents_npy_t(previewEvents,timeStretch)
+        
+        #Check if we have at least 1 event:
+        if len(previewEvents) > 0:
+            #Log the nr of events found:
+            logging.info(f"Preview - Found {len(previewEvents)} events in the chosen time frame.")
+        else:
+            logging.error("Preview - No events found in the chosen time frame.")
+            return
+        
+        #Load the events in self memory and filter on XY
+        self.previewEvents = previewEvents
+        self.previewEvents = self.filterEvents_xy(self.previewEvents,xyStretch)
+        
+        #Update the preview panel and localization list:
+        self.updateShowPreview(previewEvents=self.previewEvents,timeStretch=timeStretch,frameTime=frameTime)
+        self.updateLocList()
+
+    def findingAnalysisComplete(self):
+        #Function is run as soon as finding is completed
+        print('EMIT of finding analysis is completed@!')
+        self.currentFileInfo['FindingTime'] = time.time() - self.analysisStartTime 
+    
+    def fittingAnalysisComplete(self):
+        #Function is run as soon as fitting is completed
+        #Perfect time to save data and such :)
+        print('EMIT of fitting analysis is completed@!')
+        self.currentFileInfo['FittingTime'] = time.time() - self.currentFileInfo['FindingTime']
+        #Update the GUI results
+        self.updateGUIafterNewResults()
+        #Store data... These functions have checks on what to store
+        # if self.globalSettings['StoreFinalOutput']['value'] > 0:
+        self.storeLocalizationOutput()
+        self.storeFindingOutput()
+        self.createAndStoreFileMetadata()
+        print('all saved')
+        
+        #restore global settings (can be changed in run_processing_i)
+        self.globalSettings = self.globalSettingsBeforeRun
 
     def updateGUIafterNewResults(self,error=None):
         if error == None:
@@ -1684,171 +1594,6 @@ class MyGUI(QMainWindow):
 
         return npyData
 
-    def processSingleFile(self,FileName,onlyFitting=False,polarityVal='Mix', noFindingFitting=False):
-
-        self.data['FindingResult']={}
-        self.data['FittingResult']={}
-        #Runtime of finding and fitting
-        self.currentFileInfo['FindingTime'] = 0
-        self.currentFileInfo['FittingTime'] = 0
-
-        if not noFindingFitting:
-            if not onlyFitting:
-                #Run the analysis on a single file
-                self.currentFileInfo['CurrentFileLoc'] = FileName
-                if self.globalSettings['FindingBatching']['value']== False:
-                    npyDataCell = self.loadRawData(FileName)
-                    #Note that npyDataCell has 2 entries if pos/neg are treated seperately, otherwise just one entry:
-                    #Logic for if there are multiple entires in npyDataCell
-                    events_id = 0
-                    partialFinding = {}
-                    partialFitting = {}
-                    for npyData in npyDataCell:
-                        if npyData is None:
-                            return
-
-                        #Sort event list on time
-                        npyData = npyData[np.argsort(npyData,order='t')]
-
-                        if self.dataSelectionPolarityDropdown.currentText() != self.polarityDropdownNames[3]:
-                            #Run the current finding and fitting routine only on these events:
-                            self.runFindingAndFitting(npyData,runFitting=True,storeFinding=True,polarityVal=polarityVal)
-                        else:
-                            #Run the current finding and fitting routine only on these events:
-                            if np.all(npyData['p'] == 1):
-                                polarityVal = 'Pos'
-                            elif np.all(npyData['p'] == 0):
-                                polarityVal = 'Neg'
-                            self.runFindingAndFitting(npyData,runFitting=True,storeFinding=True,polarityVal=polarityVal)
-                            #we store our finding and fitting results like this:
-                            partialFinding[events_id] = self.data['FindingResult']
-                            partialFitting[events_id] = self.data['FittingResult']
-
-                        events_id+=1
-
-                    #If the data was split in two parts... (or more)
-                    if events_id > 1:
-                        updated_partialFinding = []
-                        updated_partialFindingMetadatastring = ''
-                        updated_partialFitting = []
-                        updated_partialFittingMetadatastring = ''
-                        totNrFindingIncrease = 0
-                        for i in range(events_id):
-                            updated_partialFindingMetadatastring = updated_partialFindingMetadatastring+partialFinding[i][1]+'\n'
-                            updated_partialFittingMetadatastring = updated_partialFittingMetadatastring+partialFitting[i][1]+'\n'
-                            for eachEntry in partialFinding[i][0].items():
-                                updated_partialFinding.append(eachEntry[1])
-                            for index,row in partialFitting[i][0].iterrows():
-                                row.candidate_id+=totNrFindingIncrease
-                                updated_partialFitting.append(row)
-
-                            #increase the total number of findings
-                            totNrFindingIncrease+=eachEntry[0]+1
-
-                        #Store them again in the self.data['FindingResult']
-                        self.data['FindingResult']={}
-                        self.data['FindingResult'][0] = dict(zip(range(len(updated_partialFinding)), updated_partialFinding))
-                        self.data['FindingResult'][1] = updated_partialFindingMetadatastring
-                        #Fitting should be changed to pd df
-                        res_dict_fitting = pd.DataFrame(updated_partialFitting)
-                        #Store them again in the self.data['FindingResult']
-                        self.data['FittingResult']={}
-                        self.data['FittingResult'][0] = res_dict_fitting
-                        self.data['FittingResult'][1] = updated_partialFittingMetadatastring
-
-
-                elif self.globalSettings['FindingBatching']['value']== True or self.globalSettings['FindingBatching']['value']== 2:
-                    self.runFindingBatching()
-            #If we only fit, we still run more or less the same info, butwe don't care about the npyData in the CurrentFileLoc.
-            elif onlyFitting:
-                self.currentFileInfo['CurrentFileLoc'] = FileName
-                logging.info('Candidate finding NOT performed')
-                npyData = None
-                if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[3]:
-                    self.runFindingAndFitting(npyData,polarityVal='Pos')
-                    #Get the number of positive candidates:
-
-                    self.runFindingAndFitting(npyData,polarityVal='Neg',findingOffset=len(self.data['FindingResult'][0]))
-                else:
-                    self.runFindingAndFitting(npyData,polarityVal=polarityVal)
-        elif noFindingFitting:
-            self.currentFileInfo['CurrentFileLoc'] = FileName
-            logging.info('Candidate finding and fitting NOT performed')
-            npyData = None
-            if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[3]:
-                self.runFindingAndFitting(npyData,polarityVal='Pos')
-                self.runFindingAndFitting(npyData,polarityVal='Neg',findingOffset=len(self.data['FindingResult'][0]),fittingOffset=len(self.data['FindingResult'][0]))
-            else:
-                self.runFindingAndFitting(npyData,polarityVal=polarityVal)
-
-    def FindingBatching(self,npyData,polarityVal,append=True):
-        #Get polarity info and do this:
-        FindingEvalText = self.getFunctionEvalText('Finding',"npyData","self.globalSettings",polarityVal)
-        if FindingEvalText is not None:
-            self.data['FindingMethod'] = str(FindingEvalText)
-            BatchFindingResult = eval(str(FindingEvalText))
-            
-            if append:
-                #Append the metadata
-                self.data['FindingResult'][1] = np.append(self.data['FindingResult'][1],BatchFindingResult[1])
-
-                #Append to the fullr esult
-                for k in range(len(BatchFindingResult[0])):
-                    try:
-                        #Subtract the GUI start-time
-                        chunkloading_currentLimits_corr = [[limit - float(self.run_startTLineEdit.text()) * 1000 for limit in subarray] for subarray in self.chunckloading_currentLimits]
-                        
-                        if self.filter_finding_on_chunking(BatchFindingResult[0][k],chunkloading_currentLimits_corr):
-                            # append BatchFindingResult[0][k] to the full result:
-                            #Shouldn't be appended, but should be a new entry in the dict:
-                            self.data['FindingResult'][0][len(self.data['FindingResult'][0])] = BatchFindingResult[0][k]
-                    except:
-                        print('issues with index '+str(k))
-            else:
-                return BatchFindingResult
-
-    def filter_finding_on_chunking(self,candidate,chunking_limits):
-        #Return true if it should be in this chunk, false if not
-
-        #Looking at end of chunk:
-        #Special case: start is after the overlap-start of next, and end is before the overlap-end of this:
-        if min(candidate['events']['t']) > chunking_limits[0][1]-(chunking_limits[1][1]-chunking_limits[0][1]) and max(candidate['events']['t']) < chunking_limits[1][1]:
-            #This will mean this candidate will be found in this chunk and in the next chunk:
-            #Check if the mean t is in this frame or not:
-            meant = np.mean(candidate['events']['t'])
-            if meant<chunking_limits[0][1]:
-                return True
-            else:
-                return False
-        #Looking at start of chunk:
-        #Special case: start is after the overlap-start of previous, and end is before the overlap-end of this:
-        elif min(candidate['events']['t']) > chunking_limits[1][0] and max(candidate['events']['t']) < chunking_limits[0][0]+(chunking_limits[1][1]-chunking_limits[0][1]):
-            #This will mean this candidate will be found in this chunk and in the previous chunk:
-            #Check if the mean t is in this frame or not:
-            meant = np.mean(candidate['events']['t'])
-            if meant>chunking_limits[0][0]:
-                return True
-            else:
-                return False
-        #Clear pass: start is after the true start of this, end is before the true end of this:
-        elif min(candidate['events']['t']) > chunking_limits[0][0] and max(candidate['events']['t']) < chunking_limits[0][1]:
-            return True
-        #Looking at end of chunk:
-        #Clear fail: start is after the true end of this
-        elif min(candidate['events']['t']) > chunking_limits[0][1]:
-            return False
-        #Looking at start of chunk:
-        #Clear fail: end is before the true start of this chunk
-        elif max(candidate['events']['t']) < chunking_limits[0][0]:
-            return False
-        else:
-            if max(candidate['events']['t'])-min(candidate['events']['t']) > (chunking_limits[1][1]-chunking_limits[0][1]):
-                logging.warning('This candidate might be cut off due to batching! Considering increasing overlap!')
-                return True
-            else:
-                logging.error('This candidate is never assigned! Should not happen!')
-                return False
-
     def obtainPolarityValFromPolarityDropdown(self):
         #Get the polarity:
         if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[0]:
@@ -1861,463 +1606,6 @@ class MyGUI(QMainWindow):
             #NOTE: Do both after one another
             polarityVal = ['Pos','Neg']
         return polarityVal
-
-
-    def runSingleHDF5Chunk(self,fileToRun,chunckloading_limits,previous_read_hdfChunk,polarityVal,parrallellized=False,events_prev=None,events_struct=None):
-    
-        res = None
-        
-        # Retrieve all entries within the specified bounding box
-        t_min = np.min(chunckloading_limits)
-        t_max = min(np.max(chunckloading_limits),float(self.run_startTLineEdit.text())*1000+float(self.run_durationTLineEdit.text())*1000)
-        #Function to get events from HDF
-        time_start = time.time()
-        events,curr_chunk = self.timeSliceFromHDF(fileToRun,requested_start_time_ms = t_min/1000,requested_end_time_ms=t_max/1000,howOftenCheckHdfTime = 500000,loggingBool=False,curr_chunk = previous_read_hdfChunk)
-        logging.error(f'Time for time-split:{time.time()-time_start}')
-        
-        #Store this current chunk id for the next chunk
-        previous_read_hdfChunk = curr_chunk-1
-
-        #Check if any events are still within the range of time we want to assess
-        if len(events) > 0:
-            if events['t'][0] < (float(self.run_startTLineEdit.text())+float(self.run_durationTLineEdit.text()))*1000:
-                #limit to requested xy
-                time_start = time.time()
-                events = self.filterEvents_xy(events,xyStretch=(float(self.run_minXLineEdit.text()),float(self.run_maxXLineEdit.text()),float(self.run_minYLineEdit.text()),float(self.run_maxYLineEdit.text())))
-                logging.error(f'Time for xy-split:{time.time()-time_start}')
-
-                #Add the starting time
-                if parrallellized == False:
-                    self.chunckloading_currentLimits = [[float(self.run_startTLineEdit.text())*1000 + x for x in sublist] for sublist in self.chunckloading_currentLimits]
-                
-                    #Add events_prev before these events:
-                    events = np.concatenate((events_prev,events))
-                elif parrallellized == True:
-                    events = np.concatenate((events_struct,events))
-
-                if len(events)>0:
-                    logging.info('Current event min/max time:'+str(min(events['t'])/1000)+"/"+str(max(events['t'])/1000))
-                    #Filter on correct polarity
-                    if polarityVal == "Pos":
-                        eventsPol = self.filterEvents_npy_p(events,1)
-                    elif polarityVal == "Neg":
-                        eventsPol = self.filterEvents_npy_p(events,0)
-                    elif polarityVal == "Mix":
-                        eventsPol = events
-
-                    if (len(eventsPol) > 0):
-                        if parrallellized == False:
-                            self.FindingBatching(eventsPol,polarityVal,append=True)
-                            self.chunckloading_number_chuck += 1
-
-                            #Keep the previous 'overlap-events' for next round
-                            events_prev = events[events['t']>self.chunckloading_currentLimits[0][1]-(self.chunckloading_currentLimits[1][1]-self.chunckloading_currentLimits[0][1])]
-                        elif parrallellized == True:
-                            res = self.FindingBatching(eventsPol,polarityVal,append=False)
-
-            else:
-                logging.info('Finished chunking!')
-                if parrallellized == False:
-                    self.number_finding_found_polarity[polarityVal] = len(self.data['FindingResult'][0])
-                    self.chunckloading_finished_chunking = True
-        else:
-            if parrallellized == False:
-                logging.info('Finished chunking!')
-                self.number_finding_found_polarity[polarityVal] = len(self.data['FindingResult'][0])
-                self.chunckloading_finished_chunking = True
-        
-        if parrallellized == False:
-            return previous_read_hdfChunk
-        elif parrallellized == True:
-            return res
-
-
-        
-
-    def runFindingBatching(self):
-        logging.info('Batching-dependant finding starting!')
-        fileToRun = self.currentFileInfo['CurrentFileLoc']
-        self.currentFileInfo['FindingTime'] = time.time()
-        self.data['FindingResult'] = {}
-        self.data['FindingResult'][0] = {}
-        self.data['FindingResult'][1] = []
-
-        #Get some logic on polarity:
-        #Get the polarity:
-        polarityValArray = self.obtainPolarityValFromPolarityDropdown()
-
-        #For batching, we only load data between some timepoints.
-        if fileToRun.endswith('.raw'):
-            logging.info('Starting with RAW for chunking')
-            #Empty dict to keep track of how many pos/neg psfs were found
-            self.number_finding_found_polarity = {}
-            sys.path.append(self.globalSettings['MetaVisionPath']['value'])
-            from metavision_core.event_io.raw_reader import RawReader
-
-            for polarityVal in polarityValArray:
-                logging.info('Starting Batching with polarity: '+polarityVal)
-
-                if not ('ExistingFinding' in getattr(self,f"CandidateFindingDropdown{polarityVal}").currentText() or 'existing Finding' in getattr(self,f"CandidateFindingDropdown{polarityVal}").currentText()):
-
-                    record_raw = RawReader(fileToRun,max_events=int(5e7)) #TODO: maybe the 5e9 should be user-defined? I think this is memory-based.
-
-                    #Seek to start time according to specifications
-                    record_raw.seek_time(float(self.run_startTLineEdit.text())*1000)
-
-
-                    #Read all chunks:
-                    self.chunckloading_number_chuck = 0
-                    events_prev = np.zeros(0, dtype={'names': ['x', 'y', 'p', 't'], 'formats': ['<u2', '<u2', '<i2', '<i8'], 'offsets': [0, 2, 4, 8], 'itemsize': 32})
-                    self.chunckloading_finished_chunking = False
-                    self.chunckloading_currentLimits = [[0,0],[0,0]]
-
-                    while self.chunckloading_finished_chunking == False:
-                        logging.info('New chunk analysis starting')
-                        if self.chunckloading_number_chuck == 0:
-                            events = record_raw.load_delta_t(float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000+float(self.globalSettings['FindingBatchingTimeOverlapMs']['value'])*1000)
-                        else:
-                            events = record_raw.load_delta_t(float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000)
-                        #Check if any events are still within the range of time we want to assess
-                        if len(events) > 0:
-
-
-                            if (min(events['t']) < (float(self.run_startTLineEdit.text())+float(self.run_durationTLineEdit.text()))*1000):
-                                #limit to requested xy
-                                events = self.filterEvents_xy(events,xyStretch=(float(self.run_minXLineEdit.text()),float(self.run_maxXLineEdit.text()),float(self.run_minYLineEdit.text()),float(self.run_maxYLineEdit.text())))
-                                #limit to requested t
-                                # maxT = (float(self.run_startTLineEdit.text())+float(self.run_durationTLineEdit.text()))*1000
-                                # events = events[events['t']<maxT]
-
-                                # logging.warning('RAW2 Current event min/max time:'+str(min(events['t'])/1000)+"/"+str(max(events['t'])/1000))
-
-                                #self.chunckloading_currentLimits is later used to check which PSFs are in the current chunk
-                                self.chunckloading_currentLimits = [[(self.chunckloading_number_chuck)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000,(self.chunckloading_number_chuck+1)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000],[(self.chunckloading_number_chuck)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000-float(self.globalSettings['FindingBatchingTimeOverlapMs']['value'])*1000,(self.chunckloading_number_chuck+1)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000+float(self.globalSettings['FindingBatchingTimeOverlapMs']['value'])*1000]]
-                                #Add the starting time
-                                self.chunckloading_currentLimits = [[float(self.run_startTLineEdit.text())*1000 + x for x in sublist] for sublist in self.chunckloading_currentLimits]
-                                #Add events_prev before these events:
-                                events = np.concatenate((events_prev,events))
-                                #Limit to the wanted minimum time
-                                # maxT = (float(self.run_startTLineEdit.text())+float(self.run_durationTLineEdit.text()))*1000
-                                # events = events[events['t']<maxT]
-
-
-
-                                if len(events)>0:
-                                    logging.info('Current event min/max time:'+str(min(events['t'])/1000)+"/"+str(max(events['t'])/1000))
-                                    #Filter on correct polarity
-                                    if polarityVal == "Pos":
-                                        eventsPol = self.filterEvents_npy_p(events,1)
-                                    elif polarityVal == "Neg":
-                                        eventsPol = self.filterEvents_npy_p(events,0)
-                                    elif polarityVal == "Mix":
-                                        eventsPol = events
-
-                                    if (len(eventsPol) > 0):
-                                        self.FindingBatching(eventsPol,polarityVal)
-                                        self.chunckloading_number_chuck += 1
-
-                                        #Keep the previous 'overlap-events' for next round
-                                        events_prev = events[events['t']>self.chunckloading_currentLimits[0][1]-(self.chunckloading_currentLimits[1][1]-self.chunckloading_currentLimits[0][1])]
-                            else:
-                                logging.info('Finished chunking!')
-                                self.number_finding_found_polarity[polarityVal] = len(self.data['FindingResult'][0])
-                                self.chunckloading_finished_chunking = True
-                        else:
-                            logging.info('Finished chunking!')
-                            self.number_finding_found_polarity[polarityVal] = len(self.data['FindingResult'][0])
-                            self.chunckloading_finished_chunking = True
-
-                else: #If we want to pre-load the existing finding info:
-                    findingOffset = 0
-                    if polarityVal == 'Neg':
-                        findingOffset = self.number_finding_found_polarity['Pos']
-
-                    self.runFindingAndFitting('',runFitting=False,storeFinding=False,polarityVal=polarityVal,findingOffset = findingOffset,fittingOffset=findingOffset)
-                    self.number_finding_found_polarity[polarityVal] = len(self.data['FindingResult'][0])
-                    z=3
-
-                    # customFindingEval = ["{key: value for key, value in self.data['FindingResult'][0].items() if key < "+str(self.number_finding_found_polarity['Pos'])+"}","{key-"+str(self.number_finding_found_polarity['Pos']-1)+": value for key, value in self.data['FindingResult'][0].items() if key >= "+str(self.number_finding_found_polarity['Pos'])+"}"]
-
-        elif self.dataLocationInput.text().endswith('.npy'):
-            logging.info('Loading npy file into memory for chuncking')
-            #For npy, load the events in memory
-            data = np.load(self.dataLocationInput.text(), mmap_mode='r')
-            dataset_minx = data['x'].min()
-            dataset_miny = data['y'].min()
-
-            #Empty dict to keep track of how many pos/neg psfs were found
-            self.number_finding_found_polarity = {}
-
-            for polarityVal in polarityValArray:
-                logging.info('Starting Batching with polarity: '+polarityVal)
-                #Limit time correctly
-                if float(self.run_startTLineEdit.text()) > data['t'].min()/1000 or float(self.run_startTLineEdit.text())+float(self.run_durationTLineEdit.text()) < data['t'].max()/1000:
-                    #Fully limit to t according to specifications
-                    data = self.filterEvents_npy_t(data,tStretch=(float(self.run_startTLineEdit.text()),float(self.run_durationTLineEdit.text())))
-
-                #Filter on correct polarity
-                if polarityVal == "Pos":
-                    data_pol = self.filterEvents_npy_p(data,1)
-                elif polarityVal == "Neg":
-                    data_pol = self.filterEvents_npy_p(data,0)
-                elif polarityVal == "Mix":
-                    data_pol = data
-
-                #set start time to zero (required for chunking):
-                # data_pol['t'] -= min(data_pol['t'])
-
-                #Read all chunks:
-                self.chunckloading_number_chuck = 0
-                self.chunckloading_finished_chunking = False
-                self.chunckloading_currentLimits = [[0,0],[0,0]]
-                #Loop over the chunks:
-                while self.chunckloading_finished_chunking == False:
-                    #Find the current time limits (inner, outer time)
-                    self.chunckloading_currentLimits = [[(self.chunckloading_number_chuck)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000,(self.chunckloading_number_chuck+1)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000],[(self.chunckloading_number_chuck)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000-float(self.globalSettings['FindingBatchingTimeOverlapMs']['value'])*1000,(self.chunckloading_number_chuck+1)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000+float(self.globalSettings['FindingBatchingTimeOverlapMs']['value'])*1000]]
-                    #Add the starting time
-                    self.chunckloading_currentLimits = [[float(self.run_startTLineEdit.text())*1000 + x for x in sublist] for sublist in self.chunckloading_currentLimits]
-                    #Check which are within the limits
-                    indices = np.logical_and((data_pol['t'] >= self.chunckloading_currentLimits[1][0]), (data_pol['t'] <= self.chunckloading_currentLimits[1][1]))
-
-
-                    #Filter to xy
-                    events = self.filterEvents_xy(data_pol,xyStretch=(dataset_minx+float(self.run_minXLineEdit.text()),dataset_minx+float(self.run_maxXLineEdit.text()),dataset_miny+float(self.run_minYLineEdit.text()),dataset_miny+float(self.run_maxYLineEdit.text())))
-                    #and filter to time
-                    events = self.filterEvents_npy_t(events,tStretch=(self.chunckloading_currentLimits[1][0]/1000,self.chunckloading_currentLimits[1][1]/1000))
-
-                    if len(events) > 0:
-                        #Check if any events are still within the range of time we want to assess
-                        if min(events['t']) < (float(self.run_startTLineEdit.text())+float(self.run_durationTLineEdit.text()))*1000:
-                            if sum(indices) > 0:
-                                #Do the actual finding
-                                self.FindingBatching(events,polarityVal)
-                                self.chunckloading_number_chuck+=1
-                            else:
-                                logging.info('Finished chunking!')
-                                self.number_finding_found_polarity[polarityVal] = len(self.data['FindingResult'][0])
-                                self.chunckloading_finished_chunking = True
-                        else:
-                            logging.info('Finished chunking!')
-                            self.number_finding_found_polarity[polarityVal] = len(self.data['FindingResult'][0])
-                            self.chunckloading_finished_chunking = True
-                    else:
-                        logging.info('Finished chunking!')
-                        self.number_finding_found_polarity[polarityVal] = len(self.data['FindingResult'][0])
-                        self.chunckloading_finished_chunking = True
-        elif fileToRun.endswith('.hdf5'):
-            logging.info('Starting with HDF5 for chunking')
-            #Empty dict to keep track of how many pos/neg psfs were found
-            self.number_finding_found_polarity = {}
-
-            for polarityVal in polarityValArray:
-                logging.info('Starting Batching with polarity: '+polarityVal)
-
-                if not ('ExistingFinding' in getattr(self,f"CandidateFindingDropdown{polarityVal}").currentText() or 'existing Finding' in getattr(self,f"CandidateFindingDropdown{polarityVal}").currentText()):
-                    
-                    parrallellized = True
-                    
-                    if parrallellized == True:
-                        
-                        
-                        #So I'm thinking of the following:
-                        #First check how many chunks we're going to need (known since hdf5 stores start/end time)
-                        #Throw a parrallel loop over the chunks
-                        
-                        #Pre-processing for the multiprocessing
-                        events_struct = np.zeros(0, dtype={'names': ['x', 'y', 'p', 't'], 'formats': ['<u2', '<u2', '<i2', '<i8'], 'offsets': [0, 2, 4, 8], 'itemsize': 32})
-                        
-                        with h5py.File(fileToRun, mode='r') as file:
-                            #get the min/max values:
-                            events_hdf5 = file['CD']['events']
-                            indexes = file['CD']['indexes']
-                            
-                            minTimeHdf5_Us = events_hdf5[0]['t']
-                            maxTimeHdf5_Us = events_hdf5[events_hdf5.size-1]['t'] #in ms
-                        
-                        minTimeUs = max(minTimeHdf5_Us,float(self.run_startTLineEdit.text())*1000)
-                        maxTimeUs = min(maxTimeHdf5_Us,float(self.run_startTLineEdit.text())*1000+float(self.run_durationTLineEdit.text())*1000)
-                        
-                        
-                        chunkingTimeUs = float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000
-                        n_chunks = int(np.ceil((maxTimeUs-minTimeUs)/chunkingTimeUs))
-                        
-                        startStopChunkTimes = np.zeros((n_chunks,2,2))
-                        for n in range(n_chunks):
-                            startStopChunkTimes[n] = [[(n)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000,(n+1)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000],[(n)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000-float(self.globalSettings['FindingBatchingTimeOverlapMs']['value'])*1000,(n+1)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000+float(self.globalSettings['FindingBatchingTimeOverlapMs']['value'])*1000]]
-                                                
-                        parr_batch_results = {}
-                        parr_batch_metadata = {}
-                        
-                        #Actual multi-processing line:
-                        
-                        # import concurrent.futures
-                        
-                        # with concurrent.futures.ProcessPoolExecutor() as executor:
-                        #     futures = {executor.submit(self.runSingleHDF5ChunkAndCorrectForChunkTime, fileToRun, startStopChunkTimes[n], 0, polarityVal, True, None, events_struct, 0): n for n in range(n_chunks)}
-                        #     for future in concurrent.futures.as_completed(futures):
-                        #         n = futures[future]
-                        #         parr_batch_results[n], parr_batch_metadata[n] = future.result()
-
-                        from joblib import Parallel, delayed
-                        import multiprocessing
-                        num_cores = multiprocessing.cpu_count()
-                        
-                        xyStretch = (float(self.run_minXLineEdit.text()),float(self.run_maxXLineEdit.text()),float(self.run_minYLineEdit.text()),float(self.run_maxYLineEdit.text()))
-                        
-                        FindingEvalText = self.getFunctionEvalText('Finding',"npyData","globalSettings",polarityVal)
-                        self.data['FindingMethod'] = str(FindingEvalText)
-                        
-                        
-                        
-                        # for n in range(n_chunks):
-                        #     parr_batch_results[n],parr_batch_metadata[n] = process_hdf5_chunk_joblib(n, fileToRun, startStopChunkTimes, polarityVal, events_struct,self.run_startTLineEdit.text(),self.run_durationTLineEdit.text(),xyStretch,FindingEvalText,self.globalSettings)
-                        
-                        
-                        #     parr_batch_results[n],parr_batch_metadata[n] = self.runSingleHDF5ChunkAndCorrectForChunkTime(fileToRun,startStopChunkTimes[n],0,polarityVal,parrallellized=True,events_prev=None,events_struct = events_struct,GUItimeOffsetMs=0)
-                        
-                        results = Parallel(n_jobs=-1)(delayed(process_hdf5_chunk_joblib)(n, fileToRun, startStopChunkTimes, polarityVal, events_struct,self.run_startTLineEdit.text(),self.run_durationTLineEdit.text(),xyStretch,FindingEvalText,self.globalSettings) for n in range(n_chunks))
-                        
-                        parr_batch_results = [result[0] for result in results]
-                        parr_batch_metadata = [result[1] for result in results]
-                        
-                        
-                        
-                        # RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(self.runSingleHDF5ChunkAndCorrectForChunkTime)(fileToRun, startStopChunkTimes[n], 0, polarityVal, parrallellized=True, events_prev=None, events_struct = events_struct, GUItimeOffsetMs=0) for n in range(len(n_chunks)))
-    
-                        
-                        # for n in range(n_chunks):
-                        #     parr_batch_results[n],parr_batch_metadata[n] = self.runSingleHDF5ChunkAndCorrectForChunkTime(fileToRun,startStopChunkTimes[n],0,polarityVal,parrallellized=True,events_prev=None,events_struct = events_struct,GUItimeOffsetMs=0)
-                        
-                        
-                        #Postprocessing after multiprocessing
-                        
-                        #append all results:
-                        #Start either empty or with the pos results (or any other results)
-                        if self.data['FindingResult'][0] == {}:
-                            combined_dict = {}
-                            combined_metadata = ''
-                        else:
-                            combined_dict = self.data['FindingResult'][0]
-                            combined_metadata = self.data['FindingResult'][1]
-                        #Ugliest way to add all to a single dictionary, but its fast and it works
-                        for n in range(0,n_chunks):
-                            newent = parr_batch_results[n]
-                            for k in newent:
-                                combined_dict[len(combined_dict)] = newent[k]
-                            combined_metadata += '\n'+parr_batch_metadata[n]
-
-                        #Store as findingresult
-                        self.data['FindingResult'][0] = combined_dict
-                        self.data['FindingResult'][1] = combined_metadata
-                            
-                        #Update number of findings
-                        self.number_finding_found_polarity[polarityVal] = len(self.data['FindingResult'][0])
-                    
-                    if parrallellized == False:
-                        self.chunckloading_finished_chunking = False
-                        self.chunckloading_currentLimits = [[0,0],[0,0]]
-
-                        previous_read_hdfChunk = 0
-                        events_prev = np.zeros(0, dtype={'names': ['x', 'y', 'p', 't'], 'formats': ['<u2', '<u2', '<i2', '<i8'], 'offsets': [0, 2, 4, 8], 'itemsize': 32})
-                        self.chunckloading_number_chuck = 0
-                        
-                        while self.chunckloading_finished_chunking == False:
-                            #Get limits from GUI
-                            self.chunckloading_currentLimits = [[(self.chunckloading_number_chuck)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000+float(self.run_startTLineEdit.text())*1000,(self.chunckloading_number_chuck+1)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000+float(self.run_startTLineEdit.text())*1000],[(self.chunckloading_number_chuck)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000-float(self.globalSettings['FindingBatchingTimeOverlapMs']['value'])*1000+float(self.run_startTLineEdit.text())*1000,(self.chunckloading_number_chuck+1)*float(self.globalSettings['FindingBatchingTimeMs']['value'])*1000+float(self.globalSettings['FindingBatchingTimeOverlapMs']['value'])*1000+float(self.run_startTLineEdit.text())*1000]]
-
-                            previous_read_hdfChunk = self.runSingleHDF5Chunk(fileToRun,self.chunckloading_currentLimits,previous_read_hdfChunk,polarityVal,parrallellized=False,events_prev=events_prev)
-                        logging.info('Chunking hdf5 complete')
-
-                else:
-                    #We dictate a findingOffset (i.e. nr of positive events if we're running negative events afterwards)
-                    findingOffset = 0
-                    if polarityVal == 'Neg':
-                        findingOffset = self.number_finding_found_polarity['Pos']
-                    #And actually run the finding/fitting:
-                    self.runFindingAndFitting('',runFitting=False,storeFinding=False,polarityVal=polarityVal,findingOffset = findingOffset,fittingOffset=findingOffset)
-                    self.number_finding_found_polarity[polarityVal] = len(self.data['FindingResult'][0])
-
-        else:
-            logging.error("Please choose a .raw or .npy or .hdf5 file for previews.")
-            return
-
-        #Check if some candidates are found:
-        if len(self.data['FindingResult'][0]) == 0:
-            logging.error("No candidates found at all! Stopping analysis.")
-            return
-
-        #store finding results:
-        if self.globalSettings['StoreFindingOutput']['value']:
-            self.storeFindingOutput(polarityVal = polarityVal)
-        self.currentFileInfo['FindingTime'] = time.time() - self.currentFileInfo['FindingTime']
-        logging.info('Number of candidates found: '+str(len(self.data['FindingResult'][0])))
-        logging.info('Candidate finding took '+str(self.currentFileInfo['FindingTime'])+' seconds.')
-
-        #All finding is done, continue with fitting:
-        if self.dataSelectionPolarityDropdown.currentText() != self.polarityDropdownNames[3]:
-            self.runFitting(polarityVal = polarityVal)
-        else:
-            #Run twice with custom parameters:
-            polArr = ['Pos','Neg']
-            customFindingEval = ["{key: value for key, value in self.data['FindingResult'][0].items() if key < "+str(self.number_finding_found_polarity['Pos'])+"}","{key-"+str(self.number_finding_found_polarity['Pos']-1)+": value for key, value in self.data['FindingResult'][0].items() if key >= "+str(self.number_finding_found_polarity['Pos'])+"}"]
-            self.runFitting(polarityVal = polArr,customFindingEval = customFindingEval,bothPolarities=True)
-
-    def runFindingAndFitting(self,npyData,runFitting=True,storeFinding=True,polarityVal='Mix',findingOffset=0,fittingOffset=0):
-        FindingEvalText = self.getFunctionEvalText('Finding',"npyData","self.globalSettings",polarityVal)
-        # print(FindingEvalText)
-
-        #I want to note that I can send this to a QThread, and it technically works, but the GUI still freezes. Implementaiton here:
-        # self.thread.setFindingEvalText(self.getFunctionEvalText('Finding',"self.npyData","self.globalSettings",polarityVal))
-        # self.thread.setFittingEvalText(FittingEvalText)
-        # self.thread.setrunFitting(runFitting)
-        # self.thread.setstoreFinding(storeFinding)
-        # self.thread.setpolarityVal(polarityVal)
-        # self.thread.setnpyData(npyData)
-        # self.thread.setGUIinfo(self)
-        # self.thread.setTypeOfThread('Finding')
-        # self.thread.run()
-
-        if FindingEvalText is not None:
-            #Here we run the finding method:
-            try:
-
-                self.currentFileInfo['FindingTime'] = time.time()
-                self.data['FindingMethod'] = str(FindingEvalText)
-                newFindingResult = eval(str(FindingEvalText))
-                if findingOffset == 0:
-                    self.data['FindingResult'] = newFindingResult
-                else:
-
-                    #Update the finding result entry, their id, but the offset:
-                    newFindingResult2 = {key+findingOffset: value for key, value in newFindingResult[0].items()}
-
-                    newFindingResultTot = list(self.data['FindingResult'])
-                    self.data['FindingResult'][0].update(newFindingResult2)
-                    newFindingResultTot[0] = self.data['FindingResult'][0]
-                    newFindingResultTot[1] += "\n"+newFindingResult[1]
-                    self.data['FindingResult'] = tuple(newFindingResultTot)
-
-
-                    #todo: THE string in findingresult[1] is wrong now, wont be fixed.
-                    # self.data['FindingResult'][1] += "Test"+newFindingResult[1]
-
-                self.currentFileInfo['FindingTime'] = time.time() - self.currentFileInfo['FindingTime']
-                logging.info('Candidate finding completed in '+str(round(self.currentFileInfo['FindingTime'],1))+' seconds; '+str(len(self.data['FindingResult'][0])) + ' candidates found')
-                logging.debug(self.data['FindingResult'])
-                if storeFinding:
-                    if self.globalSettings['StoreFindingOutput']['value']:
-                        self.storeFindingOutput(polarityVal = polarityVal)
-                #And run the fitting
-                if runFitting:
-                    self.runFitting(polarityVal,fittingOffset=fittingOffset)
-            except Exception as e:
-                error_message = f"Critical error in Finding routine! Breaking off!\nError information:\n{type(e).__name__}: {e}\n\n{traceback.format_exc()}"
-                self.open_critical_warning(error_message)
-                self.data['FindingResult'] = {}
-                self.data['FindingResult'][0] = {}
-                self.data['FindingResult'][1] = []
-        else:
-            self.open_critical_warning(f"No Finding evaluation text provided/found")
 
     def updateGUIafterNewFitting(self):
         logging.info('Candidate fitting completed in '+str(round(self.currentFileInfo['FittingTime'],1))+' seconds; '+str(len(self.data['FittingResult'][0].dropna(axis=0))) + ' localizations found')
@@ -2344,75 +1632,6 @@ class MyGUI(QMainWindow):
         if len(self.data['FittingResult'][0]) == 0:
             logging.error('No localizations found after fitting!')
             return
-
-    def runFitting(self,polarityVal,customFindingEval = None,bothPolarities=False,fittingOffset=0):
-        if self.data['FindingResult'][0] is not None:
-            #Run the finding function!
-            try:
-                if not bothPolarities:
-                    if not customFindingEval:
-                        FittingEvalText = self.getFunctionEvalText('Fitting',"self.data['FindingResult'][0]","self.globalSettings",polarityVal)
-                    if FittingEvalText is not None:
-                        self.currentFileInfo['FittingTime'] = time.time()
-                        self.data['FittingMethod'] = str(FittingEvalText)
-                        fittingResult = eval(str(FittingEvalText))
-                        if fittingOffset == 0:
-                            self.data['FittingResult'] = fittingResult
-                        elif fittingOffset > 0:
-                            newFittingResultTot = list(self.data['FittingResult'])
-                            newFittingResultTot[0] = pd.concat([newFittingResultTot[0], fittingResult[0]])
-                            newFittingResultTot[1] += "\n"+fittingResult[1]
-                            self.data['FittingResult'][0].update(pd.concat([self.data['FittingResult'][0], fittingResult[0]]))
-                            self.data['FittingResult'] = tuple(newFittingResultTot)
-                        self.currentFileInfo['FittingTime'] = time.time() - self.currentFileInfo['FittingTime']
-                        #Create and store the localization output
-                        if self.globalSettings['StoreFinalOutput']['value']:
-                            self.storeLocalizationOutput()
-                        #Create and store the metadata
-                        if self.globalSettings['StoreFileMetadata']['value']:
-                            self.createAndStoreFileMetadata()
-                        #Update the GUI
-                        self.updateGUIafterNewFitting()
-                elif bothPolarities: #If we do pos and neg separately
-                    if customFindingEval == None:
-                        logging.warning('RunFitting is only possible with custom finding evaluation text for both polarities')
-                    else:
-                        self.data['FittingMethod'] = ''
-                        self.data['FittingResult'] = {}
-                        self.data['FittingResult'][0] = pd.DataFrame()
-                        self.data['FittingResult'][1] = ''
-                        self.currentFileInfo['FittingTime'] = time.time()
-                        #We're assuming that customFindingEval has 2 entries: one for pos, one for neg.
-                        for i in range(0,2):
-                            FittingEvalText = self.getFunctionEvalText('Fitting',customFindingEval[i],"self.globalSettings",polarityVal[i])
-                            if FittingEvalText is not None:
-                                currentPolFitting = eval(str(FittingEvalText))
-                                #Correct the candidate id in the second go-around
-                                if i > 0:
-                                    currentPolFitting[0]['candidate_id'] += max(self.data['FittingResult'][0]['candidate_id'])
-                                #And add to the current fitting data
-                                self.data['FittingMethod'] += str(FittingEvalText) +"\n"
-                                self.data['FittingResult'][0] = pd.concat([self.data['FittingResult'][0],currentPolFitting[0]], ignore_index=True)
-                                self.data['FittingResult'][1] += str(currentPolFitting[1])+'\n'
-
-                        #After both pos and neg fit is completed:
-                        self.currentFileInfo['FittingTime'] = time.time() - self.currentFileInfo['FittingTime']
-                        #Create and store the localization output
-                        if self.globalSettings['StoreFinalOutput']['value']:
-                            self.storeLocalizationOutput()
-                        #Create and store the metadata
-                        if self.globalSettings['StoreFileMetadata']['value']:
-                            self.createAndStoreFileMetadata()
-                        #Update the GUI
-                        self.updateGUIafterNewFitting()
-            except Exception as e:
-                error_message = f"Critical error in Fitting routine! Breaking off!\nError information:\n{type(e).__name__}: {e}\n\n{traceback.format_exc()}"
-                self.open_critical_warning(error_message)
-                self.data['FittingResult'] = {}
-                self.data['FittingResult'][0] = {}
-                self.data['FittingResult'][1] = [{}]
-        else:
-            self.open_critical_warning(f"No Fitting evaluation text provided/found")
 
     def getStoreLocationPartial(self):
         if 'ExistingFinding' in self.data['FindingMethod']:
@@ -2447,24 +1666,25 @@ class MyGUI(QMainWindow):
             localizations.to_csv(storeLocation)
 
     def storeLocalizationOutput(self):
-        logging.debug('Attempting to store fitting results output')
-        storeLocation = self.getStoreLocationPartial()+'_FitResults_'+self.storeNameDateTime+'.csv'
-        #Store the localization output
-        localizations = self.data['FittingResult'][0].dropna(axis=0, ignore_index=True)
-        localizations = localizations.drop('fit_info', axis=1)
+        #Storing the .CSV
+        if self.globalSettings['StoreFinalOutput']['value'] > 0:
+            logging.debug('Attempting to store fitting results output')
+            storeLocation = self.getStoreLocationPartial()+'_FitResults_'+self.storeNameDateTime+'.csv'
+            #Store the localization output
+            localizations = self.data['FittingResult'][0].dropna(axis=0, ignore_index=True)
+            localizations = localizations.drop('fit_info', axis=1)
 
-        #Actually store
-        self.storeLocalization(storeLocation,localizations,outputType=self.globalSettings['OutputDataFormat']['value'])
+            #Actually store
+            self.storeLocalization(storeLocation,localizations,outputType=self.globalSettings['OutputDataFormat']['value'])
 
         #Also store pickle information:
         #Also save pos and neg seperately if so useful:
-        if self.globalSettings['StoreFittingOutput']['value']:
+        if self.globalSettings['StoreFittingOutput']['value'] > 0:
             if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[3]:
                 try:
-                    if self.number_finding_found_polarity['Pos'] > 0 and self.number_finding_found_polarity['Neg'] > 0:
-                        allPosFittingResults = self.data['FittingResult'][0][0:self.number_finding_found_polarity['Pos']]
-                        allNegFittingResults = self.data['FittingResult'][0][self.number_finding_found_polarity['Pos']:]
-
+                    allPosFittingResults = self.data['FittingResult'][0][self.data['FittingResult'][0]['p']==1]
+                    allNegFittingResults = self.data['FittingResult'][0][self.data['FittingResult'][0]['p']==0]
+                    if len(allPosFittingResults) > 0 and len(allNegFittingResults) > 0:
                         file_path = self.currentFileInfo['CurrentFileLoc'][:-4]+'_FittingResults_PosOnly_'+self.storeNameDateTime+'.pickle'
                         with open(file_path, 'wb') as file:
                             pickle.dump(self.data['refFindingFilepos'], file)
@@ -2489,73 +1709,77 @@ class MyGUI(QMainWindow):
                     pickle.dump(self.data['refFindingFile'], file)
                     pickle.dump(self.data['FittingResult'][0], file)
             logging.info('Fitting results output stored')
-        else:
-            pass
 
-    def storeFindingOutput(self,polarityVal='Pos'):
-        logging.debug('Attempting to store finding results output')
-        #Store the Finding results output
-        file_path = self.currentFileInfo['CurrentFileLoc'][:-4]+'_FindingResults_'+self.storeNameDateTime+'.pickle'
-        self.data['refFindingFile'] = file_path
-        with open(file_path, 'wb') as file:
-            pickle.dump(self.data['FindingResult'][0], file)
-
-
-        #Also save pos and neg seperately if so useful:
-        if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[3]:
-            try:
-                if self.number_finding_found_polarity['Pos'] > 0 and self.number_finding_found_polarity['Neg'] > 0:
-                    allPosFindingResults = {key: value for key, value in self.data['FindingResult'][0].items() if key < self.number_finding_found_polarity['Pos']}
-                    allNegFindingResults = {key-self.number_finding_found_polarity['Pos']: value for key, value in self.data['FindingResult'][0].items() if key >= self.number_finding_found_polarity['Pos']}
-
-                    file_path = self.currentFileInfo['CurrentFileLoc'][:-4]+'_FindingResults_PosOnly_'+self.storeNameDateTime+'.pickle'
-                    self.data['refFindingFilepos'] = file_path
-                    with open(file_path, 'wb') as file:
-                        pickle.dump(allPosFindingResults, file)
+    def storeFindingOutput(self):
+        if self.globalSettings['StoreFindingOutput']['value'] > 0:
+            logging.debug('Attempting to store finding results output')
+            #Store the Finding results output
+            file_path = self.currentFileInfo['CurrentFileLoc'][:-4]+'_FindingResults_'+self.storeNameDateTime+'.pickle'
+            self.data['refFindingFile'] = file_path
+            with open(file_path, 'wb') as file:
+                pickle.dump(self.data['FindingResult'][0], file)
 
 
-                    file_path = self.currentFileInfo['CurrentFileLoc'][:-4]+'_FindingResults_NegOnly_'+self.storeNameDateTime+'.pickle'
-                    self.data['refFindingFileneg'] = file_path
-                    with open(file_path, 'wb') as file:
-                        pickle.dump(allNegFindingResults, file)
-            except:
-                logging.debug('This can be safely ignored')
+            #Also save pos and neg seperately if so useful:
+            if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[3]:
+                #Determine how many positive/negative candidates are found:
+                #loop over the found candidates and check where the 'p' of the first index is still 1
+                nrPosLocs = max(np.where([value['events']['p'].iloc[0] for key, value in self.data['FindingResult'][0].items()])[0])
+                try:
+                    #Check that we have both positive and negative finding results
+                    if nrPosLocs > 0 and len(self.data['FindingResult'][0]) > nrPosLocs:
+                        allPosFindingResults = {key: value for key, value in self.data['FindingResult'][0].items() if key <= nrPosLocs}
+                        allNegFindingResults = {key-nrPosLocs-1: value for key, value in self.data['FindingResult'][0].items() if key > nrPosLocs}
 
-        logging.info('Finding results output stored')
+                        file_path = self.currentFileInfo['CurrentFileLoc'][:-4]+'_FindingResults_PosOnly_'+self.storeNameDateTime+'.pickle'
+                        self.data['refFindingFilepos'] = file_path
+                        with open(file_path, 'wb') as file:
+                            pickle.dump(allPosFindingResults, file)
+
+
+                        file_path = self.currentFileInfo['CurrentFileLoc'][:-4]+'_FindingResults_NegOnly_'+self.storeNameDateTime+'.pickle'
+                        self.data['refFindingFileneg'] = file_path
+                        with open(file_path, 'wb') as file:
+                            pickle.dump(allNegFindingResults, file)
+                except:
+                    logging.debug('This can be safely ignored')
+
+            logging.info('Finding results output stored')
 
     def createAndStoreFileMetadata(self):
-        logging.debug('Attempting to create and store file metadata')
-        try:
-            metadatastring = dedent(f"""\
-            Metadata information for file {self.currentFileInfo['CurrentFileLoc']}
-            Analysis routine finished at {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+        if self.globalSettings['StoreFileMetadata']['value'] > 0 :
+            logging.debug('Attempting to create and store file metadata')
+            try:
+                metadatastring = dedent(f"""\
+                Metadata information for file {self.currentFileInfo['CurrentFileLoc']}
+                Analysis routine finished at {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 
-            ---- Finding metadata output: ----
-            Methodology used:
-            {self.data['FindingMethod']}
+                ---- Finding metadata output: ----
+                Methodology used:
+                {self.data['FindingMethod']}
 
-            Number of candidates found: {len(self.data['FindingResult'][0])}
-            Candidate finding took {self.currentFileInfo['FindingTime']} seconds.
+                Number of candidates found: {len(self.data['FindingResult'][0])}
+                Candidate finding took {self.currentFileInfo['FindingTime']} seconds.
 
-            Custom output from finding function:\n""")\
-            + f"""{self.data['FindingResult'][1]}\n""" + dedent(f"""\
+                Custom output from finding function:\n""")\
+                + f"""{self.data['FindingResult'][1]}\n""" + dedent(f"""\
 
-            ---- Fitting metadata output: ----
-            Methodology used:
-            {self.data['FittingMethod']}
+                ---- Fitting metadata output: ----
+                Methodology used:
+                {self.data['FittingMethod']}
 
-            Number of localizations found: {len(self.data['FittingResult'][0].dropna(axis=0))}
-            Candidate fitting took {self.currentFileInfo['FittingTime']} seconds.
+                Number of localizations found: {len(self.data['FittingResult'][0].dropna(axis=0))}
+                Candidate fitting took {self.currentFileInfo['FittingTime']} seconds.
 
-            Custom output from fitting function:\n""")\
-            + f"""{self.data['FittingResult'][1]}
-            """
-            #Store this metadatastring:
-            with open(self.getStoreLocationPartial()+'_RunInfo_'+self.storeNameDateTime+'.txt', 'w') as f:
-                f.write(metadatastring)
-            logging.info('File metadata created and stored')
-        except:
-            logging.error('Error in creating file metadata, not stored')
+                Custom output from fitting function:\n""")\
+                + f"""{self.data['FittingResult'][1]}
+                """
+                #Store this metadatastring:
+                with open(self.getStoreLocationPartial()+'_RunInfo_'+self.storeNameDateTime+'.txt', 'w') as f:
+                    f.write(metadatastring)
+                logging.info('File metadata created and stored')
+            except:
+                logging.error('Error in creating file metadata, not stored')
 
     def getFunctionEvalText(self,className,p1,p2,polarity):
         #Get the dropdown info
@@ -2738,7 +1962,6 @@ class MyGUI(QMainWindow):
         find_editable_fields(self)
         return fields
 
-
     def reset_single_combobox_states(self):
         logging.info('Ran reset_single_combobox_states')
         original_states = {}
@@ -2771,7 +1994,6 @@ class MyGUI(QMainWindow):
                     utils.changeLayout_choice(getattr(self, f"groupboxFitting{polVal}").layout(),combobox.objectName(),getattr(self, f"Fitting_functionNameToDisplayNameMapping{polVal}"),parent=self)
         # except:
         #     pass
-
 
     def set_all_combobox_states(self):
         logging.info('Ran set_all_combobox_states')
@@ -2809,274 +2031,728 @@ class MyGUI(QMainWindow):
         # except:
         #     pass
 
+""" Fitting/Finding logic """
 
-""" Set of scripts out of any class """
-
-
-def process_hdf5_chunk_joblib(n, fileToRun, startStopChunkTimes, polarityVal, events_struct,startTlineedittext,durationTlineedittext,xyStretch,FindingEvalText,globalSettings):
-    return runSingleHDF5ChunkAndCorrectForChunkTime(fileToRun, startStopChunkTimes[n], 0, polarityVal, parrallellized=True, events_prev=None, events_struct=events_struct, GUItimeOffsetMs =  0, startTlineedittext = startTlineedittext,durationTlineedittext=durationTlineedittext,xyStretch=xyStretch,FindingEvalText=FindingEvalText,globalSettings=globalSettings)
-
-
-def runSingleHDF5ChunkAndCorrectForChunkTime(fileToRun,chunckloading_limits,previous_read_hdfChunk,polarityVal,parrallellized=False,events_prev=None,events_struct=None,GUItimeOffsetMs = 0,startTlineedittext = None,durationTlineedittext = None,xyStretch = None,FindingEvalText=None,globalSettings=None):
-    
-    #First do the normal single HDF5 chunk
-    result = runSingleHDF5Chunk(fileToRun,chunckloading_limits,previous_read_hdfChunk,polarityVal,parrallellized,events_prev,events_struct,startTlineedittext = startTlineedittext,durationTlineedittext=durationTlineedittext,xyStretch=xyStretch,FindingEvalText=FindingEvalText,globalSettings=globalSettings)
-    
-    if result is not None:
-        print("Result length: "+str(len(result[0])))
-        
-        finalResults = {}
-        #See if it's in range, and if not, we pop it
-        for k in range(len(result[0])):
-            #Subtract the GUI start-time
-            chunkloading_currentLimits_corr = [[limit - GUItimeOffsetMs * 1000 for limit in subarray] for subarray in chunckloading_limits]
-            
-            if filter_finding_on_chunking(result[0][k],chunkloading_currentLimits_corr):
-                # append BatchFindingResult[0][k] to the full result:
-                finalResults[len(finalResults)] = result[0][k]
-
-        return finalResults,result[1]
-    else:
-        logging.error("Error in processing HDF5 chunk")
-        return None,'Error in processing HDF5 chunk'
-
-#ONLY PARRALLELLIZED FUNCTION
-def runSingleHDF5Chunk(fileToRun,chunckloading_limits,previous_read_hdfChunk,polarityVal,parrallellized=True,events_prev=None,events_struct=None,startTlineedittext = None,durationTlineedittext = None,xyStretch = None,FindingEvalText=None,globalSettings=None):
-
-    res = None
-    
-    # Retrieve all entries within the specified bounding box
-    t_min = np.min(chunckloading_limits)
-    t_max = min(np.max(chunckloading_limits),float(startTlineedittext)*1000+float(durationTlineedittext)*1000)
-    #Function to get events from HDF
-    time_start = time.time()
-    events,curr_chunk = timeSliceFromHDF(fileToRun,requested_start_time_ms = t_min/1000,requested_end_time_ms=t_max/1000,howOftenCheckHdfTime = 10000,loggingBool=False,curr_chunk = previous_read_hdfChunk)
-    logging.error(f'Time for time-split:{time.time()-time_start}')
-    
-    #Store this current chunk id for the next chunk
-    previous_read_hdfChunk = curr_chunk-1
-
-    #Check if any events are still within the range of time we want to assess
-    if len(events) > 0:
-        if events['t'][0] < (float(startTlineedittext)+float(durationTlineedittext))*1000:
-            #limit to requested xy
-            time_start = time.time()
-            events = filterEvents_xy(events,xyStretch=xyStretch)
-            logging.error(f'Time for xy-split:{time.time()-time_start}')
-
-            #Add the starting time
-            # if parrallellized == False:
-            #     self.chunckloading_currentLimits = [[float(self.run_startTLineEdit.text())*1000 + x for x in sublist] for sublist in self.chunckloading_currentLimits]
-            
-            #     #Add events_prev before these events:
-            #     events = np.concatenate((events_prev,events))
-            # elif parrallellized == True:
-            events = np.concatenate((events_struct,events))
-
-            if len(events)>0:
-                logging.info('Current event min/max time:'+str(min(events['t'])/1000)+"/"+str(max(events['t'])/1000))
-                #Filter on correct polarity
-                if polarityVal == "Pos":
-                    eventsPol = filterEvents_npy_p(events,1)
-                elif polarityVal == "Neg":
-                    eventsPol = filterEvents_npy_p(events,0)
-                elif polarityVal == "Mix":
-                    eventsPol = events
-
-                if (len(eventsPol) > 0):
-                    # if parrallellized == False:
-                    #     self.FindingBatching(eventsPol,polarityVal,append=True)
-                    #     self.chunckloading_number_chuck += 1
-
-                    #     #Keep the previous 'overlap-events' for next round
-                    #     events_prev = events[events['t']>self.chunckloading_currentLimits[0][1]-(self.chunckloading_currentLimits[1][1]-self.chunckloading_currentLimits[0][1])]
-                    # elif parrallellized == True:
-                    res = FindingBatching(eventsPol,polarityVal,globalSettings,FindingEvalText = FindingEvalText,append=False)
-
-        # else:
-            # logging.info('Finished chunking!')
-            # if parrallellized == False:
-            #     self.number_finding_found_polarity[polarityVal] = len(self.data['FindingResult'][0])
-            #     self.chunckloading_finished_chunking = True
-    # else:
-    #     if parrallellized == False:
-    #         logging.info('Finished chunking!')
-    #         self.number_finding_found_polarity[polarityVal] = len(self.data['FindingResult'][0])
-    #         self.chunckloading_finished_chunking = True
-    
-    # if parrallellized == False:
-    #     return previous_read_hdfChunk
-    if parrallellized == True:
-        return res
-
-
-def filter_finding_on_chunking(candidate,chunking_limits):
-    #Return true if it should be in this chunk, false if not
-
-    #Looking at end of chunk:
-    #Special case: start is after the overlap-start of next, and end is before the overlap-end of this:
-    if min(candidate['events']['t']) > chunking_limits[0][1]-(chunking_limits[1][1]-chunking_limits[0][1]) and max(candidate['events']['t']) < chunking_limits[1][1]:
-        #This will mean this candidate will be found in this chunk and in the next chunk:
-        #Check if the mean t is in this frame or not:
-        meant = np.mean(candidate['events']['t'])
-        if meant<chunking_limits[0][1]:
-            return True
-        else:
-            return False
-    #Looking at start of chunk:
-    #Special case: start is after the overlap-start of previous, and end is before the overlap-end of this:
-    elif min(candidate['events']['t']) > chunking_limits[1][0] and max(candidate['events']['t']) < chunking_limits[0][0]+(chunking_limits[1][1]-chunking_limits[0][1]):
-        #This will mean this candidate will be found in this chunk and in the previous chunk:
-        #Check if the mean t is in this frame or not:
-        meant = np.mean(candidate['events']['t'])
-        if meant>chunking_limits[0][0]:
-            return True
-        else:
-            return False
-    #Clear pass: start is after the true start of this, end is before the true end of this:
-    elif min(candidate['events']['t']) > chunking_limits[0][0] and max(candidate['events']['t']) < chunking_limits[0][1]:
-        return True
-    #Looking at end of chunk:
-    #Clear fail: start is after the true end of this
-    elif min(candidate['events']['t']) > chunking_limits[0][1]:
-        return False
-    #Looking at start of chunk:
-    #Clear fail: end is before the true start of this chunk
-    elif max(candidate['events']['t']) < chunking_limits[0][0]:
-        return False
-    else:
-        if max(candidate['events']['t'])-min(candidate['events']['t']) > (chunking_limits[1][1]-chunking_limits[0][1]):
-            logging.warning('This candidate might be cut off due to batching! Considering increasing overlap!')
-            return True
-        else:
-            logging.error('This candidate is never assigned! Should not happen!')
-            return False
-
-
-def timeSliceFromHDF(dataLocation,requested_start_time_ms = 0,requested_end_time_ms=1000,howOftenCheckHdfTime = 100000,loggingBool=False,curr_chunk = 0):
-    """Function that returns all events between start/end time in a HDF5 file. Extremely sped-up since the HDF5 file is time-sorted, and only checked every 100k (howOftenCheckHdfTime) events.
-
-    Args:
-        dataLocation (String): Storage location of the .hdf5 file
-        requested_start_time_ms (int, optional): Start time in milliseconds. Defaults to 0.
-        requested_end_time_ms (int, optional): End time in milliseconds. Defaults to 1000.
-        howOftenCheckHdfTime (int, optional): At which N intervals the time should be checked. This means that HDF event 0,N*howOftenCheckHdfTime,(N+1)*howOftenCheckHdfTime etc will be checked and pre-loaded. After this, all events within the time bounds is loaded. Defaults to 100000.
-        loggingBool (bool, optional): Whether or not logging is activated. Defaults to True.
-        curr_chunk (int, optional): Starting chunk to look at. Normally should be 0. Defaults to 0.
-
-    Returns:
-        events: Events in wanted format
-        latest_chunk: Last chunk that was used. Can be used to run this function more often via curr_chunk.
+class FindingFittingAnalysis():
     """
-    #Variable starting
-    lookup_start_index = -1
-    lookup_end_index = -1
+    General class for both finding and fitting analysis - expanded later for specific finding or fitting.
+    """
+    def __init__(self):
+        # super().__init__()
+        #Initiate empy variables in self:
+        self.polarityAnalysis = 'Both' #'Pos','Neg','Mix', or 'Both'
+        self.parrallellized = False
+        self.GPU = False #Not yet implemented
+        self.settings = None #Global settings of the GUI
+        self.GUIinfo = None #all GUI info 
+        self.EvalText = '' #Textual string of what function to run, including all params
+        self.Results = {} #Where the fitting/finding results will be stored eventually
+        self.disableRun = False #Set to True if you want to skip the run entirely.
+        
+    
+    #Some functions to set variables/values:
+    def set_polarityAnalysis(self,polarityAnalysis):
+        self.polarityAnalysis = polarityAnalysis
+    
+    def set_parrallellized(self,parrallellized):
+        self.parrallellized = parrallellized
+    
+    def set_GPU(self,GPU):
+        self.GPU = GPU
+    
+    def set_globalSettings(self,settings):
+        #Settings should be the globalSettings structure from the GUI
+        self.settings = settings
+    
+    def set_GUIinfo(self,GUIinfo):
+        self.GUIinfo = GUIinfo
+    
+    def get_Results(self):
+        return self.Results
+
+    def set_EvalText(self,EvalText):
+        self.EvalText = EvalText
+    
+    def getFunctionEvalText(self,GUIinfo,className,p1,p2,polarity):
+        #Get the dropdown info
+        moduleMethodEvalTexts = []
+        all_layouts = GUIinfo.findChild(QWidget, "groupbox"+className+polarity).findChildren(QLayout)[0]
 
 
-    #Load the hdf5 file
-    with h5py.File(dataLocation, mode='r') as file:
-        time0 = time.time()
-        #Events are here in this file:
-        events_hdf5 = file['CD']['events']
+        methodKwargNames_method = []
+        methodKwargValues_method = []
+        methodName_method = ''
+        # Iterate over the items in the layout
+        for index in range(all_layouts.count()):
+            item = all_layouts.itemAt(index)
+            widget = item.widget()
+            if widget is not None:#Catching layouts rather than widgets....
+                if ("LineEdit" in widget.objectName()) and widget.isVisibleTo(GUIinfo.tab_processing):
+                    # The objectName will be along the lines of foo#bar#str
+                    #Check if the objectname is part of a method or part of a scoring
+                    split_list = widget.objectName().split('#')
+                    methodName_method = split_list[1]
+                    methodKwargNames_method.append(split_list[2])
 
-        #Loop while either start or end index hasn't been found yet
-        while lookup_start_index == -1 or lookup_end_index == -1:
-            index = curr_chunk*howOftenCheckHdfTime
+                    #Widget.text() could contain a file location. Thus, we need to swap out all \ for /:
+                    methodKwargValues_method.append(widget.text().replace('\\','/'))
 
-
-            if index <= events_hdf5.size:
-                #Get the time
-                foundtime = events_hdf5[index]['t']/1000 #in ms
-
-                if loggingBool == True:
-                    print('Loading HDF, currently on chunk '+str(curr_chunk)+', at time: '+str(foundtime))
-
-                #Check if the start time has surpassed
-                if foundtime > requested_start_time_ms:
-                    if lookup_start_index == -1:
-                        lookup_start_index = max(0,curr_chunk-1)*howOftenCheckHdfTime
-                #Check if the end-time is surpassed
-                if foundtime > requested_end_time_ms:
-                    if lookup_end_index == -1:
-                        lookup_end_index = max(1,curr_chunk+1)*howOftenCheckHdfTime
-                #Increase current chunk
-                curr_chunk+=1
+                # add distKwarg choice to Kwargs if given
+                if ("ComboBox" in widget.objectName()) and widget.isVisibleTo(GUIinfo.tab_processing) and 'dist_kwarg' in widget.objectName():
+                    methodKwargNames_method.append('dist_kwarg')
+                    methodKwargValues_method.append(widget.currentText())
             else:
-                print('End of file reached while chunking HDF5')
-                if lookup_start_index == -1:
-                    lookup_start_index = events_hdf5.size #Set to end of file
-                if lookup_end_index == -1:
-                    lookup_end_index = events_hdf5.size #Set to end of file
+                #If the item is a layout instead...
+                if isinstance(item, QLayout):
+                    for index2 in range(item.count()):
+                        item_sub = item.itemAt(index2)
+                        widget_sub = item_sub.widget()
+                        if ("LineEdit" in widget_sub.objectName()) and widget_sub.isVisibleTo(GUIinfo.tab_processing):
+                            # The objectName will be along the lines of foo#bar#str
+                            #Check if the objectname is part of a method or part of a scoring
+                            split_list = widget_sub.objectName().split('#')
+                            methodName_method = split_list[1]
+                            methodKwargNames_method.append(split_list[2])
 
-        time1 = time.time()
-        #Properly (32bit) initialise dicts
-        wantedEvents_tooLarge = np.zeros(0, dtype={'names': ['x', 'y', 'p', 't'], 'formats': ['<u2', '<u2', '<i2', '<i8'], 'offsets': [0, 2, 4, 8], 'itemsize': 32})
-        events_output = np.zeros(0, dtype={'names': ['x', 'y', 'p', 't'], 'formats': ['<u2', '<u2', '<i2', '<i8'], 'offsets': [0, 2, 4, 8], 'itemsize': 32})
-        time2 = time.time()
-        #Now we know the start/end index, so we cut out that area:
-        wantedEvents_tooLarge = events_hdf5[lookup_start_index:lookup_end_index]
-        
-        time3 = time.time()
-    #And we fully cut it to exact size:
-    events_output = wantedEvents_tooLarge[(wantedEvents_tooLarge['t'] >= requested_start_time_ms*1000) & (wantedEvents_tooLarge['t'] <= requested_end_time_ms*1000)]
-    time4 = time.time()
-    
+                            #Widget.text() could contain a file location. Thus, we need to swap out all \ for /:
+                            methodKwargValues_method.append(widget_sub.text().replace('\\','/'))
 
-    #Return the events
-    return events_output,curr_chunk
+                        # add distKwarg choice to Kwargs if given
+                        if ("ComboBox" in widget_sub.objectName()) and widget_sub.isVisibleTo(GUIinfo.tab_processing) and 'dist_kwarg' in widget_sub.objectName():
+                            methodKwargNames_method.append('dist_kwarg')
+                            methodKwargValues_method.append(widget_sub.currentText())
 
+        #If at this point there is no methodName_method, it means that the method has exactly 0 req or opt kwargs. Thus, we simply find the value of the QComboBox which should be the methodName:
+        if methodName_method == '':
+            for index in range(all_layouts.count()):
+                item = all_layouts.itemAt(index)
+                widget = item.widget()
+                if isinstance(widget,QComboBox) and widget.isVisibleTo(GUIinfo.tab_processing) and className in widget.objectName():
+                    if className == 'Finding':
+                        methodName_method = utils.functionNameFromDisplayName(widget.currentText(),getattr(GUIinfo,f"Finding_functionNameToDisplayNameMapping{polarity}"))
+                    elif className == 'Fitting':
+                        methodName_method = utils.functionNameFromDisplayName(widget.currentText(),getattr(GUIinfo,f"Fitting_functionNameToDisplayNameMapping{polarity}"))
 
-def filterEvents_xy(events,xyStretch=(-np.Inf,-np.Inf,np.Inf,np.Inf)):
-    """
-    Filter events that are in a numpy array to a certain xy stretch.
-    """
-    #Edit values for x,y coordinates:
-    #First check if all entries in array are numbers:
-    try:
-        xyStretch = (float(xyStretch[0]), float(xyStretch[1]), float(xyStretch[2]), float(xyStretch[3]))
-        #Check if they all are floats:
-        if not all(isinstance(x, float) for x in [float(xyStretch[0]),float(xyStretch[1]),float(xyStretch[2]),float(xyStretch[3])]):
-            logging.info("No XY cutting due to not all entries being floats.")
-        #If they are all float values, we can proceed
+        #Function call: get the to-be-evaluated text out, giving the methodName, method KwargNames, methodKwargValues, and 'function Type (i.e. cellSegmentScripts, etc)' - do the same with scoring as with method
+        if methodName_method != '':
+            EvalTextMethod = utils.getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart=str(p1)+','+str(p2))
+            #append this to moduleEvalTexts
+            moduleMethodEvalTexts.append(EvalTextMethod)
+
+        if moduleMethodEvalTexts is not None and len(moduleMethodEvalTexts) > 0:
+            return moduleMethodEvalTexts[0]
         else:
-            if (xyStretch[0] > 0) | (xyStretch[2] > 0) | (xyStretch[1] < np.inf) | (xyStretch[3] < np.inf):
-                logging.info("XY cutting to values: "+str(xyStretch[0])+","+str(xyStretch[1])+","+str(xyStretch[2])+","+str(xyStretch[3]))
-                #Filter on x,y coordinates:
-                events = events[(events['x'] >= float(xyStretch[0])) & (events['x'] <= float(xyStretch[1]))]
-                events = events[(events['y'] >= float(xyStretch[2])) & (events['y'] <= float(xyStretch[3]))]
-    except:
-        #Warning if something crashes. Note the extra dash to the end of the warning
-        logging.warning("No XY cutting due to not all entries being float-.")
+            return None
 
-    return events
-
-
-def filterEvents_npy_p(events,pValue=0):
+class FindingAnalysis(FindingFittingAnalysis):
     """
-    Filter events that are in a numpy array to a certain polarity
+    General class that runs the finding analysis. Should take in parameters, based on the file location (NOT the events), and spit out the finding results. Should handle all file loading/data handling, splitting of data, multiprocessing, etc etc.
     """
-    #tStretch is (start, duration)
-    indices = np.where((events['p'] == pValue))
-    # Access the partial data using the indices
-    eventsFiltered = events[indices]
-
-    #Warning if no events are found
-    if len(eventsFiltered) == 0:
-        logging.warning("No events found with the chosen polarity: "+str(pValue))
-
-    return eventsFiltered
-
-
-def FindingBatching(npyData,polarityVal,globalSettings,FindingEvalText=None,append=True):
-    if FindingEvalText is not None:
-        BatchFindingResult = eval(str(FindingEvalText))
+    def __init__(self):
+        super().__init__()
+        #Initiate empy variables in self:
+        self.fileLocation = '' #location of file (.hdf5, .raw, .npy)
+        self.timeStretchMs = [0,np.inf] #Time stretch in milliseconds
+        self.xyStretch = [[0,np.inf],[0,np.inf]] #XY stretch in pixels
+        self.chunkingTime = [np.inf,0]
         
-        return BatchFindingResult
+    def set_xyStretch(self,xyStretch):
+        self.xyStretch = xyStretch
+    
+    def set_fileLocation(self,fileLocation):
+        #Check if ends on .hdf5, .raw, .npy:
+        if not fileLocation.endswith('.hdf5') and not fileLocation.endswith('.raw') and not fileLocation.endswith('.npy'):
+            logging.error('File location must end with .hdf5, .raw, or .npy')
+        else:
+            self.fileLocation = fileLocation
+            if fileLocation.endswith('.npy'):
+                if self.parrallellized == True:
+                    self.parrallellized = False
+                    logging.warning('Parrallellization for FINDING in NPY turned off!')
+            if fileLocation.endswith('.raw'):
+                if self.parrallellized == True:
+                    self.parrallellized = False
+                    logging.warning('Parrallellization for FINDING in RAW turned off!')
+    
+    def set_timeStretchMs(self,timeStretchMs):
+        self.timeStretchMs = timeStretchMs
+    
+    def set_chunkingTime(self,chunkingTime):
+        self.chunkingTime = chunkingTime
+    #Real functions:
+    """
+    Callable functions
+    """
+    def analyse(self):
+        #First, check on which polarities we should run:
+        if self.polarityAnalysis == 'Pos':
+            self.runFindingOnPolarity('Pos')
+        elif self.polarityAnalysis == 'Neg':
+            self.runFindingOnPolarity('Neg')
+        elif self.polarityAnalysis == 'Mix':
+            self.runFindingOnPolarity('Mix')
+        elif self.polarityAnalysis == 'Both':
+            self.runFindingOnPolarity('Pos')
+            self.runFindingOnPolarity('Neg')
+        else:
+            logging.error('Polarity analysis must be either Pos, Neg, Mix, or Both')
+        
+        #Tell the GUI the finding is complete!
+        self.GUIinfo.FindingCompleted = True
+        pass
+    
+    def loadPickleFinding(self,evalText,singlePolarity):
+        #Function run when loading a pickle file for a single polarity 
+        self.events = None
+        pickleLoad = eval(evalText)
+        
+        #Store as results:
+        if self.Results == {}:
+            self.Results = pickleLoad
+        else: #if there is some data already:
+            newResults = self.Results
+            offsetlen = len(self.Results[0])
+            self.Results={}
+            self.Results[0]=newResults[0]
+            #we should append it:
+            for k in pickleLoad[0]:
+                self.Results[0][k+offsetlen] = pickleLoad[0][k]
+            self.Results[1] = newResults[1]+'\n\n\n'+pickleLoad[1]
+        
+        return
+    
+    def checkForRunDisableLoadPickleMismatch(self,singlePolarity):
+        #If the FITTING is loading a PICKLE, but the FINDING is NOT loading a pickle, the FINDING is skipped.
+        #If the FITTING is loading a PICKLE, but the FINDING is loading a pickle, continue as normal.
+        #If the FITTING is NOT loading a PICKLE, continue as normal
+        findingeval = self.getFunctionEvalText(self.GUIinfo,'Finding',"","",singlePolarity)
+        fittingeval = self.getFunctionEvalText(self.GUIinfo,'Fitting',"","",singlePolarity)
+        if not 'LoadExistingFitting' in fittingeval:
+            self.disableRun = False
+        else:
+            if 'LoadExistingFinding' in findingeval:
+                self.disableRun = False
+            else:
+                self.disableRun = True
+    
+    def runFindingOnPolarity(self,singlePolarity):
+        #check for disabling the run
+        self.checkForRunDisableLoadPickleMismatch(singlePolarity)
+        
+        #Run the analysis
+        if self.disableRun == True:
+            logging.warning('Finding not run because disableRun was set to True! (pickle load mis-match)')
+            #Still need to enter something as finding result:
+            if self.Results == {}:
+                self.Results={}
+                self.Results[0]={}
+                self.Results[1]='Finding not run because of pickle load mis-match'
+            else:
+                newmetadata = self.Results[1]+'\n\n\nFinding not run because of pickle load mis-match'
+                newResults = self.Results
+                self.Results = {}
+                self.Results[0] = newResults[0]
+                self.Results[1] = newmetadata
+            #Tell the GUI the finding is complete!
+            self.GUIinfo.FindingCompleted = True
+            return
+        
+        #Run the finding on a single polarity
+        #First, get the evaluation text:
+        evalText = self.getFunctionEvalText(self.GUIinfo,'Finding',"self.events","self.settings",singlePolarity)
+        self.set_EvalText(evalText)
+        
+        #Set this to the GUI
+        self.GUIinfo.data['FindingMethod'] = evalText
+        
+        #Run an entirely different function if a pickle file needs to be loaded: - we don't want to load any npy/raw/hdf5 data in this case.
+        if "LoadExistingFinding" in evalText:
+            self.loadPickleFinding(evalText,singlePolarity)
+            return #end the runFindingOnPolarity function
+        
+        #Then, we initialize the finding, based on file type and parrallellization
+        if self.GPU == False:
+            if self.parrallellized == False:
+                if self.fileLocation.endswith('.hdf5'):
+                    
+                    if self.chunkingTime[0] == np.inf:
+                        #Function that returns all the start/stop indexes for all slices:
+                        hdf5_startstopindeces = utils.findIndexFromTimeSliceHDF(self.fileLocation,requested_start_time_ms_arr = [self.timeStretchMs[0]],requested_end_time_ms_arr=[self.timeStretchMs[1]])
+                    else:
+                        #Function that returns all the start/stop indexes for all slices:
+                        requested_start_time_ms_arr, requested_end_time_ms_arr = utils.determineAllStartStopTimesHDF(self.fileLocation,timeChunkMs=self.chunkingTime[0],timeChunkOverlapMs=self.chunkingTime[1],chunkStartStopTime = self.timeStretchMs)
+                        
+                        hdf5_startstopindeces = utils.findIndexFromTimeSliceHDF(self.fileLocation,requested_start_time_ms_arr = requested_start_time_ms_arr,requested_end_time_ms_arr=requested_end_time_ms_arr)
+                    
+                    #Now we have 1 or multiple chunks we have to loop over:
+                    totalFindingResults = {}
+                    totalFindingResults[0] = {}
+                    totalFindingResults[1]=''
+                    for chunk in range(len(hdf5_startstopindeces)):
+                        #Get the events from these indeces:
+                        self.events = utils.timeSliceFromHDFFromIndeces(self.fileLocation,hdf5_startstopindeces,index=chunk)
+                        
+                        self.splitOnPolarity(singlePolarity)
+                        self.splitOnXY()
+                        
+                        #Run the finding on this:
+                        findingResults = self.runFinding(storeasselfResults=False)
+                        
+                        #If we have chunking - we should ensure we only keep the candidates that are in this 'real chunk' part of the chunk:
+                        if len(hdf5_startstopindeces) > 0:
+                            origfindingResults = findingResults
+                            chunking_limits = [[requested_start_time_ms_arr[chunk]+self.chunkingTime[1],requested_end_time_ms_arr[chunk]-self.chunkingTime[1]],[requested_start_time_ms_arr[chunk],requested_end_time_ms_arr[chunk]]]
+                            chunking_limits = np.multiply(chunking_limits,1000) #ms to us
+                            
+                            #Loop over all candidates:
+                            for k in reversed(range(len(origfindingResults[0]))):
+                                candidate = origfindingResults[0][k]
+                                if self.filter_finding_on_chunking(candidate,chunking_limits) == False:
+                                    #pop it
+                                    origfindingResults[0].pop(k)
+                            
+                            #Reset the index values:
+                            findingResults = {}
+                            findingResults[0] = {index: value for index, value in enumerate(origfindingResults[0].values())}
+                            findingResults[1] = origfindingResults[1]
+                        
+                        #And append
+                        index_offset = len(totalFindingResults[0])
+                        for k in findingResults[0]:
+                            totalFindingResults[0][k + index_offset] = findingResults[0][k]
+                        totalFindingResults[1] += '\n'+findingResults[1]
+                    
+                    #Store as results:
+                    if self.Results == {}:
+                        self.Results = totalFindingResults
+                    else: #if there is some data already:
+                        offsetlen = len(self.Results[0])
+                        #we should append it:
+                        for k in totalFindingResults[0]:
+                            self.Results[0][k+offsetlen] = totalFindingResults[0][k]
+                        self.Results[1] += '\n\n\n'+totalFindingResults[1]
+                
+                elif self.fileLocation.endswith('.raw'):
+                    if self.chunkingTime[0] == np.inf or self.settings['FindingBatching']['value']==0:
+                        #If no chunking, simply load the entire file in memory: Note that this also loads a .npy with the same name if available.
+                        self.events = utils.RawToNpy(filepath=self.fileLocation,metaVisionPath=self.GUIinfo.globalSettings['MetaVisionPath']['value'],storeConvertedData = self.GUIinfo.globalSettings['StoreConvertedRawData']['value']>0)
+                        
+                        #get the correct time area:
+                        #Keep only events between timeStretchMs[0] and [1]:
+                        self.events = self.events[np.where((self.events['t']>self.timeStretchMs[0]*1000)&(self.events['t']<self.timeStretchMs[1]*1000))]
+                        #Split on polarity, xy:
+                        self.splitOnPolarity(singlePolarity)
+                        self.splitOnXY()
+                        
+                        #Run the finding on this:
+                        findingResults = self.runFinding()
+                    else:
+                        chunkFinished = False
+                        curr_chunk = 0
+                        findingResultsChunks = {}
+                        while chunkFinished == False:
+                            #determine min/max time based on chunk and chunking time, but don't go past timeStretchMs[1] or below zero:
+                            minTime = max(0,curr_chunk*self.chunkingTime[0]+self.timeStretchMs[0]-self.chunkingTime[1])
+                            maxTime = (curr_chunk+1)*self.chunkingTime[0]+self.timeStretchMs[0]+self.chunkingTime[1]
+                            if maxTime > self.timeStretchMs[1]:
+                                maxTime = self.timeStretchMs[1]
+                                #Make this the last chunk to be run:
+                                chunkFinished = True
+                            logging.info(f"Chunking time: {minTime} - {maxTime}")
+                            #Read in chunks:
+                            self.events = utils.readRawTimeStretch(filepath=self.fileLocation,metaVisionPath=self.GUIinfo.globalSettings['MetaVisionPath']['value'], timeStretchMs=[minTime,maxTime+minTime])
+                            
+                            if len(self.events) == 0:
+                                print('Final chunk reached!')
+                                chunkFinished = True
+                                break
+                            
+                            #Split on polarity, xy:
+                            self.splitOnPolarity(singlePolarity)
+                            self.splitOnXY()
+                            
+                            #Run the finding on this:
+                            findingResultsChunks[curr_chunk] = self.runFinding(storeasselfResults=False)
+                            curr_chunk+=1
+                        
+                        #Combine all finding results...
+                        #First we only keep finding results in their 'correct chunk' (i.e. allowing for overlap)
+                        totalFindingResults = {}
+                        totalFindingResults[0] = {}
+                        totalFindingResults[1] = ''
+                        for chunk in range(len(findingResultsChunks)):
+                            chunkmintime = max(0,chunk*self.chunkingTime[0]+self.timeStretchMs[0])
+                            chunkmaxtime = (chunk+1)*self.chunkingTime[0]+self.timeStretchMs[0]
+                            chunking_limits = [[chunkmintime,chunkmaxtime],[chunkmintime-self.chunkingTime[1],chunkmaxtime+self.chunkingTime[1]]]
+                            chunking_limits = np.multiply(chunking_limits,1000) #ms to us
+                            #Integer and non-negative:
+                            chunking_limits = [[int(max(0,x)) for x in sub_array] for sub_array in chunking_limits]
+                            
+                            #Get the finding results
+                            origfindingResults = findingResultsChunks[chunk][0]
+                            #Reset the index:
+                            origfindingResults= {index: value for index, value in enumerate(origfindingResults.values())}
+                        
+                            #Loop over all candidates:
+                            for k in reversed(range(len(origfindingResults))):
+                                candidate = origfindingResults[k]
+                                if self.filter_finding_on_chunking(candidate,chunking_limits) == False:
+                                    #pop it
+                                    origfindingResults.pop(k)
+                                    
+                            #Reset the index again:
+                            origfindingResults= {index: value for index, value in enumerate(origfindingResults.values())}
+                            
+                            #And append
+                            index_offset = len(origfindingResults)
+                            for k in origfindingResults:
+                                totalFindingResults[0][k + index_offset] = origfindingResults[k]
+                            totalFindingResults[1] += '\n'+findingResultsChunks[chunk][1]
+                        
+                        #Reset the index:
+                        totalFindingResults[0]= {index: value for index, value in enumerate(totalFindingResults[0].values())}
+                        
+                        #Set or append to self.results (i.e. neg after pos)
+                        if self.Results == {}:
+                            self.Results = totalFindingResults
+                        else:
+                            newResults = self.Results
+                            offsetlen = len(newResults[0])
+                            #we should append it:
+                            for k in totalFindingResults[0]:
+                                newResults[0][k+offsetlen] = totalFindingResults[0][k]
+                            newResults[1] += '\n\n\n'+totalFindingResults[1]
+                            self.Results={}
+                            self.Results = newResults
+                    pass 
+                
+                elif self.fileLocation.endswith('.npy'):
+                    #Load the data
+                    self.events = np.load(self.fileLocation)
+                    
+                    #get the correct time area:
+                    #Keep only events between timeStretchMs[0] and [1]:
+                    self.events = self.events[np.where((self.events['t']>self.timeStretchMs[0]*1000)&(self.events['t']<self.timeStretchMs[1]*1000))]
+                    #Split on polarity, xy:
+                    self.splitOnPolarity(singlePolarity)
+                    self.splitOnXY()
+                    
+                    #Run the finding on this:
+                    findingResults = self.runFinding()
+                    
+                    pass 
+                else:
+                    logging.error('File location must end with .hdf5, .raw, or .npy')
+                    pass
+                
+            elif self.parrallellized == True: #Parrallel-CPU processing
+                if self.fileLocation.endswith('.hdf5'):
+                    
+                    if self.settings['FindingBatching']['value']>0:
+                        #Find the start/end time arrays based on the slicing
+                        requested_start_time_ms_arr, requested_end_time_ms_arr = utils.determineAllStartStopTimesHDF(self.fileLocation,timeChunkMs = self.chunkingTime[0],timeChunkOverlapMs = self.chunkingTime[1],chunkStartStopTime = self.timeStretchMs)
+                    else:#if no batching, just use the whole file
+                        #Find the start/end time arrays based on the slicing
+                        requested_start_time_ms_arr, requested_end_time_ms_arr = utils.determineAllStartStopTimesHDF(self.fileLocation,timeChunkMs = np.inf,timeChunkOverlapMs = 0,chunkStartStopTime = self.timeStretchMs)
+                    
+                    #Function that returns all the start/stop indexes for all slices:
+                    hdf5_startstopindeces = utils.findIndexFromTimeSliceHDF(self.fileLocation,requested_start_time_ms_arr = requested_start_time_ms_arr,requested_end_time_ms_arr=requested_end_time_ms_arr)
+                    
+                    #myGUI and pyqtsignal cannot be passed, so has to be removed:
+                    GUIinfo = self.GUIinfo
+                    self.GUIinfo = {}
+                    
+                    #Run the analysis in parallel over all cpu cores
+                    results = Parallel(n_jobs=-1)(delayed(self.process_hdf5_chunk_joblib)(n, hdf5_startstopindeces,singlePolarity) for n in range(0,len(hdf5_startstopindeces)))
+                    
+                    #reset GUIinfo in case we need it:
+                    self.GUIinfo = GUIinfo
+                    
+                    #If we have chunking - we should ensure we only keep the candidates that are in this 'real chunk' part of the chunk:
+                    if len(hdf5_startstopindeces) > 0:
+                        
+                        #We loop over all results:
+                        for chunk in range(0,len(results)):
+                            result = results[chunk]
+                        
+                            origfindingResults = result
+                            
+                            chunking_limits = [[requested_start_time_ms_arr[chunk]+self.chunkingTime[1],requested_end_time_ms_arr[chunk]-self.chunkingTime[1]],[requested_start_time_ms_arr[chunk],requested_end_time_ms_arr[chunk]]]
+                            chunking_limits = np.multiply(chunking_limits,1000) #ms to us
+                        
+                            #Loop over all candidates:
+                            for k in reversed(range(len(origfindingResults[0]))):
+                                candidate = origfindingResults[0][k]
+                                if self.filter_finding_on_chunking(candidate,chunking_limits) == False:
+                                    #pop it
+                                    origfindingResults[0].pop(k)
+                            
+                            #Reset the index values:
+                            result = {}
+                            result[0] = {index: value for index, value in enumerate(origfindingResults[0].values())}
+                            result[1] = origfindingResults[1]
+                            
+                            #Store back in original results
+                            results[chunk] = result
+                    
+                    #Get all results of all parrallell runs:
+                    parr_batch_results = [result[0] for result in results]
+                    parr_batch_metadata = [result[1] for result in results]
+                    
+                    #Create the combined dictionary and metadata of all results:
+                    combined_dict = {}
+                    combined_metadata = ''
+                    
+                    #Ugliest way to add all to a single dictionary, but its fast and it works
+                    for n in range(0,len(results)):
+                        newent = parr_batch_results[n]
+                        for k in newent:
+                            combined_dict[len(combined_dict)] = newent[k]
+                        combined_metadata += '\n'+parr_batch_metadata[n]
 
+                    #Finally, store it as the Results data, or append it if Both polarity
+                    if self.Results == {}: #If it's the first data, just store it
+                        self.Results[0] = combined_dict
+                        self.Results[1] = combined_metadata
+                    else: #Otherwise append to previous data (i.e. first pos, then neg)
+                        oldResults = self.Results
+                        self.Results = {}
+                        combined_dict_index_offset = len(oldResults[0])
+                        self.Results[0] = oldResults[0]
+                        for k in combined_dict:
+                            self.Results[0][k + combined_dict_index_offset] = combined_dict[k]
+                        self.Results[1] = oldResults[1]+'\n\n'+combined_metadata
+                    
+                    pass
+                    
+                elif self.fileLocation.endswith('.raw'):
+                    #To be implemented
+                    logging.error('NOT YET IMPLEMENTED YOU SHOULDNT REACH THIS -RAW')
+                    pass 
+                
+                elif self.fileLocation.endswith('.npy'):
+                    #To be implemented
+                    logging.error('NOT YET IMPLEMENTED YOU SHOULDNT REACH THIS -RAW')
+                    pass 
+                else:
+                    logging.error('File location must end with .hdf5, .raw, or .npy')
+                    pass
+                
+        else:
+            #To be implemented
+            pass
+        
+        pass
 
+    def splitOnPolarity(self,singlePolarity):
+        #Split the self.events on p data:
+        if singlePolarity == 'Pos':
+            self.events = utils.filterEvents_p(self.events,pValue=1)
+        elif singlePolarity == 'Neg':
+            self.events = utils.filterEvents_p(self.events,pValue=0)
 
-""" End of set of scripts out of any class """
+    def splitOnXY(self):
+        #Split the events on xy:
+        self.events = utils.filterEvents_xy(self.events,xyStretch = (self.xyStretch[0][0], self.xyStretch[0][1], self.xyStretch[1][0], self.xyStretch[1][1]))
 
+    """
+    Functions to chunk the data (in time):
+    """    
+    def filter_finding_on_chunking(self,candidate,chunking_limits):
+        #Return true if it should be in this chunk, false if not
+
+        #Looking at end of chunk:
+        #Special case: start is after the overlap-start of next, and end is before the overlap-end of this:
+        if min(candidate['events']['t']) > chunking_limits[0][1]-(chunking_limits[1][1]-chunking_limits[0][1]) and max(candidate['events']['t']) < chunking_limits[1][1]:
+            #This will mean this candidate will be found in this chunk and in the next chunk:
+            #Check if the mean t is in this frame or not:
+            meant = np.mean(candidate['events']['t'])
+            if meant<chunking_limits[0][1]:
+                return True
+            else:
+                return False
+        #Looking at start of chunk:
+        #Special case: start is after the overlap-start of previous, and end is before the overlap-end of this:
+        elif min(candidate['events']['t']) > chunking_limits[1][0] and max(candidate['events']['t']) < chunking_limits[0][0]+(chunking_limits[1][1]-chunking_limits[0][1]):
+            #This will mean this candidate will be found in this chunk and in the previous chunk:
+            #Check if the mean t is in this frame or not:
+            meant = np.mean(candidate['events']['t'])
+            if meant>chunking_limits[0][0]:
+                return True
+            else:
+                return False
+        #Clear pass: start is after the true start of this, end is before the true end of this:
+        elif min(candidate['events']['t']) > chunking_limits[0][0] and max(candidate['events']['t']) < chunking_limits[0][1]:
+            return True
+        #Looking at end of chunk:
+        #Clear fail: start is after the true end of this
+        elif min(candidate['events']['t']) > chunking_limits[0][1]:
+            return False
+        #Looking at start of chunk:
+        #Clear fail: end is before the true start of this chunk
+        elif max(candidate['events']['t']) < chunking_limits[0][0]:
+            return False
+        else:
+            if max(candidate['events']['t'])-min(candidate['events']['t']) > (chunking_limits[1][1]-chunking_limits[0][1]):
+                logging.warning('This candidate might be cut off due to batching! Considering increasing overlap!')
+                return True
+            else:
+                logging.error('This candidate is never assigned! Should not happen!')
+                return False
+
+    """
+    Finding itself
+    """
+    def runFinding(self,storeasselfResults=True):
+        #Check if we have events left:
+        if len(self.events) == 0 :
+            logging.error("No events found! Check time, xy, polarity filtering!")
+        else:
+            if self.EvalText is not None:
+                FindingResult = eval(str(self.EvalText))
+                
+                #Only keep the results that should be in this chunk:
+                # filter_finding_on_chunking(candidate,chunking_limits)
+                if storeasselfResults:
+                    if self.Results == {}:
+                        self.Results = FindingResult
+                    else: #if there already is some finding result (i.e. first pos, then next), it should be appended 
+                        newResults = {}
+                        newResults[0] = self.Results[0].copy()
+                        newResults[1] = self.Results[1]
+                        combined_dict_index_offset = len(newResults[0])
+                        for k in FindingResult[0]:
+                            newResults[0][k + combined_dict_index_offset] = FindingResult[0][k]
+                        newResults[1] += '\n\n'+FindingResult[1]
+                        self.Results={}
+                        self.Results[0] = newResults[0]
+                        self.Results[1] = newResults[1]
+                        pass
+                
+                return FindingResult
+            else:
+                logging.error("FindingEvalText is None")
+                pass
+
+    def process_hdf5_chunk_joblib(self,n,hdf5startstopindeces,singlePolarity):
+        #Allowing for multicore hdf5 chunking, or single-core
+        print('Running finding chunk '+str(n)+' of '+str(len(hdf5startstopindeces)))
+        #Get the events from these indeces (example at 0):
+        self.events = utils.timeSliceFromHDFFromIndeces(self.fileLocation,hdf5startstopindeces,index=n)
+        
+        #Split the events on p data:
+        if singlePolarity == 'Pos':
+            self.events = utils.filterEvents_p(self.events,pValue=1)
+        elif singlePolarity == 'Neg':
+            self.events = utils.filterEvents_p(self.events,pValue=0)
+        #Split the events on xy:
+        self.events = utils.filterEvents_xy(self.events,xyStretch = (self.xyStretch[0][0], self.xyStretch[0][1], self.xyStretch[1][0], self.xyStretch[1][1]))
+        
+        #Run the finding on this:
+        FindingResult = self.runFinding()
+        
+        #Return them
+        return FindingResult
+
+class FittingAnalysis(FindingFittingAnalysis):
+    """
+    General class that runs the fitting analysis. Should take in parameters, based on the finding results, and spit out the fitting results. 
+    """
+    def __init__(self):
+        super().__init__()
+        self.findingResult = None
+    
+    def set_findingResult(self,findingResult):
+        self.findingResult = findingResult
+        
+    def analyse(self):
+        #First, check on which polarities we should run:
+        if self.polarityAnalysis == 'Pos':
+            self.runFittingOnPolarity('Pos')
+        elif self.polarityAnalysis == 'Neg':
+            self.runFittingOnPolarity('Neg')
+        elif self.polarityAnalysis == 'Mix':
+            self.runFittingOnPolarity('Mix')
+        elif self.polarityAnalysis == 'Both':
+            self.runFittingOnPolarity('Pos')
+            self.runFittingOnPolarity('Neg')
+        else:
+            logging.error('Polarity analysis must be either Pos, Neg, Mix, or Both')
+        
+        #Tell the GUI the fitting is complete!
+        self.GUIinfo.FittingCompleted = True
+        pass
+        
+    def runFittingOnPolarity(self,singlePolarity):
+        #Run the finding on a single polarity
+        
+        if len(self.findingResult[0]) > 0:
+            #Remove all finding results that are not this polarity:
+            if singlePolarity != 'Mix':
+                self.partialFindingResults = self.findingResult[0].copy()
+                #Loop over all entries reversed (for popping)
+                for k in reversed(range(len(self.partialFindingResults))):
+                    polval = np.unique(self.partialFindingResults[k]['events']['p'])
+                    if len(polval) > 1:
+                        #pop it!
+                        self.partialFindingResults.pop(k)
+                    else:
+                        if singlePolarity == 'Pos':
+                            if polval[0] == 0: #pop it if it's negative
+                                self.partialFindingResults.pop(k)
+                        elif singlePolarity == 'Neg':
+                            if polval[0] == 1: #pop it if it's positive
+                                self.partialFindingResults.pop(k)
+            else:
+                self.partialFindingResults = self.findingResult[0].copy()
+            
+            #fitting require indexes to start at 0, so correcting for this:
+            try:
+                first_key = next(iter(self.partialFindingResults))
+            except:
+                first_key=0
+            self.fittingAdjustValue = first_key
+            self.partialFindingResults = {key - first_key: value for key, value in self.partialFindingResults.items()}
+        else:
+            logging.warning('No finding results found!')
+            self.partialFindingResults = None
+        
+        #First, get the evaluation text:
+        self.set_EvalText(self.getFunctionEvalText(self.GUIinfo,'Fitting',"self.partialFindingResults","self.settings",singlePolarity))
+        #Set it in the GUI
+        self.GUIinfo.data['FittingMethod'] = str(self.getFunctionEvalText(self.GUIinfo,'Fitting',"self.partialFindingResults","self.settings",singlePolarity))
+        
+        #Run the fitting
+        self.runFitting()
+        
+    """
+    Fitting itself
+    """
+    def runFitting(self):
+        if self.EvalText is not None:
+            FittingResult = eval(str(self.EvalText))
+            resbackup = self.Results
+            if self.Results == {}:
+                self.Results = FittingResult 
+            else: #if there already is some fitting result, it should be appended
+                if not hasattr(self,'fittingAdjustValue'):
+                    self.fittingAdjustValue = len(self.Results[0])
+                #Add the candidate_id offset correctly:
+                FittingResult[0]['candidate_id'] = FittingResult[0]['candidate_id'] + self.fittingAdjustValue
+                origResults = self.Results
+                #append to self.results:
+                #Need to reset self.Result to avoid errors
+                self.Results = {}
+                self.Results[0] = pd.concat([origResults[0],FittingResult[0]],ignore_index=True)
+                self.Results[1] = origResults[1]+'\n\n\n'+FittingResult[1]
+                pass
+            
+            return FittingResult
+        else:
+            logging.error("FittingEvalText is None")
+            pass
+
+""" Other GUI stuff"""
 
 class AdvancedSettingsWindow(QMainWindow):
     def __init__(self, parent):
@@ -3363,8 +3039,8 @@ class ImageSlider(QWidget):
         self.slider.setRange(0, len(new_figures) - 1)
         self.update_figure(0)
 
-#Pressing clickable group boxes collapses them
 class ClickableGroupBox(QGroupBox):
+    #Pressing clickable group boxes collapses them
     def __init__(self, title):
         super().__init__(title)
         # self.setCheckable(True)

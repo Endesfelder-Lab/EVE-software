@@ -7,6 +7,8 @@ import warnings, logging
 import numpy as np
 import itertools
 from EventDistributions import eventDistributions
+import time
+import h5py
 
 #Import all scripts in the custom script folders
 from CandidateFinding import *
@@ -841,3 +843,288 @@ def getEvalTextFromGUIFunction(methodName, methodKwargNames, methodKwargValues, 
         else:
             logging.error('SOMETHING VERY STUPID HAPPENED')
             return None
+        
+
+
+""" 
+Functions to obtain events or filter events:
+"""
+def determineAllStartStopTimesHDF(dataLocation,timeChunkMs=10000,timeChunkOverlapMs=500,chunkStartStopTime=[0,np.inf]):
+    """
+    Determine all start/stop times of all chunks that are to be found in a HDF5 file
+    """
+    #Find the last time point from the hdf5 file:
+    with h5py.File(dataLocation, mode='r') as file:
+        #Events are here in this file:
+        events_hdf5 = file['CD']['events']
+        hdf5_maxtime = events_hdf5[events_hdf5.size-1]['t']/1000
+    
+    if chunkStartStopTime[1]-chunkStartStopTime[0] < timeChunkMs: #a very short time
+        #We just need a single chunk:
+        start_time_ms_arr = [np.maximum(chunkStartStopTime[0]-timeChunkOverlapMs,0)]
+        end_time_ms_arr = [np.minimum(chunkStartStopTime[1]+timeChunkOverlapMs,hdf5_maxtime)]
+    else: #We're looking at a long time
+        start_time_ms_arr = np.maximum(np.arange(chunkStartStopTime[0],min(hdf5_maxtime,chunkStartStopTime[1]),timeChunkMs)-timeChunkOverlapMs,0)
+        end_time_ms_arr = np.minimum(np.arange(chunkStartStopTime[0]+timeChunkMs,min(hdf5_maxtime,chunkStartStopTime[1])+timeChunkMs,timeChunkMs)+timeChunkOverlapMs,hdf5_maxtime)
+    
+    return start_time_ms_arr,end_time_ms_arr
+
+def findIndexFromTimeSliceHDF(dataLocation,requested_start_time_ms_arr = [0],requested_end_time_ms_arr=[1000],n_course_chunks = 5000):
+    # Returns:
+    #N-by-2 array of start/end indeces from hdf5 file:
+    startEndIndecesHdf5File = np.zeros((len(requested_start_time_ms_arr),2))
+    
+    #Check if start/end time arrays are same size:
+    if len(requested_start_time_ms_arr) != len(requested_end_time_ms_arr):
+        logging.error('Start and end time arrays must be same size!')
+        return None
+
+    #Load the hdf5 file
+    with h5py.File(dataLocation, mode='r') as file:
+        #Events are here in this file:
+        events_hdf5 = file['CD']['events']
+        
+        howOftenCheckHdfTime= events_hdf5.size//n_course_chunks
+        
+        #Create a 'chunk' array that links chunk nrs to times:
+        chunk_arr = np.zeros(int(np.ceil(events_hdf5.size/howOftenCheckHdfTime)),)
+        
+        curr_chunk = 0
+        allChunksFound=False
+        #Loop over the hdf5 to get course info:
+        while (curr_chunk < len(chunk_arr)) and (not allChunksFound):
+            index = curr_chunk*howOftenCheckHdfTime
+            if index <= events_hdf5.size:
+                foundtime = events_hdf5[index]['t']/1000
+                chunk_arr[curr_chunk] = foundtime
+            curr_chunk+=1
+            if curr_chunk > len(chunk_arr):
+                allChunksFound = True
+
+        for index,start_time in enumerate(requested_start_time_ms_arr):
+            #Get corresponding end_time:
+            end_time = requested_end_time_ms_arr[index]
+            #First get the coarse/wide start/end index:
+            wide_start_index = np.max((0,np.where(chunk_arr > start_time)[0][0]-1))
+            wide_end_index = np.min((events_hdf5.size,np.where(chunk_arr <= end_time)[0][-1]))
+            
+            #If wide_start_index is e.g. at index 10, we know for sure our exact start time is somewhere between 10 and 11.
+            #Thus, we exract the data between wide_start_index and wide_start_index+1:
+            precise_start_lookupdata = events_hdf5[wide_start_index*howOftenCheckHdfTime:(wide_start_index+1)*howOftenCheckHdfTime]['t']/1000
+            precise_end_lookupdata = events_hdf5[wide_end_index*howOftenCheckHdfTime:(wide_end_index+1)*howOftenCheckHdfTime]['t']/1000
+            #Find the index where precise_start_lookup data is the first time that is higher than the start time:
+            lookup_start_index = int(np.where(precise_start_lookupdata >= start_time)[0][0]+wide_start_index*howOftenCheckHdfTime)
+            #Check if we're requesting an end_time that is before the end of the file:
+            if end_time < precise_end_lookupdata[-1]:
+                lookup_end_index = int(np.where(precise_end_lookupdata > end_time)[0][0]+wide_end_index*howOftenCheckHdfTime-1)
+            else: #Set to teh hdf5 size
+                lookup_end_index = int(events_hdf5.size-1)
+            #Add to big array
+            startEndIndecesHdf5File[index] = (lookup_start_index,lookup_end_index) 
+        
+        return startEndIndecesHdf5File
+
+def timeSliceFromHDFFromIndeces(dataLocation,startEndIndecesHdf5File,index=0):
+    #Get the time slice from a hdf5 file for index, after running findIndexFromTimeSliceHDF
+    with h5py.File(dataLocation, mode='r') as file:
+        events_hdf5 = file['CD']['events']
+        events =  events_hdf5[int(startEndIndecesHdf5File[index][0]):int(startEndIndecesHdf5File[index][1])]
+    return events
+
+
+def filter_finding_on_chunking(candidate,chunking_limits):
+    #Return true if it should be in this chunk, false if not
+
+    #Looking at end of chunk:
+    #Special case: start is after the overlap-start of next, and end is before the overlap-end of this:
+    if min(candidate['events']['t']) > chunking_limits[0][1]-(chunking_limits[1][1]-chunking_limits[0][1]) and max(candidate['events']['t']) < chunking_limits[1][1]:
+        #This will mean this candidate will be found in this chunk and in the next chunk:
+        #Check if the mean t is in this frame or not:
+        meant = np.mean(candidate['events']['t'])
+        if meant<chunking_limits[0][1]:
+            return True
+        else:
+            return False
+    #Looking at start of chunk:
+    #Special case: start is after the overlap-start of previous, and end is before the overlap-end of this:
+    elif min(candidate['events']['t']) > chunking_limits[1][0] and max(candidate['events']['t']) < chunking_limits[0][0]+(chunking_limits[1][1]-chunking_limits[0][1]):
+        #This will mean this candidate will be found in this chunk and in the previous chunk:
+        #Check if the mean t is in this frame or not:
+        meant = np.mean(candidate['events']['t'])
+        if meant>chunking_limits[0][0]:
+            return True
+        else:
+            return False
+    #Clear pass: start is after the true start of this, end is before the true end of this:
+    elif min(candidate['events']['t']) > chunking_limits[0][0] and max(candidate['events']['t']) < chunking_limits[0][1]:
+        return True
+    #Looking at end of chunk:
+    #Clear fail: start is after the true end of this
+    elif min(candidate['events']['t']) > chunking_limits[0][1]:
+        return False
+    #Looking at start of chunk:
+    #Clear fail: end is before the true start of this chunk
+    elif max(candidate['events']['t']) < chunking_limits[0][0]:
+        return False
+    else:
+        if max(candidate['events']['t'])-min(candidate['events']['t']) > (chunking_limits[1][1]-chunking_limits[0][1]):
+            logging.warning('This candidate might be cut off due to batching! Considering increasing overlap!')
+            return True
+        else:
+            logging.error('This candidate is never assigned! Should not happen!')
+            return False
+
+def filterEvents_xy(events,xyStretch=(-np.Inf,-np.Inf,np.Inf,np.Inf)):
+    """
+    Filter events that are in a numpy array to a certain xy stretch.
+    """
+    #Edit values for x,y coordinates:
+    #First check if all entries in array are numbers:
+    try:
+        xyStretch = (float(xyStretch[0]), float(xyStretch[1]), float(xyStretch[2]), float(xyStretch[3]))
+        #Check if they all are floats:
+        if not all(isinstance(x, float) for x in [float(xyStretch[0]),float(xyStretch[1]),float(xyStretch[2]),float(xyStretch[3])]):
+            logging.info("No XY cutting due to not all entries being floats.")
+        #If they are all float values, we can proceed
+        else:
+            if (xyStretch[0] > 0) | (xyStretch[2] > 0) | (xyStretch[1] < np.inf) | (xyStretch[3] < np.inf):
+                logging.info("XY cutting to values: "+str(xyStretch[0])+","+str(xyStretch[1])+","+str(xyStretch[2])+","+str(xyStretch[3]))
+                #Filter on x,y coordinates:
+                events = events[(events['x'] >= float(xyStretch[0])) & (events['x'] <= float(xyStretch[1]))]
+                events = events[(events['y'] >= float(xyStretch[2])) & (events['y'] <= float(xyStretch[3]))]
+    except:
+        #Warning if something crashes. Note the extra dash to the end of the warning
+        logging.warning("No XY cutting due to not all entries being float-.")
+
+    return events
+
+def filterEvents_p(events,pValue=0):
+    """
+    Filter events that are in a numpy array to a certain polarity
+    """
+    #tStretch is (start, duration)
+    indices = np.where((events['p'] == pValue))
+    # Access the partial data using the indices
+    eventsFiltered = events[indices]
+
+    #Warning if no events are found
+    if len(eventsFiltered) == 0:
+        logging.warning("No events found with the chosen polarity: "+str(pValue))
+
+    return eventsFiltered
+
+def RawToNpy(filepath,metaVisionPath,storeConvertedData=False,buffer_size = 5e7, n_batches=5e7):
+    import sys
+    if(os.path.exists(filepath[:-4]+'.npy')):
+        events = np.load(filepath[:-4]+'.npy')
+        logging.info('NPY file from RAW was already present, loading this instead of RAW!')
+    else:
+        logging.info('Starting to load RAW...')
+        sys.path.append(metaVisionPath)
+        from metavision_core.event_io.raw_reader import RawReader
+        record_raw = RawReader(filepath,max_events=int(buffer_size))
+        sums = 0
+        time = 0
+        events=np.empty
+        while not record_raw.is_done() and record_raw.current_event_index() < buffer_size:
+            #Load a batch of events
+            events_temp = record_raw.load_n_events(n_batches)
+            sums += events_temp.size
+            #Add the events in this batch to the big array
+            if sums == events_temp.size:
+                events = events_temp
+            else:
+                events = np.concatenate((events,events_temp))
+        record_raw.reset()
+        if storeConvertedData:
+            np.save(filepath[:-4]+'.npy',events)
+            logging.debug('NPY file created')
+        logging.info('Raw data loaded')
+    return events
+
+def readRawTimeStretch(filepath,metaVisionPath,buffer_size = 5e7, n_batches=5e7, timeStretchMs=[0,1000]):
+    import sys
+    #Function to read only part of the raw file, between time stretch [0] and [1]
+    logging.info('Starting to load RAW...')
+    sys.path.append(metaVisionPath)
+    from metavision_core.event_io.raw_reader import RawReader
+    record_raw = RawReader(filepath,max_events=int(buffer_size))
+    #First seek to the start-time:
+    record_raw.seek_time(timeStretchMs[0]*1000)
+    #Then load the time in a single batch:
+    events = record_raw.load_delta_t(timeStretchMs[1]*1000-timeStretchMs[0]*1000)
+    record_raw.reset()
+    return events
+
+#DEPRACATED
+def timeSliceFromHDF(dataLocation,requested_start_time_ms = 0,requested_end_time_ms=1000,howOftenCheckHdfTime = 100000,loggingBool=False,curr_chunk = 0):
+    """Function that returns all events between start/end time in a HDF5 file. Extremely sped-up since the HDF5 file is time-sorted, and only checked every 100k (howOftenCheckHdfTime) events.
+
+    Args:
+        dataLocation (String): Storage location of the .hdf5 file
+        requested_start_time_ms (int, optional): Start time in milliseconds. Defaults to 0.
+        requested_end_time_ms (int, optional): End time in milliseconds. Defaults to 1000.
+        howOftenCheckHdfTime (int, optional): At which N intervals the time should be checked. This means that HDF event 0,N*howOftenCheckHdfTime,(N+1)*howOftenCheckHdfTime etc will be checked and pre-loaded. After this, all events within the time bounds is loaded. Defaults to 100000.
+        loggingBool (bool, optional): Whether or not logging is activated. Defaults to True.
+        curr_chunk (int, optional): Starting chunk to look at. Normally should be 0. Defaults to 0.
+
+    Returns:
+        events: Events in wanted format
+        latest_chunk: Last chunk that was used. Can be used to run this function more often via curr_chunk.
+    """
+    #Variable starting
+    lookup_start_index = -1
+    lookup_end_index = -1
+
+
+    #Load the hdf5 file
+    with h5py.File(dataLocation, mode='r') as file:
+        time0 = time.time()
+        #Events are here in this file:
+        events_hdf5 = file['CD']['events']
+
+        #Loop while either start or end index hasn't been found yet
+        while lookup_start_index == -1 or lookup_end_index == -1:
+            index = curr_chunk*howOftenCheckHdfTime
+
+
+            if index <= events_hdf5.size:
+                #Get the time
+                foundtime = events_hdf5[index]['t']/1000 #in ms
+
+                if loggingBool == True:
+                    print('Loading HDF, currently on chunk '+str(curr_chunk)+', at time: '+str(foundtime))
+
+                #Check if the start time has surpassed
+                if foundtime > requested_start_time_ms:
+                    if lookup_start_index == -1:
+                        lookup_start_index = max(0,curr_chunk-1)*howOftenCheckHdfTime
+                #Check if the end-time is surpassed
+                if foundtime > requested_end_time_ms:
+                    if lookup_end_index == -1:
+                        lookup_end_index = max(1,curr_chunk+1)*howOftenCheckHdfTime
+                #Increase current chunk
+                curr_chunk+=1
+            else:
+                print('End of file reached while chunking HDF5')
+                if lookup_start_index == -1:
+                    lookup_start_index = events_hdf5.size #Set to end of file
+                if lookup_end_index == -1:
+                    lookup_end_index = events_hdf5.size #Set to end of file
+
+        time1 = time.time()
+        #Properly (32bit) initialise dicts
+        wantedEvents_tooLarge = np.zeros(0, dtype={'names': ['x', 'y', 'p', 't'], 'formats': ['<u2', '<u2', '<i2', '<i8'], 'offsets': [0, 2, 4, 8], 'itemsize': 32})
+        events_output = np.zeros(0, dtype={'names': ['x', 'y', 'p', 't'], 'formats': ['<u2', '<u2', '<i2', '<i8'], 'offsets': [0, 2, 4, 8], 'itemsize': 32})
+        time2 = time.time()
+        #Now we know the start/end index, so we cut out that area:
+        wantedEvents_tooLarge = events_hdf5[lookup_start_index:lookup_end_index]
+        
+        time3 = time.time()
+    #And we fully cut it to exact size:
+    events_output = wantedEvents_tooLarge[(wantedEvents_tooLarge['t'] >= requested_start_time_ms*1000) & (wantedEvents_tooLarge['t'] <= requested_end_time_ms*1000)]
+    time4 = time.time()
+    
+
+    #Return the events
+    return events_output,curr_chunk

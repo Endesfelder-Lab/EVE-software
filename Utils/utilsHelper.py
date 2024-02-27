@@ -24,8 +24,16 @@ def argumentChecking(dictionaryInfo, function_name, given_kwargs):
 
 # Convert a string representation of truth to true (1) or false (0), or raise an exception
 def strtobool(val):
+    #check if it's already a bool:
+    if isinstance(val, bool):
+        return val
+    
+    #if it's a int/float, convert to string:
+    if isinstance(val, (int, float)):
+        val = str(val)
+    
     val = val.lower()
-    if val in ('y', 'yes', 't', 'true','on', '1'):
+    if val in ('y', 'yes', 't', 'true','on', '1','2'):
         return 1
     elif val in ('n', 'no', 'f', 'false', 'off', '0'):
         return 0
@@ -122,11 +130,15 @@ def get_subdictionary(main_dict, start_key, end_key):
 
 # Slice data to distribute the computation on several cores for fitting routine
 def slice_data(candidate_dic, nb_slices):
-    slice_size=1.*len(candidate_dic)/nb_slices
-    slice_size=np.int64(np.ceil(slice_size))
-    data_split=[]
-    last_key = list(candidate_dic.keys())[-1]
-    for k in np.arange(nb_slices):
-        keys = [k*slice_size, min((k+1)*slice_size-1,last_key)]
-        data_split.append(get_subdictionary(candidate_dic, keys[0], keys[1]))
-    return data_split
+    if len(candidate_dic) > 0:
+        slice_size=1.*len(candidate_dic)/nb_slices
+        slice_size=np.int64(np.ceil(slice_size))
+        data_split=[]
+        last_key = list(candidate_dic.keys())[-1]
+        for k in np.arange(nb_slices):
+            keys = [k*slice_size, min((k+1)*slice_size-1,last_key)]
+            data_split.append(get_subdictionary(candidate_dic, keys[0], keys[1]))
+        return data_split
+    else:
+        return []
+
