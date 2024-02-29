@@ -1056,6 +1056,16 @@ def readRawTimeStretch(filepath,metaVisionPath,buffer_size = 5e7, n_batches=5e7,
     record_raw.reset()
     return events
 
+def removeHotPixelEvents(events,hotPixelArray=None):
+    origEventLen = len(events)
+    #Remove all events that are on a hot pixel:
+    if hotPixelArray is not None:
+        for id in range(len(hotPixelArray)):
+            events = events[~((events['x'] == hotPixelArray[id][0]) & (events['y'] == hotPixelArray[id][1]))]
+    finalEventLen = len(events)
+    print("Removed "+str(origEventLen-finalEventLen)+" hot pixel events, which is "+str(round(100*(origEventLen-finalEventLen)/origEventLen,2))+"pct of all events.")
+    return events
+
 #DEPRACATED
 def timeSliceFromHDF(dataLocation,requested_start_time_ms = 0,requested_end_time_ms=1000,howOftenCheckHdfTime = 100000,loggingBool=False,curr_chunk = 0):
     """Function that returns all events between start/end time in a HDF5 file. Extremely sped-up since the HDF5 file is time-sorted, and only checked every 100k (howOftenCheckHdfTime) events.

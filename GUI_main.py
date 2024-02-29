@@ -323,6 +323,10 @@ class MyGUI(QMainWindow):
         globalSettings['StoreFittingOutput']['value'] = True
         globalSettings['StoreFittingOutput']['input'] = bool
         globalSettings['StoreFittingOutput']['displayName'] = 'Store intermediate output (after fitting)'
+        globalSettings['HotPixelIndexes'] = {}
+        globalSettings['HotPixelIndexes']['value'] = ""
+        globalSettings['HotPixelIndexes']['input'] = str
+        globalSettings['HotPixelIndexes']['displayName'] = 'Hot-pixel indeces'
         globalSettings['OutputDataFormat'] = {}
         globalSettings['OutputDataFormat']['value'] = 'thunderstorm'
         globalSettings['OutputDataFormat']['input'] = 'choice'
@@ -2348,6 +2352,9 @@ class FindingAnalysis(FindingFittingAnalysis):
                         #Get the events from these indeces:
                         self.events = utils.timeSliceFromHDFFromIndeces(self.fileLocation,hdf5_startstopindeces,index=chunk)
                         
+                        hotpixelarray = eval("["+self.settings['HotPixelIndexes']['value']+"]")
+                        self.events = utils.removeHotPixelEvents(self.events,hotpixelarray)
+                        
                         self.splitOnPolarity(singlePolarity)
                         self.splitOnXY()
                         
@@ -2393,6 +2400,10 @@ class FindingAnalysis(FindingFittingAnalysis):
                         #If no chunking, simply load the entire file in memory: Note that this also loads a .npy with the same name if available.
                         self.events = utils.RawToNpy(filepath=self.fileLocation,metaVisionPath=self.GUIinfo.globalSettings['MetaVisionPath']['value'],storeConvertedData = self.GUIinfo.globalSettings['StoreConvertedRawData']['value']>0)
                         
+                        #Remove hot pixels
+                        hotpixelarray = eval("["+self.settings['HotPixelIndexes']['value']+"]")
+                        self.events = utils.removeHotPixelEvents(self.events,hotpixelarray)
+                        
                         #get the correct time area:
                         #Keep only events between timeStretchMs[0] and [1]:
                         self.events = self.events[np.where((self.events['t']>self.timeStretchMs[0]*1000)&(self.events['t']<self.timeStretchMs[1]*1000))]
@@ -2417,6 +2428,10 @@ class FindingAnalysis(FindingFittingAnalysis):
                             logging.info(f"Chunking time: {minTime} - {maxTime}")
                             #Read in chunks:
                             self.events = utils.readRawTimeStretch(filepath=self.fileLocation,metaVisionPath=self.GUIinfo.globalSettings['MetaVisionPath']['value'], timeStretchMs=[minTime,maxTime+minTime])
+                            
+                            #Remove hot pixels
+                            hotpixelarray = eval("["+self.settings['HotPixelIndexes']['value']+"]")
+                            self.events = utils.removeHotPixelEvents(self.events,hotpixelarray)
                             
                             if len(self.events) == 0:
                                 print('Final chunk reached!')
@@ -2485,6 +2500,9 @@ class FindingAnalysis(FindingFittingAnalysis):
                 elif self.fileLocation.endswith('.npy'):
                     #Load the data
                     self.events = np.load(self.fileLocation)
+                    #Remove hot pixels
+                    hotpixelarray = eval("["+self.settings['HotPixelIndexes']['value']+"]")
+                    self.events = utils.removeHotPixelEvents(self.events,hotpixelarray)
                     
                     #get the correct time area:
                     #Keep only events between timeStretchMs[0] and [1]:
@@ -2519,7 +2537,9 @@ class FindingAnalysis(FindingFittingAnalysis):
                     self.GUIinfo = {}
                     
                     #Run the analysis in parallel over all cpu cores
-                    results = Parallel(n_jobs=-1)(delayed(self.process_hdf5_chunk_joblib)(n, hdf5_startstopindeces,singlePolarity) for n in range(0,len(hdf5_startstopindeces)))
+                    from joblib import parallel_backend, cpu_count
+                    with parallel_backend('threading', n_jobs=-1, inner_max_num_threads=cpu_count()):
+                        results = Parallel()(delayed(self.process_hdf5_chunk_joblib)(n, hdf5_startstopindeces,singlePolarity) for n in range(0,len(hdf5_startstopindeces)))
                     
                     #reset GUIinfo in case we need it:
                     self.GUIinfo = GUIinfo
@@ -2566,10 +2586,12 @@ class FindingAnalysis(FindingFittingAnalysis):
                             combined_dict[len(combined_dict)] = newent[k]
                         combined_metadata += '\n'+parr_batch_metadata[n]
 
+                    findingResults = {}
+                    findingResults[0] = combined_dict
+                    findingResults[1] = combined_metadata
                     #Finally, store it as the Results data, or append it if Both polarity
                     if self.Results == {}: #If it's the first data, just store it
-                        self.Results[0] = combined_dict
-                        self.Results[1] = combined_metadata
+                        self.Results = findingResults
                     else: #Otherwise append to previous data (i.e. first pos, then neg)
                         oldResults = self.Results
                         self.Results = {}
@@ -2594,10 +2616,15 @@ class FindingAnalysis(FindingFittingAnalysis):
                     logging.error('File location must end with .hdf5, .raw, or .npy')
                     pass
                 
-        else:
+        else: #GPU running
             #To be implemented
             pass
         
+        #Logging feedback
+        if 'findingResults' in locals():
+            logging.info(f"Finding of polarity {singlePolarity} complete. {len(findingResults[0])} candidates found!")
+        else:
+            logging.info(f"Finding of polarity {singlePolarity} complete. {len(self.Results[0])} candidates found!")
         pass
 
     def splitOnPolarity(self,singlePolarity):
@@ -2696,6 +2723,13 @@ class FindingAnalysis(FindingFittingAnalysis):
         #Get the events from these indeces (example at 0):
         self.events = utils.timeSliceFromHDFFromIndeces(self.fileLocation,hdf5startstopindeces,index=n)
         
+        #Remove hot pixels
+        hotpixelarray = eval("["+self.settings['HotPixelIndexes']['value']+"]")
+        self.events = utils.removeHotPixelEvents(self.events,hotpixelarray)
+        
+        msk=(self.events['p']==0)
+        fractionPosEvents = (np.sum(msk==False)*100.0/len(msk))
+        print(f"fraction of positive events: {fractionPosEvents:.2f} at time {self.events['t'][0]/1e6}us")
         #Split the events on p data:
         if singlePolarity == 'Pos':
             self.events = utils.filterEvents_p(self.events,pValue=1)
@@ -2794,7 +2828,8 @@ class FittingAnalysis(FindingFittingAnalysis):
         self.GUIinfo.data['FittingMethod'] = str(self.getFunctionEvalText(self.GUIinfo,'Fitting',"self.partialFindingResults","self.settings",singlePolarity))
         
         #Run the fitting
-        self.runFitting()
+        fittingResults = self.runFitting()
+        logging.info(f"Fitting of polarity {singlePolarity} complete. {len(fittingResults[0].dropna())} valid localizations found!")
         
     """
     Fitting itself
