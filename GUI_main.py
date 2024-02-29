@@ -17,6 +17,8 @@ import h5py
 import traceback
 import re
 from joblib import Parallel, delayed
+from joblib import parallel_backend, cpu_count
+from dask.distributed import Client, LocalCluster
 
 #Imports for PyQt5 (GUI)
 from PyQt5 import QtWidgets, QtGui
@@ -72,6 +74,17 @@ class MyGUI(QMainWindow):
             None
         """
 
+        # try:
+        #     cluster.close()
+        # except:
+        #     pass
+        # try:
+        #     client.close()
+        # except:
+        #     pass
+        # cluster = LocalCluster()
+        # client = Client(cluster)
+        # print(f"DASK client at: {client.dashboard_link}")
         #Create parser
         parser = argparse.ArgumentParser(description='EBS fitting - Endesfelder lab - Nov 2023')
         #Look for debug argument
@@ -2535,14 +2548,16 @@ class FindingAnalysis(FindingFittingAnalysis):
                     #myGUI and pyqtsignal cannot be passed, so has to be removed:
                     GUIinfo = self.GUIinfo
                     self.GUIinfo = {}
+                    SelfResults = self.Results
+                    self.Results = {}
                     
                     #Run the analysis in parallel over all cpu cores
-                    from joblib import parallel_backend, cpu_count
-                    with parallel_backend('threading', n_jobs=-1, inner_max_num_threads=cpu_count()):
+                    with parallel_backend('loky', n_jobs=-1):
                         results = Parallel()(delayed(self.process_hdf5_chunk_joblib)(n, hdf5_startstopindeces,singlePolarity) for n in range(0,len(hdf5_startstopindeces)))
                     
                     #reset GUIinfo in case we need it:
                     self.GUIinfo = GUIinfo
+                    self.Results = SelfResults
                     
                     #If we have chunking - we should ensure we only keep the candidates that are in this 'real chunk' part of the chunk:
                     if len(hdf5_startstopindeces) > 0:
@@ -2719,27 +2734,34 @@ class FindingAnalysis(FindingFittingAnalysis):
 
     def process_hdf5_chunk_joblib(self,n,hdf5startstopindeces,singlePolarity):
         #Allowing for multicore hdf5 chunking, or single-core
-        logging.info('Running finding chunk '+str(n)+' of '+str(len(hdf5startstopindeces)))
+        # print('Running finding chunk '+str(n)+' of '+str(len(hdf5startstopindeces)) )
+        st_time = time.time()
+        print(f"Worker{n} started {time.time()}")
         #Get the events from these indeces (example at 0):
         self.events = utils.timeSliceFromHDFFromIndeces(self.fileLocation,hdf5startstopindeces,index=n)
-        
+        # print(f"Worker{n} events loaded time {time.time()}")
         #Remove hot pixels
         hotpixelarray = eval("["+self.settings['HotPixelIndexes']['value']+"]")
         self.events = utils.removeHotPixelEvents(self.events,hotpixelarray)
+        # print(f"Worker{n} hot pixels filtered time {time.time()}")
         
         msk=(self.events['p']==0)
         fractionPosEvents = (np.sum(msk==False)*100.0/len(msk))
-        print(f"fraction of positive events: {fractionPosEvents:.2f} at time {self.events['t'][0]/1e6}us")
+        # print(f"fraction of positive events: {fractionPosEvents:.2f} at time {self.events['t'][0]/1e6}us")
+        # print(f"Worker{n} event filter started time {time.time()}")
         #Split the events on p data:
         if singlePolarity == 'Pos':
             self.events = utils.filterEvents_p(self.events,pValue=1)
         elif singlePolarity == 'Neg':
             self.events = utils.filterEvents_p(self.events,pValue=0)
+        # print(f"Worker{n} event filter done time {time.time()}")
         #Split the events on xy:
         self.events = utils.filterEvents_xy(self.events,xyStretch = (self.xyStretch[0][0], self.xyStretch[0][1], self.xyStretch[1][0], self.xyStretch[1][1]))
+        # print(f"Worker{n} xy filter done time {time.time()}")
         
         #Run the finding on this:
-        FindingResult = self.runFinding()
+        FindingResult = self.runFinding(storeasselfResults=False)
+        print(f"Worker{n} finding completed time {time.time()-st_time}")
         
         #Return them
         return FindingResult
