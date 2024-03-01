@@ -117,6 +117,12 @@ def DriftCorr_entropyMin(resultArray,findingResult,settings,**kwargs):
         plt.title('Drift Estimation')
         plt.show()
 
+    import logging
+    #Remove all entries where a negative time was given:
+    if len(resultArray[resultArray['t'] <= 0]):
+        logging.warning('Removing ' + str(len(resultArray[resultArray['t'] <= 0])) + ' negative times')
+    resultArray = resultArray[resultArray['t'] > 0]
+    
 
     framenumFull = np.floor(np.array(resultArray['t'].values)/(frame_time_for_dme))
     framenumFull -= min(framenumFull)
@@ -124,10 +130,14 @@ def DriftCorr_entropyMin(resultArray,findingResult,settings,**kwargs):
     #Get the drift of every localization - note the back-conversion from px to nm
     drift_locs = ([estimated_drift[min(i,len(estimated_drift)-1)][0]*(float(settings['PixelSize_nm']['value'])) for i in framenumFull],[estimated_drift[min(i,len(estimated_drift)-1)][1]*(float(settings['PixelSize_nm']['value'])) for i in framenumFull])
     
+    import copy
     #Correct the resultarray for the drift
-    drift_corr_locs = resultArray.copy()
+    drift_corr_locs = copy.deepcopy(resultArray)
     drift_corr_locs.loc[:,'x'] -= drift_locs[0]
     drift_corr_locs.loc[:,'y'] -= drift_locs[1]
+    
+    print(drift_locs[0][0], drift_locs[1][0])
+    print(drift_locs[0][-1], drift_locs[1][-1])
 
 
 
