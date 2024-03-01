@@ -13,8 +13,8 @@ def __function_metadata__():
     return {
         "PolarityMatching": {
             "required_kwargs": [
-                {"name": "Max_xyDistance", "description": "Maximum distance in x,y in nm units (nm)","default":"50","type":float,"display_text":"Max. XY distance (nm)"},
-                {"name": "Max_tDistance", "description": "Maximum time distance in ms (between positive and negative)","default":"500","type":float,"display_text":"Max time distance (ms)"},
+                {"name": "Max_xyDistance", "description": "Maximum distance in x,y in nm units (nm)","default":"200","type":float,"display_text":"Max. XY distance (nm)"},
+                {"name": "Max_tDistance", "description": "Maximum time distance in ms (between positive and negative)","default":"1000","type":float,"display_text":"Max time distance (ms)"},
             ],
             "optional_kwargs": [
             ],
@@ -98,43 +98,44 @@ def PolarityMatching(localizations,findingResult,settings,**kwargs):
 
         #We loop over the positive events:
         for posEventId,posEvent in posEvents.iterrows():
-            if np.mod(posEventId,500) == 0:
-                logging.info('PolarityMatching progress: ' + str(posEventId) + ' of ' + str(len(posEvents)))
-            minin = mininAll[posEventId]
-            maxin = maxinAll[posEventId]
-        
-            negEventsInTime = negEvents[minin:maxin]
+            if posEventId < len(posEvents):
+                if np.mod(posEventId,500) == 0:
+                    logging.info('PolarityMatching progress: ' + str(posEventId) + ' of ' + str(len(posEvents)))
+                minin = mininAll[posEventId]
+                maxin = maxinAll[posEventId]
             
-            x_diff = negEventsInTime['x'].values - posEvent['x']
-            y_diff = negEventsInTime['y'].values - posEvent['y']
-            distance = np.sqrt(x_diff**2 + y_diff**2)
+                negEventsInTime = negEvents[minin:maxin]
+                
+                x_diff = negEventsInTime['x'].values - posEvent['x']
+                y_diff = negEventsInTime['y'].values - posEvent['y']
+                distance = np.sqrt(x_diff**2 + y_diff**2)
 
-            foundNegEventId = distance < float(kwargs['Max_xyDistance'])
+                foundNegEventId = distance < float(kwargs['Max_xyDistance'])
 
-            #If we found at least one:
-            if sum(foundNegEventId) > 0:
-                #Find the first id of True (the closest in time)
-                foundNegEventId = np.argmax(foundNegEventId)
-                #Find the corresponding event
-                negEventsWithinDistance = negEventsInTime.iloc[foundNegEventId]
-                #And find the event distance belonging to it
-                eventDistance = distance[foundNegEventId]
-                
-                #Renaming
-                negEventFound = negEventsWithinDistance
-                
-                negEventId = negEventFound._name
-                
-                #Update the positive candidate
-                posEvents.loc[posEventId,'pol_link_id'] = (negEventFound.candidate_id)
-                posEvents.loc[posEventId,'pol_link_time'] = (negEventFound.t - posEvent.t)
-                posEvents.loc[posEventId,'pol_link_xy'] = eventDistance
-                
-                #And update the negative candidate
-                negEvents.loc[negEventId,'pol_link_id'] = (posEvent.candidate_id)
-                negEvents.loc[negEventId,'pol_link_time'] = (posEvent.t-negEventFound.t)
-                negEvents.loc[negEventId,'pol_link_xy'] = eventDistance
-                
+                #If we found at least one:
+                if sum(foundNegEventId) > 0:
+                    #Find the first id of True (the closest in time)
+                    foundNegEventId = np.argmax(foundNegEventId)
+                    #Find the corresponding event
+                    negEventsWithinDistance = negEventsInTime.iloc[foundNegEventId]
+                    #And find the event distance belonging to it
+                    eventDistance = distance[foundNegEventId]
+                    
+                    #Renaming
+                    negEventFound = negEventsWithinDistance
+                    
+                    negEventId = negEventFound._name
+                    
+                    #Update the positive candidate
+                    posEvents.loc[posEventId,'pol_link_id'] = (negEventFound.candidate_id)
+                    posEvents.loc[posEventId,'pol_link_time'] = (negEventFound.t - posEvent.t)
+                    posEvents.loc[posEventId,'pol_link_xy'] = eventDistance
+                    
+                    #And update the negative candidate
+                    negEvents.loc[negEventId,'pol_link_id'] = (posEvent.candidate_id)
+                    negEvents.loc[negEventId,'pol_link_time'] = (posEvent.t-negEventFound.t)
+                    negEvents.loc[negEventId,'pol_link_xy'] = eventDistance
+                    
                 
         #re-create localizations by adding these below one another again:
         localizations = pd.concat([posEvents, negEvents])

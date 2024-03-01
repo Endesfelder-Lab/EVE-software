@@ -265,7 +265,7 @@ def rcc_own(xy, framenum, timebins, zoom=1,
             if len(spots) == 0:
                 raise ValueError(f'no spots in bin {k}')
 
-            images[k] = dll.DrawGaussians(img, spots)       
+            images[k] = dll.DrawGaussians(img, spots)
     
     #print(f"RCC pairs: {timebins*(timebins-1)//2}. Bins={timebins}")
     pairs = np.array(np.triu_indices(timebins,1)).T
