@@ -20,6 +20,18 @@ def __function_metadata__():
             "optional_kwargs": [
             ],
             "help_string": "Drift correction from Cnossen et al.."
+        },
+        "DriftCorr_RCC": {
+            "required_kwargs": [
+                {"name": "frame_time_for_dme", "description": "Frame-time used for drift-correction (in ms)","default":100.,"type":float,"display_text":"Frame time used in DME"},
+                {"name": "nr_time_bins", "description": "Number of time bins","default":10,"type":int,"display_text":"Number of bins"},
+                {"name": "zoom_level", "description": "Zoom level","default":2,"type":int,"display_text":"Zoom of RCC plots"},
+                {"name": "use_cuda", "description": "Use CUDA-GPU rather than CPU.","default":False,"display_text":"Use CUDA"},
+                {"name": "visualisation", "description": "Visualisation of the drift traces.","default":True,"display_text":"Visualisation"},
+            ],
+            "optional_kwargs": [
+            ],
+            "help_string": "RCC Drift correction from Cnossen et al.."
         }
     }
 
@@ -64,8 +76,6 @@ def DriftCorr_entropyMin(resultArray,findingResult,settings,**kwargs):
     framenum -= min(framenum)
     framenum = framenum.astype(int)
     
-    
-    
     #to prevent unexpected errors: remove the bottom and top 0.1 percentile:
     bottom_percentile = np.percentile(framenum, 0.1)
     top_percentile = np.percentile(framenum, 99.9)
@@ -73,15 +83,6 @@ def DriftCorr_entropyMin(resultArray,findingResult,settings,**kwargs):
     framenum = framenum[(framenum > bottom_percentile) & (framenum < top_percentile)]
     
     framenum -= min(framenum)
-    
-    # #Histogram the framenrs and show:
-    #     import matplotlib.pyplot as plt
-    #     #Create a new figure
-    #     plt.figure(88)
-    #     #Plot the drift traces
-    #     plt.plot(np.arange(int(len(framenum)))*(frame_time_for_dme),framenum)
-    #     plt.show()
-        
     
     #CRLB is hardcoded at half a pixel in x,y. Probably not the best implementation, but it seems to work
     crlb = np.ones(locs_for_dme.shape) * np.array((0.5,0.5))[None]
@@ -139,8 +140,93 @@ def DriftCorr_entropyMin(resultArray,findingResult,settings,**kwargs):
     print(drift_locs[0][0], drift_locs[1][0])
     print(drift_locs[0][-1], drift_locs[1][-1])
 
+    performance_metadata = f"Dummy function ran for seconds."
+    print('Function one ran!')
 
+    return drift_corr_locs, performance_metadata
 
+def DriftCorr_RCC(resultArray,findingResult,settings,**kwargs):
+    """ 
+    Implementation of DME drift correction based on Cnossen et al. 2021 (https://opg.optica.org/oe/fulltext.cfm?uri=oe-29-18-27961&id=457245). 
+    """
+    #Check if we have the required kwargs
+    [provided_optional_args, missing_optional_args] = utilsHelper.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
+
+    #Import the correct package
+    from .dme.dme import dme
+    from .dme.dme.rcc import rcc, rcc3D
+    
+    
+    #Set user variables
+    frame_time_for_dme = float(kwargs['frame_time_for_dme']) #in ms
+    nr_time_bins = int(kwargs['nr_time_bins'])
+    zoom_level = int(kwargs['zoom_level'])
+    use_cuda= utilsHelper.strtobool(kwargs['use_cuda'])
+    visualisation=utilsHelper.strtobool(kwargs['visualisation'])
+
+    #Obtain the localizations from the resultArray
+    resultArray=resultArray.dropna()
+    locs_for_dme = np.column_stack((resultArray['x'].values-min(resultArray['x']),resultArray['y'].values-min(resultArray['y'])))
+    #Convert it to pixel-units
+    locs_for_dme/=(float(settings['PixelSize_nm']['value']))
+    
+    #Get the 'frame' for each localization based on user-defined frame_time_for_dme
+    framenumFull = np.floor(np.array(resultArray['t'].values)/(frame_time_for_dme))
+    #Pop -1 entries:
+    locs_for_dme = locs_for_dme[framenumFull != -1]
+    framenum = framenumFull[framenumFull != -1]
+    framenum -= min(framenum)
+    framenum = framenum.astype(int)
+    
+    #to prevent unexpected errors: remove the bottom and top 0.1 percentile:
+    bottom_percentile = np.percentile(framenum, 0.1)
+    top_percentile = np.percentile(framenum, 99.9)
+    locs_for_dme = locs_for_dme[(framenum > bottom_percentile) & (framenum < top_percentile)]
+    framenum = framenum[(framenum > bottom_percentile) & (framenum < top_percentile)]
+    
+    framenum -= min(framenum)
+    
+    #RCC drift
+    shift_px = rcc_own(locs_for_dme, framenum, nr_time_bins, zoom=zoom_level, 
+        sigma=1, maxpairs=1000, use_cuda=use_cuda)
+
+    #Briefly visualise the drift if wanted:
+    if visualisation:
+        import matplotlib.pyplot as plt
+        #Close all previous plots, assumed max 10
+        for _ in range(10):
+            plt.close()
+        #Create a new figure
+        plt.figure(88)
+        #Plot the drift traces
+        plt.plot(np.arange(int(len(shift_px[0])))*(frame_time_for_dme),shift_px[0][:,0]*(float(settings['PixelSize_nm']['value'])))
+        plt.plot(np.arange(int(len(shift_px[0])))*(frame_time_for_dme),shift_px[0][:,1]*(float(settings['PixelSize_nm']['value'])))
+        #Add axis labels:
+        plt.xlabel('Time (ms)')
+        plt.ylabel('Drift (nm)')
+        plt.legend(['X drift', 'Y drift'])
+        #Add a title:
+        plt.title('Drift Estimation')
+        plt.show()
+
+    import logging
+    #Remove all entries where a negative time was given:
+    if len(resultArray[resultArray['t'] <= 0]):
+        logging.warning('Removing ' + str(len(resultArray[resultArray['t'] <= 0])) + ' negative times')
+    resultArray = resultArray[resultArray['t'] > 0]
+    
+
+    framenumFull = np.floor(np.array(resultArray['t'].values)/(frame_time_for_dme))
+    framenumFull -= min(framenumFull)
+    framenumFull = framenumFull.astype(int)
+    #Get the drift of every localization - note the back-conversion from px to nm
+    drift_locs = ([shift_px[0][min(i,len(shift_px[0])-1)][0]*(float(settings['PixelSize_nm']['value'])) for i in framenumFull],[shift_px[0][min(i,len(shift_px[0])-1)][1]*(float(settings['PixelSize_nm']['value'])) for i in framenumFull])
+    
+    import copy
+    #Correct the resultarray for the drift
+    drift_corr_locs = copy.deepcopy(resultArray)
+    drift_corr_locs.loc[:,'x'] -= drift_locs[0]
+    drift_corr_locs.loc[:,'y'] -= drift_locs[1]
 
     performance_metadata = f"Dummy function ran for seconds."
     print('Function one ran!')
@@ -148,34 +234,72 @@ def DriftCorr_entropyMin(resultArray,findingResult,settings,**kwargs):
     return drift_corr_locs, performance_metadata
 
 
-# Simulate an SMLM dataset in 3D with blinking molecules
-def smlm_simulation(
-        drift_trace,
-        fov_width, # field of view size in pixels
-        loc_error, # localization error XYZ 
-        n_sites, # number of locations where molecules blink on and off
-        n_frames,
-        on_prob = 0.1, # probability of a binding site generating a localization in a frame
-        ): 
+def rcc_own(xy, framenum, timebins, zoom=1, 
+        sigma=1, maxpairs=1000, use_cuda=False):
     
-    """
-    localization error is set to 20nm XY and 50nm Z precision 
-    (assumping Z coordinates are in um and XY are in pixels)
-    """
+    from .dme.dme import dme
+    from .dme.dme.native_api import NativeAPI
+    from .dme.dme.rcc import findshift_pairs, InterpolatedUnivariateSpline
+    
+    rendersize = int(np.max(xy))
+    area = np.array([rendersize,rendersize])
+    nframes = np.max(framenum)+1
+    framesperbin = nframes/timebins
+    
+    imgshape = area*zoom
+    images = np.zeros((timebins, *imgshape))
 
-    # typical 2D acquisition with small Z range and large XY range        
-    binding_sites = np.random.uniform([0,0,-1], [fov_width,fov_width,1], size=(n_sites,3))
+    with NativeAPI(use_cuda) as dll:
+        for k in range(timebins):
+            img = np.zeros(imgshape,dtype=np.float32)
+            
+            indices = np.nonzero((0.5 + framenum/framesperbin).astype(int)==k)[0]
+
+            spots = np.zeros((len(indices), 5), dtype=np.float32)
+            spots[:, 0] = xy[indices,0] * zoom
+            spots[:, 1] = xy[indices,1] * zoom
+            spots[:, 2] = sigma
+            spots[:, 3] = sigma
+            spots[:, 4] = 1
+            
+            if len(spots) == 0:
+                raise ValueError(f'no spots in bin {k}')
+
+            images[k] = dll.DrawGaussians(img, spots)       
     
-    localizations = []
-    framenum = []
+    #print(f"RCC pairs: {timebins*(timebins-1)//2}. Bins={timebins}")
+    pairs = np.array(np.triu_indices(timebins,1)).T
+    if len(pairs)>maxpairs:
+        pairs = pairs[np.random.choice(len(pairs),maxpairs)]
+    pair_shifts = findshift_pairs(images, pairs)
     
-    for i in range(n_frames):
-        on = np.random.binomial(1, on_prob, size=n_sites).astype(bool)
-        locs = binding_sites[on]*1
-        # add localization error
-        locs += drift_trace[i] + np.random.normal(0, loc_error, size=locs.shape)
-        framenum.append(np.ones(len(locs),dtype=np.int32)*i)
-        localizations.append(locs)
+    A = np.zeros((len(pairs),timebins))
+    A[np.arange(len(pairs)),pairs[:,0]] = 1
+    A[np.arange(len(pairs)),pairs[:,1]] = -1
+    
+    inv = np.linalg.pinv(A)
+    shift_x = inv @ pair_shifts[:,0]
+    shift_y = inv @ pair_shifts[:,1]
+    shift_y -= shift_y[0]
+    shift_x -= shift_x[0]
+    shift = -np.vstack((shift_x,shift_y)).T / zoom
         
-    return np.concatenate(localizations), np.concatenate(framenum)
+    t = (0.5+np.arange(timebins))*framesperbin
+    
+    shift -= np.mean(shift,0)
 
+    shift_estim = np.zeros((len(shift),3))
+    shift_estim[:,[0,1]] = shift
+    shift_estim[:,2] = t
+
+    if timebins != nframes:
+        spl_x = InterpolatedUnivariateSpline(t, shift[:,0], k=2)
+        spl_y = InterpolatedUnivariateSpline(t, shift[:,1], k=2)
+    
+        shift_interp = np.zeros((nframes,2))
+        shift_interp[:,0] = spl_x(np.arange(nframes))
+        shift_interp[:,1] = spl_y(np.arange(nframes))
+    else:
+        c = shift
+    
+    return shift_interp, shift_estim, images
