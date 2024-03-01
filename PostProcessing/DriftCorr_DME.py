@@ -14,7 +14,6 @@ def __function_metadata__():
             "required_kwargs": [
                 {"name": "frame_time_for_dme", "description": "Frame-time used for drift-correction (in ms)","default":100.,"type":float,"display_text":"Frame time used in DME"},
                 {"name": "frames_per_bin", "description": "Number of frames in every bin for dme drift correction ","default":50,"type":int,"display_text":"Frames per bin"},
-                {"name": "use_cuda", "description": "Use CUDA-GPU rather than CPU.","default":False,"display_text":"Use CUDA"},
                 {"name": "visualisation", "description": "Visualisation of the drift traces.","default":True,"display_text":"Visualisation"},
             ],
             "optional_kwargs": [
@@ -26,7 +25,6 @@ def __function_metadata__():
                 {"name": "frame_time_for_dme", "description": "Frame-time used for drift-correction (in ms)","default":100.,"type":float,"display_text":"Frame time used in DME"},
                 {"name": "nr_time_bins", "description": "Number of time bins","default":10,"type":int,"display_text":"Number of bins"},
                 {"name": "zoom_level", "description": "Zoom level","default":2,"type":int,"display_text":"Zoom of RCC plots"},
-                {"name": "use_cuda", "description": "Use CUDA-GPU rather than CPU.","default":False,"display_text":"Use CUDA"},
                 {"name": "visualisation", "description": "Visualisation of the drift traces.","default":True,"display_text":"Visualisation"},
             ],
             "optional_kwargs": [
@@ -56,7 +54,7 @@ def DriftCorr_entropyMin(resultArray,findingResult,settings,**kwargs):
     #Set user variables
     frame_time_for_dme = float(kwargs['frame_time_for_dme']) #in ms
     framesperbinv = int(kwargs['frames_per_bin'])#in 'frames'
-    use_cuda= utilsHelper.strtobool(kwargs['use_cuda'])
+    use_cuda= settings['UseCUDA']['value']>0
     visualisation=utilsHelper.strtobool(kwargs['visualisation'])
     
     #Hard-coded variables
@@ -161,7 +159,7 @@ def DriftCorr_RCC(resultArray,findingResult,settings,**kwargs):
     frame_time_for_dme = float(kwargs['frame_time_for_dme']) #in ms
     nr_time_bins = int(kwargs['nr_time_bins'])
     zoom_level = int(kwargs['zoom_level'])
-    use_cuda= utilsHelper.strtobool(kwargs['use_cuda'])
+    use_cuda= settings['UseCUDA']['value']>0
     visualisation=utilsHelper.strtobool(kwargs['visualisation'])
 
     #Obtain the localizations from the resultArray

@@ -363,6 +363,9 @@ class MyGUI(QMainWindow):
         globalSettings['Multithread'] = {}
         globalSettings['Multithread']['value'] = True
         globalSettings['Multithread']['input'] = bool
+        globalSettings['UseCUDA'] = {}
+        globalSettings['UseCUDA']['value'] = False
+        globalSettings['UseCUDA']['input'] = bool
         #Finding batching info
         globalSettings['FindingBatching'] = {}
         globalSettings['FindingBatching']['value'] = True

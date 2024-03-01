@@ -8,8 +8,7 @@ def __function_metadata__():
         "GaussianKernel_fixedSigma": {
             "required_kwargs": [
                 {"name": "px_size", "description": "Visualisation px size","default":10,"type":int,"display_text":"Pixel size (in nm)"},
-                {"name": "sigma", "description": "Gaussian sigma value in pixel","default":20.,"type":float,"display_text":"Sigma (in nm)"},
-                {"name": "use_cuda", "description": "Use CUDA-GPU rather than CPU.","default":False,"display_text":"Use CUDA"},
+                {"name": "sigma", "description": "Gaussian sigma value in pixel","default":20.,"type":float,"display_text":"Sigma (in nm)"}
             ],
             "optional_kwargs": [
             ],
@@ -17,8 +16,7 @@ def __function_metadata__():
         },
         "GaussianKernel_locPrec": {
             "required_kwargs": [
-                {"name": "px_size", "description": "Visualisation px size","default":10,"type":int,"display_text":"Pixel size (in nm)"},
-                {"name": "use_cuda", "description": "Use CUDA-GPU rather than CPU.","default":False,"display_text":"Use CUDA"},
+                {"name": "px_size", "description": "Visualisation px size","default":10,"type":int,"display_text":"Pixel size (in nm)"}
             ],
             "optional_kwargs": [
             ],
@@ -35,9 +33,9 @@ def GaussianKernel_fixedSigma(resultArray,settings,**kwargs):
     from .dme.dme.native_api import NativeAPI
     
     # sigma = float(kwargs['FWHM'])/(2*np.sqrt(2*np.log(2)))*16 #not sure why times 16, but seems to be right
-    sigma = float(kwargs['sigma'])
+    sigma = float(kwargs['sigma'])  
     px_size = float(kwargs['px_size'])
-    use_cuda= utilsHelper.strtobool(kwargs['use_cuda'])
+    use_cuda= settings['UseCUDA']['value']>0
     zoom = (float(settings['PixelSize_nm']['value']))/px_size
     
     #Obtain the localizations from the resultArray
@@ -78,7 +76,7 @@ def GaussianKernel_fixedSigma(resultArray,settings,**kwargs):
 def GaussianKernel_locPrec(resultArray,settings,**kwargs):
     from .dme.dme.native_api import NativeAPI
     px_size = float(kwargs['px_size'])
-    use_cuda= utilsHelper.strtobool(kwargs['use_cuda'])
+    use_cuda= settings['UseCUDA']['value']>0
     zoom = (float(settings['PixelSize_nm']['value']))/px_size
     
     import logging
