@@ -2553,7 +2553,7 @@ class FindingAnalysis(FindingFittingAnalysis):
                     
                     #Run the analysis in parallel over all cpu cores
                     with parallel_backend('loky', n_jobs=-1):
-                        results = Parallel()(delayed(self.process_hdf5_chunk_joblib)(n, hdf5_startstopindeces,singlePolarity) for n in range(0,len(hdf5_startstopindeces)))
+                        results = Parallel(max_nbytes=None,timeout=1e6)(delayed(self.process_hdf5_chunk_joblib)(n, hdf5_startstopindeces,singlePolarity) for n in range(0,len(hdf5_startstopindeces)))
                     
                     #reset GUIinfo in case we need it:
                     self.GUIinfo = GUIinfo
