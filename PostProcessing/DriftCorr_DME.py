@@ -125,9 +125,9 @@ def DriftCorr_entropyMin(resultArray,findingResult,settings,**kwargs):
     drift_locs = ([estimated_drift[min(i,len(estimated_drift)-1)][0]*(float(settings['PixelSize_nm']['value'])) for i in framenumFull],[estimated_drift[min(i,len(estimated_drift)-1)][1]*(float(settings['PixelSize_nm']['value'])) for i in framenumFull])
     
     #Correct the resultarray for the drift
-    drift_corr_locs = resultArray
-    drift_corr_locs['x'] -= drift_locs[0]
-    drift_corr_locs['y'] -= drift_locs[1]
+    drift_corr_locs = resultArray.copy()
+    drift_corr_locs.loc[:,'x'] -= drift_locs[0]
+    drift_corr_locs.loc[:,'y'] -= drift_locs[1]
 
 
 
