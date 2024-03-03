@@ -88,19 +88,32 @@ def removeCandidatesWithSmallBoundingBox(candidates,xymin=0,tmin=0):
 def info(candidates, fails):
     nb_candidates = len(candidates)
     fit_info = ''
+    localization_fit_fails = 0
     if len(fails) > 0:
         grouped_fails = fails.groupby('fit_info')
         for fail_reason, count in grouped_fails.size().items():
-            fail_text = f'Removed {count}/{nb_candidates} ({count/(nb_candidates)*100:.2f}%) candidates due to {fail_reason}.'
+            if fail_reason.startswith('Time'):
+                fail_text = f'Took average time instead of fitted time for {count}/{nb_candidates} ({count/(nb_candidates)*100:.2f}%) candidates due to {fail_reason}.'
+            else:
+                localization_fit_fails += 1
+                fail_text = f'Removed {count}/{nb_candidates} ({count/(nb_candidates)*100:.2f}%) candidates due to {fail_reason}.'
             logging.warning(fail_text)
             fit_info += fail_text + '\n'
         fit_info += '\n'
         for fail_reason, candidate_group in grouped_fails:
             candidate_list = candidate_group['candidate_id'].tolist()
-            if len(candidate_list)>20:
-                fit_info += f'Candidates discarded by {fail_reason}: [{", ".join(map(str, candidate_list[:10]))}, ..., {", ".join(map(str, candidate_list[-10:]))}]\n'
+            if fail_reason.startswith('Time'):
+                if len(candidate_list)>20:
+                    fit_info += f'Candidates for which average time was taken instead of fitted time due to {fail_reason}:[{", ".join(map(str, candidate_list[:10]))}, ..., {", ".join(map(str, candidate_list[-10:]))}]\n'
+                else:
+                    fit_info += f'Candidates for which average time was taken instead of fitted time due to {fail_reason}: {candidate_list}\n'
             else:
-                fit_info += f'Candidates discarded by {fail_reason}: {candidate_list}\n'
+                if len(candidate_list)>20:
+                    fit_info += f'Candidates discarded by {fail_reason}: [{", ".join(map(str, candidate_list[:10]))}, ..., {", ".join(map(str, candidate_list[-10:]))}]\n'
+                else:
+                    fit_info += f'Candidates discarded by {fail_reason}: {candidate_list}\n'
+        if  localization_fit_fails == 0:
+            fit_info += 'No candidates were discarded due to bad fitting. Average time was taken instead of fitted time for several candidates.'
     else:
         fit_info = 'No candidates were discarded due to bad fitting.'
     return fit_info

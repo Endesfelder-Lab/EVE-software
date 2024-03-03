@@ -11,6 +11,7 @@ from EventDistributions import eventDistributions
 #Import all scripts in the custom script folders
 from CandidateFinding import *
 from CandidateFitting import *
+from TemporalFitting import timeFitting
 from Visualisation import *
 from PostProcessing import *
 from CandidatePreview import *
@@ -135,11 +136,11 @@ def optKwargsFromFunction(functionname):
     names = re.findall(name_pattern, allkwarginfo[1][0])
     return names
 
-def distKwargValuesFromFittingFunction(functionname):
+def classKwargValuesFromFittingFunction(functionname, class_type):
     #Get all kwarg info
     allkwarginfo = kwargsFromFunction(functionname)
     derivedClasses = []
-    if allkwarginfo[2] != []:
+    if allkwarginfo[2] != [] and class_type=="dist":
         base_pattern = r"base:\s*(\S+)"
         base_name = re.findall(base_pattern, allkwarginfo[2][0])[0]
         # get base class
@@ -149,9 +150,19 @@ def distKwargValuesFromFittingFunction(functionname):
             for name, obj in inspect.getmembers(eventDistributions):
                 if inspect.isclass(obj) and issubclass(obj, baseClass) and obj != baseClass:
                     derivedClasses.append(name)
+    elif allkwarginfo[3] != [] and class_type=="time":
+        base_pattern = r"base:\s*(\S+)"
+        base_name = re.findall(base_pattern, allkwarginfo[3][0])[0]
+        # get base class
+        baseClass = getattr(timeFitting, base_name, None)
+        if not baseClass == None:
+            # get all derived classes that share common base
+            for name, obj in inspect.getmembers(timeFitting):
+                if inspect.isclass(obj) and issubclass(obj, baseClass) and obj != baseClass:
+                    derivedClasses.append(name)
     return derivedClasses
 
-def defaultOptionFromDistKwarg(functionname):
+def defaultOptionFromClassKwarg(functionname):
     #Check if the function has a 'default' option for the distribution kwarg. 
     defaultOption=None
     functionparent = functionname.split('.')[0]
@@ -164,17 +175,35 @@ def defaultOptionFromDistKwarg(functionname):
             defaultOption = getattr(eventDistributions, defaultOption, None)
             if defaultOption != None:
                 defaultOption = defaultOption.__name__
+    if "time_kwarg" in functionMetadata:
+        if "default_option" in functionMetadata["time_kwarg"]:
+            defaultOption = functionMetadata["time_kwarg"]["default_option"]
+            # check if defaultOption is a valid option
+            defaultOption = getattr(timeFitting, defaultOption, None)
+            if defaultOption != None:
+                defaultOption = defaultOption.__name__
     return defaultOption
 
-def getInfoFromDistribution(distribution):
+def getInfoFromClass(class_name, class_type):
     description = None
-    distClass = getattr(eventDistributions, distribution, None)
-    if not distClass == None:
-        try:
-            description = distClass.description
-        except AttributeError:
-            pass
-    return description
+    display_name = None
+    if class_type == "dist":
+        distClass = getattr(eventDistributions, class_name, None)
+        if not distClass == None:
+            try:
+                description = distClass.description
+                display_name = distClass.display_name
+            except AttributeError:
+                pass
+    elif class_type == "time":
+        timeClass = getattr(timeFitting, class_name, None)
+        if not timeClass == None:
+            try:
+                description = timeClass.description
+                display_name = timeClass.display_name
+            except AttributeError:
+                pass
+    return description, display_name
 
 #Obtain the kwargs from a function. Results in an array with entries
 def kwargsFromFunction(functionname):
@@ -196,6 +225,7 @@ def kwargsFromFunction(functionname):
         rkwarr_arr = []
         okwarr_arr = []
         dist_kwarg = []
+        time_kwarg = []
         loopindex = 0
         for i in looprange:
             #Get name text for all entries
@@ -224,14 +254,21 @@ def kwargsFromFunction(functionname):
                 for key, value in functionMetadata[list(functionMetadata.keys())[i]]["dist_kwarg"].items():
                     txt += f"{key}: {value}\n"
                 dist_kwarg.append(txt)
+            #Get text for time fitting kwargs
+            txt = ""
+            if "time_kwarg" in functionMetadata[list(functionMetadata.keys())[i]]:
+                for key, value in functionMetadata[list(functionMetadata.keys())[i]]["time_kwarg"].items():
+                    txt += f"{key}: {value}\n"
+                time_kwarg.append(txt)
     #Error handling if __function_metadata__ doesn't exist
     except AttributeError:
         rkwarr_arr = []
         okwarr_arr = []
         dist_kwarg = []
+        time_kwarg = []
         return f"No __function_metadata__ in {functionname}"
             
-    return [rkwarr_arr, okwarr_arr, dist_kwarg]
+    return [rkwarr_arr, okwarr_arr, dist_kwarg, time_kwarg]
 
 #Obtain the help-file and info on kwargs on a specific function
 #Optional: Boolean kwarg showKwargs & Boolean kwarg showHelp
@@ -281,6 +318,9 @@ def infoFromMetadata(functionname,**kwargs):
                 # for distribution kwarg
                 if specificKwarg == 'dist_kwarg':
                     helptext = functionMetadata[functionname.split('.')[1]]["dist_kwarg"]['description']
+                # for time fitting kwarg
+                if specificKwarg == 'time_kwarg':
+                    helptext = functionMetadata[functionname.split('.')[1]]["time_kwarg"]['description']
                 finaltext = helptext
                 skipfinalline = True
                 looprange = range(0,0)
@@ -521,26 +561,47 @@ def changeLayout_choice(curr_layout,className,displayNameToFunctionNameMap,paren
         #Visual max number of rows before a 2nd column is started.
         labelposoffset = 0
 
+        timeFitValues = classKwargValuesFromFittingFunction(current_selected_function, 'time')
+        if len(timeFitValues) != 0:
+            # Add a combobox containing all the possible kw-args
+            label = QLabel("<b>Time fit routine</b>")
+            label.setObjectName(f"Label#{current_selected_function}#time_kwarg#{current_selected_polarity}")
+            if checkAndShowWidget(curr_layout,label.objectName()) == False:
+                label.setToolTip(infoFromMetadata(current_selected_function,specificKwarg='time_kwarg'))
+                curr_layout.addWidget(label,labelposoffset+2,0)
+            combobox = QComboBox()
+            combobox.addItems(timeFitValues)
+            combobox.setObjectName(f"ComboBox#{current_selected_function}#time_kwarg#{current_selected_polarity}")
+            defaultOption = defaultOptionFromClassKwarg(current_selected_function)
+            if defaultOption != None:
+                combobox.setCurrentText(defaultOption)
+            test = combobox.currentText()
+            combobox.setToolTip(getInfoFromClass(combobox.currentText(),'time')[0])
+            combobox.currentTextChanged.connect(lambda text: combobox.setToolTip(getInfoFromClass(text, 'time')[0]))
+            if checkAndShowWidget(curr_layout,combobox.objectName()) == False:
+                curr_layout.addWidget(combobox,labelposoffset+2,1)
+            labelposoffset += 1
+
         #Add a widget-pair for the distribution
-        distKwargValues = distKwargValuesFromFittingFunction(current_selected_function)
+        distKwargValues = classKwargValuesFromFittingFunction(current_selected_function, 'dist')
         if len(distKwargValues) != 0:
             # Add a combobox containing all the possible kw-args
             label = QLabel("<b>distribution</b>")
             label.setObjectName(f"Label#{current_selected_function}#dist_kwarg#{current_selected_polarity}")
             if checkAndShowWidget(curr_layout,label.objectName()) == False:
                 label.setToolTip(infoFromMetadata(current_selected_function,specificKwarg='dist_kwarg'))
-                curr_layout.addWidget(label,2,0)
+                curr_layout.addWidget(label,labelposoffset+2,0)
             combobox = QComboBox()
             combobox.addItems(distKwargValues)
             combobox.setObjectName(f"ComboBox#{current_selected_function}#dist_kwarg#{current_selected_polarity}")
-            defaultOption = defaultOptionFromDistKwarg(current_selected_function)
+            defaultOption = defaultOptionFromClassKwarg(current_selected_function)
             if defaultOption != None:
                 combobox.setCurrentText(defaultOption)
             test = combobox.currentText()
-            combobox.setToolTip(getInfoFromDistribution(combobox.currentText()))
-            combobox.currentTextChanged.connect(lambda text: combobox.setToolTip(getInfoFromDistribution(text)))
+            combobox.setToolTip(getInfoFromClass(combobox.currentText(),'dist')[0])
+            combobox.currentTextChanged.connect(lambda text: combobox.setToolTip(getInfoFromClass(text, 'dist')[0]))
             if checkAndShowWidget(curr_layout,combobox.objectName()) == False:
-                curr_layout.addWidget(combobox,2,1)
+                curr_layout.addWidget(combobox,labelposoffset+2,1)
             labelposoffset += 1
             
         reqKwargs = reqKwargsFromFunction(current_selected_function)
@@ -833,6 +894,9 @@ def getEvalTextFromGUIFunction(methodName, methodKwargNames, methodKwargValues, 
                 #Add the distribution kwarg if it exists
                 if 'dist_kwarg' in methodKwargNames:
                     partialString += ",dist_kwarg=\""+methodKwargValues[methodKwargNames.index('dist_kwarg')]+"\""
+                #Add the time fit if it exists
+                if 'time_kwarg' in methodKwargNames:
+                    partialString += ",time_kwarg=\""+methodKwargValues[methodKwargNames.index('time_kwarg')]+"\""
                 segmentEval = methodName+"("+partialString+")"
                 return segmentEval
             else:

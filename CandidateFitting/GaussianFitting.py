@@ -1,13 +1,14 @@
 import inspect
 from Utils import utilsHelper
-from CandidateFitting.TemporalFitting import timeDistributions
 from EventDistributions import eventDistributions
+from TemporalFitting import timeFitting
 import pandas as pd
 import numpy as np
 import time, logging
 from scipy import optimize
 import warnings
 from scipy.optimize import OptimizeWarning
+warnings.simplefilter("error", RuntimeWarning)
 warnings.simplefilter("error", OptimizeWarning)
 
 from joblib import Parallel, delayed
@@ -18,7 +19,8 @@ import multiprocessing
 def __function_metadata__():
     return {
         "Gaussian2D": {
-            "dist_kwarg" : {"base": "XYDist", "description": "Two-dimensional event-distribution to run fitting on.", "default_option": "Hist2d_xy"},
+            "dist_kwarg" : {"base": "XYDist", "description": "Two-dimensional event-distribution to fit to get x,y-localization.", "default_option": "Hist2d_xy"},
+            "time_kwarg" : {"base": "TemporalFits", "description": "Temporal fitting routine to get time estimate.", "default_option": "TwoDGaussianFirstTime"},
             "required_kwargs": [
                 {"name": "expected_width", "display_text":"expected width", "description": "Expected width of Gaussian fit (in nm)","default":150.},
                 {"name": "fitting_tolerance", "display_text":"fitting tolerance", "description": "Discard localizations with uncertainties larger than this value times the pixel size. ","default":1.},
@@ -29,7 +31,8 @@ def __function_metadata__():
             "display_name": "2D Gaussian"
         }, 
         "LogGaussian2D": {
-            "dist_kwarg" : {"base": "XYDist", "description": "Two-dimensional event-distribution to run fitting on.", "default_option": "Hist2d_xy"},
+            "dist_kwarg" : {"base": "XYDist", "description": "Two-dimensional event-distribution to fit to get x,y-localization.", "default_option": "Hist2d_xy"},
+            "time_fit" : {"base": "TemporalFits", "description": "Temporal fitting routine to get time estimate.", "default_option": "TwoDGaussianFirstTime"},
             "required_kwargs": [
                 {"name": "expected_width", "display_text":"expected width", "description": "Expected width of log-Gaussian fit (in nm)","default":150.},
                 {"name": "fitting_tolerance", "display_text":"fitting tolerance", "description": "Discard localizations with uncertainties larger than this value times the pixel size. ","default":1.},
@@ -40,7 +43,8 @@ def __function_metadata__():
             "display_name": "2D LogGaussian"
         }, 
         "Gaussian3D": {
-            "dist_kwarg" : {"base": "XYDist", "description": "Two-dimensional event-distribution to run fitting on.", "default_option": "Hist2d_xy"},
+            "dist_kwarg" : {"base": "XYDist", "description": "Two-dimensional event-distribution to fit to get x,y-localization.", "default_option": "Hist2d_xy"},
+            "time_fit" : {"base": "TemporalFits", "description": "Temporal fitting routine to get time estimate.", "default_option": "TwoDGaussianFirstTime"},
             "required_kwargs": [
                 {"name": "theta", "display_text":"rotation angle", "description": "Rotation angle (in degrees) of the Gaussian","default":0},
                 {"name": "expected_width", "display_text":"expected width", "description": "Expected width of Gaussian fit (in nm)","default":150.},
@@ -69,11 +73,14 @@ class fit:
         if hasattr(dist, 'weights'):
             self.weights = dist.weights.ravel()
             max_weight = np.nanmax(self.weights)
-            self.sigma = (max_weight - self.weights + 1)/max_weight # Is this right?
-            # self.weights = np.ones_like(self.weights)
+            self.sigma = (max_weight - self.weights + 1)/max_weight
+            mask = ~np.isnan(self.sigma)
+            self.sigma = self.sigma[mask]
         else:
-            self.weights = np.ones_like(self.image)
-        self.imstats = [np.nanmax(self.image), np.nanmedian(self.image)]
+            weights = np.ones_like(self.image)
+            mask = ~np.isnan(self.image)
+            self.sigma = weights[mask]
+        self.imstats = [np.nanpercentile(self.image, 90), np.nanpercentile(self.image, 10)] # [np.nanmax(self.image), np.nanmedian(self.image)]
         self.mesh = self.meshgrid()
         self.fit_info = ''
     
@@ -85,7 +92,7 @@ class fit:
     
     def __call__(self, func, **kwargs):
         try:
-            popt, pcov = optimize.curve_fit(func, self.mesh, self.image, sigma=self.weights, nan_policy='omit', **kwargs) #, gtol=1e-4,ftol=1e-4
+            popt, pcov = optimize.curve_fit(func, self.mesh, self.image, sigma=self.sigma, nan_policy='omit', **kwargs) #, gtol=1e-4,ftol=1e-4
             perr = np.sqrt(np.diag(pcov))
         except RuntimeError as warning:
             self.fit_info += 'RuntimeError: ' + str(warning)
@@ -108,29 +115,13 @@ class gauss2D(fit):
         if hasattr(dist, 'trafo_gauss'):
             dist.trafo_gauss()
         super().__init__(dist, candidateID)
-        q1 = np.percentile(self.image, 5)
-        q3 = np.percentile(self.image, 95)
-
-        # Calculate the interquartile range (IQR)
-        iqr = q3 - q1
-
-        # Define the outlier range
-        lower_bound = q1 - 1.5 * iqr
-        upper_bound = q3 + 1.5 * iqr
-
-        # Replace outliers in self.image with NaN
-        mask = (self.image < lower_bound) | (self.image > upper_bound)
-        self.image[mask] = np.nan
-        self.weights[mask] = np.nan
-        self.weights = self.weights[~np.isnan(self.weights)]
-
         self.bounds = self.bounds()
         self.p0 = self.p0(width)
         self.fitting_tolerance = fitting_tolerance
         self.pixel_size = pixel_size
 
     def bounds(self):
-        bounds = ([0., 0., 0., 0., 0., -np.inf], [self.xlim, self.ylim, np.inf, np.inf, np.inf, np.inf])
+        bounds = ([-0.5, -0.5, 0., 0., 0., -np.inf], [self.xlim-0.5, self.ylim-0.5, np.inf, np.inf, np.inf, np.inf]) # allow borders of pixels
         return bounds
     
     def p0(self, width):
@@ -142,8 +133,9 @@ class gauss2D(fit):
         g = offset + amplitude * np.exp( - ((X-x0)**2/(2*sigma_x**2) + (Y-y0)**2/(2*sigma_y**2)))
         return g
     
-    def __call__(self, events, **kwargs):
+    def __call__(self, events, time_fit, **kwargs):
         opt, err = super().__call__(self.func, bounds=self.bounds, p0=self.p0, **kwargs)
+        time_fit_fails = 0
         if self.fit_info != '':
             x = np.nan
             y = np.nan
@@ -151,6 +143,7 @@ class gauss2D(fit):
             del_y = np.nan
             p = np.nan
             t = np.nan
+            del_t = np.nan
         else: 
             x = (opt[0]+np.min(events['x']))*self.pixel_size # in nm
             y = (opt[1]+np.min(events['y']))*self.pixel_size # in nm
@@ -163,15 +156,35 @@ class gauss2D(fit):
                 del_x = np.nan
                 del_y = np.nan
                 t = np.nan
+                del_t = np.nan
             else:
-                time_fit = timeDistributions.rayleigh(events['t']*1e-3, bins='auto')
-                t = self.func((opt[0], opt[1]), *opt)
-                t = self.dist.undo_trafo_gauss(t)*1e-3
-                #time_fit_results = time_fit(events['t']*1e-3)
-                #t = time_fit_results[0]
+                try:
+                    t, del_t, t_fit_info, opt_t = time_fit(events, opt) # t, del_t in ms
+                except RuntimeWarning:
+                    print(self.candidateID)
+                if t_fit_info != '':
+                    self.fit_info = t_fit_info
+                #------ bootstrap time fitting ---------
+                # n_bootstrap = 50
+                # times = []
+                # for i in range(n_bootstrap):
+                #     sampled_events = events.sample(frac=0.9)
+                #     t, del_t, t_fit_info, opt_t = time_fit(sampled_events) # t, del_t in ms
+                #     if t_fit_info != '':
+                #         time_fit_fails += 1
+                #         self.fit_info = t_fit_info
+                #     else:
+                #         times.append(t)
+                # if time_fit_fails != n_bootstrap:
+                #     t = np.mean(times)
+                #     del_t = np.std(times)
+                # else:
+                #     self.fit_info = 'TimeFittingWarning: Time fitting failed.'
+                #     t = np.mean(events['t']*1e-3) # in ms
+                #     del_t = np.std(events['t']*1e-3) # in ms
             mean_polarity = events['p'].mean()
             p = int(mean_polarity == 1) + int(mean_polarity == 0) * 0 + int(mean_polarity > 0 and mean_polarity < 1) * 2
-        loc_df = pd.DataFrame({'candidate_id': self.candidateID, 'x': x, 'y': y, 'del_x': del_x, 'del_y': del_y, 'p': p, 't': t, 'fit_info': self.fit_info}, index=[0])
+        loc_df = pd.DataFrame({'candidate_id': self.candidateID, 'x': x, 'y': y, 'del_x': del_x, 'del_y': del_y, 'p': p, 't': t, 'del_t': del_t, 't_fit_fails': time_fit_fails, 'fit_info': self.fit_info}, index=[0])
         return loc_df
 
 # 2d log gaussian fit
@@ -211,7 +224,7 @@ class gauss3D(gauss2D):
 
 
 # perform localization for part of candidate dictionary
-def localize_canditates2D(i, candidate_dic, func, distfunc, *args, **kwargs):
+def localize_canditates2D(i, candidate_dic, func, distfunc, time_fit, *args, **kwargs):
     logging.info('Localizing PSFs (thread '+str(i)+')...')
     localizations = []
     fails = pd.DataFrame()  # Initialize fails as an empty DataFrame
@@ -219,7 +232,7 @@ def localize_canditates2D(i, candidate_dic, func, distfunc, *args, **kwargs):
     for candidate_id in list(candidate_dic):
         dist = distfunc(candidate_dic[candidate_id]['events'])
         fitting = func(dist, candidate_id, *args)
-        localization = fitting(candidate_dic[candidate_id]['events'], **kwargs)
+        localization = fitting(candidate_dic[candidate_id]['events'], time_fit, **kwargs)
         localizations.append(localization)
         if localization['fit_info'][0] != '':
             fail['candidate_id'] = localization['candidate_id']
@@ -253,6 +266,7 @@ def Gaussian2D(candidate_dic,settings,**kwargs):
     expected_width = expected_width/pixel_size
     fit_func = gauss2D
     dist_func = getattr(eventDistributions, kwargs['dist_kwarg'])
+    time_fit = getattr(timeFitting, kwargs['time_kwarg'])()
     params = expected_width, fitting_tolerance, pixel_size
 
     if multithread == True: num_cores = multiprocessing.cpu_count()
@@ -265,7 +279,7 @@ def Gaussian2D(candidate_dic,settings,**kwargs):
     logging.info("Candidate fitting split in "+str(njobs)+" job(s) and divided on "+str(num_cores)+" core(s).")
 
     # Determine all localizations
-    RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(localize_canditates2D)(i, data_split[i], fit_func, dist_func, *params) for i in range(len(data_split)))
+    RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(localize_canditates2D)(i, data_split[i], fit_func, dist_func, time_fit, *params) for i in range(len(data_split)))
     
     localization_list = [res[0] for res in RES]
     localizations = pd.concat(localization_list, ignore_index=True)
@@ -295,6 +309,7 @@ def LogGaussian2D(candidate_dic,settings,**kwargs):
     expected_width = expected_width/pixel_size
     fit_func = loggauss2D
     dist_func = getattr(eventDistributions, kwargs['dist_kwarg'])
+    time_fit = getattr(timeFitting, kwargs['time_kwarg'])()
     params = expected_width, fitting_tolerance, pixel_size
 
     if multithread == True: num_cores = multiprocessing.cpu_count()
@@ -307,7 +322,7 @@ def LogGaussian2D(candidate_dic,settings,**kwargs):
     logging.info("Candidate fitting split in "+str(njobs)+" job(s) and divided on "+str(num_cores)+" core(s).")
 
     # Determine all localizations
-    RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(localize_canditates2D)(i, data_split[i], fit_func, dist_func, *params) for i in range(len(data_split)))
+    RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(localize_canditates2D)(i, data_split[i], fit_func, dist_func, time_fit, *params) for i in range(len(data_split)))
     
     localization_list = [res[0] for res in RES]
     localizations = pd.concat(localization_list)
@@ -338,6 +353,7 @@ def Gaussian3D(candidate_dic,settings,**kwargs):
     theta = np.radians(float(kwargs['theta']))
     fit_func = gauss3D
     dist_func = getattr(eventDistributions, kwargs['dist_kwarg'])
+    time_fit = getattr(timeFitting, kwargs['time_kwarg'])()
     params = expected_width, fitting_tolerance, pixel_size, theta
 
     if multithread == True: num_cores = multiprocessing.cpu_count()
@@ -350,7 +366,7 @@ def Gaussian3D(candidate_dic,settings,**kwargs):
     logging.info("Candidate fitting split in "+str(njobs)+" job(s) and divided on "+str(num_cores)+" core(s).")
 
     # Determine all localizations
-    RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(localize_canditates2D)(i, data_split[i], fit_func, dist_func, *params) for i in range(len(data_split)))
+    RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(localize_canditates2D)(i, data_split[i], fit_func, dist_func, time_fit, *params) for i in range(len(data_split)))
     
     localization_list = [res[0] for res in RES]
     localizations = pd.concat(localization_list)

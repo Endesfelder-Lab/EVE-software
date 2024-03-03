@@ -40,6 +40,7 @@ from vispy.color import Colormap
 # Add the folder 2 folders up to the system path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 #Import all scripts in the custom script folders
+# List all files in the CandidateFitting directory
 from CandidateFitting import *
 from CandidateFinding import *
 from Visualisation import *
@@ -1396,7 +1397,7 @@ class MyGUI(QMainWindow):
             pass
 
         # Define the number of significant digits for each column
-        significant_digits = {'x': 2, 'y': 2, 'p': 0, 'id':0,'candidate_id':0,'del_x':2,'del_y':2, 't':0}
+        significant_digits = {'x': 2, 'y': 2, 'p': 0, 'id':0,'candidate_id':0,'del_x':2,'del_y':2, 't':2, 'del_t':2}
 
         for y in range(len(localizations.columns)):
             significant_digit = significant_digits.get(localizations.columns[y])
@@ -2441,6 +2442,10 @@ class MyGUI(QMainWindow):
                 if ("ComboBox" in widget.objectName()) and widget.isVisibleTo(self.tab_processing) and 'dist_kwarg' in widget.objectName():
                     methodKwargNames_method.append('dist_kwarg')
                     methodKwargValues_method.append(widget.currentText())
+                # add timeKwarg choice to Kwargs if given
+                if ("ComboBox" in widget.objectName()) and widget.isVisibleTo(self.tab_processing) and 'time_kwarg' in widget.objectName():
+                    methodKwargNames_method.append('time_kwarg')
+                    methodKwargValues_method.append(widget.currentText())
             else:
                 #If the item is a layout instead...
                 if isinstance(item, QLayout):
@@ -2460,6 +2465,10 @@ class MyGUI(QMainWindow):
                         # add distKwarg choice to Kwargs if given
                         if ("ComboBox" in widget_sub.objectName()) and widget_sub.isVisibleTo(self.tab_processing) and 'dist_kwarg' in widget_sub.objectName():
                             methodKwargNames_method.append('dist_kwarg')
+                            methodKwargValues_method.append(widget_sub.currentText())
+                        # add timeKwarg choice to Kwargs if given
+                        if ("ComboBox" in widget_sub.objectName()) and widget_sub.isVisibleTo(self.tab_processing) and 'time_kwarg' in widget_sub.objectName():
+                            methodKwargNames_method.append('time_kwarg')
                             methodKwargValues_method.append(widget_sub.currentText())
 
         #If at this point there is no methodName_method, it means that the method has exactly 0 req or opt kwargs. Thus, we simply find the value of the QComboBox which should be the methodName:
@@ -2568,6 +2577,8 @@ class MyGUI(QMainWindow):
                                     elif 'Fitting' in field_widget.objectName():
                                         polVal2 = field_widget.objectName()[-3:]
                                         if 'dist_kwarg' in field_widget.objectName():
+                                            field_widget.setCurrentText(self.entries[field_name])
+                                        elif 'time_kwarg' in field_widget.objectName():
                                             field_widget.setCurrentText(self.entries[field_name])
                                         else:
                                             utils.changeLayout_choice(getattr(self, f"groupboxFitting{polVal2}").layout(),field_widget.objectName(),getattr(self, f"Fitting_functionNameToDisplayNameMapping{polVal2}"),parent=self)
@@ -3945,8 +3956,12 @@ class CandidatePreview(QWidget):
                 logging.debug(f"Attempting to show candidate {self.CandidatePreviewID}.")
                 # Get all localizations that belong to the candidate
                 self.CandidatePreviewLocs = parent.data['FittingResult'][0][parent.data['FittingResult'][0]['candidate_id'] == self.CandidatePreviewID]
-                if pd.isna(self.CandidatePreviewLocs['x'].iloc[0]):
-                    self.fit_info.setText(f"No localization generated due to {self.CandidatePreviewLocs['fit_info'].iloc[0]}")
+                # Check if fitting was successful
+                if self.CandidatePreviewLocs['fit_info'].iloc[0] != '':
+                    if pd.isna(self.CandidatePreviewLocs['x'].iloc[0]):
+                        self.fit_info.setText(f"No localization generated due to {self.CandidatePreviewLocs['fit_info'].iloc[0]}")
+                    else:
+                        self.fit_info.setText(f"Average time was taken instead of fitted time due to {self.CandidatePreviewLocs['fit_info'].iloc[0]}")
 
                 # Get some info about the candidate
                 N_events = parent.data['FindingResult'][0][self.CandidatePreviewID]['N_events']
