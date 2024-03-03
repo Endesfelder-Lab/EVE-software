@@ -454,12 +454,15 @@ def eigenFeature_analysis(npy_array,settings,**kwargs):
         logging.error("No clusterpoints found via spectral clustering - maximum eigenval probably wrong!")
         candidates = {}
     
-    
+    time0 = time.time()
     #Remove small/large bounding-box data
     candidates, _, _ = utilsHelper.removeCandidatesWithLargeSmallBoundingBox(candidates,settings)
-
+    time1 = time.time()
+    
     #Remove xytOutliers
     candidates = utilsHelper.removeCandidates_xytoutliers(candidates,settings)
+    time2 = time.time()
+    
     
     performance_metadata = f"SpectralClustering Finding ran for {time.time() - starttime} seconds."
     

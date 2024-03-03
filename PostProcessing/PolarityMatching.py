@@ -13,8 +13,8 @@ def __function_metadata__():
     return {
         "PolarityMatching": {
             "required_kwargs": [
-                {"name": "Max_xyDistance", "description": "Maximum distance in x,y in nm units (nm)","default":"50","type":float,"display_text":"Max. XY distance (nm)"},
-                {"name": "Max_tDistance", "description": "Maximum time distance in ms (between positive and negative)","default":"500","type":float,"display_text":"Max time distance (ms)"},
+                {"name": "Max_xyDistance", "description": "Maximum distance in x,y in nm units (nm)","default":"200","type":float,"display_text":"Max. XY distance (nm)"},
+                {"name": "Max_tDistance", "description": "Maximum time distance in ms (between positive and negative)","default":"1000","type":float,"display_text":"Max time distance (ms)"},
             ],
             "optional_kwargs": [
             ],
@@ -22,6 +22,15 @@ def __function_metadata__():
         },
         "PolarityMatching_NeNA": {
             "required_kwargs": [
+            ],
+            "optional_kwargs": [
+            ],
+            "help_string": "Perform NeNA on the matched polarities."
+        },
+        "PolarityMatching_NeNASpatial": {
+            "required_kwargs": [
+                {"name": "n_points_per_bin", "description": "Number of points per bin","default":"200","type":int,"display_text":"Number of points per bin"},
+                
             ],
             "optional_kwargs": [
             ],
@@ -89,43 +98,44 @@ def PolarityMatching(localizations,findingResult,settings,**kwargs):
 
         #We loop over the positive events:
         for posEventId,posEvent in posEvents.iterrows():
-            if np.mod(posEventId,500) == 0:
-                logging.info('PolarityMatching progress: ' + str(posEventId) + ' of ' + str(len(posEvents)))
-            minin = mininAll[posEventId]
-            maxin = maxinAll[posEventId]
-        
-            negEventsInTime = negEvents[minin:maxin]
+            if posEventId < len(posEvents):
+                if np.mod(posEventId,500) == 0:
+                    logging.info('PolarityMatching progress: ' + str(posEventId) + ' of ' + str(len(posEvents)))
+                minin = mininAll[posEventId]
+                maxin = maxinAll[posEventId]
             
-            x_diff = negEventsInTime['x'].values - posEvent['x']
-            y_diff = negEventsInTime['y'].values - posEvent['y']
-            distance = np.sqrt(x_diff**2 + y_diff**2)
+                negEventsInTime = negEvents[minin:maxin]
+                
+                x_diff = negEventsInTime['x'].values - posEvent['x']
+                y_diff = negEventsInTime['y'].values - posEvent['y']
+                distance = np.sqrt(x_diff**2 + y_diff**2)
 
-            foundNegEventId = distance < float(kwargs['Max_xyDistance'])
+                foundNegEventId = distance < float(kwargs['Max_xyDistance'])
 
-            #If we found at least one:
-            if sum(foundNegEventId) > 0:
-                #Find the first id of True (the closest in time)
-                foundNegEventId = np.argmax(foundNegEventId)
-                #Find the corresponding event
-                negEventsWithinDistance = negEventsInTime.iloc[foundNegEventId]
-                #And find the event distance belonging to it
-                eventDistance = distance[foundNegEventId]
-                
-                #Renaming
-                negEventFound = negEventsWithinDistance
-                
-                negEventId = negEventFound._name
-                
-                #Update the positive candidate
-                posEvents.loc[posEventId,'pol_link_id'] = (negEventFound.candidate_id)
-                posEvents.loc[posEventId,'pol_link_time'] = (negEventFound.t - posEvent.t)
-                posEvents.loc[posEventId,'pol_link_xy'] = eventDistance
-                
-                #And update the negative candidate
-                negEvents.loc[negEventId,'pol_link_id'] = (posEvent.candidate_id)
-                negEvents.loc[negEventId,'pol_link_time'] = (posEvent.t-negEventFound.t)
-                negEvents.loc[negEventId,'pol_link_xy'] = eventDistance
-                
+                #If we found at least one:
+                if sum(foundNegEventId) > 0:
+                    #Find the first id of True (the closest in time)
+                    foundNegEventId = np.argmax(foundNegEventId)
+                    #Find the corresponding event
+                    negEventsWithinDistance = negEventsInTime.iloc[foundNegEventId]
+                    #And find the event distance belonging to it
+                    eventDistance = distance[foundNegEventId]
+                    
+                    #Renaming
+                    negEventFound = negEventsWithinDistance
+                    
+                    negEventId = negEventFound._name
+                    
+                    #Update the positive candidate
+                    posEvents.loc[posEventId,'pol_link_id'] = (negEventFound.candidate_id)
+                    posEvents.loc[posEventId,'pol_link_time'] = (negEventFound.t - posEvent.t)
+                    posEvents.loc[posEventId,'pol_link_xy'] = eventDistance
+                    
+                    #And update the negative candidate
+                    negEvents.loc[negEventId,'pol_link_id'] = (posEvent.candidate_id)
+                    negEvents.loc[negEventId,'pol_link_time'] = (posEvent.t-negEventFound.t)
+                    negEvents.loc[negEventId,'pol_link_xy'] = eventDistance
+                    
                 
         #re-create localizations by adding these below one another again:
         localizations = pd.concat([posEvents, negEvents])
@@ -136,6 +146,45 @@ def PolarityMatching(localizations,findingResult,settings,**kwargs):
     #Required output: localizations
     metadata = 'Information or so'
     return localizations,metadata
+
+def runNeNA(sublocs,n_bins_nena=99,loggingShow=True,visualisation=True):
+    #Create a histogram for the fitting
+    ahist=np.histogram(sublocs['pol_link_xy'],bins=n_bins_nena,density=True)
+    #Get the x-values (relative distance)
+    ar=ahist[1][1:len(ahist[1])]-1
+    #Get the y-values
+    ay=ahist[0]
+    #Perform the fit
+    nena_start = 20;
+    nena_lower = 2
+    nena_upper = 100
+    #Results will be stored in aF, error in aFerr
+    aF,aFerr=CFit_resultsCorr(ar,ay,nena_start,nena_lower,nena_upper)
+    
+    if loggingShow is True:
+        #Output on the logging
+        logging.info(f'NeNA precision: {np.round(aF[0],2)} +- {np.round(np.sqrt(aFerr[0,0]),2)}nm')
+        logging.info(f'All NeNA parameters: {aF.tolist()}')
+    
+    if visualisation is True:
+        #Create the visual fit
+        ayf=cFunc_2dCorr(ar,aF[0],aF[1],aF[2],aF[3],aF[4],aF[5])
+        
+        #Create a plot
+        fig, ax = plt.subplots()
+        #Show the NeNA histogram
+        ax.hist(sublocs['pol_link_xy'],bins=n_bins_nena,density=True)
+        #Add the fit
+        ax.plot(ar,ayf,'r-')
+        # Add a text box at position (0.5, 0.5) with the text "Your Text Here"
+        ax.text(0.95, 0.95, "NeNA precision: "+str(np.round(aF[0],2))+ " +- " +str(np.round(np.sqrt(aFerr[0,0]),2)) + "nm", ha='right', va='top', transform=ax.transAxes, bbox=dict(facecolor='white', alpha=0.5))
+        #Label
+        plt.xlabel('Relative pairwise distance (nm)')
+        plt.ylabel('Probability')
+        #show
+        plt.show()
+    
+    return aF,aFerr
 
 def PolarityMatching_NeNA(localizations,findingResult,settings,**kwargs):
     """
@@ -156,40 +205,9 @@ def PolarityMatching_NeNA(localizations,findingResult,settings,**kwargs):
         
         #Define the nr of bins for nena
         n_bins_nena = 99
+        runNeNA(sublocs,n_bins_nena=n_bins_nena,loggingShow=True,visualisation=True)
         
-        #Create a histogram for the fitting
-        ahist=np.histogram(sublocs['pol_link_xy'],bins=n_bins_nena,density=True)
-        #Get the x-values (relative distance)
-        ar=ahist[1][1:len(ahist[1])]-1
-        #Get the y-values
-        ay=ahist[0]
-        #Perform the fit
-        nena_start = 20;
-        nena_lower = 2
-        nena_upper = 100
-        #Results will be stored in aF, error in aFerr
-        aF,aFerr=CFit_resultsCorr(ar,ay,nena_start,nena_lower,nena_upper)
         
-        #Output on the logging
-        logging.info(f'NeNA precision: {np.round(aF[0],2)} +- {np.round(np.sqrt(aFerr[0,0]),2)}nm')
-        logging.info(f'All NeNA parameters: {aF.tolist()}')
-        
-        #Create the visual fit
-        ayf=cFunc_2dCorr(ar,aF[0],aF[1],aF[2],aF[3],aF[4],aF[5])
-        
-        #Create a plot
-        fig, ax = plt.subplots()
-        #Show the NeNA histogram
-        ax.hist(sublocs['pol_link_xy'],bins=n_bins_nena,density=True)
-        #Add the fit
-        ax.plot(ar,ayf,'r-')
-        # Add a text box at position (0.5, 0.5) with the text "Your Text Here"
-        ax.text(0.95, 0.95, "NeNA precision: "+str(np.round(aF[0],2))+ " +- " +str(np.round(np.sqrt(aFerr[0,0]),2)) + "nm", ha='right', va='top', transform=ax.transAxes, bbox=dict(facecolor='white', alpha=0.5))
-        #Label
-        plt.xlabel('Relative pairwise distance (nm)')
-        plt.ylabel('Probability')
-        #show
-        plt.show()
         
 def PolarityMatching_time(localizations,findingResult,settings,**kwargs):
 
@@ -219,4 +237,105 @@ def PolarityMatching_time(localizations,findingResult,settings,**kwargs):
     ax2.set_xscale('log')
     plt.xlabel('Time between pos/neg events (ms)')
     plt.show()
+
+
+
+def PolarityMatching_NeNASpatial(localizations,findingResult,settings,**kwargs):
     
+    
+    #Pre-filter to only positive events (to only have all links once)
+    sublocs = localizations[localizations['p'] == 1]
+    #Also remove all -1 pol link xy:
+    sublocs = sublocs[sublocs['pol_link_xy']>0]
+    
+    #We will cluster the points in sublocs into n_bins
+    #But we base this on n_points_per bin
+    n_points_per_bin = int(kwargs['n_points_per_bin'])
+    n_bins = len(sublocs)//n_points_per_bin
+    
+    n_colsrows = int((np.sqrt(n_bins)))
+    logging.info("n_colsrows: " + str(n_colsrows))
+    
+    #Split the sublocs data in these bins in x,y:
+    #sort data on x:
+    sublocs = sublocs.sort_values(by=['x'])
+    #split
+    sublocssplit = np.array_split(sublocs, n_colsrows)
+    xcounter = 0
+    ycounter = 0
+    neNAval = np.zeros((n_colsrows,n_colsrows))
+    
+    for sublocssplit_i in sublocssplit:
+        sublocssplit_i = sublocssplit_i.sort_values(by=['y'])
+        sublocssplit_ij = np.array_split(sublocssplit_i, n_colsrows)
+        for sublocssplit_ij_i in sublocssplit_ij:
+            aF = runNeNA(sublocssplit_ij_i,n_bins_nena=99,loggingShow=False,visualisation=False)
+            neNAval[xcounter,ycounter] = aF[0][0]
+            ycounter+=1
+        xcounter+=1
+        ycounter = 0
+    
+    
+    #Plot the figure
+    plt.figure()
+    #plot a 2d image:
+    plt.imshow(neNAval, cmap='viridis', interpolation='nearest')
+    plt.colorbar()
+    plt.show()
+    
+    
+    #Percentage error
+    # pcterr = 0.2
+    
+    # subsamplerate = 50
+    # #We do a contrained k_means clustering
+    # from k_means_constrained import KMeansConstrained
+    # clf = KMeansConstrained(
+    #     n_clusters=n_bins,
+    #     size_min=n_points_per_bin*(1-pcterr)//subsamplerate,
+    #     size_max=int(np.ceil(n_points_per_bin*(1+pcterr)/subsamplerate)),
+    #     random_state=0
+    # )
+    # #randomly subsample the data:
+    # sublocspartial = sublocs.sample(frac=1/subsamplerate, random_state=0)
+    # clf.fit_predict(sublocspartial[['x','y']].values)
+        
+    # #create a figure:
+    # pxsizenm = 10;
+    # figxsize = int(np.ceil(np.ceil(localizations['x'].max() - localizations['x'].min())//pxsizenm))
+    # figysize = int(np.ceil(np.ceil(localizations['y'].max() - localizations['y'].min())//pxsizenm))
+    
+    # # Create grid of x and y coordinates
+    # x_coords, y_coords = np.meshgrid(np.arange(figxsize), np.arange(figysize))
+
+    # # Adjust cluster centers
+    # adjusted_cluster_centers = clf.cluster_centers_ - np.array([localizations['x'].min(), localizations['y'].min()])
+
+    # # Calculate distances
+    # distances = np.sum((adjusted_cluster_centers[:, np.newaxis, np.newaxis, :] - 
+    #                     np.stack([x_coords*pxsizenm, y_coords*pxsizenm], axis=-1))**2, axis=-1)
+
+    # # Find index of minimum distance
+    # closest_cluster = np.argmin(distances, axis=0)
+
+    # #Calculate NeNA for entries in each cluster
+    # neNAval = np.zeros(n_bins)
+    # for l in range(0,n_bins):
+    #     locs = sublocs[clf.labels_==l]
+    #     #Calculate NeNA of this cluster:
+    #     aF = runNeNA(locs,n_bins_nena=99,loggingShow=True,visualisation=False)
+    #     neNAval[l] = aF[0][0]
+
+    # # Assign values to the imagearray
+    # imagearray = neNAval[closest_cluster]
+    
+    # #Plot the figure
+    # plt.figure()
+    # #plot a 2d image:
+    # plt.imshow(imagearray, cmap='viridis', interpolation='nearest')
+    # plt.colorbar()
+    # plt.show()
+
+    #Required output: localizations
+    metadata = 'Information or so'
+    return localizations,metadata
