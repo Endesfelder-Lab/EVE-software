@@ -128,6 +128,7 @@ class Hist2d_ty(YTDist):
         return hist_ty.T, x_edges, y_edges
 
 class Hist2d_xy(XYDist):
+    display_name = "2D histogram of x, y positions"
     description = "2D histogram of x, y position of all events."
     def __init__(self, events, **kwargs):
         super().__init__(events)
@@ -151,6 +152,7 @@ class Hist2d_xy(XYDist):
         return hist_xy.T, x_edges, y_edges
     
 class SumPolarity(XYDist):
+    display_name = "Sum of polarities"
     description = "The sum of the polarities of all events for each pixel."
     def __init__(self, events):
         super().__init__(events)
@@ -182,6 +184,7 @@ class SumPolarity(XYDist):
         return histxy.T, x_edges, y_edges
 
 class FirstTimestamp(XYDist):
+    display_name = "First time/pixel"
     description = "The timestamp of the first event for each pixel."
     def __init__(self, events):
         super().__init__(events)
@@ -209,6 +212,7 @@ class FirstTimestamp(XYDist):
         return super().measure(smallest_t)
 
 class AverageTimestamp(XYDist):
+    display_name = "Average time/pixel"
     description = "The average timestamp of all events for each pixel."
     def __init__(self, events):
         super().__init__(events)
@@ -224,6 +228,7 @@ class AverageTimestamp(XYDist):
         return super().measure(average_t)
     
 class MedianTimestamp(XYDist):
+    display_name = "Median time/pixel"
     description = "The median timestamp of all events for each pixel."
     def __init__(self, events):
         super().__init__(events)
@@ -239,6 +244,7 @@ class MedianTimestamp(XYDist):
         return super().measure(median_t)
     
 class AverageTimeDiff(XYDist):
+    display_name = "Average time delay/pixel"
     description = "The average time difference between events for each pixel."
     def __init__(self, events):
         super().__init__(events)
@@ -257,6 +263,7 @@ class AverageTimeDiff(XYDist):
         return super().measure(averageTimeDiff)
     
 class MinTimeDiff(XYDist):
+    display_name = "Minimum time delay/pixel"
     description = "The minimum time difference between events for each pixel."
     def __init__(self, events):
         super().__init__(events)
@@ -275,6 +282,7 @@ class MinTimeDiff(XYDist):
         return super().measure(minTimeDiff)
     
 class MaxTimeDiff(XYDist):
+    display_name = "Maximum time delay/pixel"
     description = "The maximum time difference between events for each pixel."
     def __init__(self, events):
         super().__init__(events)
