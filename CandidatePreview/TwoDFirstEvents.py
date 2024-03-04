@@ -26,7 +26,7 @@ def __function_metadata__():
                 {"name": "use_weights", "display_text":"use weights", "description": "Weigh first events per pixel with number of events/pixel","default":"True"}
             ],
             "help_string": "2D time of first per pixel, scatter plot with Gaussian fit, sigma/pixel",
-            "display_name": "Time of first event per pixel and 2D Gaussian fit"
+            "display_name": "Time of first event per pixel (2D Gaussian fit)"
         }
     }
 
@@ -114,8 +114,8 @@ def TwoDFirstEvents(findingResult, fittingResult, previewEvents, figure, setting
     if show_fits== True and np.isnan(opt[0]):
         # Fit failed, add info to plot
         text = f'Fit failed! {fit_info}'
-        props = dict(boxstyle='round', facecolor='white', edgecolor='gray', alpha=0.8)
-        figure.text(0.5,0.5, s=text, fontsize=10, color='red', verticalalignment='top', horizontalalignment='center', bbox=props)
+        props = dict(boxstyle='round', facecolor='white', edgecolor='None', alpha=0.8)
+        figure.text(0.05, 0.05, s=text, fontsize=10, color='red', verticalalignment='bottom', horizontalalignment='left', bbox=props, wrap=True)
     if show_fits == True and not np.isnan(opt[0]):
         x = np.linspace(0, gaussian_fit.fit.xlim, 20)
         y = np.linspace(0, gaussian_fit.fit.ylim, 20)

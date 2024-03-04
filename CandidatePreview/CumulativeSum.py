@@ -24,7 +24,7 @@ def __function_metadata__():
                 {"name": "weigh_first", "display_text":"weigh first events", "description": "Weigh first events per pixel with number of events/pixel","default":"False"}
             ],
             "help_string": "Draws cumulative sum (and lognormal cdf fit) of all events of the candidate cluster.",
-            "display_name": "Cumulative sum of candidate cluster"
+            "display_name": "Cumulative sum of candidate cluster (Lognormal cdf fit)"
         }
     }
 
@@ -47,7 +47,7 @@ def CumulativeSum(findingResult, fittingResult, previewEvents, figure, settings,
     figure.tight_layout()
     figure.subplots_adjust(top=0.95,bottom=0.190,left=0.080)
     t_min = None
-  
+    text = ''
     # Plot the cumulative sums and fits
     # all events
     if len(findingResult[findingResult['p'] == 0]) != 0 and len(findingResult[findingResult['p'] == 1]) != 0:
@@ -55,11 +55,8 @@ def CumulativeSum(findingResult, fittingResult, previewEvents, figure, settings,
         t, del_t, fit_info, opt = lognorm_cdf(findingResult, fittingResult)
         ax.errorbar(lognorm_cdf.fit.times, lognorm_cdf.fit.cumsum, color='olive', marker='.', markersize=5, mfc='darkolivegreen', label='Cumulative sum (mix)', zorder=-2)
         if show_fits== True and np.isnan(opt[0]):
-            # Fit failed, add info to plot
-            text = f'Fit failed! {fit_info}'
-            props = dict(boxstyle='round', facecolor='white', edgecolor='gray', alpha=0.8)
-            figure.text(0.5,0.5, s=text, fontsize=10, color='red', verticalalignment='top', horizontalalignment='center', bbox=props)
-        
+            # Fit failed, add info to text
+            text += f'Fit of all events failed! {fit_info}'
         if show_fits==True and not np.isnan(opt[0]):
             if not t_min==None:
                 t_min = np.min([t, t_min])
@@ -76,11 +73,8 @@ def CumulativeSum(findingResult, fittingResult, previewEvents, figure, settings,
         t, del_t, fit_info, opt = lognorm_cdf(findingResult[findingResult['p'] == 1], fittingResult)
         ax.errorbar(lognorm_cdf.fit.times, lognorm_cdf.fit.cumsum, color='C0', marker='.', markersize=5, mfc='mediumblue', label='Cumulative sum (pos)',zorder=-2)
         if show_fits== True and np.isnan(opt[0]):
-            # Fit failed, add info to plot
-            text = f'Fit failed! {fit_info}'
-            props = dict(boxstyle='round', facecolor='white', edgecolor='gray', alpha=0.8)
-            figure.text(0.5,0.5, s=text, fontsize=10, color='red', verticalalignment='top', horizontalalignment='center', bbox=props)
-        
+            # Fit failed, add info to text
+            text += f'Fit of pos. events failed! {fit_info}'
         if show_fits==True and not np.isnan(opt[0]):
             if not t_min==None:
                 t_min = np.min([t, t_min])
@@ -97,11 +91,8 @@ def CumulativeSum(findingResult, fittingResult, previewEvents, figure, settings,
         t, del_t, fit_info, opt = lognorm_cdf(findingResult[findingResult['p'] == 0], fittingResult)
         ax.errorbar(lognorm_cdf.fit.times, lognorm_cdf.fit.cumsum, color='C1', marker='.', markersize=5, mfc='peru', label='Cumulative sum (neg)', zorder=-2)
         if show_fits== True and np.isnan(opt[0]):
-            # Fit failed, add info to plot
-            text = f'Fit failed! {fit_info}'
-            props = dict(boxstyle='round', facecolor='white', edgecolor='gray', alpha=0.8)
-            figure.text(0.5,0.5, s=text, fontsize=10, color='red', verticalalignment='top', horizontalalignment='center', bbox=props)
-        
+            # Fit failed, add info to text
+            text += f'Fit of neg. events failed! {fit_info}'
         if show_fits==True  and not np.isnan(opt[0]):
             if not t_min==None:
                 t_min = np.min([t, t_min])
@@ -119,11 +110,10 @@ def CumulativeSum(findingResult, fittingResult, previewEvents, figure, settings,
             t, del_t, fit_info, opt = lognorm_cdf(findingResult, fittingResult)
             ax.errorbar(lognorm_cdf.fit.times, lognorm_cdf.fit.cumsum, color='C2', marker='.', markersize=5, mfc='darkgreen', label='Cumulative sum (first)', zorder=-1)
             if show_fits== True and np.isnan(opt[0]):
-                # Fit failed, add info to plot
-                text = f'Fit failed! {fit_info}'
-                props = dict(boxstyle='round', facecolor='white', edgecolor='gray', alpha=0.8)
-                figure.text(0.5,0.5, s=text, fontsize=10, color='red', verticalalignment='top', horizontalalignment='center', bbox=props)
-            
+                # Fit failed, add info to text
+                if text != '':
+                    text += '\n'
+                text += f'Fit of first events failed! {fit_info}'
             if show_fits==True and not np.isnan(opt[0]):
                 if not t_min==None:
                     t_min = np.min([t, t_min])
@@ -139,11 +129,10 @@ def CumulativeSum(findingResult, fittingResult, previewEvents, figure, settings,
             
             ax.errorbar(lognorm_cdf.fit.times, lognorm_cdf.fit.cumsum, yerr=lognorm_cdf.sigma, color='C2', marker='.', markersize=5, mfc='darkgreen', label='Cumulative sum (first, weighted)', zorder=-1)
             if show_fits== True and np.isnan(opt[0]):
-                # Fit failed, add info to plot
-                text = f'Fit failed! {fit_info}'
-                props = dict(boxstyle='round', facecolor='white', edgecolor='gray', alpha=0.8)
-                figure.text(0.5,0.5, s=text, fontsize=10, color='red', verticalalignment='top', horizontalalignment='center', bbox=props)
-            
+                # Fit failed, add info to text
+                if text != '':
+                    text += '\n'
+                text += f'Fit of first events failed! {fit_info}'
             if show_fits==True and not np.isnan(opt[0]):
                 if not t_min==None:
                     t_min = np.min([t, t_min])
@@ -157,6 +146,10 @@ def CumulativeSum(findingResult, fittingResult, previewEvents, figure, settings,
     for index, row in fittingResult[:-1].iterrows():
         ax.axvline(x=row['t'], color='red')
     ax.axvline(x=fittingResult.iloc[-1]['t'], color='red', label='Localization(s)')
+
+    if text != '':
+        props = dict(boxstyle='round', facecolor='white', edgecolor='None', alpha=0.8)
+        figure.text(0.05, 0.05, s=text, fontsize=10, color='red', verticalalignment='bottom', horizontalalignment='left', bbox=props, wrap=True)
 
     # Add and set labels
     if not t_min==None:
