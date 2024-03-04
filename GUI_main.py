@@ -18,7 +18,6 @@ import traceback
 import re
 from joblib import Parallel, delayed
 from joblib import parallel_backend, cpu_count
-from dask.distributed import Client, LocalCluster
 
 #Imports for PyQt5 (GUI)
 from PyQt5 import QtWidgets, QtGui
@@ -302,6 +301,14 @@ class MyGUI(QMainWindow):
         globalSettings['MaxFindingBoundingBoxT']['value'] = 1000
         globalSettings['MaxFindingBoundingBoxT']['input'] = float
         globalSettings['MaxFindingBoundingBoxT']['displayName'] = 'Maximum size of a bounding box in ms units'
+        globalSettings['XYTOutlierRemoval'] = {}
+        globalSettings['XYTOutlierRemoval']['value'] = True
+        globalSettings['XYTOutlierRemoval']['input'] = bool
+        globalSettings['XYTOutlierRemoval']['displayName'] = 'XYTOutlierRemoval'
+        globalSettings['XYTOutlierRemoval_multiplier'] = {}
+        globalSettings['XYTOutlierRemoval_multiplier']['value'] = 2.5
+        globalSettings['XYTOutlierRemoval_multiplier']['input'] = float
+        globalSettings['XYTOutlierRemoval_multiplier']['displayName'] = 'STD multiplier for XYTOutlierRemoval'
         globalSettings['PixelSize_nm'] = {}
         globalSettings['PixelSize_nm']['value'] = 80
         globalSettings['PixelSize_nm']['input'] = float
@@ -2758,7 +2765,6 @@ class FindingAnalysis(FindingFittingAnalysis):
         #Allowing for multicore hdf5 chunking, or single-core
         # print('Running finding chunk '+str(n)+' of '+str(len(hdf5startstopindeces)) )
         st_time = time.time()
-        print(f"Worker{n} started {time.time()}")
         #Get the events from these indeces (example at 0):
         self.events = utils.timeSliceFromHDFFromIndeces(self.fileLocation,hdf5startstopindeces,index=n)
         # print(f"Worker{n} events loaded time {time.time()}")
@@ -2783,7 +2789,6 @@ class FindingAnalysis(FindingFittingAnalysis):
         
         #Run the finding on this:
         FindingResult = self.runFinding(storeasselfResults=False)
-        print(f"Worker{n} finding completed time {time.time()-st_time}")
         
         #Return them
         return FindingResult

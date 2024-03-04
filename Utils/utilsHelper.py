@@ -40,23 +40,43 @@ def strtobool(val):
     else:
         raise ValueError("invalid truth value %r" % (val,))
 
-def removeCandidates_xytoutliers(candidates,settings,x_std_mult = 2.5, y_std_mult = 2.5, t_std_mult = 2.5):
-    nrOrigCandidates = len(candidates)
-    nchanged = 0
-    for candidate in sorted(candidates, reverse=True):
-        candidate_mean_x = np.mean(candidates[candidate]['events']['x'])
-        candidate_std_x = np.std(candidates[candidate]['events']['x'])
-        candidate_mean_y = np.mean(candidates[candidate]['events']['y'])
-        candidate_std_y = np.std(candidates[candidate]['events']['y'])
-        candidate_mean_t = np.mean(candidates[candidate]['events']['t'])
-        candidate_std_t = np.std(candidates[candidate]['events']['t'])
-        #Determine which events are outside the standard deviation:
-        x_std_outliers = np.abs(candidates[candidate]['events']['x']-candidate_mean_x) > x_std_mult*candidate_std_x
-        y_std_outliers = np.abs(candidates[candidate]['events']['y']-candidate_mean_y) > y_std_mult*candidate_std_y
-        t_std_outliers = np.abs(candidates[candidate]['events']['t']-candidate_mean_t) > t_std_mult*candidate_std_t
-        #Remove the outliers:
-        candidates[candidate]['events'] = candidates[candidate]['events'][~(x_std_outliers | y_std_outliers | t_std_outliers)]
-
+def removeCandidates_xytoutliers(candidates,settings,x_std_mult = None, y_std_mult = None, t_std_mult = None):
+    #._std_mult can be set to a value to force the standard deviation, otherwise it is set by the settings (and if not found, set to default of 2.5):
+    if 'XYTOutlierRemoval' in settings:
+        if settings['XYTOutlierRemoval']['value'] > 0:
+            running = True #run with given settings, unless specified in this command
+            if x_std_mult == None:
+                x_std_mult = float(settings['XYTOutlierRemoval_multiplier']['value'])
+            if y_std_mult == None:
+                y_std_mult = float(settings['XYTOutlierRemoval_multiplier']['value'])
+            if t_std_mult == None:
+                t_std_mult = float(settings['XYTOutlierRemoval_multiplier']['value'])
+        else:
+            running = False
+    else: #If run from completely outside eve, just run with default settings, unless specified:
+        running = True
+        if x_std_mult == None:
+            x_std_mult = 2.5
+        if y_std_mult == None:
+            y_std_mult = 2.5
+        if t_std_mult == None:
+            t_std_mult = 2.5
+        
+    if running == True:
+        for candidate in sorted(candidates, reverse=True):
+            candidate_mean_x = np.mean(candidates[candidate]['events']['x'])
+            candidate_std_x = np.std(candidates[candidate]['events']['x'])
+            candidate_mean_y = np.mean(candidates[candidate]['events']['y'])
+            candidate_std_y = np.std(candidates[candidate]['events']['y'])
+            candidate_mean_t = np.mean(candidates[candidate]['events']['t'])
+            candidate_std_t = np.std(candidates[candidate]['events']['t'])
+            #Determine which events are outside the standard deviation:
+            x_std_outliers = np.abs(candidates[candidate]['events']['x']-candidate_mean_x) > x_std_mult*candidate_std_x
+            y_std_outliers = np.abs(candidates[candidate]['events']['y']-candidate_mean_y) > y_std_mult*candidate_std_y
+            t_std_outliers = np.abs(candidates[candidate]['events']['t']-candidate_mean_t) > t_std_mult*candidate_std_t
+            #Remove the outliers:
+            candidates[candidate]['events'] = candidates[candidate]['events'][~(x_std_outliers | y_std_outliers | t_std_outliers)]
+    
     return candidates
 
 
