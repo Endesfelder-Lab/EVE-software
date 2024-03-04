@@ -111,7 +111,7 @@ class gauss2D(TwoDfit):
         del_t = np.std(events['t']*1e-3) # in ms
         if self.fit_info == '':
             xy_threshold = 1.5 # threshold in px
-            if abs(opt_loc[0]-opt[0])>xy_threshold and abs(opt_loc[1]-opt[1])>xy_threshold: 
+            if abs(opt_loc[0]-opt[0])>xy_threshold or abs(opt_loc[1]-opt[1])>xy_threshold: 
                 self.fit_info += 'TimeToleranceWarning: Temporal fit result exceeds the tolerance.'
                 opt = np.array([np.nan])
             else:
@@ -327,8 +327,8 @@ class LognormCDFAllEvents(TemporalFits):
         self.fit = None
 
     def __call__(self, events, opt_loc, **kwargs):
-        np.save("/home/laura/PhD/Event_Based_Sensor_Project/GUI_tests/MLE_fit/data.npy", events)
-        events.to_pickle("/home/laura/PhD/Event_Based_Sensor_Project/GUI_tests/MLE_fit/data.pkl")
+        # np.save("/home/laura/PhD/Event_Based_Sensor_Project/GUI_tests/MLE_fit/data.npy", events)
+        # events.to_pickle("/home/laura/PhD/Event_Based_Sensor_Project/GUI_tests/MLE_fit/data.pkl")
         self.fit = lognormal_cdf(events)
         t, del_t, self.fit_info, opt = self.fit()
         return t, del_t, self.fit_info, opt
