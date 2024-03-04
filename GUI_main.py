@@ -18,7 +18,6 @@ import traceback
 import re
 from joblib import Parallel, delayed
 from joblib import parallel_backend, cpu_count
-from dask.distributed import Client, LocalCluster
 
 #Imports for PyQt5 (GUI)
 from PyQt5 import QtWidgets, QtGui
