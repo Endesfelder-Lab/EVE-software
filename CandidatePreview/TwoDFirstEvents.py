@@ -25,8 +25,8 @@ def __function_metadata__():
             "optional_kwargs": [
                 {"name": "use_weights", "display_text":"use weights", "description": "Weigh first events per pixel with number of events/pixel","default":"True"}
             ],
-            "help_string": "2D time of first per pixel, outlier removed, weight",
-            "display_name": "2D time of first event per pixel and candidate cluster"
+            "help_string": "2D time of first per pixel, scatter plot with Gaussian fit, sigma/pixel",
+            "display_name": "Time of first event per pixel and 2D Gaussian fit"
         }
     }
 
@@ -111,6 +111,11 @@ def TwoDFirstEvents(findingResult, fittingResult, previewEvents, figure, setting
     gaussian_fit = timeFitting.TwoDGaussianFirstTime()
     opt_loc = [(fittingResult['x']/pixel_size-np.min(findingResult['x'])).iloc[0], (fittingResult['y']/pixel_size-np.min(findingResult['y'])).iloc[0]]
     t, del_t, fit_info, opt = gaussian_fit(findingResult, opt_loc, use_weights=use_weights)
+    if show_fits== True and np.isnan(opt[0]):
+        # Fit failed, add info to plot
+        text = f'Fit failed! {fit_info}'
+        props = dict(boxstyle='round', facecolor='white', edgecolor='gray', alpha=0.8)
+        figure.text(0.5,0.5, s=text, fontsize=10, color='red', verticalalignment='top', horizontalalignment='center', bbox=props)
     if show_fits == True and not np.isnan(opt[0]):
         x = np.linspace(0, gaussian_fit.fit.xlim, 20)
         y = np.linspace(0, gaussian_fit.fit.ylim, 20)
@@ -124,7 +129,7 @@ def TwoDFirstEvents(findingResult, fittingResult, previewEvents, figure, setting
         X = X.reshape(len(y), len(x))
         Y = Y.reshape(len(y), len(x))
 
-        ax_gaussfit.plot_surface(X,Y,fit, color='black', alpha=0.7, cmap='binary', zorder=-1)
+        ax_gaussfit.plot_surface(X,Y,fit, color='black', alpha=0.7, zorder=-1) # cmap='binary'
         time_surface = ax_gaussfit.plot_surface(X,Y,np.ones_like(fit)*t, color='maroon', alpha=0.3, label='Fitted time')
         time_surface._edgecolors2d = time_surface._edgecolor3d
         time_surface._facecolors2d = time_surface._facecolor3d

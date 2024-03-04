@@ -99,18 +99,20 @@ def TwoDProjection(findingResult, fittingResult, previewEvents, figure, settings
     hist_ty_neg = hist_ty(findingResult[findingResult['p'] == 0])[0]
 
     # Set goodlooking aspect ratio depending on nr of xyt-bins
-    aspectty = 3. * (len(t_edges)-1) / (len(y_edges)-1)
-    aspecttx = 3. * (len(t_edges)-1) / (len(x_edges)-1)
+    aspectty = 0.33#3. * (len(t_edges)-1) / (len(y_edges)-1)
+    aspecttx = 0.33#3. * (len(t_edges)-1) / (len(x_edges)-1)
 
     # Plot the 2D histograms
     ax_xy.pcolormesh(x_edges, y_edges, hist_xy.dist2D)
     ax_xy.set_aspect('equal')
     ax_xy.format_coord = lambda x,y:format_coord_projectionxy(x,y,hist_xy_pos.T, hist_xy_neg.T, x_edges, y_edges)
     ax_xt.pcolormesh(t_edges, x_edges, hist_tx.dist2D)
-    ax_xt.set_aspect(aspecttx)
+    ax_xt.set_aspect('auto')#aspecttx)
+    ax_xt.set_box_aspect(aspecttx)
     ax_xt.format_coord = lambda x,y:format_coord_projectiontx(x,y,hist_tx_pos.T, hist_tx_neg.T, t_edges, x_edges)
     ax_yt.pcolormesh(t_edges, y_edges, hist_ty.dist2D)
-    ax_yt.set_aspect(aspectty)
+    ax_yt.set_aspect('auto')#aspectty)
+    ax_yt.set_box_aspect(aspectty)
     ax_yt.format_coord = lambda x,y:format_coord_projectionty(x,y,hist_ty_pos.T, hist_ty_neg.T, t_edges, y_edges)
     ax_xy.plot(fittingResult['x']/pixel_size, fittingResult['y']/pixel_size, marker='x', c='red')
     ax_xt.plot(fittingResult['t'], fittingResult['x']/pixel_size, marker='x', c='red')
