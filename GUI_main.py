@@ -2170,6 +2170,10 @@ class FindingFittingAnalysis():
                 if ("ComboBox" in widget.objectName()) and widget.isVisibleTo(GUIinfo.tab_processing) and 'dist_kwarg' in widget.objectName():
                     methodKwargNames_method.append('dist_kwarg')
                     methodKwargValues_method.append(widget.currentText())
+                # add timeKwarg choice to Kwargs if given
+                if ("ComboBox" in widget.objectName()) and widget.isVisibleTo(GUIinfo.tab_processing) and 'time_kwarg' in widget.objectName():
+                    methodKwargNames_method.append('time_kwarg')
+                    methodKwargValues_method.append(widget.currentText())
             else:
                 #If the item is a layout instead...
                 if isinstance(item, QLayout):
@@ -2189,6 +2193,10 @@ class FindingFittingAnalysis():
                         # add distKwarg choice to Kwargs if given
                         if ("ComboBox" in widget_sub.objectName()) and widget_sub.isVisibleTo(GUIinfo.tab_processing) and 'dist_kwarg' in widget_sub.objectName():
                             methodKwargNames_method.append('dist_kwarg')
+                            methodKwargValues_method.append(widget_sub.currentText())
+                            # add timeKwarg choice to Kwargs if given
+                        if ("ComboBox" in widget_sub.objectName()) and widget_sub.isVisibleTo(GUIinfo.tab_processing) and 'time_kwarg' in widget_sub.objectName():
+                            methodKwargNames_method.append('time_kwarg')
                             methodKwargValues_method.append(widget_sub.currentText())
 
         #If at this point there is no methodName_method, it means that the method has exactly 0 req or opt kwargs. Thus, we simply find the value of the QComboBox which should be the methodName:
