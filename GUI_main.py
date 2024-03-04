@@ -1181,7 +1181,7 @@ class MyGUI(QMainWindow):
             pass
 
         # Define the number of significant digits for each column
-        significant_digits = {'x': 2, 'y': 2, 'p': 0, 'id':0,'candidate_id':0,'del_x':2,'del_y':2, 't':2, 'del_t':2}
+        significant_digits = {'x': 2, 'y': 2, 'p': 0, 'id':0,'candidate_id':0,'del_x':2,'del_y':2, 't':2, 'del_t':2, 'N_events':0, 'x_dim':0, 'y_dim':0, 't_dim':2, 'sigma_x': 2, 'sigma_y': 2}
 
         for y in range(len(localizations.columns)):
             significant_digit = significant_digits.get(localizations.columns[y])
