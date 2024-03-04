@@ -2766,7 +2766,6 @@ class FindingAnalysis(FindingFittingAnalysis):
         #Allowing for multicore hdf5 chunking, or single-core
         # print('Running finding chunk '+str(n)+' of '+str(len(hdf5startstopindeces)) )
         st_time = time.time()
-        print(f"Worker{n} started {time.time()}")
         #Get the events from these indeces (example at 0):
         self.events = utils.timeSliceFromHDFFromIndeces(self.fileLocation,hdf5startstopindeces,index=n)
         # print(f"Worker{n} events loaded time {time.time()}")
@@ -2791,7 +2790,6 @@ class FindingAnalysis(FindingFittingAnalysis):
         
         #Run the finding on this:
         FindingResult = self.runFinding(storeasselfResults=False)
-        print(f"Worker{n} finding completed time {time.time()-st_time}")
         
         #Return them
         return FindingResult
