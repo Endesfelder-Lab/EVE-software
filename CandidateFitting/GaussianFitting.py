@@ -8,7 +8,6 @@ import time, logging
 from scipy import optimize
 import warnings
 from scipy.optimize import OptimizeWarning
-warnings.simplefilter("error", RuntimeWarning)
 warnings.simplefilter("error", OptimizeWarning)
 
 from joblib import Parallel, delayed
@@ -157,10 +156,7 @@ class gauss2D(fit):
                 t = np.nan
                 del_t = np.nan
             else:
-                try:
-                    t, del_t, t_fit_info, opt_t = time_fit(candidate['events'], opt) # t, del_t in ms
-                except RuntimeWarning:
-                    print(self.candidateID)
+                t, del_t, t_fit_info, opt_t = time_fit(candidate['events'], opt) # t, del_t in ms
                 if t_fit_info != '':
                     self.fit_info = t_fit_info
             mean_polarity = candidate['events']['p'].mean()
@@ -231,10 +227,7 @@ class gauss3D(gauss2D):
                 sigma_x = np.nan
                 sigma_y = np.nan
             else:
-                try:
-                    t, del_t, t_fit_info, opt_t = time_fit(candidate['events'], opt) # t, del_t in ms
-                except RuntimeWarning:
-                    print(self.candidateID)
+                t, del_t, t_fit_info, opt_t = time_fit(candidate['events'], opt) # t, del_t in ms
                 if t_fit_info != '':
                     self.fit_info = t_fit_info
             mean_polarity = candidate['events']['p'].mean()
