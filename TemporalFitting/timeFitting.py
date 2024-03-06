@@ -232,8 +232,8 @@ class lognormal_cdf(cumsum_fit):
                 fac_sigma = -2.*sigma*np.exp(mu-sigma**2)
                 del_t_intersect = np.sqrt((fac_shift*err_shift)**2+(fac_mu*err_mu)**2+(fac_sigma*err_sigma)**2)
             except RuntimeWarning:
-                t = mean_t
-                del_t = std_t
+                t_intersect = mean_t
+                del_t_intersect = std_t
                 t_fit_info = 'TimeRuntimeWarning: Fit yielded unphysical results.'
         return t_intersect, del_t_intersect, a, b, t_fit_info
     
