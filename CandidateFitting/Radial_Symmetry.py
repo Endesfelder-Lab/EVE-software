@@ -2,13 +2,10 @@ import inspect
 from Utils import utilsHelper
 import pandas as pd
 import numpy as np
-from scipy.interpolate import UnivariateSpline
+from scipy.ndimage import convolve
+from EventDistributions import eventDistributions
+from TemporalFitting import timeFitting
 import logging
-#from scipy import optimize
-import warnings
-#from scipy.optimize import OptimizeWarning
-# warnings.simplefilter("error", UserWarning)
-#from sklearn.metrics import mean_squared_error
 
 from joblib import Parallel, delayed
 import multiprocessing
@@ -18,12 +15,10 @@ import multiprocessing
 def __function_metadata__():
     return {
         "RadialSym2D": {
+            "time_kwarg" : {"base": "TemporalFits", "description": "Temporal fitting routine to get time estimate.", "default_option": "TwoDGaussianFirstTime"},
             "required_kwargs": [
-                 {"name": "smoothing_factor", "description": "Smoothing factor controls interplay of smoothness and approximation quality of the fit, increasing leads to smoother fits ","default":0.07},
-                 {"name": "localization_sampling", "description": "Time intervals to sample localizations from spline fit (in ms)","default":10.},
             ],
             "optional_kwargs": [
-                {"name": "multithread","description": "True to use multithread parallelization; False not to.","default":True},
             ],
             "help_string": "Determines localization parameters via radial symmetry.",
             "display_name": "Radial Symmetry 2D"
@@ -34,73 +29,155 @@ def __function_metadata__():
 #Helper functions
 #-------------------------------------------------------------------------------------------------------------------------------
 
-# calculate number of jobs on CPU
-def nb_jobs(candidate_dic, num_cores):
-    nb_candidates = len(candidate_dic)
-    if nb_candidates < num_cores or num_cores == 1:
-        njobs = 1
-        num_cores = 1
-    elif nb_candidates/num_cores > 100:
-        njobs = np.int64(np.ceil(nb_candidates/100.))
+def radialcenter(distfunc, candidateID, candidate, time_fit, pixel_size):
+    I = distfunc(candidate['events']).dist2D
+    # Number of grid points
+    Ny, Nx = I.shape
+
+    # grid coordinates are -n:n, where Nx (or Ny) = 2*n+1
+    # grid midpoint coordinates are -n+0.5:n-0.5;
+    # The two lines below replace
+    #    xm = repmat(-(Nx-1)/2.0+0.5:(Nx-1)/2.0-0.5,Ny-1,1);
+    # and are faster (by a factor of >15 !)
+    # -- the idea is taken from the repmat source code
+    xm_onerow = np.arange(-(Nx-1)/2.0+0.5, (Nx-1)/2.0-0.5+1)
+    xm = np.tile(xm_onerow, (Ny-1, 1))
+    # similarly replacing
+    #    ym = repmat((-(Ny-1)/2.0+0.5:(Ny-1)/2.0-0.5)', 1, Nx-1);
+    ym_onecol = np.arange(-(Ny-1)/2.0+0.5, (Ny-1)/2.0-0.5+1)[:, np.newaxis] #Note that y increases "downward"
+    ym = np.tile(ym_onecol, (1, Nx-1))
+
+    # Calculate derivatives along 45-degree shifted coordinates (u and v)
+    # Note that y increases "downward" (increasing row number) -- we'll deal
+    # with this when calculating "m" below.
+    dIdu = I[:-1, 1:] - I[1:, :-1]
+    dIdv = I[:-1, :-1] - I[1:, 1:]
+
+    # Smoothing --
+    h = np.ones((3, 3)) / 9.0  #simple 3x3 averaging filter
+    fdu = convolve(dIdu, h, mode='constant')
+    fdv = convolve(dIdv, h, mode='constant')
+    dImag2 = fdu**2 + fdv**2  # gradient magnitude, squared
+
+    # Slope of the gradient .  Note that we need a 45 degree rotation of 
+    # the u,v components to express the slope in the x-y coordinate system.
+    # The negative sign "flips" the array to account for y increasing
+    # "downward" 
+    m = -(fdv + fdu) / (fdu - fdv)
+
+    # *Very* rarely, m might be NaN if (fdv + fdu) and (fdv - fdu) are both
+    # zero.  In this case, replace with the un-smoothed gradient.
+    NNanm = np.sum(np.isnan(m))
+    if NNanm > 0:
+        unsmoothm = (dIdv + dIdu) / (dIdu - dIdv)
+        m[np.isnan(m)] = unsmoothm[np.isnan(m)]
+
+    # If it's still NaN, replace with zero. (Very unlikely.)
+    NNanm = np.sum(np.isnan(m))
+    if NNanm > 0:
+        m[np.isnan(m)] = 0
+
+
+
+    # Almost as rarely, an element of m can be infinite if the smoothed u and v
+    # derivatives are identical.  To avoid NaNs later, replace these with some
+    # large number -- 10x the largest non-infinite slope.  The sign of the
+    # infinity doesn't matter
+    try:
+        m[np.isinf(m)] = 10 * np.max(m[~np.isinf(m)])
+    except:
+        # if this fails, it's because all the elements are infinite.  Replace
+        # with the unsmoothed derivative.  There's probably a more elegant way
+        # to do this.
+        m = (dIdv + dIdu) / (dIdu - dIdv)
+
+
+
+    # Shorthand "b", which also happens to be the
+    # y intercept of the line of slope m that goes through each grid midpoint
+    b = ym - m * xm
+
+    # Weighting: weight by square of gradient magnitude and inverse 
+    # distance to gradient intensity centroid.
+    sdI2 = np.sum(dImag2)
+    xcentroid = np.sum(np.sum(dImag2 * xm)) / sdI2
+    ycentroid = np.sum(np.sum(dImag2 * ym)) / sdI2
+    w = dImag2 / np.sqrt((xm - xcentroid)**2 + (ym - ycentroid)**2)
+
+    # least-squares minimization to determine the translated coordinate
+    # system origin (xc, yc) such that lines y = mx+b have
+    # the minimal total distance^2 to the origin:
+    # See function lsradialcenterfit (below)
+    xc, yc = lsradialcenterfit(m, b, w)
+
+
+
+    
+    # Return output relative to upper left coordinate
+    xc += (Nx + 1) / 2.0
+    yc += (Ny + 1) / 2.0
+
+    # A rough measure of the particle width.
+    # Not at all connected to center determination, but may be useful for tracking applications; 
+    # could eliminate for (very slightly) greater speed
+    Isub = I - np.min(I)
+    px, py = np.meshgrid(np.arange(1, Nx + 1), np.arange(1, Ny + 1))
+    xoffset = px - xc
+    yoffset = py - yc
+    r2 = xoffset**2 + yoffset**2
+    sigma = np.sqrt(np.sum(np.sum(Isub * r2)) / np.sum(Isub)) / 2  # second moment is 2*Gaussian width
+
+    mean_polarity = candidate['events']['p'].mean()
+    p = int(mean_polarity == 1) + int(mean_polarity == 0) * 0 + int(mean_polarity > 0 and mean_polarity < 1) * 2
+    opt = [xc, yc]
+    t, del_t, t_fit_info, opt_t = time_fit(candidate['events'], opt)
+    xc = (xc + np.min(candidate['events']['x']))*pixel_size # in nm
+    yc = (yc + np.min(candidate['events']['y']))*pixel_size # in nm
+
+    loc_df = pd.DataFrame({'candidate_id': candidateID, 'x': xc, 'y': yc, 'p': p, 't': t, 'del_t': del_t, 'N_events': candidate['N_events'], 'x_dim': candidate['cluster_size'][0], 'y_dim': candidate['cluster_size'][1], 't_dim': candidate['cluster_size'][2]*1e-3, 'fit_info': t_fit_info}, index=[0])
+    return loc_df
+
+
+def lsradialcenterfit(m, b, w):
+    # Least squares solution to determine the radial symmetry center
+
+    # inputs m, b, w are defined on a grid
+    # w are the weights for each point
+    wm2p1 = w / (m**2 + 1)
+    sw = np.sum(np.sum(wm2p1))
+    smmw = np.sum(np.sum(m**2 * wm2p1))
+    smw = np.sum(np.sum(m * wm2p1))
+    smbw = np.sum(np.sum(m * b * wm2p1))
+    sbw = np.sum(np.sum(b * wm2p1))
+    det = smw**2 - smmw * sw
+    xc = (smbw * sw - smw * sbw) / det  # relative to image center
+    yc = (smbw * smw - smmw * sbw) / det  # relative to image center
+
+    #Shifting the centre coordinates so the origin is 0,0 and not 1,1
+    xc-=1
+    yc-=1
+
+    return xc, yc
+
+# perform localization for part of candidate dictionary
+def localize_canditates2D(i, candidate_dic, distfunc, time_fit, pixel_size):
+    logging.info('Localizing PSFs (thread '+str(i)+')...')
+    localizations = []
+    fails = pd.DataFrame()  # Initialize fails as an empty DataFrame
+    fail = pd.DataFrame()
+    for candidate_id in list(candidate_dic):
+        localization = radialcenter(distfunc, candidate_id, candidate_dic[candidate_id], time_fit, pixel_size)
+        localizations.append(localization)
+        if localization['fit_info'][0] != '':
+            fail['candidate_id'] = localization['candidate_id']
+            fail['fit_info'] = localization['fit_info'].str.split(':').str[0][0]
+            fails = pd.concat([fails, fail], ignore_index=True)
+    if localizations == []:
+        localizations = pd.DataFrame()
     else:
-        njobs = num_cores
-    return njobs, num_cores
-
-def get_subdictionary(main_dict, start_key, end_key):
-    sub_dict = {k: main_dict[k] for k in range(start_key, end_key + 1) if k in main_dict}
-    return sub_dict
-
-# Slice data to distribute the computation on several cores
-def slice_data(candidate_dic, nb_slices):
-    slice_size=1.*len(candidate_dic)/nb_slices
-    slice_size=np.int64(np.ceil(slice_size))
-    data_split=[]
-    last_key = list(candidate_dic.keys())[-1]
-    for k in np.arange(nb_slices):
-        keys = [k*slice_size, min((k+1)*slice_size-1,last_key)]
-        data_split.append(get_subdictionary(candidate_dic, keys[0], keys[1]))
-    return data_split
-
-def candidate_spline(candidate, candidate_id, smoothing_factor, localization_sampling, pixel_size, **kwargs):
-    candidate['events'] = candidate['events'].sort_values(by=['t'])
-    s = smoothing_factor * len(candidate['events']['x'])
-    try:    
-        spx = UnivariateSpline(candidate['events']['t'], candidate['events']['x'], s=s, **kwargs)
-        spy = UnivariateSpline(candidate['events']['t'], candidate['events']['y'], s=s, **kwargs)
-        t = np.arange(np.min(candidate['events']['t']), np.max(candidate['events']['t']), localization_sampling*1000.)
-        if t[-1] < np.max(candidate['events']['t']):
-            t = np.append(t, np.max(candidate['events']['t']))
-        locx = spx(t) * pixel_size # in nm
-        locy = spy(t) * pixel_size # in nm
-        residual_x = spx.get_residual() * pixel_size # in nm
-        residual_y = spy.get_residual() * pixel_size # in nm
-        spline_fit_info = ''
-        localization_id = np.arange(0, len(t), 1)
-        mean_polarity = candidate['events']['p'].mean()
-        p = int(mean_polarity == 1) + int(mean_polarity == 0) * 0 + int(mean_polarity > 0 and mean_polarity < 1) * 2
-        loc_df = pd.DataFrame({'candidate_id': candidate_id, 'localization_id': localization_id, 'x': locx, 'y': locy, 'residual_x': residual_x, 'residual_y': residual_y, 'p': p, 't': t/1000.})
-    except UserWarning as warning:
-        spline_fit_info = 'Candidate cluster ' + str(candidate_id) + ' could not be fitted, a warning occurred:'
-        spline_fit_info += str(warning)
-        spline_fit_info += '\n\n'
-        loc_df = pd.DataFrame()
-    return loc_df, spline_fit_info
-
-
-def spline_fit_candidates(i, candidate_dic, smoothing_factor, localization_sampling, pixel_size, **kwargs):
-    print('Fitting splines (thread ' + str(i) + ')...')
-    dfs = []
-    fitting_info = ''
-    for candidate_id, candidate in candidate_dic.items():
-        loc_df, spline_fit_info = candidate_spline(candidate, candidate_id, smoothing_factor, localization_sampling, pixel_size, **kwargs)
-        dfs.append(loc_df)
-        fitting_info += spline_fit_info
-    if dfs == []:
-        df = pd.DataFrame()
-    else:
-        df = pd.concat(dfs, ignore_index=True)
-    print('Fitting splines (thread ' + str(i) + ') done!')
-    return df, fitting_info
+        localizations = pd.concat(localizations, ignore_index=True)
+    logging.info('Localizing PSFs (thread '+str(i)+') done!')
+    return localizations, fails
 
 
 #-------------------------------------------------------------------------------------------------------------------------------
@@ -115,35 +192,36 @@ def RadialSym2D(candidate_dic,settings,**kwargs):
     logging.info("Load and initiate all parameters of candidate fitting...")
 
     # Load the required kwargs
-    smoothing_factor = float(kwargs['smoothing_factor'])
-    localization_sampling = float(kwargs['localization_sampling'])
+    # maybe add a smoothing parameter here
 
     # Load the optional kwargs
-    k = int(kwargs['degree'])
-    multithread = utilsHelper.strtobool(kwargs['multithread'])
 
     # Initializations - general
+    multithread = bool(settings['Multithread']['value'])
     pixel_size = float(settings['PixelSize_nm']['value']) # in nm
+
+    distfunc = getattr(eventDistributions, 'Hist2d_xy')
+    time_fit = getattr(timeFitting, kwargs['time_kwarg'])()
 
     if multithread == True: num_cores = multiprocessing.cpu_count()
     else: num_cores = 1
     
     # Determine number of jobs on CPU and slice data accordingly
-    njobs, num_cores = nb_jobs(candidate_dic, num_cores)
-    data_split = slice_data(candidate_dic, njobs)
+    njobs, num_cores = utilsHelper.nb_jobs(candidate_dic, num_cores)
+    data_split = utilsHelper.slice_data(candidate_dic, njobs)
 
     logging.info("Candidate fitting split in "+str(njobs)+" job(s) and divided on "+str(num_cores)+" core(s).")
 
     # Determine all localizations
-    RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(spline_fit_candidates)(i, data_split[i], smoothing_factor, localization_sampling, pixel_size, k=k) for i in range(len(data_split)))
+    RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(localize_canditates2D)(i, data_split[i], distfunc, time_fit, pixel_size) for i in range(len(data_split)))
     
     localization_list = [res[0] for res in RES]
-    localizations = pd.concat(localization_list)
+    localizations = pd.concat(localization_list, ignore_index=True)
+
+    fail_list = [res[1] for res in RES]
+    fails = pd.concat(fail_list, ignore_index=True)
     
     # Fit performance information
-    nb_fails = len(candidate_dic)-len(localizations['candidate_id'].unique())
-    spline_fit_info = f'Spline fitting failed for {nb_fails} candidate cluster(s).'
-    logging.info(spline_fit_info)
-    spline_fit_info += ''.join([res[1] for res in RES])
+    radSym_fit_info = utilsHelper.info(localizations, fails)
 
-    return localizations, spline_fit_info
+    return localizations, radSym_fit_info
