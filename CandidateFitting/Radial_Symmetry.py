@@ -114,8 +114,8 @@ def radialcenter(distfunc, candidateID, candidate, time_fit, pixel_size):
 
     
     # Return output relative to upper left coordinate
-    xc += (Nx + 1) / 2.0
-    yc += (Ny + 1) / 2.0
+    xc += (Nx -2) / 2.0
+    yc += (Ny - 2) / 2.0
 
     # A rough measure of the particle width.
     # Not at all connected to center determination, but may be useful for tracking applications; 
@@ -152,10 +152,6 @@ def lsradialcenterfit(m, b, w):
     det = smw**2 - smmw * sw
     xc = (smbw * sw - smw * sbw) / det  # relative to image center
     yc = (smbw * smw - smmw * sbw) / det  # relative to image center
-
-    #Shifting the centre coordinates so the origin is 0,0 and not 1,1
-    xc-=1
-    yc-=1
 
     return xc, yc
 
