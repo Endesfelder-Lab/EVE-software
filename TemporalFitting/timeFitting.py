@@ -5,7 +5,6 @@ from scipy.optimize import curve_fit
 import warnings
 from scipy.optimize import OptimizeWarning
 warnings.simplefilter("error", OptimizeWarning)
-warnings.simplefilter("error", RuntimeWarning)
 import pandas as pd
 from EventDistributions import eventDistributions
 from scipy.special import erf, erfinv
@@ -208,6 +207,7 @@ class lognormal_cdf(cumsum_fit):
     def get_time(self, opt, err):
         mu, sigma, shift, scale, slope, offset = opt
         err_mu, err_sigma, err_shift, err_scale, err_slope, err_offset = err
+        warnings.simplefilter("error", RuntimeWarning)
         try: 
             alpha = alpha = 0.5*(1.+erf(-sigma/np.sqrt(2)))
             x_hat = np.exp(mu-sigma**2)+shift
