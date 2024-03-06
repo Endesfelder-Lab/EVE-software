@@ -21,8 +21,8 @@ from joblib import parallel_backend, cpu_count
 
 #Imports for PyQt5 (GUI)
 from PyQt5 import QtWidgets, QtGui
-from PyQt5.QtGui import QCursor, QTextCursor, QIntValidator
-from PyQt5.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QTableWidget, QTableWidgetItem, QLayout, QMainWindow, QLabel, QPushButton, QSizePolicy, QGroupBox, QTabWidget, QGridLayout, QWidget, QComboBox, QLineEdit, QFileDialog, QToolBar, QCheckBox,QDesktopWidget, QMessageBox, QTextEdit, QSlider, QSpacerItem, QTableView, QFrame, QScrollArea, QProgressBar
+from PyQt5.QtGui import QCursor, QTextCursor, QIntValidator, QColor
+from PyQt5.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QTableWidget, QTableWidgetItem, QLayout, QMainWindow, QLabel, QPushButton, QSizePolicy, QGroupBox, QTabWidget, QGridLayout, QWidget, QComboBox, QLineEdit, QFileDialog, QToolBar, QCheckBox,QDesktopWidget, QMessageBox, QTextEdit, QSlider, QSpacerItem, QTableView, QFrame, QScrollArea, QProgressBar, QMenu, QMenuBar, QColorDialog
 from PyQt5.QtCore import Qt, QPoint, QProcess, QCoreApplication, QTimer, QFileSystemWatcher, QFile, QThread, pyqtSignal, QObject
 import sys
 import typing
@@ -73,18 +73,6 @@ class MyGUI(QMainWindow):
         Returns:
             None
         """
-
-        # try:
-        #     cluster.close()
-        # except:
-        #     pass
-        # try:
-        #     client.close()
-        # except:
-        #     pass
-        # cluster = LocalCluster()
-        # client = Client(cluster)
-        # print(f"DASK client at: {client.dashboard_link}")
         #Create parser
         parser = argparse.ArgumentParser(description='EBS fitting - Endesfelder lab - Nov 2023')
         #Look for debug argument
@@ -224,6 +212,9 @@ class MyGUI(QMainWindow):
 
         #Initialise polarity value thing (only affects very first run I believe):
         self.polarityDropdownChanged()
+        
+        #Initialise ToolBar (File,Edit-toolbar etc)
+        self.createToolBar()
 
         #Set up worker information:
         # self.worker = Worker()
@@ -251,6 +242,73 @@ class MyGUI(QMainWindow):
 
 
         logging.info('Initialisation complete.')
+
+    def createToolBar(self):
+        menuBar = QMenuBar(self)
+        self.setMenuBar(menuBar)
+        settingsMenu = menuBar.addMenu("&Settings")
+        changeColorAction = settingsMenu.addAction("Change appearance color")
+        changeColorAction.triggered.connect(self.changeAppearanceColor)
+
+    def changeAppearanceColor(self):
+        #Function that changes the appearance color
+        color = QColorDialog.getColor()
+        if color.isValid():
+            self.setStyleSheet(self.get_stylesheet(accentColor = color.name()))
+    
+    def adjust_color_brightness(self,hex_color, percent):
+        # Convert hexadecimal color to RGB
+        rgb_color = tuple(int(hex_color[1+i:1+i+2], 16) for i in (0, 2, 4))
+        # Convert HSL color back to RGB 
+        rgb_color = tuple(int(round(i + i * percent / 100)) for i in rgb_color)
+        # Bound each element between 0 and 255
+        rgb_color = tuple(max(0, min(255, i)) for i in rgb_color)
+        # Convert RGB color to hexadecimal
+        hex_color = '#{:02x}{:02x}{:02x}'.format(*rgb_color)
+        
+        return hex_color
+
+    def get_stylesheet(self,accentColor= '#d5d5e5'  ):
+        # External variables for colors
+        background_color = '#f8f8f8'
+        tab_pane_background_color = '#585858'
+        accent_color = accentColor
+        accent_color_darker = self.adjust_color_brightness(accent_color, -15)#'#b0b0e5'
+        text_color = '#333333'
+        border_radius = '0px'
+        border_width = '1px'
+        padding_small = '1px'#'2px'
+        padding_medium = '2px'#'4px'
+        padding_large = '3px'#'6px'
+        margin_small = '1px'#'2px'
+        margin_medium = '3px'#'5px'
+        margin_between_groupbox_and_entry = '8px'  # Adjust as needed
+
+        # Stylesheet
+        stylesheet = (
+            f"QWidget {{ margin: {margin_small}; }}"
+            f"QGroupBox {{ background-color: {background_color}; }}"
+            f"QLayout {{ background-color: {background_color}; }}"
+
+            f"QLabel, QLineEdit, QComboBox, QCheckBox {{ color: {text_color}; }}"
+            f"QPushButton {{ background-color: {accent_color}; color: {text_color}; "
+            f"border: {border_width} solid {accent_color}; border-radius: {border_radius}; padding: {padding_large}; }}"
+            f"QPushButton:hover {{ background-color: {accent_color_darker}; }}"
+            f"QPushButton:pressed {{ background-color: {accent_color}; }}"
+            f"QLineEdit {{ border: {border_width} solid {accent_color}; border-radius: {border_radius}; padding: {padding_small}; }}"
+            f"QComboBox {{ border: {border_width} solid {accent_color}; border-radius: {border_radius}; padding: {padding_small}; }}"
+            f"QComboBox::drop-down {{ subcontrol-origin: padding; subcontrol-position: top right;}}"
+            f"QComboBox QAbstractItemView {{ selection-background-color: #0078D7; selection-color: {text_color};}}" 
+            f"QTabWidget::pane {{ border: {border_width} solid {accent_color}; border-radius: {border_radius}; margin: 0; }}"
+            f"QTabBar::tab {{ background-color: {background_color}; color: {text_color}; border: {border_width} solid {accent_color}; border-top: none; border-bottom-left-radius: {border_radius}; border-bottom-right-radius: {border_radius}; padding: {padding_medium}; margin-right: {margin_small}; }}"
+            f"QTabBar::tab:selected {{ background-color: {accent_color_darker}; color: {text_color}; border-top: {border_width} solid {accent_color}; }}"
+            f"QTabBar::tab:hover {{ background-color: {accent_color}; color: {text_color}; }}"
+            f"QGroupBox {{ border: {border_width} solid {accent_color}; border-radius: {border_radius}; margin-top: {margin_between_groupbox_and_entry}; }}"
+            f"QGroupBox::title {{ subcontrol-origin: margin; left: {margin_small}; padding: 0 {padding_medium}; background-color: {accent_color}; color: {text_color}; border: {border_width} solid {accent_color}; border-radius: {border_radius}; }}"
+            
+        )
+
+        return stylesheet
 
     def QThreadEmitCatcher(self,text):
         #Catches all output from the worker thread
