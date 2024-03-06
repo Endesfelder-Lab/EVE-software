@@ -109,7 +109,7 @@ class gauss2D(TwoDfit):
         t = np.mean(events['t']*1e-3) # in ms
         del_t = np.std(events['t']*1e-3) # in ms
         if self.fit_info == '':
-            xy_threshold = 1.5 # threshold in px
+            xy_threshold = 2. # threshold in px
             if abs(opt_loc[0]-opt[0])>xy_threshold or abs(opt_loc[1]-opt[1])>xy_threshold: 
                 self.fit_info += 'TimeToleranceWarning: Temporal fit result exceeds the tolerance.'
                 opt = np.array([np.nan])
@@ -204,9 +204,10 @@ class lognormal_cdf(cumsum_fit):
         p0 = [mu, sigma, shift, scale, slope, offset]
         return p0
     
-    def get_time(self, opt, err):
+    def get_time(self, opt, err, mean_t, std_t):
         mu, sigma, shift, scale, slope, offset = opt
         err_mu, err_sigma, err_shift, err_scale, err_slope, err_offset = err
+        t_fit_info = ''
         warnings.simplefilter("error", RuntimeWarning)
         try: 
             alpha = alpha = 0.5*(1.+erf(-sigma/np.sqrt(2)))
@@ -221,15 +222,20 @@ class lognormal_cdf(cumsum_fit):
             fac_sigma = np.exp(mu-sigma**2)/sigma - np.sqrt(np.pi/2.)*sigma*(1-erf(sigma/np.sqrt(2))*np.exp(mu-sigma**2/2.))
             del_t_intersect = np.sqrt((fac_shift*err_shift)**2+(fac_mu*err_mu)**2+(fac_sigma*err_sigma)**2)
         except RuntimeWarning: # for very steep lognormal cdfs a approaches inf (a vertical line) and is thus not feasible
-            x_hat = np.exp(mu-sigma**2)+shift
             a = np.inf
             b = np.inf
-            t_intersect = x_hat
-            fac_shift = 1.
-            fac_mu = np.exp(mu-sigma**2)
-            fac_sigma = -2.*sigma*np.exp(mu-sigma**2)
-            del_t_intersect = np.sqrt((fac_shift*err_shift)**2+(fac_mu*err_mu)**2+(fac_sigma*err_sigma)**2)
-        return t_intersect, del_t_intersect, a, b
+            try:
+                x_hat = np.exp(mu-sigma**2)+shift
+                t_intersect = x_hat
+                fac_shift = 1.
+                fac_mu = np.exp(mu-sigma**2)
+                fac_sigma = -2.*sigma*np.exp(mu-sigma**2)
+                del_t_intersect = np.sqrt((fac_shift*err_shift)**2+(fac_mu*err_mu)**2+(fac_sigma*err_sigma)**2)
+            except RuntimeWarning:
+                t = mean_t
+                del_t = std_t
+                t_fit_info = 'TimeRuntimeWarning: Fit yielded unphysical results.'
+        return t_intersect, del_t_intersect, a, b, t_fit_info
     
     def func(self, t, mu, sigma, shift, scale, slope, offset):
         shift_t = (t - shift) # shift t
@@ -245,7 +251,9 @@ class lognormal_cdf(cumsum_fit):
         t = np.mean(self.times)
         del_t = np.std(self.times)
         if self.fit_info == '':
-            t, del_t = self.get_time(opt, err)[0:2]
+            time_fit_results = self.get_time(opt, err, t, del_t)
+            t, del_t = time_fit_results[0:2]
+            self.fit_info += time_fit_results[4]
             # del_t = self.get_R2(self.times, self.func(self.times, *opt))
         return t, del_t, self.fit_info, opt
 
