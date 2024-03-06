@@ -8,7 +8,6 @@ import time, logging
 from scipy import optimize
 import warnings
 from scipy.optimize import OptimizeWarning
-warnings.simplefilter("error", RuntimeWarning)
 warnings.simplefilter("error", OptimizeWarning)
 
 from joblib import Parallel, delayed
@@ -32,7 +31,7 @@ def __function_metadata__():
         }, 
         "LogGaussian2D": {
             "dist_kwarg" : {"base": "XYDist", "description": "Two-dimensional event-distribution to fit to get x,y-localization.", "default_option": "Hist2d_xy"},
-            "time_fit" : {"base": "TemporalFits", "description": "Temporal fitting routine to get time estimate.", "default_option": "TwoDGaussianFirstTime"},
+            "time_kwarg" : {"base": "TemporalFits", "description": "Temporal fitting routine to get time estimate.", "default_option": "TwoDGaussianFirstTime"},
             "required_kwargs": [
                 {"name": "expected_width", "display_text":"expected width", "description": "Expected width of log-Gaussian fit (in nm)","default":150.},
                 {"name": "fitting_tolerance", "display_text":"fitting tolerance", "description": "Discard localizations with uncertainties larger than this value times the pixel size. ","default":1.},
@@ -44,11 +43,11 @@ def __function_metadata__():
         }, 
         "Gaussian3D": {
             "dist_kwarg" : {"base": "XYDist", "description": "Two-dimensional event-distribution to fit to get x,y-localization.", "default_option": "Hist2d_xy"},
-            "time_fit" : {"base": "TemporalFits", "description": "Temporal fitting routine to get time estimate.", "default_option": "TwoDGaussianFirstTime"},
+            "time_kwarg" : {"base": "TemporalFits", "description": "Temporal fitting routine to get time estimate.", "default_option": "TwoDGaussianFirstTime"},
             "required_kwargs": [
                 {"name": "theta", "display_text":"rotation angle", "description": "Rotation angle (in degrees) of the Gaussian","default":0},
                 {"name": "expected_width", "display_text":"expected width", "description": "Expected width of Gaussian fit (in nm)","default":150.},
-                {"name": "fitting_tolerance", "display_text":"expected width", "description": "Discard localizations with uncertainties larger than this value times the pixel size. ","default":1.},
+                {"name": "fitting_tolerance", "display_text":"fitting tolerance", "description": "Discard localizations with uncertainties larger than this value times the pixel size. ","default":1.},
             ],
             "optional_kwargs": [
             ],
@@ -121,7 +120,7 @@ class gauss2D(fit):
         self.pixel_size = pixel_size
 
     def bounds(self):
-        bounds = ([-0.5, -0.5, 0., 0., 0., -np.inf], [self.xlim-0.5, self.ylim-0.5, np.inf, np.inf, np.inf, np.inf]) # allow borders of pixels
+        bounds = ([-0.5, -0.5, 0., 0., 0., 0.0], [self.xlim-0.5, self.ylim-0.5, np.inf, np.inf, np.inf, np.inf]) # allow borders of pixels
         return bounds
     
     def p0(self, width):
@@ -133,9 +132,8 @@ class gauss2D(fit):
         g = offset + amplitude * np.exp( - ((X-x0)**2/(2*sigma_x**2) + (Y-y0)**2/(2*sigma_y**2)))
         return g
     
-    def __call__(self, events, time_fit, **kwargs):
+    def __call__(self, candidate, time_fit, **kwargs):
         opt, err = super().__call__(self.func, bounds=self.bounds, p0=self.p0, **kwargs)
-        time_fit_fails = 0
         if self.fit_info != '':
             x = np.nan
             y = np.nan
@@ -145,8 +143,8 @@ class gauss2D(fit):
             t = np.nan
             del_t = np.nan
         else: 
-            x = (opt[0]+np.min(events['x']))*self.pixel_size # in nm
-            y = (opt[1]+np.min(events['y']))*self.pixel_size # in nm
+            x = (opt[0]+np.min(candidate['events']['x']))*self.pixel_size # in nm
+            y = (opt[1]+np.min(candidate['events']['y']))*self.pixel_size # in nm
             del_x = err[0]*self.pixel_size # in nm
             del_y = err[1]*self.pixel_size # in nm
             if del_x > self.fitting_tolerance*self.pixel_size or del_y > self.fitting_tolerance*self.pixel_size:
@@ -158,33 +156,12 @@ class gauss2D(fit):
                 t = np.nan
                 del_t = np.nan
             else:
-                try:
-                    t, del_t, t_fit_info, opt_t = time_fit(events, opt) # t, del_t in ms
-                except RuntimeWarning:
-                    print(self.candidateID)
+                t, del_t, t_fit_info, opt_t = time_fit(candidate['events'], opt) # t, del_t in ms
                 if t_fit_info != '':
                     self.fit_info = t_fit_info
-                #------ bootstrap time fitting ---------
-                # n_bootstrap = 50
-                # times = []
-                # for i in range(n_bootstrap):
-                #     sampled_events = events.sample(frac=0.9)
-                #     t, del_t, t_fit_info, opt_t = time_fit(sampled_events) # t, del_t in ms
-                #     if t_fit_info != '':
-                #         time_fit_fails += 1
-                #         self.fit_info = t_fit_info
-                #     else:
-                #         times.append(t)
-                # if time_fit_fails != n_bootstrap:
-                #     t = np.mean(times)
-                #     del_t = np.std(times)
-                # else:
-                #     self.fit_info = 'TimeFittingWarning: Time fitting failed.'
-                #     t = np.mean(events['t']*1e-3) # in ms
-                #     del_t = np.std(events['t']*1e-3) # in ms
-            mean_polarity = events['p'].mean()
+            mean_polarity = candidate['events']['p'].mean()
             p = int(mean_polarity == 1) + int(mean_polarity == 0) * 0 + int(mean_polarity > 0 and mean_polarity < 1) * 2
-        loc_df = pd.DataFrame({'candidate_id': self.candidateID, 'x': x, 'y': y, 'del_x': del_x, 'del_y': del_y, 'p': p, 't': t, 'del_t': del_t, 't_fit_fails': time_fit_fails, 'fit_info': self.fit_info}, index=[0])
+        loc_df = pd.DataFrame({'candidate_id': self.candidateID, 'x': x, 'y': y, 'del_x': del_x, 'del_y': del_y, 'p': p, 't': t, 'del_t': del_t, 'N_events': candidate['N_events'], 'x_dim': candidate['cluster_size'][0], 'y_dim': candidate['cluster_size'][1], 't_dim': candidate['cluster_size'][2]*1e-3, 'fit_info': self.fit_info}, index=[0])
         return loc_df
 
 # 2d log gaussian fit
@@ -221,6 +198,42 @@ class gauss3D(gauss2D):
         g = offset + amplitude * np.exp( - (a*((X-x0)**2) + 2*b*(X-x0)*(Y-y0) 
                                 + c*((Y-y0)**2)))
         return g
+    
+    def __call__(self, candidate, time_fit, **kwargs):
+        opt, err = super(gauss2D, self).__call__(self.func, bounds=self.bounds, p0=self.p0, **kwargs)
+        if self.fit_info != '':
+            x = np.nan
+            y = np.nan
+            del_x = np.nan
+            del_y = np.nan
+            p = np.nan
+            t = np.nan
+            del_t = np.nan
+        else: 
+            x = (opt[0]+np.min(candidate['events']['x']))*self.pixel_size # in nm
+            y = (opt[1]+np.min(candidate['events']['y']))*self.pixel_size # in nm
+            del_x = err[0]*self.pixel_size # in nm
+            del_y = err[1]*self.pixel_size # in nm
+            sigma_x = opt[2]*self.pixel_size # in nm
+            sigma_y = opt[3]*self.pixel_size # in nm
+            if del_x > self.fitting_tolerance*self.pixel_size or del_y > self.fitting_tolerance*self.pixel_size:
+                self.fit_info = 'ToleranceWarning: Fitting uncertainties exceed the tolerance.'
+                x = np.nan
+                y = np.nan
+                del_x = np.nan
+                del_y = np.nan
+                t = np.nan
+                del_t = np.nan
+                sigma_x = np.nan
+                sigma_y = np.nan
+            else:
+                t, del_t, t_fit_info, opt_t = time_fit(candidate['events'], opt) # t, del_t in ms
+                if t_fit_info != '':
+                    self.fit_info = t_fit_info
+            mean_polarity = candidate['events']['p'].mean()
+            p = int(mean_polarity == 1) + int(mean_polarity == 0) * 0 + int(mean_polarity > 0 and mean_polarity < 1) * 2
+        loc_df = pd.DataFrame({'candidate_id': self.candidateID, 'x': x, 'y': y, 'del_x': del_x, 'del_y': del_y, 'sigma_x': sigma_x, 'sigma_y': sigma_y, 'p': p, 't': t, 'del_t': del_t, 'N_events': candidate['N_events'], 'x_dim': candidate['cluster_size'][0], 'y_dim': candidate['cluster_size'][1], 't_dim': candidate['cluster_size'][2]*1e-3, 'fit_info': self.fit_info}, index=[0])
+        return loc_df
 
 
 # perform localization for part of candidate dictionary
@@ -232,7 +245,7 @@ def localize_canditates2D(i, candidate_dic, func, distfunc, time_fit, *args, **k
     for candidate_id in list(candidate_dic):
         dist = distfunc(candidate_dic[candidate_id]['events'])
         fitting = func(dist, candidate_id, *args)
-        localization = fitting(candidate_dic[candidate_id]['events'], time_fit, **kwargs)
+        localization = fitting(candidate_dic[candidate_id], time_fit, **kwargs)
         localizations.append(localization)
         if localization['fit_info'][0] != '':
             fail['candidate_id'] = localization['candidate_id']

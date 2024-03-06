@@ -17,9 +17,8 @@ import multiprocessing
 def __function_metadata__():
     return {
         "PhasorFitting": {
-            "required_kwargs": [            ],
-            "optional_kwargs": [
-            ],
+            "required_kwargs": [],
+            "optional_kwargs": [],
             "help_string": "3D phasor.",
             "display_name": "Phasor"
         }
@@ -62,7 +61,7 @@ class phasor(fit):
         t_hist = t_hist.ravel()
         return t_hist
     
-    def __call__(self, events, **kwargs):
+    def __call__(self, candidate, **kwargs):
         
         #Perform 2D Fourier transform over the xy ROI
         self.image_sq = self.image.reshape(((self.xlim[1]-self.xlim[0]+1), (self.ylim[1]-self.ylim[0]+1)))
@@ -75,14 +74,14 @@ class phasor(fit):
         if xangle > 0:
             xangle -= 2*np.pi
         #Calculate position based on the ROI size
-        PositionX = abs(xangle)/(2*np.pi/((self.xlim[1]-self.xlim[0]+1)+1));
+        PositionX = abs(xangle)/(2*np.pi/((self.xlim[1]-self.xlim[0]+1)+1))
         
         yangle = np.arctan(ROI_F[1,0].imag/ROI_F[1,0].real) - np.pi
         #Correct in case it's positive
         if yangle > 0:
             yangle -= 2*np.pi
         #Calculate position based on the ROI size
-        PositionY = abs(yangle)/(2*np.pi/((self.ylim[1]-self.ylim[0]+1)+1));
+        PositionY = abs(yangle)/(2*np.pi/((self.ylim[1]-self.ylim[0]+1)+1))
         
         ROI_FFT_t = np.fft.fft(self.time_hist)
         tangle = np.arctan(ROI_FFT_t[1].imag/ROI_FFT_t[1].real) - np.pi
@@ -96,9 +95,9 @@ class phasor(fit):
         y = (PositionY+self.ylim[0])*self.pixel_size # in nm
         t = ((PositionT+self.tlim_scaled[0])*self.msscale) # in ms
         
-        mean_polarity = events['p'].mean()
+        mean_polarity = candidate['events']['p'].mean()
         p = int(mean_polarity == 1) + int(mean_polarity == 0) * 0 + int(mean_polarity > 0 and mean_polarity < 1) * 2
-        loc_df = pd.DataFrame({'candidate_id': self.candidateID, 'x': x, 'y': y, 'p': p, 't': t, 'fit_info': ''}, index=[0])
+        loc_df = pd.DataFrame({'candidate_id': self.candidateID, 'x': x, 'y': y, 'p': p, 't': t, 'N_events': candidate['N_events'], 'x_dim': candidate['cluster_size'][0], 'y_dim': candidate['cluster_size'][1], 't_dim': candidate['cluster_size'][2]*1e-3, 'fit_info': ''}, index=[0])
         return loc_df
 
 # perform localization for part of candidate dictionary
@@ -107,7 +106,7 @@ def localize_canditates2D(i, candidate_dic, func, *args, **kwargs):
     localizations = []
     for candidate_id in list(candidate_dic):
         fitting = func(candidate_dic[candidate_id]['events'], candidate_id, *args)
-        localization = fitting(candidate_dic[candidate_id]['events'], **kwargs)
+        localization = fitting(candidate_dic[candidate_id], **kwargs)
         localizations.append(localization)
     if localizations == []:
         localizations = pd.DataFrame()

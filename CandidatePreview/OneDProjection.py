@@ -26,8 +26,8 @@ def __function_metadata__():
             "optional_kwargs": [
                 {"name": "weigh_first", "display_text":"weigh first events", "description": "Weigh first events per pixel with number of events/pixel","default":"False"}
             ],
-            "help_string": "Draws temporal trace (and rayleigh fit)of the candidate cluster.",
-            "display_name": "Temporal trace of candidate cluster"
+            "help_string": "Draws temporal trace (and rayleigh fit) of the candidate cluster.",
+            "display_name": "Temporal trace of candidate cluster (Rayleigh fit)"
         }
     }
 
@@ -63,6 +63,7 @@ def OneDProjection(findingResult, fittingResult, previewEvents, figure, settings
         t_bin_width = hist_t_edges[1]-hist_t_edges[0]
     
     t_min = None
+    text = ''
 
     # plot 1D histogram and fit
     # all events
@@ -71,10 +72,8 @@ def OneDProjection(findingResult, fittingResult, previewEvents, figure, settings
         t, del_t, fit_info, opt = rayleigh(findingResult, fittingResult, bins=hist_t_edges)
         ax.bar(rayleigh.fit.hist_edges[:-1], rayleigh.fit.hist, width=t_bin_width,  label='Histogram (mix)', color='olive', alpha=0.5, align='edge')
         if show_fits== True and np.isnan(opt[0]):
-            # Fit failed, add info to plot
-            text = f'Fit failed! {fit_info}'
-            props = dict(boxstyle='round', facecolor='white', edgecolor='gray', alpha=0.8)
-            figure.text(0.5,0.5, s=text, fontsize=10, color='red', verticalalignment='top', horizontalalignment='center', bbox=props)
+            # Fit failed, add info to text
+            text += f'Fit of all events failed! {fit_info}'
         if show_fits == True and not np.isnan(opt[0]):
             if not t_min==None:
                 t_min = np.min([t, t_min])
@@ -90,10 +89,8 @@ def OneDProjection(findingResult, fittingResult, previewEvents, figure, settings
         t, del_t, fit_info, opt = rayleigh(findingResult[findingResult['p'] == 1], fittingResult, bins=hist_t_edges)
         ax.bar(rayleigh.fit.hist_edges[:-1], rayleigh.fit.hist, width=t_bin_width,  label='Histogram (pos)', color='C0', alpha=0.5, align='edge')
         if show_fits== True and np.isnan(opt[0]):
-            # Fit failed, add info to plot
-            text = f'Fit failed! {fit_info}'
-            props = dict(boxstyle='round', facecolor='white', edgecolor='gray', alpha=0.8)
-            figure.text(0.5,0.5, s=text, fontsize=10, color='red', verticalalignment='top', horizontalalignment='center', bbox=props)
+            # Fit failed, add info to text
+            text += f'Fit of pos. events failed! {fit_info}'
         if show_fits == True and not np.isnan(opt[0]):
             if not t_min==None:
                 t_min = np.min([t, t_min])
@@ -109,10 +106,8 @@ def OneDProjection(findingResult, fittingResult, previewEvents, figure, settings
         t, del_t, fit_info, opt = rayleigh(findingResult[findingResult['p'] == 0], fittingResult, bins=hist_t_edges)
         ax.bar(rayleigh.fit.hist_edges[:-1], rayleigh.fit.hist, width=t_bin_width,  label='Histogram (neg)', color='C1', alpha=0.5, align='edge')
         if show_fits== True and np.isnan(opt[0]):
-            # Fit failed, add info to plot
-            text = f'Fit failed! {fit_info}'
-            props = dict(boxstyle='round', facecolor='white', edgecolor='gray', alpha=0.8)
-            figure.text(0.5,0.5, s=text, fontsize=10, color='red', verticalalignment='top', horizontalalignment='center', bbox=props)
+            # Fit failed, add info to text
+            text += f'Fit of neg. events failed! {fit_info}'
         if show_fits == True and not np.isnan(opt[0]):
             if not t_min==None:
                 t_min = np.min([t, t_min])
@@ -136,10 +131,10 @@ def OneDProjection(findingResult, fittingResult, previewEvents, figure, settings
             bincentres = (t_edges[1:]-t_edges[:-1])/2.+t_edges[:-1] 
             ax.step(bincentres,hist_t_first,where='mid',color='C2', label='Histogram (first)',linewidth=1.5)
             if show_fits== True and np.isnan(opt[0]):
-                # Fit failed, add info to plot
-                text = f'Fit failed! {fit_info}'
-                props = dict(boxstyle='round', facecolor='white', edgecolor='gray', alpha=0.8)
-                figure.text(0.5,0.5, s=text, fontsize=10, color='red', verticalalignment='top', horizontalalignment='center', bbox=props)
+                # Fit failed, add info to text
+                if text != '':
+                    text += '\n'
+                text += f'Fit of first events failed! {fit_info}'
             if show_fits == True and not np.isnan(opt[0]):
                 if not t_min==None:
                     t_min = np.min([t, t_min])
@@ -160,10 +155,10 @@ def OneDProjection(findingResult, fittingResult, previewEvents, figure, settings
             bincentres = (t_edges[1:]-t_edges[:-1])/2.+t_edges[:-1] 
             ax.step(bincentres,hist_t_first,where='mid',color='C2', label='Histogram (first, weighted)',linewidth=1.5)
             if show_fits== True and np.isnan(opt[0]):
-                # Fit failed, add info to plot
-                text = f'Fit failed! {fit_info}'
-                props = dict(boxstyle='round', facecolor='white', edgecolor='gray', alpha=0.8)
-                figure.text(0.5,0.5, s=text, fontsize=10, color='red', verticalalignment='top', horizontalalignment='center', bbox=props)
+                # Fit failed, add info to text
+                if text != '':
+                    text += '\n'
+                text += f'Fit of first events failed! {fit_info}'
             if show_fits == True and not np.isnan(opt[0]):
                 if not t_min==None:
                     t_min = np.min([t, t_min])
@@ -180,6 +175,10 @@ def OneDProjection(findingResult, fittingResult, previewEvents, figure, settings
         t_min = np.min([fittingResult.iloc[0]['t'], t_min])
     else:
         t_min = fittingResult.iloc[0]['t']
+
+    if text != '':
+        props = dict(boxstyle='round', facecolor='white', edgecolor='None', alpha=0.8)
+        figure.text(0.05, 0.05, s=text, fontsize=10, color='red', verticalalignment='bottom', horizontalalignment='left', bbox=props, wrap=True)
 
     # Add and set labels
     if not t_min==None:

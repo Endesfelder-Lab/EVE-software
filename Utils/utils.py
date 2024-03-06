@@ -1127,7 +1127,8 @@ def removeHotPixelEvents(events,hotPixelArray=None):
         for id in range(len(hotPixelArray)):
             events = events[~((events['x'] == hotPixelArray[id][0]) & (events['y'] == hotPixelArray[id][1]))]
     finalEventLen = len(events)
-    print("Removed "+str(origEventLen-finalEventLen)+" hot pixel events, which is "+str(round(100*(origEventLen-finalEventLen)/origEventLen,2))+"pct of all events.")
+    if origEventLen-finalEventLen > 0:
+        print("Removed "+str(origEventLen-finalEventLen)+" hot pixel events, which is "+str(round(100*(origEventLen-finalEventLen)/origEventLen,2))+"pct of all events.")
     return events
 
 #DEPRACATED

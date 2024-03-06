@@ -51,7 +51,7 @@ def candidate_spline(candidate, candidate_id, smoothing_factor, localization_sam
         residual_y = spy.get_residual() * pixel_size # in nm
         spline_fit_info = ''
         localization_id = np.arange(0, len(t), 1)
-        loc_df = pd.DataFrame({'candidate_id': candidate_id, 'localization_id': localization_id, 'x': locx, 'y': locy, 'residual_x': residual_x, 'residual_y': residual_y, 'p': p, 't': t/1000., 'fit_info': spline_fit_info})
+        loc_df = pd.DataFrame({'candidate_id': candidate_id, 'localization_id': localization_id, 'x': locx, 'y': locy, 'residual_x': residual_x, 'residual_y': residual_y, 'p': p, 't': t/1000., 'N_events': candidate['N_events'], 'x_dim': candidate['cluster_size'][0], 'y_dim': candidate['cluster_size'][1], 't_dim': candidate['cluster_size'][2]*1e-3, 'fit_info': spline_fit_info})
     except UserWarning as warning:
         spline_fit_info = 'UserWarning: ' + str(warning)
         localization_id = 0.
@@ -60,7 +60,7 @@ def candidate_spline(candidate, candidate_id, smoothing_factor, localization_sam
         residual_x = np.nan
         residual_y = np.nan
         t = np.nan
-        loc_df = pd.DataFrame({'candidate_id': candidate_id, 'localization_id': localization_id, 'x': locx, 'y': locy, 'residual_x': residual_x, 'residual_y': residual_y, 'p': p, 't': t, 'fit_info': spline_fit_info}, index=[0])
+        loc_df = pd.DataFrame({'candidate_id': candidate_id, 'localization_id': localization_id, 'x': locx, 'y': locy, 'residual_x': residual_x, 'residual_y': residual_y, 'p': p, 't': t, 'N_events': candidate['N_events'], 'x_dim': candidate['cluster_size'][0], 'y_dim': candidate['cluster_size'][1], 't_dim': candidate['cluster_size'][2]*1e-3, 'fit_info': spline_fit_info}, index=[0])
     return loc_df
 
 

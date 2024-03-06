@@ -5,7 +5,6 @@ from scipy.optimize import curve_fit
 import warnings
 from scipy.optimize import OptimizeWarning
 warnings.simplefilter("error", OptimizeWarning)
-warnings.simplefilter("error", RuntimeWarning)
 import pandas as pd
 from EventDistributions import eventDistributions
 from scipy.special import erf, erfinv
@@ -111,7 +110,7 @@ class gauss2D(TwoDfit):
         del_t = np.std(events['t']*1e-3) # in ms
         if self.fit_info == '':
             xy_threshold = 1.5 # threshold in px
-            if abs(opt_loc[0]-opt[0])>xy_threshold and abs(opt_loc[1]-opt[1])>xy_threshold: 
+            if abs(opt_loc[0]-opt[0])>xy_threshold or abs(opt_loc[1]-opt[1])>xy_threshold: 
                 self.fit_info += 'TimeToleranceWarning: Temporal fit result exceeds the tolerance.'
                 opt = np.array([np.nan])
             else:
@@ -208,6 +207,7 @@ class lognormal_cdf(cumsum_fit):
     def get_time(self, opt, err):
         mu, sigma, shift, scale, slope, offset = opt
         err_mu, err_sigma, err_shift, err_scale, err_slope, err_offset = err
+        warnings.simplefilter("error", RuntimeWarning)
         try: 
             alpha = alpha = 0.5*(1.+erf(-sigma/np.sqrt(2)))
             x_hat = np.exp(mu-sigma**2)+shift
@@ -327,8 +327,8 @@ class LognormCDFAllEvents(TemporalFits):
         self.fit = None
 
     def __call__(self, events, opt_loc, **kwargs):
-        np.save("/home/laura/PhD/Event_Based_Sensor_Project/GUI_tests/MLE_fit/data.npy", events)
-        events.to_pickle("/home/laura/PhD/Event_Based_Sensor_Project/GUI_tests/MLE_fit/data.pkl")
+        # np.save("/home/laura/PhD/Event_Based_Sensor_Project/GUI_tests/MLE_fit/data.npy", events)
+        # events.to_pickle("/home/laura/PhD/Event_Based_Sensor_Project/GUI_tests/MLE_fit/data.pkl")
         self.fit = lognormal_cdf(events)
         t, del_t, self.fit_info, opt = self.fit()
         return t, del_t, self.fit_info, opt
