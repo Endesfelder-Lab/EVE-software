@@ -6,6 +6,10 @@ from scipy.ndimage import convolve
 from EventDistributions import eventDistributions
 from TemporalFitting import timeFitting
 import logging
+from scipy.optimize import least_squares
+import warnings
+from scipy.optimize import OptimizeWarning
+warnings.simplefilter("error", OptimizeWarning)
 
 from joblib import Parallel, delayed
 import multiprocessing
@@ -114,8 +118,8 @@ def radialcenter(distfunc, candidateID, candidate, time_fit, pixel_size):
 
     
     # Return output relative to upper left coordinate
-    xc += (Nx -2) / 2.0
-    yc += (Ny - 2) / 2.0
+    xc += (Nx - 1) / 2.0
+    yc += (Ny - 1) / 2.0
 
     # A rough measure of the particle width.
     # Not at all connected to center determination, but may be useful for tracking applications; 
@@ -155,6 +159,133 @@ def lsradialcenterfit(m, b, w):
 
     return xc, yc
 
+class radysm:
+    def __init__(self, events, distfunc):
+        self.dist = distfunc(events).dist2D
+        self.ylim, self.xlim = self.dist.shape
+        self.shift = np.array([(self.xlim-1.)/2., (self.ylim-1.)/2.])
+        self.xmean = np.average(np.arange(1,self.xlim+1), weights=np.nansum(self.dist, axis=0))-1.-self.shift[0]
+        self.ymean = np.average(np.arange(1,self.ylim+1), weights=np.nansum(self.dist, axis=1))-1.-self.shift[1]
+        self.mesh = self.meshgrid()
+        self.slope, self.magnitude = self.gradient()
+        self.weights = self.weight()
+        self.fit_info = ''
+
+    def meshgrid(self):
+        # x = np.arange(self.xlim)
+        # y = np.arange(self.ylim)
+        x = np.linspace(-(self.xlim-2.)/2., (self.xlim-2.)/2., self.xlim-1)
+        y = np.linspace(-(self.ylim-2.)/2., (self.ylim-2.)/2., self.ylim-1)
+        X,Y = np.meshgrid(x,y)
+        return X.ravel(),Y.ravel()
+
+    def gradient(self):
+        # Calculate derivatives along 45-degree shifted coordinates (u and v)
+        dIdu = self.dist[:-1, 1:] - self.dist[1:, :-1]
+        dIdv = self.dist[:-1, :-1] - self.dist[1:, 1:]
+
+        # Smoothing
+        h = np.ones((3, 3)) / 9.0  #simple 3x3 averaging filter
+        fdu = convolve(dIdu, h, mode='constant')
+        fdv = convolve(dIdv, h, mode='constant')
+        
+        # Slope of the gradient.  Note that we need a 45 degree rotation of 
+        # the u,v components to express the slope in the x-y coordinate system.
+        # The negative sign "flips" the array to account for y increasing
+        # "downward" 
+        m = -(fdv + fdu) / (fdu - fdv)
+
+        # *Very* rarely, m might be NaN if (fdv + fdu) and (fdv - fdu) are both
+        # zero.  In this case, replace with the un-smoothed gradient.
+        NNanm = np.sum(np.isnan(m))
+        if NNanm > 0:
+            unsmoothm = (dIdv + dIdu) / (dIdu - dIdv)
+            m[np.isnan(m)] = unsmoothm[np.isnan(m)]
+
+        # If it's still NaN, replace with zero. (Very unlikely.)
+        NNanm = np.sum(np.isnan(m))
+        if NNanm > 0:
+            m[np.isnan(m)] = 0
+
+        # Almost as rarely, an element of m can be infinite if the smoothed u and v
+        # derivatives are identical.  To avoid NaNs later, replace these with some
+        # large number -- 10x the largest non-infinite slope.  The sign of the
+        # infinity doesn't matter
+        try:
+            m[np.isinf(m)] = 10 * np.nanmax(m[~np.isinf(m)])
+        except:
+            # if this fails, it's because all the elements are infinite.  Replace
+            # with the unsmoothed derivative.  
+            m = (dIdv + dIdu) / (dIdu - dIdv)
+
+        # Weighting: weight by square of gradient magnitude and inverse 
+        # distance to gradient intensity centroid.
+        dImag2 = fdu**2 + fdv**2  # gradient magnitude, squared
+        return m.ravel(), dImag2.ravel()
+
+    def weight(self):
+        # Weighting: weight by square of gradient magnitude and inverse 
+        # distance to gradient intensity centroid.
+        sdI2 = np.sum(self.magnitude)
+        xcentroid = np.sum(np.sum(self.magnitude * self.mesh[0])) / sdI2
+        ycentroid = np.sum(np.sum(self.magnitude * self.mesh[1])) / sdI2
+        w = self.magnitude / np.sqrt((self.mesh[0] - xcentroid)**2 + (self.mesh[1] - ycentroid)**2)
+        return w
+    
+    def p0(self):
+        p0 = [self.xmean, self.ymean]
+        return p0
+    
+    def bounds(self):
+        bounds = ([-0.5-self.shift[0], -0.5-self.shift[1]], [self.xlim-0.5-self.shift[0], self.ylim-0.5-self.shift[1]]) # allow borders of pixels
+        return bounds
+    
+    def distance(self, xy_c): # function to minimize with least-squares
+        X, Y = self.mesh
+        d = ((Y-xy_c[1])-self.slope*(X-xy_c[0]))/np.sqrt(self.slope**2+1.)*np.sqrt(self.weights)
+        return d
+        
+    def __call__(self, candidate, time_fit, pixel_size, candidateID, **kwargs):
+        try:
+            res = least_squares(self.distance, self.p0(), bounds=self.bounds(), **kwargs)
+            popt = res.x + self.shift
+            perr = np.sqrt(np.diag(res.jac))
+            # perr = np.sqrt(np.diag(pcov))
+            # popt += self.shift
+        except RuntimeError as warning:
+            self.fit_info += 'RuntimeError: ' + str(warning)
+            popt = np.array([np.nan])
+            perr = np.array([np.nan])
+        except ValueError as warning:
+            self.fit_info += 'ValueError: ' + str(warning)
+            popt = np.array([np.nan])
+            perr = np.array([np.nan])
+        except OptimizeWarning as warning:
+            self.fit_info += 'OptimizeWarning: ' + str(warning)
+            popt = np.array([np.nan])
+            perr = np.array([np.nan])
+
+        if self.fit_info != '':
+            x = np.nan
+            y = np.nan
+            del_x = np.nan
+            del_y = np.nan
+            p = np.nan
+            t = np.nan
+            del_t = np.nan
+        else: 
+            x = (popt[0]+np.min(candidate['events']['x']))*pixel_size # in nm
+            y = (popt[1]+np.min(candidate['events']['y']))*pixel_size # in nm
+            del_x = perr[0]*pixel_size # in nm
+            del_y = perr[1]*pixel_size # in nm
+            t, del_t, t_fit_info, opt_t = time_fit(candidate['events'], popt) # t, del_t in ms
+            if t_fit_info != '':
+                self.fit_info = t_fit_info
+            mean_polarity = candidate['events']['p'].mean()
+            p = int(mean_polarity == 1) + int(mean_polarity == 0) * 0 + int(mean_polarity > 0 and mean_polarity < 1) * 2
+        loc_df = pd.DataFrame({'candidate_id': candidateID, 'x': x, 'y': y, 'del_x': del_x, 'del_y': del_y, 'p': p, 't': t, 'del_t': del_t, 'N_events': candidate['N_events'], 'x_dim': candidate['cluster_size'][0], 'y_dim': candidate['cluster_size'][1], 't_dim': candidate['cluster_size'][2]*1e-3, 'fit_info': self.fit_info}, index=[0])
+        return loc_df
+
 # perform localization for part of candidate dictionary
 def localize_canditates2D(i, candidate_dic, distfunc, time_fit, pixel_size):
     logging.info('Localizing PSFs (thread '+str(i)+')...')
@@ -162,7 +293,8 @@ def localize_canditates2D(i, candidate_dic, distfunc, time_fit, pixel_size):
     fails = pd.DataFrame()  # Initialize fails as an empty DataFrame
     fail = pd.DataFrame()
     for candidate_id in list(candidate_dic):
-        localization = radialcenter(distfunc, candidate_id, candidate_dic[candidate_id], time_fit, pixel_size)
+        radsym_fit = radysm(candidate_dic[candidate_id]['events'], distfunc) # radsym_fit(candidate_dic[candidate_id], time_fit, pixel_size, candidate_id)#
+        localization = radsym_fit(candidate_dic[candidate_id], time_fit, pixel_size, candidate_id) #radialcenter(distfunc, candidate_id, candidate_dic[candidate_id], time_fit, pixel_size)
         localizations.append(localization)
         if localization['fit_info'][0] != '':
             fail['candidate_id'] = localization['candidate_id']
