@@ -11,7 +11,7 @@ The software requires Python 3.9.18.
 ### Installation instructions
 1. First download Eve or clone it to your local repository using git:
     ```bash
-    git clone git@github.com:Endesfelder-Lab/Eve.git
+    git clone https://github.com/Endesfelder-Lab/Eve.git
     ```
 2. Install required python dependencies
     #### With `virtualenv`
