@@ -19,9 +19,9 @@ $ pip install -r requirements.txt
 
 ### Installation with `conda`
 ```bash
-cd Eve
-conda env create -f environment_droplet.yml
-conda activate Eve
+$ cd Eve
+$ conda env create -f environment_droplet.yml
+$ conda activate Eve
 ```
 
 
