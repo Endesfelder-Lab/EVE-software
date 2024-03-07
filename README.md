@@ -25,7 +25,7 @@ The software requires Python 3.9.18.
    Simply follow the instructions below:
     ```bash
     cd Eve
-    conda env create -f environment_Eve.yml
+    conda env create -f environment_eve.yml
     conda activate Eve
     ```
 3. Optional:
