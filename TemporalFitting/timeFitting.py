@@ -114,11 +114,17 @@ class gauss2D(TwoDfit):
                 self.fit_info += 'TimeToleranceWarning: Temporal fit result exceeds the tolerance.'
                 opt = np.array([np.nan])
             else:
-                t = self.func((opt[0], opt[1]), *opt)
-                t = dist.undo_trafo_gauss(t)*1e-3 # in ms
-                del_t = np.sqrt(err[4]**2)*1e-3 # in ms # + err[5]**2
-                opt[4] = (-1)*opt[4]*1e-3 # in ms
-                self.offset = dist.undo_trafo_gauss(self.offset)*1e-3 # in ms
+                t_estimated = self.func((opt[0], opt[1]), *opt)
+                t_estimated = dist.undo_trafo_gauss(t_estimated)*1e-3 # in ms
+                t_min = np.min(events['t']*1e-3)-2.* del_t
+                t_max = np.max(events['t']*1e-3)
+                if t_estimated<t_min or t_estimated>t_max:
+                    self.fit_info += 'TimeToleranceWarning: Estimated time out of bounds.'
+                else: 
+                    t = t_estimated
+                    del_t = np.sqrt(err[4]**2)*1e-3 # in ms # + err[5]**2
+                    opt[4] = (-1)*opt[4]*1e-3 # in ms
+                    self.offset = dist.undo_trafo_gauss(self.offset)*1e-3 # in ms
         return t, del_t, self.fit_info, opt
 
 
@@ -127,6 +133,7 @@ class hist_fit(fit):
         super().__init__()
         self.hist, self.hist_edges = np.histogram(times.values,**kwargs)
         self.bincentres = (self.hist_edges[1:]-self.hist_edges[:-1])/2.0 + self.hist_edges[:-1]
+        self.t0 = times.values[0]*1e-3 # in ms
         self.fit_info = ''
     
     def __call__(self, func, **kwargs):
@@ -137,11 +144,11 @@ class hist_fit(fit):
 class rayleigh(hist_fit):
     def __init__(self, times, **kwargs):
         super().__init__(times, **kwargs)
-        self.bounds = self.bounds()
+        self.bounds = self.bounds(times)
         self.p0 = self.p0(times)
 
-    def bounds(self):
-        bounds = ([-np.inf, np.finfo(np.float64).tiny, 0.5*np.sqrt(np.finfo(np.float64).tiny), 0.], [np.inf, np.inf, np.inf, np.inf])
+    def bounds(self, times):
+        bounds = ([self.t0-2*np.std(times.values), np.finfo(np.float64).tiny, 0.5*np.sqrt(np.finfo(np.float64).tiny), 0.], [times.values[-1], np.inf, np.inf, np.inf])
         return bounds
     
     def p0(self, times):
@@ -165,6 +172,8 @@ class rayleigh(hist_fit):
             times_std = np.std(times)
             if err[0] > times_std:
                 self.fit_info += 'TimeToleranceWarning: Temporal fitting uncertainties exceed the tolerance.'
+            elif opt[0]<self.bounds[0][2] or opt[0]>self.bounds[1][2]:
+                self.fit_info += 'TimeToleranceWarning: Estimated time out of bounds.'
             else:
                 t = opt[0]
                 del_t = err[0]
@@ -234,7 +243,7 @@ class lognormal_cdf(cumsum_fit):
             except RuntimeWarning:
                 t_intersect = mean_t
                 del_t_intersect = std_t
-                t_fit_info = 'TimeRuntimeWarning: Fit yielded unphysical results.'
+                t_fit_info = 'TimeRuntimeWarning: Fit yields unphysical results.'
         return t_intersect, del_t_intersect, a, b, t_fit_info
     
     def func(self, t, mu, sigma, shift, scale, slope, offset):
@@ -252,9 +261,14 @@ class lognormal_cdf(cumsum_fit):
         del_t = np.std(self.times)
         if self.fit_info == '':
             time_fit_results = self.get_time(opt, err, t, del_t)
-            t, del_t = time_fit_results[0:2]
             self.fit_info += time_fit_results[4]
-            # del_t = self.get_R2(self.times, self.func(self.times, *opt))
+            tolerance_del_t = 1e9 # 1 s as upper limit for time uncertainty
+            if time_fit_results[0]<self.bounds[0][2] or time_fit_results[0]>self.bounds[1][2]:
+                self.fit_info += 'TimeToleranceWarning: Estimated time out of bounds.'
+            elif time_fit_results[1] > tolerance_del_t:
+                self.fit_info += 'TimeToleranceWarning: Estimated time uncertainty exceeds tolerance.'
+            else:
+                t, del_t = time_fit_results[0:2]
         return t, del_t, self.fit_info, opt
 
 class TemporalFits:
