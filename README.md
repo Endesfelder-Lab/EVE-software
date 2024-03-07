@@ -8,21 +8,28 @@ The `main` branch contains the latest running version of the software. The lates
 This software was tested under Linux Ubuntu 20.04 and Windows 10. Besides the drift correction module that contains and uses pre-compiled dll-files and is therefore only running on Windows, everthing is running under Linux and Windows.
 
 The software requires Python 3.9.18.
-
-### Installation with `virtualenv`
-Set-up virtual environment wiith virtualenv and install the required packages with pip. Replace `PATH_TO_PYTHON` by your python path, e.g. `/usr/bin`
-```bash
-$ virtualenv -p PATH_TO_PYTHON/python3.9.18 env_name
-$ source env_name/bin/activate
-$ pip install -r requirements.txt
-```
-
-### Installation with `conda`
-```bash
-$ cd Eve
-$ conda env create -f environment_droplet.yml
-$ conda activate Eve
-```
-
+### Installation instructions
+1. First download Eve or clone it to your local repository using git:
+    ```bash
+    git clone git@github.com:Endesfelder-Lab/Eve.git
+    ```
+2. Install required python dependencies
+    #### With `virtualenv`
+    Replace `PYTHON_PATH` by your python path, e.g. `/usr/bin` and `ENVIRONMENT_PATH` by the path to the virtual environments on your machine and follow the instructions below:
+    ```bash
+    virtualenv -p PYTHON_PATH/python3.9.18 ENVIRONMENT_PATH/Eve
+    source ENVIRONMENT_PATH/Eve/bin/activate
+    pip install -r requirements.txt
+    ```
+    #### With `conda`
+   Simply follow the instructions below:
+    ```bash
+    cd Eve
+    conda env create -f environment_Eve.yml
+    conda activate Eve
+    ```
+3. *Optional:
+   
+    Eve can read and process event-based data in `.npy` and `.hdf5` format. Additionally the `.raw` format of [Prophesee](https://www.prophesee.ai/) can be used. If you have `.raw` data that you want to analyze you need to install the [Metavision SDK from Prophesee](https://docs.prophesee.ai/stable/installation/index.html). 
 
 ## Getting started
