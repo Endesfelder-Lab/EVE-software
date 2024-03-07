@@ -17,6 +17,7 @@ from TemporalFitting import timeFitting
 from Visualisation import *
 from PostProcessing import *
 from CandidatePreview import *
+from Utils import *
 
 #Imports for PyQt5 (GUI)
 from PyQt5 import QtWidgets, QtGui
@@ -60,7 +61,7 @@ def functionNamesFromDir(dirname):
         #Check if they're .py files
         if file.endswith(".py"):
             #Check that they're not init files or similar
-            if not file.startswith("_"):
+            if not file.startswith("_") and not file == "utils.py" and not file == "utilsHelper.py":
                 #Get the function name
                 functionName = file[:-3]
                 #Get the metadata from this function and from there obtain

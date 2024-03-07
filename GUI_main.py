@@ -48,6 +48,7 @@ from CandidateFinding import *
 from Visualisation import *
 from PostProcessing import *
 from CandidatePreview import *
+from Utils import *
 
 #Obtain the helperfunctions
 from Utils import utils, utilsHelper
@@ -249,6 +250,16 @@ class MyGUI(QMainWindow):
         settingsMenu = menuBar.addMenu("&Settings")
         changeColorAction = settingsMenu.addAction("Change appearance color")
         changeColorAction.triggered.connect(self.changeAppearanceColor)
+        
+        utilsFunctions = utils.functionNamesFromDir('Utils')
+        #Create a new menu, and add actions corresponding to all utilsFunctions:
+        utilsMenu = settingsMenu.addMenu("Utilities")
+        #Connect all found functions to this dropdown
+        utilsDisplayNames = utils.displayNamesFromFunctionNames(utilsFunctions,'')
+        utilActions = {}
+        for i, utilsFunction in enumerate(utilsFunctions):
+            utilActions[i] = utilsMenu.addAction(utilsDisplayNames[0][i])
+            utilActions[i].triggered.connect(eval(utilsFunction))
 
     def changeAppearanceColor(self):
         #Function that changes the appearance color
