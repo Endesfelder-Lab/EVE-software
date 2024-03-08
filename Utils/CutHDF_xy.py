@@ -9,13 +9,10 @@ def __function_metadata__():
     return {
         "CutHDF_xy": {
             "required_kwargs": [
-                {"name": "frame_time_for_dme", "description": "Frame-time used for drift-correction (in ms)","default":100.,"type":float,"display_text":"Frame time used in DME"},
-                {"name": "frames_per_bin", "description": "Number of frames in every bin for dme drift correction ","default":50,"type":int,"display_text":"Frames per bin"},
-                {"name": "visualisation", "description": "Visualisation of the drift traces.","default":True,"display_text":"Visualisation"},
             ],
             "optional_kwargs": [
             ],
-            "help_string": "Drift correction from Cnossen et al.."
+            "help_string": ""
         }
     }
 
@@ -76,7 +73,3 @@ def CutHDF_xy(parent,**kwargs):#(dataLocation,xyStretch=(-np.Inf,-np.Inf,np.Inf,
     
     window.show()
     pass
-
-
-# print('starting cuthdfxy')
-# CutHDF_xy(filefolder+filename,xyStretch=(400,450,400,450))
