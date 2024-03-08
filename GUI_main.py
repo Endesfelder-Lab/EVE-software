@@ -258,8 +258,10 @@ class MyGUI(QMainWindow):
         utilsDisplayNames = utils.displayNamesFromFunctionNames(utilsFunctions,'')
         utilActions = {}
         for i, utilsFunction in enumerate(utilsFunctions):
+            print(utilsFunction)
             utilActions[i] = utilsMenu.addAction(utilsDisplayNames[0][i])
-            utilActions[i].triggered.connect(lambda _, s=self: eval(utilsFunction+'(s)'))
+            #Run "function(self)" when triggered - passing self to the function 
+            utilActions[i].triggered.connect(lambda _, s=self, func=utilsFunction: eval(func+'(s)'))
 
     def changeAppearanceColor(self):
         #Function that changes the appearance color
