@@ -7,6 +7,7 @@ from EventDistributions import eventDistributions
 from TemporalFitting import timeFitting
 import logging
 from scipy.optimize import least_squares
+from scipy import linalg
 import warnings
 from scipy.optimize import OptimizeWarning
 warnings.simplefilter("error", OptimizeWarning)
@@ -249,9 +250,11 @@ class radysm:
         try:
             res = least_squares(self.distance, self.p0(), bounds=self.bounds(), **kwargs)
             popt = res.x + self.shift
-            perr = np.sqrt(np.diag(res.jac))
-            # perr = np.sqrt(np.diag(pcov))
-            # popt += self.shift
+            U, s, Vh = linalg.svd(res.jac, full_matrices=False)
+            tol = np.finfo(float).eps*s[0]*max(res.jac.shape)
+            w = s > tol
+            cov = (Vh[w].T/s[w]**2) @ Vh[w]  # robust covariance matrix
+            perr = np.sqrt(np.diag(cov))     # 1sigma uncertainty on fitted parameters
         except RuntimeError as warning:
             self.fit_info += 'RuntimeError: ' + str(warning)
             popt = np.array([np.nan])
@@ -293,8 +296,8 @@ def localize_canditates2D(i, candidate_dic, distfunc, time_fit, pixel_size):
     fails = pd.DataFrame()  # Initialize fails as an empty DataFrame
     fail = pd.DataFrame()
     for candidate_id in list(candidate_dic):
-        radsym_fit = radysm(candidate_dic[candidate_id]['events'], distfunc) # radsym_fit(candidate_dic[candidate_id], time_fit, pixel_size, candidate_id)#
-        localization = radsym_fit(candidate_dic[candidate_id], time_fit, pixel_size, candidate_id) #radialcenter(distfunc, candidate_id, candidate_dic[candidate_id], time_fit, pixel_size)
+        radsym_fit = radysm(candidate_dic[candidate_id]['events'], distfunc)
+        localization = radsym_fit(candidate_dic[candidate_id], time_fit, pixel_size, candidate_id) # radialcenter(distfunc, candidate_id, candidate_dic[candidate_id], time_fit, pixel_size)
         localizations.append(localization)
         if localization['fit_info'][0] != '':
             fail['candidate_id'] = localization['candidate_id']
