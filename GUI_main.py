@@ -251,15 +251,15 @@ class MyGUI(QMainWindow):
         changeColorAction = settingsMenu.addAction("Change appearance color")
         changeColorAction.triggered.connect(self.changeAppearanceColor)
         
-        utilsFunctions = utils.functionNamesFromDir('Utils')
         #Create a new menu, and add actions corresponding to all utilsFunctions:
-        utilsMenu = settingsMenu.addMenu("Utilities")
+        utilsMenu = menuBar.addMenu("Utilities")
+        utilsFunctions = utils.functionNamesFromDir('Utils')
         #Connect all found functions to this dropdown
         utilsDisplayNames = utils.displayNamesFromFunctionNames(utilsFunctions,'')
         utilActions = {}
         for i, utilsFunction in enumerate(utilsFunctions):
             utilActions[i] = utilsMenu.addAction(utilsDisplayNames[0][i])
-            utilActions[i].triggered.connect(eval(utilsFunction))
+            utilActions[i].triggered.connect(lambda _, s=self: eval(utilsFunction+'(s)'))
 
     def changeAppearanceColor(self):
         #Function that changes the appearance color
@@ -461,7 +461,10 @@ class MyGUI(QMainWindow):
     def datasetSearchButtonClicked(self):
         # Function that handles the dataset 'File' lookup button
         logging.debug('data lookup search button clicked')
-        file_path = utils.generalFileSearchButtonAction(parent=self,text="Select File",filter="EBS files (*.raw *.npy *hdf5);;All Files (*)")
+        parentFolder = self.dataLocationInput.text()
+        if parentFolder != "":
+            parentFolder = os.path.dirname(parentFolder)
+        file_path = utils.generalFileSearchButtonAction(parent=self,text="Select File",filter="EBS files (*.raw *.npy *hdf5);;All Files (*)",parentFolder=parentFolder)
         if file_path:
             self.dataLocationInput.setText(file_path)
 

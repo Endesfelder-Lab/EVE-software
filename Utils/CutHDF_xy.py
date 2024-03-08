@@ -18,12 +18,32 @@ def __function_metadata__():
             "help_string": "Drift correction from Cnossen et al.."
         }
     }
-    
-def CutHDF_xy(**kwargs):#(dataLocation,xyStretch=(-np.Inf,-np.Inf,np.Inf,np.Inf)):
-    filefolder = "//Smi2pc/e/Data/Koen/20240222/DNAPAINT_fullGreen_cont_mirror_TIRF_cleanup561/"
-    filename = "output.hdf5"
-    dataLocation = filefolder+filename
-    xyStretch=(400,450,400,450)
+
+import sys
+from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout, QFileDialog
+
+#Imports for PyQt5 (GUI)
+from PyQt5 import QtWidgets, QtGui
+from PyQt5.QtGui import QCursor, QTextCursor, QIntValidator, QColor
+from PyQt5.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QTableWidget, QTableWidgetItem, QLayout, QMainWindow, QLabel, QPushButton, QSizePolicy, QGroupBox, QTabWidget, QGridLayout, QWidget, QComboBox, QLineEdit, QFileDialog, QToolBar, QCheckBox,QDesktopWidget, QMessageBox, QTextEdit, QSlider, QSpacerItem, QTableView, QFrame, QScrollArea, QProgressBar, QMenu, QMenuBar, QColorDialog
+from PyQt5.QtCore import Qt, QPoint, QProcess, QCoreApplication, QTimer, QFileSystemWatcher, QFile, QThread, pyqtSignal, QObject
+import sys
+import typing
+
+
+class SmallWindow(QMainWindow):
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.setWindowTitle("Small Window")
+        self.resize(300, 200)
+
+        self.parent = parent
+        # Set the window icon to the parent's icon
+        self.setWindowIcon(self.parent.windowIcon())
+
+def CutHDF_xy_run(loadfile,savefile,xyStretch):
+    xyStretch=eval(xyStretch)
+    dataLocation = loadfile
     #Get the time slice from a hdf5 file for index, after running findIndexFromTimeSliceHDF
     print('Starting to read')
     with h5py.File(dataLocation, mode='r') as file:
@@ -33,11 +53,29 @@ def CutHDF_xy(**kwargs):#(dataLocation,xyStretch=(-np.Inf,-np.Inf,np.Inf,np.Inf)
     
     print('Starting to save')
     #Store these events as a new hdf5:
-    newsavename = dataLocation.replace('.hdf5','_xyCut.hdf5')
-    with h5py.File(newsavename, mode='r+') as file:
+    with h5py.File(savefile, mode='w') as file:
         events = file.create_dataset('CD/events', data=events, compression="gzip")
+    
+    print('Saved')
         
-    return events
+
+def CutHDF_xy(parent,**kwargs):#(dataLocation,xyStretch=(-np.Inf,-np.Inf,np.Inf,np.Inf)):
+    #Create a small pyqt popup window which allows you to load a file:
+
+    from Utils import utils
+
+    window = utils.SmallWindow(parent,windowTitle="Cut HDF5 file in xy")
+    window.addDescription("This function allows you to cut an hdf5 file between certain x,y coordinates. Please find the file location, specify the save location, and specify the XY boundaries (e.g. '(100,200,200,250)' to cut 100-200 in x, 200-250 in y)")
+    loadfileloc = window.addFileLocation()
+    savefileloc = window.addFileLocation(labelText="Save location:", textAddPrePeriod = "_xyCut")
+    
+    xyStretchText = window.addTextEdit(labelText="XY boundaries:",preFilledText="(0,np.inf,0,np.inf)")
+    
+    button = window.addButton("Run")
+    button.clicked.connect(lambda: CutHDF_xy_run(loadfileloc.text(),savefileloc.text(),xyStretchText.text()))
+    
+    window.show()
+    pass
 
 
 # print('starting cuthdfxy')

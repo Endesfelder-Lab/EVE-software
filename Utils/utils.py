@@ -821,11 +821,15 @@ def getMethodDropdownInfo(curr_layout,className):
 
 
 def lineEditFileLookup(line_edit_objName, text, filter,parent=None):
-    file_path = generalFileSearchButtonAction(parent=parent,text=text,filter=filter)
+    parentFolder = line_edit_objName.text()
+    if parentFolder != "":
+        parentFolder = os.path.dirname(parentFolder)
+    
+    file_path = generalFileSearchButtonAction(parent=parent,text=text,filter=filter,parentFolder=parentFolder)
     line_edit_objName.setText(file_path)
         
-def generalFileSearchButtonAction(parent=None,text='Select File',filter='*.txt'):
-    file_path, _ = QFileDialog.getOpenFileName(parent,text,filter=filter)
+def generalFileSearchButtonAction(parent=None,text='Select File',filter='*.txt',parentFolder=""):
+    file_path, _ = QFileDialog.getOpenFileName(parent,text,parentFolder,filter=filter)
     return file_path
 
     
@@ -1131,6 +1135,121 @@ def removeHotPixelEvents(events,hotPixelArray=None):
     if origEventLen-finalEventLen > 0:
         print("Removed "+str(origEventLen-finalEventLen)+" hot pixel events, which is "+str(round(100*(origEventLen-finalEventLen)/origEventLen,2))+"pct of all events.")
     return events
+
+
+class SmallWindow(QMainWindow):
+    """ 
+    General class that creates a small popup window to have some data. Mostly used for utility functions.
+    """
+    
+    #Create a small window that pops up
+    def __init__(self, parent, windowTitle="Small Window"):
+        super().__init__(parent)
+        self.setWindowTitle(windowTitle)
+        self.resize(300, 200)
+
+        self.parent = parent
+        # Set the window icon to the parent's icon
+        self.setWindowIcon(self.parent.windowIcon())
+        
+        #Add a layout
+        layout = QVBoxLayout()
+        self.setCentralWidget(QWidget())  # Create a central widget for the window
+        self.centralWidget().setLayout(layout)  # Set the layout for the central widget
+
+    #Function to find/select a file and add it to the lineedit
+    def openFileDialog(self,fileArgs = "All Files (*)"):
+        options = QFileDialog.Options()
+        #Try to get current folder from self.fileLocationLineEdit:
+        try:
+            #Split the filelocationtext on slash:
+            filefolder = self.fileLocationLineEdit.text().split('/')
+            #Get all but the last element of this:
+            filefolder = '/'.join(filefolder[:-1])
+            folderName = filefolder
+        except:
+            folderName = ""
+        
+        file_name, _ = QFileDialog.getOpenFileName(None, "Open File", folderName, fileArgs, options=options)
+        if file_name:
+            self.fileLocationLineEdit.setText(file_name)
+        
+        return file_name
+    
+    #Add extra text before the period
+    def addTextPrePriod(self,lineedit,LineEditText,textAddPrePeriod = ""):
+        #Add the textAddPrePriod directly before the last found period in the LineEditText:
+        if textAddPrePeriod != "":
+            try:
+                LineEditText = LineEditText.split('.')
+                LineEditText[-2] = LineEditText[-2]+textAddPrePeriod
+                LineEditText = '.'.join(LineEditText)
+            except:
+                pass
+        lineedit.setText(LineEditText)
+    
+    def addDescription(self,description):
+        #Create a horizontal box layout:
+        layout = QHBoxLayout()
+        #add the description as text, allowing for multi-line text:
+        self.descriptionLabel = QLabel(description)
+        self.descriptionLabel.setWordWrap(True)
+        #Add the label to the layout:
+        layout.addWidget(self.descriptionLabel)
+        #Add the layout to the central widget:
+        self.centralWidget().layout().addLayout(layout)
+        return self.descriptionLabel
+    
+    def addButton(self,buttonText="Button"):
+        #Create a horizontal box layout:
+        layout = QHBoxLayout()
+        #add a button:
+        self.button = QPushButton(buttonText)
+        #Add the button to the layout:
+        layout.addWidget(self.button)
+        #Add the layout to the central widget:
+        self.centralWidget().layout().addLayout(layout)
+        return self.button
+    
+    def addTextEdit(self,labelText = "Text edit:", preFilledText = ""):
+        #Create a horizontal box layout:
+        layout = QHBoxLayout()
+        #add a label and text edit:
+        self.textEdit = QLineEdit()
+        self.textEdit.setText(preFilledText)
+        #Add the label and text edit to the layout:
+        layout.addWidget(QLabel(labelText))
+        layout.addWidget(self.textEdit)
+        #Add the layout to the central widget:
+        self.centralWidget().layout().addLayout(layout)
+        return self.textEdit
+    
+    #Add a file information label/text/button:
+    def addFileLocation(self, labelText="File location:", textAddPrePeriod = ""):
+        #Create a horizontal box layout:
+        layout = QHBoxLayout()
+        #add a label, line edit and button:
+        self.fileLocationLabel = QLabel(labelText)
+        self.fileLocationLineEdit = QLineEdit()
+        LineEditText = self.parent.dataLocationInput.text()
+        
+        self.addTextPrePriod(self.fileLocationLineEdit,LineEditText,textAddPrePeriod)
+        
+        self.fileLocationButton = QPushButton("...")
+        self.fileLocationButton.clicked.connect(lambda: self.openFileDialog(fileArgs = "All Files (*)"))
+        
+        #Add the label, line edit and button to the layout:
+        layout.addWidget(self.fileLocationLabel)
+        layout.addWidget(self.fileLocationLineEdit)
+        layout.addWidget(self.fileLocationButton)
+        #Add the layout to the central widget:
+        self.centralWidget().layout().addLayout(layout)
+        return self.fileLocationLineEdit
+
+
+
+
+
 
 #DEPRACATED
 def timeSliceFromHDF(dataLocation,requested_start_time_ms = 0,requested_end_time_ms=1000,howOftenCheckHdfTime = 100000,loggingBool=False,curr_chunk = 0):
