@@ -7,7 +7,6 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 import imageio
 from PIL import Image
-from metavision_core.event_io.raw_reader import RawReader
 
 # Required function __function_metadata__
 # Should have an entry for every function in this file
@@ -23,6 +22,7 @@ def __function_metadata__():
     }
 
 def detectHotPixels_run(loadfile,maxTime,outputArea):
+    from metavision_core.event_io.raw_reader import RawReader
     maxTime=eval(maxTime)
     #Check if loadfile ends in .raw:
     if loadfile.endswith('.raw'):

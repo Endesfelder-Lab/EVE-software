@@ -41,7 +41,6 @@ from vispy.color import Colormap
 #Custom imports
 # Add the folder 2 folders up to the system path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.append('/usr/lib/python3/dist-packages')
 #Import all scripts in the custom script folders
 # List all files in the CandidateFitting directory
 from CandidateFitting import *
@@ -1804,7 +1803,7 @@ class MyGUI(QMainWindow):
             #Create thunderstorm headers
             headers = list(localizations.columns)
             headers = ['\"x [nm]\"' if header == 'x' else '\"y [nm]\"' if header == 'y' else '\"z [nm]\"' if header == 'z' else '\"t [ms]\"' if header == 't' else 'Δx [nm]' if header == 'del_x' else 'Δy [nm]' if header == 'del_y' else 'Δt [ms]' if header == 'del_t' else 'x_dim [px]' if header == 'x_dim' else 'y_dim [px]' if header == 'y_dim' else 't_dim [ms]' if header == 't_dim' else header for header in headers]
-                        
+
             #Store the csv with ID as index:
             localizations.to_csv(storeLocation, header=headers, quoting=csv.QUOTE_NONE, index=False, index_label='\"id\"')
         else:
