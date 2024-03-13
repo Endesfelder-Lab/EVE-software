@@ -5,8 +5,6 @@ import numpy as np
 import time, logging
 from scipy import optimize
 import warnings
-from scipy.optimize import OptimizeWarning
-warnings.simplefilter("error", OptimizeWarning)
 from sklearn.metrics import mean_squared_error
 
 from joblib import Parallel, delayed

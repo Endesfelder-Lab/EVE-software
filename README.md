@@ -47,12 +47,15 @@ To open the graphical user interface and run Eve, first activate the python envi
 ## Quick Start Guide
 ### Set up the Processing Tab
 Running `GUI.py` will open Eve's graphical user interface. 
+![](Quick_Start/Setting_up_GUI.png)
 The main window has 7 major parts that are marked with red boxes and are described in more detail in the following.
 1. Global settings: Here, you can open the `Advanced settings`, save the current GUI configuration and settings with `Save GUI contents` or load a specific GUI configuration with `Load GUI contents`.
 2. Data to analyse: Here, you specify the data that will be analysed in the following. You can either select a single file (in `.npy`, `.hdf5` or `.raw` format) or a folder. If you select a folder all files in the folder will be analysed one after another.
 
-   The folder `Data` contains an event-based acquisition of a DNA nanoruler (`DNAPAINT.hdf5`) which we will use in this tutorial. Fill the path entry field with the corresponding path to the nanoruler dataset.
-3.  
+   The folder `Data` contains an event-based acquisition of a DNA nanoruler (`DNAPAINT.hdf5`) which we will use in this tutorial. Fill the path entry field `Dataset localtion:` with the corresponding path to the nanoruler dataset.
+
+   In the `Data selection` box, you can now further specify which parts of the data should be analysed and how. You have different options for `Polarity`, `Time` and `Position`. Choose `Pos and neg seperately` as `Polarity` option and and leave the other settings unchanged. Thereby, you simply load the all events without restrictions in time or space. By selecting `Pos and neg seperately` all further analysis routines will be run on the positive and negative events seperatly. 
+4.  
 ### Adjust Advanced Options
 ### Perform a Preview Run
 ### View the Preview Run Results
