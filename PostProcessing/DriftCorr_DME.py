@@ -26,6 +26,7 @@ def __function_metadata__():
                 {"name": "nr_time_bins", "description": "Number of time bins","default":10,"type":int,"display_text":"Number of bins"},
                 {"name": "zoom_level", "description": "Zoom level","default":2,"type":int,"display_text":"Zoom of RCC plots"},
                 {"name": "visualisation", "description": "Visualisation of the drift traces.","default":True,"display_text":"Visualisation"},
+                {"name": "ConvHist", "description": "Use convoluted histogram, ideally do not use","default":False,"display_text":"Use ConvHist (Linux)"}
             ],
             "optional_kwargs": [
             ],
@@ -186,7 +187,7 @@ def DriftCorr_RCC(resultArray,findingResult,settings,**kwargs):
     
     #RCC drift
     shift_px = rcc_own(locs_for_dme, framenum, nr_time_bins, zoom=zoom_level, 
-        sigma=1, maxpairs=1000, use_cuda=use_cuda)
+        sigma=1, maxpairs=1000, use_cuda=use_cuda, use_conv_hist = utilsHelper.strtobool(kwargs['ConvHist']))
 
     #Briefly visualise the drift if wanted:
     if visualisation:
@@ -233,10 +234,9 @@ def DriftCorr_RCC(resultArray,findingResult,settings,**kwargs):
 
 
 def rcc_own(xy, framenum, timebins, zoom=1, 
-        sigma=1, maxpairs=1000, use_cuda=False):
+        sigma=1, maxpairs=1000, use_cuda=False, use_conv_hist = False):
     
     from .dme.dme import dme
-    from .dme.dme.native_api import NativeAPI
     from .dme.dme.rcc import findshift_pairs, InterpolatedUnivariateSpline
     
     rendersize = int(np.max(xy))
@@ -247,7 +247,28 @@ def rcc_own(xy, framenum, timebins, zoom=1,
     imgshape = area*zoom
     images = np.zeros((timebins, *imgshape))
 
-    with NativeAPI(use_cuda) as dll:
+    if use_conv_hist == False:
+        from .dme.dme.native_api import NativeAPI
+        with NativeAPI(use_cuda) as dll:
+            for k in range(timebins):
+                img = np.zeros(imgshape,dtype=np.float32)
+                
+                indices = np.nonzero((0.5 + framenum/framesperbin).astype(int)==k)[0]
+
+                spots = np.zeros((len(indices), 5), dtype=np.float32)
+                spots[:, 0] = xy[indices,0] * zoom
+                spots[:, 1] = xy[indices,1] * zoom
+                spots[:, 2] = sigma
+                spots[:, 3] = sigma
+                spots[:, 4] = 1
+                
+                if len(spots) == 0:
+                    raise ValueError(f'no spots in bin {k}')
+
+                images[k] = dll.DrawGaussians(img, spots)
+    elif use_conv_hist == True:
+        maxx = imgshape[0]/zoom
+        maxy = imgshape[1]/zoom
         for k in range(timebins):
             img = np.zeros(imgshape,dtype=np.float32)
             
@@ -262,9 +283,15 @@ def rcc_own(xy, framenum, timebins, zoom=1,
             
             if len(spots) == 0:
                 raise ValueError(f'no spots in bin {k}')
-
-            images[k] = dll.DrawGaussians(img, spots)
-    
+            
+            
+            histogram_original = np.histogram2d(spots[:, 0], spots[:, 1], range=[[0,maxx], [0,maxy]],
+                                            bins=[range(int(maxx*zoom+1)), range(int(maxy*zoom+1))])
+            
+            kernel = create_kernel(7)
+            import scipy
+            images[k] = scipy.signal.convolve2d(histogram_original[0], kernel, mode='same').T #Transpose to fix x,y shifting wrt DME
+        
     #print(f"RCC pairs: {timebins*(timebins-1)//2}. Bins={timebins}")
     pairs = np.array(np.triu_indices(timebins,1)).T
     if len(pairs)>maxpairs:
@@ -301,3 +328,21 @@ def rcc_own(xy, framenum, timebins, zoom=1,
         c = shift
     
     return shift_interp, shift_estim, images
+
+def create_kernel(size):
+    #Check if size is odd:
+    if size % 2 == 0:
+        import logging
+        size += 1
+        logging.info(f'Kerning size was even, made odd and changed to size {size}')
+    kernel = np.zeros((size,size))
+    
+    center = (size/2-.5,size/2-.5)
+    
+    
+    for xx in range(size):
+        for yy in range(size):
+            dist_to_center = np.ceil(np.sqrt((xx-center[0])**2+(yy-center[1])**2))
+            kernel[xx,yy] = max(0,center[0]+1-dist_to_center)
+            
+    return kernel
