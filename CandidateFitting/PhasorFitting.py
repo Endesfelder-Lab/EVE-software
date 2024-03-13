@@ -62,7 +62,7 @@ class phasor(fit):
     def __call__(self, candidate, **kwargs):
         
         #Perform 2D Fourier transform over the xy ROI
-        self.image_sq = self.image.reshape(((self.xlim[1]-self.xlim[0]+1), (self.ylim[1]-self.ylim[0]+1)))
+        self.image_sq = self.image.reshape(((self.ylim[1]-self.ylim[0]+1), (self.xlim[1]-self.xlim[0]+1)))
         ROI_F = np.fft.fft2(self.image_sq)
         #We have to calculate the phase angle of array entries [0,1] and [1,0] for 
         #the sub-pixel x and y values, respectively

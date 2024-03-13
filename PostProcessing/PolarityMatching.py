@@ -234,7 +234,7 @@ def PolarityMatching_time(localizations,findingResult,settings,**kwargs):
     ax2 = fig.add_subplot(122)
     #show the same data but on log x-scale:
     ax2.hist(sublocs['pol_link_time'], bins=np.logspace(np.log10(perc1), np.log10(perc95), 100), density=True)
-    ax2.set_xscale('log')
+    ax2.set_yscale('log')
     plt.xlabel('Time between pos/neg events (ms)')
     plt.show()
 

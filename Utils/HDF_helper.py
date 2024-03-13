@@ -27,17 +27,6 @@ from PyQt5.QtCore import Qt, QPoint, QProcess, QCoreApplication, QTimer, QFileSy
 import sys
 import typing
 
-
-class SmallWindow(QMainWindow):
-    def __init__(self, parent):
-        super().__init__(parent)
-        self.setWindowTitle("Small Window")
-        self.resize(300, 200)
-
-        self.parent = parent
-        # Set the window icon to the parent's icon
-        self.setWindowIcon(self.parent.windowIcon())
-
 def CutHDF_xy_run(loadfile,savefile,xyStretch):
     xyStretch=eval(xyStretch)
     dataLocation = loadfile

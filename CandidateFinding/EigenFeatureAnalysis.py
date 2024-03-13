@@ -62,7 +62,7 @@ def __function_metadata__():
         },
         "eigenFeature_analysis_and_bbox_finding": {
             "required_kwargs": [
-                {"name": "norm_eigenval_cutoff","display_text":"Normalized Eigenvalue cutoff", "description": "Cutoff of normalized eigenvalues","default":0.7,"type":float},
+                {"name": "linearity_cutoff","display_text":"Linearity cutoff", "description": "Cutoff of normalized eigenvalues","default":0.7,"type":float},
                 {"name": "max_eigenval_cutoff","display_text":"Maximum Eigenvalue cutoff", "description": "Cutoff of maximum eigenvalue. Set to zero to auto-determine this!","default":0.0,"type":float},
                 {"name": "search_n_neighbours","display_text":"Number of neighbours", "description": "Number of (closest) neighbours for the covariance determination","default":50,"type":int},
                 {"name": "ratio_ms_to_px","display_text":"Ratio ms to px", "description": "Ratio of milliseconds to pixels.","default":20.0,"type":float},
