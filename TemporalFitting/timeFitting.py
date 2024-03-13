@@ -205,7 +205,7 @@ class lognormal_cdf(cumsum_fit):
         max_cumsum = np.max(self.cumsum)
         i_half_max = np.argmax(self.cumsum >= 0.5 * max_cumsum)
         shift = np.percentile(self.times, 5)
-        mu = np.max(np.log(self.times[i_half_max]-shift),0)
+        mu = np.max([np.log(np.max([self.times[i_half_max]-shift, 1])),0])
         sigma = 1 # idea: set sigma to np.sqrt(2*(np.log(np.mean(times))-mu)), but this seems to be generally to high
         scale = max_cumsum
         slope = 0.1 # expected background event rate
