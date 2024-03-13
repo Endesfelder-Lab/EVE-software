@@ -43,9 +43,23 @@ The software requires Python 3.9.18.
    
     Eve can read and process event-based data in `.npy` and `.hdf5` format. Additionally the `.raw` format of [Prophesee](https://www.prophesee.ai/) can be used. If you have `.raw` data that you want to analyze you need to install the [Metavision SDK from Prophesee](https://docs.prophesee.ai/stable/installation/index.html) in addition.
 ### Running Eve
-To open the graphical user interface and run Eve, first activate the python environment you created during the installation. Then run `GUI.py`:
- ```bash
-ENVIRONMENT_PATH/Eve/bin/python3.9 GUI_PATH/GUI.py
- ```
-Again exchange `ENVIRONMENT_PATH` by the path to the virtual environments and `GUI_PATH` by the path to the `GUI.py`.
-## Getting started
+To open the graphical user interface and run Eve, first activate the python environment you created during the installation. Then run `GUI.py` with Python.
+## Quick Start Guide
+### Set up the Processing Tab
+Running `GUI.py` will open Eve's graphical user interface. 
+The main window has 7 major parts that are marked with red boxes and are described in more detail in the following.
+1. Global settings: Here, you can open the `Advanced settings`, save the current GUI configuration and settings with `Save GUI contents` or load a specific GUI configuration with `Load GUI contents`.
+2. Data to analyse: Here, you specify the data that will be analysed in the following. You can either select a single file (in `.npy`, `.hdf5` or `.raw` format) or a folder. If you select a folder all files in the folder will be analysed one after another.
+
+   The folder `Data` contains an event-based acquisition of a DNA nanoruler (`DNAPAINT.hdf5`) which we will use in this tutorial. Fill the path entry field with the corresponding path to the nanoruler dataset.
+3.  
+### Adjust Advanced Options
+### Perform a Preview Run
+### View the Preview Run Results
+### Explore the Candidate Preview
+### Excute a full Run
+### Visualize the Localization Results
+### Apply a Drift Correction
+### Apply additional Localization Filters
+### Estimate the Localization Precision
+### Analyse the On-time Distribution
