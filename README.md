@@ -15,7 +15,7 @@ Besides a variety of different finding and fitting algorithms, Eve also offers v
 Eve is written in Python and structured in such a way, that is easy to implement and add new functionalties in form of new finding, fitting routines, etc. 
 ## Version
 The `main` branch contains the latest running version of the software. The latest developments are stored in the `develop` branch.
-## Installation
+## How to install and run Eve
 This software was tested under Linux Ubuntu 20.04 and Windows 10. Besides the drift correction module that contains and uses pre-compiled dll-files and is therefore only running on Windows, everthing is running under Linux and Windows.
 
 The software requires Python 3.9.18.
@@ -42,5 +42,10 @@ The software requires Python 3.9.18.
 3. Optional:
    
     Eve can read and process event-based data in `.npy` and `.hdf5` format. Additionally the `.raw` format of [Prophesee](https://www.prophesee.ai/) can be used. If you have `.raw` data that you want to analyze you need to install the [Metavision SDK from Prophesee](https://docs.prophesee.ai/stable/installation/index.html) in addition.
-
+### Running Eve
+To open the graphical user interface and run Eve, first activate the python environment you created during the installation. Then run `GUI.py`:
+ ```bash
+ENVIRONMENT_PATH/Eve/bin/python3.9 GUI_PATH/GUI.py
+ ```
+Again exchange `ENVIRONMENT_PATH` by the path to the virtual environments and `GUI_PATH` by the path to the `GUI.py`.
 ## Getting started
