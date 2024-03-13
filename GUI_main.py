@@ -1517,6 +1517,7 @@ class MyGUI(QMainWindow):
         #Run the processing on a different thread for GUI proper working
         thread = threading.Thread(target=self.run_processing_i)
         thread.start()
+        # self.run_processing_i()
         
         #Visually show we're started by updating the progress bar to 5%
         self.updateProgressBar(overwriteValue = 5)
