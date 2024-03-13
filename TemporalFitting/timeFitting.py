@@ -244,6 +244,7 @@ class lognormal_cdf(cumsum_fit):
                 t_intersect = mean_t
                 del_t_intersect = std_t
                 t_fit_info = 'TimeRuntimeWarning: Fit yields unphysical results.'
+        warnings.simplefilter("ignore", RuntimeWarning)
         return t_intersect, del_t_intersect, a, b, t_fit_info
     
     def func(self, t, mu, sigma, shift, scale, slope, offset):
