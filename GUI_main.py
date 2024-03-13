@@ -41,6 +41,7 @@ from vispy.color import Colormap
 #Custom imports
 # Add the folder 2 folders up to the system path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append('/usr/lib/python3/dist-packages')
 #Import all scripts in the custom script folders
 # List all files in the CandidateFitting directory
 from CandidateFitting import *
@@ -1096,6 +1097,12 @@ class MyGUI(QMainWindow):
             loclist.rename(columns={'x [nm]': 'x'}, inplace=True)
             loclist.rename(columns={'y [nm]': 'y'}, inplace=True)
             loclist.rename(columns={'t [ms]': 't'}, inplace=True)
+            loclist.rename(columns={'Δx [nm]' : 'del_x'}, inplace=True)
+            loclist.rename(columns={'Δy [nm]' : 'del_y'}, inplace=True)
+            loclist.rename(columns={'Δt [nm]' : 'del_t'}, inplace=True)
+            loclist.rename(columns={'x_dim [px]' : 'x_dim'}, inplace=True)
+            loclist.rename(columns={'y_dim [px]' : 'y_dim'}, inplace=True)
+            loclist.rename(columns={'t_dim [ms]' : 't_dim'}, inplace=True)
 
             #Set this as result:
             self.data['FittingResult'] = {}
@@ -1795,7 +1802,7 @@ class MyGUI(QMainWindow):
             localizations['frame'] -= min(localizations['frame'])-1
             #Create thunderstorm headers
             headers = list(localizations.columns)
-            headers = ['\"x [nm]\"' if header == 'x' else '\"y [nm]\"' if header == 'y' else '\"z [nm]\"' if header == 'z' else '\"t [ms]\"' if header == 't' else header for header in headers]
+            headers = ['\"x [nm]\"' if header == 'x' else '\"y [nm]\"' if header == 'y' else '\"z [nm]\"' if header == 'z' else '\"t [ms]\"' if header == 't' else 'Δx [nm]' if header == 'del_x' else 'Δy [nm]' if header == 'del_y' else 'Δt [ms]' if header == 'del_t' else 'x_dim [px]' if header == 'x_dim' else 'y_dim [px]' if header == 'y_dim' else 't_dim [ms]' if header == 't_dim' else header for header in headers]
                         
             #Store the csv with ID as index:
             localizations.to_csv(storeLocation, header=headers, quoting=csv.QUOTE_NONE, index=False, index_label='\"id\"')
