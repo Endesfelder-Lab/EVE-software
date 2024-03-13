@@ -22,7 +22,7 @@ The software requires Python 3.9.18.
     pip install -r requirements.txt
     ```
     #### With `conda`
-   Simply follow the instructions below:
+   Simply follow the instructions below, this will also install the correct python version on your system:
     ```bash
     cd Eve
     conda env create -f environment_eve.yml
