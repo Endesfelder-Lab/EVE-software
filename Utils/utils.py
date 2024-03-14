@@ -934,7 +934,10 @@ def determineAllStartStopTimesHDF(dataLocation,timeChunkMs=10000,timeChunkOverla
         end_time_ms_arr = [np.minimum(chunkStartStopTime[1]+timeChunkOverlapMs,hdf5_maxtime)]
     else: #We're looking at a long time
         start_time_ms_arr = np.maximum(np.arange(chunkStartStopTime[0],min(hdf5_maxtime,chunkStartStopTime[1]),timeChunkMs)-timeChunkOverlapMs,0)
-        end_time_ms_arr = np.minimum(np.arange(chunkStartStopTime[0]+timeChunkMs,min(hdf5_maxtime,chunkStartStopTime[1])+timeChunkMs,timeChunkMs)+timeChunkOverlapMs,hdf5_maxtime)
+        if chunkStartStopTime[1] != np.inf:
+            end_time_ms_arr = np.minimum(np.arange(chunkStartStopTime[0]+timeChunkMs,min(hdf5_maxtime,chunkStartStopTime[1])+timeChunkMs,timeChunkMs)+timeChunkOverlapMs,hdf5_maxtime)
+        else:
+            end_time_ms_arr = np.array([np.inf])
     
     return start_time_ms_arr,end_time_ms_arr
 
