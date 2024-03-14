@@ -54,8 +54,8 @@ The main window has 7 major parts that are marked with red boxes and are describ
 
    The folder `Data` contains an event-based acquisition of a DNA nanoruler (`DNAPAINT.hdf5`) which we will use in this tutorial. Fill the path entry field `Dataset localtion:` with the corresponding path to the nanoruler dataset.
 
-   In the `Data selection` box, you can now further specify which parts of the data should be analysed and how. You have different options for `Polarity`, `Time` and `Position`. Choose `Pos and neg seperately` as `Polarity` option and and leave the other settings unchanged. Thereby, you simply load the all events without restrictions in time or space. By selecting `Pos and neg seperately` all further analysis routines will be run on the positive and negative events seperatly. 
-4.  
+   In the `Data selection` box, you can now further specify which parts of the data should be analysed and how. You have different options for `Polarity`, `Time` and `Position`. Choose `Pos and neg seperately` as `Polarity` option while leaving the remaining settings unchanged. Thereby, you simply load the all events without temporal or spatial constraints. By selecting `Pos and neg seperately` all subsequent analysis steps will be run on the positive and negative events distinctly. As you can see the GUI has adapted to your selection and you can now choose finding and fitting routines for positive and negative events seperatly.
+3.  
 ### Adjust Advanced Options
 ### Perform a Preview Run
 ### View the Preview Run Results
