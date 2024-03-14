@@ -2957,6 +2957,10 @@ class FittingAnalysis(FindingFittingAnalysis):
         #Set it in the GUI
         self.GUIinfo.data['FittingMethod'] = str(self.getFunctionEvalText(self.GUIinfo,'Fitting',"self.partialFindingResults","self.settings",singlePolarity))
         
+        #Set a 0-offset for the fitting if a file is loaded, otherwise it appends and creates a gap.
+        if "LoadExistingFitting" in self.EvalText:
+            self.fittingAdjustValue = 0
+        
         #Run the fitting
         fittingResults = self.runFitting()
         logging.info(f"Fitting of polarity {singlePolarity} complete. {len(fittingResults[0].dropna())} valid localizations found!")
