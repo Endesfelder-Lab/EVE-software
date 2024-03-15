@@ -3902,14 +3902,16 @@ class PreviewFindingFitting(QWidget):
         if self.timeOfLastCursorUpdate == 0 or (time.time() - self.timeOfLastCursorUpdate) >= timeBetweenCursorUpdates:
             #We get the canvas size/position in image pixel units
             canvas_size_in_px_units = event.source.size/self.napariviewer.camera.zoom
-            camera_coords = [self.napariviewer.camera.center[2]+.5, self.napariviewer.camera.center[1]+.5]
+            # camera_coords = [self.napariviewer.camera.center[2]+.5, self.napariviewer.camera.center[1]+.5]
+            camera_coords = [self.napariviewer.camera.center[2], self.napariviewer.camera.center[1]]
             canvas_pos = np.vstack([camera_coords-(canvas_size_in_px_units/2),camera_coords+(canvas_size_in_px_units/2)])
             #And we can normalize the cursor position to image pixels
             cursor_unit_norm = event._pos/event.source.size
             #Thus, we can find the pixel index - at the moment we simply calculate this
             highlighted_px_index=np.zeros((2,))
-            highlighted_px_index[0] = (cursor_unit_norm[0]*canvas_size_in_px_units[0]+canvas_pos[0][0])/((float(self.settings['PixelSize_nm']['value']))/1000)-(100*((float(self.settings['PixelSize_nm']['value']))/1000)) #Not fully sure why I need the 100*, but seems to work
-            highlighted_px_index[1] = (cursor_unit_norm[1]*canvas_size_in_px_units[1]+canvas_pos[0][1])/((float(self.settings['PixelSize_nm']['value']))/1000)-(100*((float(self.settings['PixelSize_nm']['value']))/1000)) #Not fully sure why I need the 100*, but seems to work
+            highlighted_px_index[0] = (cursor_unit_norm[0]*canvas_size_in_px_units[0]+canvas_pos[0][0])/((float(self.settings['PixelSize_nm']['value']))/1000)+.5
+            
+            highlighted_px_index[1] = (cursor_unit_norm[1]*canvas_size_in_px_units[1]+canvas_pos[0][1])/((float(self.settings['PixelSize_nm']['value']))/1000)+.5
 
             #Here's the calculated pixel index in x,y coordinate.
             pixel_index = np.floor(highlighted_px_index).astype(int)
@@ -3922,7 +3924,6 @@ class PreviewFindingFitting(QWidget):
         """
         Updates the under cursor information with details about time, pixel, and events. 
         """
-        self.underCursorInfoDF
         fullText = ''
         #Only update info if there are events
         if len(self.events)>0:
