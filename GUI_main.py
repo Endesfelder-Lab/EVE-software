@@ -4156,6 +4156,10 @@ class CandidatePreview(QWidget):
         self.next_buttonCan = QPushButton("Next")
         self.next_buttonCan.clicked.connect(lambda: self.next_candidate_callback(parent))
 
+        self.average_candidate_button = QPushButton("Average candidate")
+        self.average_candidate_button.clicked.connect(lambda: self.average_candidate_callback(parent))
+        canPreviewtab_horizontal_container.addWidget(self.average_candidate_button)
+
         canPreviewtab_horizontal_container.addWidget(self.prev_buttonCan)
         canPreviewtab_horizontal_container.addWidget(self.next_buttonCan)
 
@@ -4393,6 +4397,72 @@ class CandidatePreview(QWidget):
         else:
             return None
 
+    def average_candidate_callback(self, parent):
+        if 'FindingMethod' in parent.data:
+            logging.debug(f"Attempting to calculate and plot average candidate.")
+            pxsize = float(parent.globalSettings['PixelSize_nm']['value'])
+            
+            sumAllEventsPos = pd.DataFrame(columns=['x', 'y', 't', 'p'])
+            sumAllEventsNeg = pd.DataFrame(columns=['x', 'y', 't', 'p'])
+            sumAllEventsMix = pd.DataFrame(columns=['x', 'y', 't', 'p'])
+            import copy
+            candidates = 0
+            #We loop over all localizations:
+            for loc in range(0,len(parent.data['FittingResult'][0])):
+                if np.mod(loc,1000) == 0:
+                    logging.info(f"Currently at: {loc} of {len(parent.data['FittingResult'][0])}, or {100*loc/len(parent.data['FittingResult'][0])}%")
+                if parent.data['FittingResult'][0].iloc[loc]['fit_info'] != '':
+                    continue
+                else: 
+                    #we grab its candidate id:
+                    candidate_id = parent.data['FittingResult'][0].iloc[loc]['candidate_id']
+                    #We find the corresponding candidate from findingResult:
+                    candidate = copy.deepcopy(parent.data['FindingResult'][0][candidate_id])
+                    #We take the events in there:
+                    events = candidate['events'].copy()
+                    
+                    #Correct the event for the localization x, y, time:
+                    events['x'] = events['x'] - parent.data['FittingResult'][0].iloc[loc]['x']/pxsize
+                    events['y'] = events['y'] - parent.data['FittingResult'][0].iloc[loc]['y']/pxsize
+                    events['t'] = events['t'] - parent.data['FittingResult'][0].iloc[loc]['t']*1000.  
+                    #check if all p==1:
+                    if all(events['p'] == 1):
+                        #append all entries in events to sumalleventspos:
+                        sumAllEventsPos = pd.concat([sumAllEventsPos, events], ignore_index=True)
+                    elif all(events['p'] == 0):
+                        sumAllEventsNeg = pd.concat([sumAllEventsNeg, events], ignore_index=True)
+                    else:
+                        sumAllEventsMix = pd.concat([sumAllEventsMix, events], ignore_index=True)
+                    candidates += 1
+
+            average_loc = pd.DataFrame({'x': [0], 'y': [0], 't': [0]})
+
+            # First clear text and figures
+            self.candidate_info.setText('')
+            self.fit_info.setText('')
+            self.firstCandidateFigure.clf()
+            self.secondCandidateFigure.clf()
+            self.firstCandidateCanvas.draw()
+            self.secondCandidateCanvas.draw()
+
+            # Get some info about the candidate
+            N_events = len(sumAllEventsPos)
+            cluster_size = [sumAllEventsPos['x'].max() - sumAllEventsPos['x'].min() + 1, sumAllEventsPos['y'].max() - sumAllEventsPos['y'].min() + 1, sumAllEventsPos['t'].max() - sumAllEventsPos['t'].min()]
+            self.candidate_info.setText(f"The average candidate has {N_events/candidates} events and has dimensions ({cluster_size[0]}, {cluster_size[1]}, {cluster_size[2]}).")
+            FirstFunctionEvalText = self.getCanPrevFunctionEvalText("sumAllEventsPos", "average_loc", "[]", "self.firstCandidateFigure","parent.globalSettings")
+            SecondFunctionEvalText = self.getCanPrevFunctionEvalText("sumAllEventsPos", "average_loc", "[]", "self.secondCandidateFigure","parent.globalSettings")
+            eval(FirstFunctionEvalText)
+            eval(SecondFunctionEvalText)
+            # Improve figure layout and update the first canvases
+            # self.firstCandidateFigure.tight_layout()
+            self.firstCandidateCanvas.draw()
+            # self.secondCandidateFigure.tight_layout()
+            self.secondCandidateCanvas.draw()
+        else:
+            self.candidate_info.setText('Tried to visualise candidate but no data found!')
+            logging.error('Tried to visualise candidate but no data found!')
+
+        
 class TableModel(QAbstractTableModel):
     """TableModel that heavily speedsup the table view
     Blatantly taken from https://stackoverflow.com/questions/71076164/fastest-way-to-fill-or-read-from-a-qtablewidget-in-pyqt5
