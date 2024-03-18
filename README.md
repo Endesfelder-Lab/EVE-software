@@ -48,13 +48,18 @@ To open the graphical user interface and run Eve, first activate the python envi
 Running `GUI.py` will open Eve's graphical user interface. 
 ![](Quick_Start/Setting_up_GUI.png)
 The main window has 7 major parts that are marked with red boxes and are described in more detail in the following.
-1. Global settings: Here, you can open the `Advanced settings`, save the current GUI configuration and settings with `Save GUI contents` or load a specific GUI configuration with `Load GUI contents`.
-2. Data to analyse: Here, you specify the data that will be analysed in the following. You can either select a single file (in `.npy`, `.hdf5` or `.raw` format) or a folder. If you select a folder all files in the folder will be analysed one after another.
+1. Global settings: Here, you can open the `Advanced settings`, save the current GUI configuration and settings with `Save GUI contents` or load a specific GUI configuration with `Load GUI contents`. Open the advaced settings, and change the settings in accordance with the image below.\
+   \
+   ![](Quick_Start/advanced_settings_2.png)
+3. Data to analyse: Here, you specify the data that will be analysed in the following. You can either select a single file (in `.npy`, `.hdf5` or `.raw` format) or a folder. If you select a folder all files in the folder will be analysed one after another.
 
    The folder `Data` contains an event-based acquisition of a DNA nanoruler (`DNAPAINT.hdf5`) which we will use in this tutorial. Fill the path entry field `Dataset localtion:` with the corresponding path to the nanoruler dataset.
 
-   In the `Data selection` box, you can now further specify which parts of the data should be analysed and how. You have different options for `Polarity`, `Time` and `Position`. Choose `Pos and neg seperately` as `Polarity` option while leaving the remaining settings unchanged. Thereby, you simply load the all events without temporal or spatial constraints. By selecting `Pos and neg seperately` all subsequent analysis steps will be run on the positive and negative events distinctly. As you can see the GUI has adapted to your selection and you can now choose finding and fitting routines for positive and negative events seperatly.
-3.  
+   In the `Data selection` box, you can now further specify which parts of the data should be analysed and how. You have different options for `Polarity`, `Time` and `Position`. Choose `Pos and neg seperately` as `Polarity` option while leaving the remaining settings unchanged. Thereby, you simply load the all events without temporal or spatial constraints. By selecting `Pos and neg seperately` all subsequent analysis steps will be run on the positive and negative events distinctly. As you can see the GUI has adapted to your selection and you can now choose finding and fitting routines for positive and negative events seperatly.\
+   \
+![](Quick_Start/eigen_feature_settings_small.png)
+4. Candidate Finding routine: Here, you can select among different candidate finding routines. Choose `Eigen-feature analysis`, both for positive and negative events and change the settings as shown in the screenshot above.
+5. Candidate Fitting routine: Here, you can specify which fitting routines you want to use to get localizations for each candidate, cluster. Choose `2D Gaussian` and again modify all other parameters as shown in the screenshot above.
 ### Adjust Advanced Options
 ### Perform a Preview Run
 ### View the Preview Run Results
