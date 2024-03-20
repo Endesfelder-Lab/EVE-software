@@ -132,14 +132,29 @@ class MyGUI(QMainWindow):
         #Initialisation - title and size
         super().__init__()
         self.setWindowTitle("Eve - alphaVersion")
-        self.setMinimumSize(600, 1000)  # Set minimum size for the GUI window
+        self.setMinimumSize(400, 400)  # Set minimum size for the GUI window
 
-        #Set the central widget that contains everything (self.central_widget)
-        #This is a group box that contains a grid layout. We fill everything inside this grid layout
-        self.central_widget = QGroupBox()
-        self.setCentralWidget(self.central_widget)
+        # Create a scroll area
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+
+        # Create a widget to hold the layout
+        content_widget = QWidget()
+
+        # Create a layout for the content widget
         self.layout = QGridLayout()
-        self.central_widget.setLayout(self.layout)
+        content_widget.setLayout(self.layout)
+
+
+        # Set the content widget to the scroll area
+        scroll_area.setWidget(content_widget)
+
+        # Create a central widget for the main window
+        central_widget = QWidget()
+        central_layout = QVBoxLayout()
+        central_layout.addWidget(scroll_area)
+        central_widget.setLayout(central_layout)
+        self.setCentralWidget(central_widget)
 
         self.polarityDropdownNames = ['All events treated equal','Positive only','Negative only','Pos and neg seperately']
         self.polarityDropdownOrder = [0,1,2,3]
@@ -195,7 +210,7 @@ class MyGUI(QMainWindow):
         self.tab_canPreview = QWidget()
         self.mainTabWidget.addTab(self.tab_canPreview, "Candidate preview")
 
-        #Set up the tabs
+        # Set up the tabs
         self.setup_tab('Processing')
         self.setup_tab('Post-processing')
         self.setup_tab('LocalizationList')
@@ -216,18 +231,7 @@ class MyGUI(QMainWindow):
         
         #Initialise ToolBar (File,Edit-toolbar etc)
         self.createToolBar()
-
-        #Set up worker information:
-        # self.worker = Worker()
-        # self.worker_thread = QThread()
-        # self.worker.moveToThread(self.worker_thread)
-        # # Connect the started signal to the do_work method of the worker
-        # self.worker_thread.started.connect(lambda: self.worker.do_work())
-        # self.worker.progress.connect(self.QThreadEmitCatcher)
-        # self.worker.finished.connect(self.worker_thread.quit)
-        # self.worker.finished.connect(self.worker.deleteLater)
-        # self.worker_thread.finished.connect(self.worker_thread.deleteLater)
-
+        
         #Initialise empty dictionaries for storage
         self.data['FindingResult'] = {}
         self.data['FindingResult'][0] = {}
@@ -246,11 +250,6 @@ class MyGUI(QMainWindow):
         self.data['avg_cluster_size_mix'] = np.zeros(3)
         self.data['avg_cluster_size_pos'] = np.zeros(3)
         self.data['avg_cluster_size_neg'] = np.zeros(3)
-
-        # self.thread = ProcessingThread()
-        # self.thread.finished.connect(self.thread.quit)
-        # self.thread.progress.connect(self.QThreadEmitCatcher)
-
 
         logging.info('Initialisation complete.')
 
@@ -2083,7 +2082,7 @@ class MyGUI(QMainWindow):
             with open(json_file_path, "r") as json_file:
                 self.entries = json.load(json_file)
 
-            for polVal in ["Pos","Neg","Mix"]:
+            for polVal in ['Pos']:#["Pos","Neg","Mix"]:
                 # Set the values of the editable fields from the loaded entries
                 for field_name, field_widget in self.get_editable_fields().items():
                     if field_name in self.entries:
