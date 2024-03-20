@@ -165,20 +165,20 @@ def classKwargValuesFromFittingFunction(functionname, class_type):
                     derivedClasses.append(name)
     return derivedClasses
 
-def defaultOptionFromClassKwarg(functionname):
+def defaultOptionFromClassKwarg(functionname, classtype):
     #Check if the function has a 'default' option for the distribution kwarg. 
     defaultOption=None
     functionparent = functionname.split('.')[0]
     #Get the full function metadata
     functionMetadata = eval(f'{str(functionparent)}.__function_metadata__()')[functionname.split('.')[1]]
-    if "dist_kwarg" in functionMetadata:
+    if "dist_kwarg" in functionMetadata and classtype == "dist":
         if "default_option" in functionMetadata["dist_kwarg"]:
             defaultOption = functionMetadata["dist_kwarg"]["default_option"]
             # check if defaultOption is a valid option
             defaultOption = getattr(eventDistributions, defaultOption, None)
             if defaultOption != None:
                 defaultOption = defaultOption.__name__
-    if "time_kwarg" in functionMetadata:
+    if "time_kwarg" in functionMetadata and classtype == "time":
         if "default_option" in functionMetadata["time_kwarg"]:
             defaultOption = functionMetadata["time_kwarg"]["default_option"]
             # check if defaultOption is a valid option
@@ -575,10 +575,9 @@ def changeLayout_choice(curr_layout,className,displayNameToFunctionNameMap,paren
             combobox = QComboBox()
             combobox.addItems(timeFitValues)
             combobox.setObjectName(f"ComboBox#{current_selected_function}#time_kwarg#{current_selected_polarity}")
-            defaultOption = defaultOptionFromClassKwarg(current_selected_function)
+            defaultOption = defaultOptionFromClassKwarg(current_selected_function, 'time')
             if defaultOption != None:
                 combobox.setCurrentText(defaultOption)
-            test = combobox.currentText()
             combobox.setToolTip(getInfoFromClass(combobox.currentText(),'time')[0])
             combobox.currentTextChanged.connect(lambda text: combobox.setToolTip(getInfoFromClass(text, 'time')[0]))
             if checkAndShowWidget(curr_layout,combobox.objectName()) == False:
@@ -597,10 +596,9 @@ def changeLayout_choice(curr_layout,className,displayNameToFunctionNameMap,paren
             combobox = QComboBox()
             combobox.addItems(distKwargValues)
             combobox.setObjectName(f"ComboBox#{current_selected_function}#dist_kwarg#{current_selected_polarity}")
-            defaultOption = defaultOptionFromClassKwarg(current_selected_function)
+            defaultOption = defaultOptionFromClassKwarg(current_selected_function, 'dist')
             if defaultOption != None:
                 combobox.setCurrentText(defaultOption)
-            test = combobox.currentText()
             combobox.setToolTip(getInfoFromClass(combobox.currentText(),'dist')[0])
             combobox.currentTextChanged.connect(lambda text: combobox.setToolTip(getInfoFromClass(text, 'dist')[0]))
             if checkAndShowWidget(curr_layout,combobox.objectName()) == False:

@@ -12,7 +12,7 @@ import multiprocessing
 def __function_metadata__():
     return {
         "AverageXYpos": {
-            "time_kwarg" : {"base": "TemporalFits", "description": "Temporal fitting routine to get time estimate.", "default_option": "TwoDGaussianFirstTime"},
+            "time_kwarg" : {"base": "TemporalFits", "description": "Temporal fitting routine to get time estimate.", "default_option": "LognormCDFFirstEvents_weighted"},
             "required_kwargs": [
             ],
             "optional_kwargs": [

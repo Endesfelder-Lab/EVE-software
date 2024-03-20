@@ -20,7 +20,7 @@ import multiprocessing
 def __function_metadata__():
     return {
         "RadialSym2D": {
-            "time_kwarg" : {"base": "TemporalFits", "description": "Temporal fitting routine to get time estimate.", "default_option": "TwoDGaussianFirstTime"},
+            "time_kwarg" : {"base": "TemporalFits", "description": "Temporal fitting routine to get time estimate.", "default_option": "LognormCDFFirstEvents_weighted"},
             "required_kwargs": [
             ],
             "optional_kwargs": [
