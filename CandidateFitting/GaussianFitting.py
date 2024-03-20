@@ -139,7 +139,6 @@ class gauss2D(fit):
             y = np.nan
             del_x = np.nan
             del_y = np.nan
-            p = np.nan
             t = np.nan
             del_t = np.nan
         else: 
@@ -160,7 +159,7 @@ class gauss2D(fit):
                 if t_fit_info != '':
                     self.fit_info = t_fit_info
             mean_polarity = candidate['events']['p'].mean()
-            p = int(mean_polarity == 1) + int(mean_polarity == 0) * 0 + int(mean_polarity > 0 and mean_polarity < 1) * 2
+        p = int(mean_polarity == 1) + int(mean_polarity == 0) * 0 + int(mean_polarity > 0 and mean_polarity < 1) * 2
         loc_df = pd.DataFrame({'candidate_id': self.candidateID, 'x': x, 'y': y, 'del_x': del_x, 'del_y': del_y, 'p': p, 't': t, 'del_t': del_t, 'N_events': candidate['N_events'], 'x_dim': candidate['cluster_size'][0], 'y_dim': candidate['cluster_size'][1], 't_dim': candidate['cluster_size'][2]*1e-3, 'fit_info': self.fit_info}, index=[0])
         return loc_df
 
