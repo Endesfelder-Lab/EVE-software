@@ -14,7 +14,8 @@ def __function_metadata__():
             "required_kwargs": [
             ],
             "optional_kwargs": [
-                {"name": "t_bin_width", "display_text":"temporal bin width", "description": "Padding in t direction (in ms)", "default":"10"}
+                {"name": "t_bin_width", "display_text":"temporal bin width", "description": "Width of temporal bin (in ms)", "default":"10"},
+                {"name": "xy_bin_width", "display_text":"spatial bin width", "description": "width of spatial (x,y) bin (in pixels)", "default":"1"}
             ],
             "help_string": "Draws xy, xt and yt projections of the candidate cluster.",
             "display_name": "2D projections of candidate cluster"
@@ -74,6 +75,7 @@ def TwoDProjection(findingResult, fittingResult, previewEvents, figure, settings
 
     pixel_size = float(settings['PixelSize_nm']['value']) # in nm
     t_bin_width = float(kwargs['t_bin_width'])
+    xy_bin_width = float(kwargs['xy_bin_width'])
 
     ax_xy = figure.add_subplot(121)
     ax_xt = figure.add_subplot(222)
@@ -83,9 +85,9 @@ def TwoDProjection(findingResult, fittingResult, previewEvents, figure, settings
     figure.tight_layout()
     figure.subplots_adjust(top=0.955,bottom=0.190)
 
-    hist_xy = eventDistributions.Hist2d_xy(findingResult)
-    hist_tx = eventDistributions.Hist2d_tx(findingResult, t_bin_width=t_bin_width)
-    hist_ty = eventDistributions.Hist2d_ty(findingResult, t_bin_width=t_bin_width)
+    hist_xy = eventDistributions.Hist2d_xy(findingResult, xy_bin_width=xy_bin_width)
+    hist_tx = eventDistributions.Hist2d_tx(findingResult, t_bin_width=t_bin_width, x_bin_width=xy_bin_width)
+    hist_ty = eventDistributions.Hist2d_ty(findingResult, t_bin_width=t_bin_width, x_bin_width=xy_bin_width)
 
     x_edges, y_edges, t_edges = hist_xy.x_edges, hist_xy.y_edges, hist_tx.x_edges
 

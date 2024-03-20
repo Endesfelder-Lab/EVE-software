@@ -69,9 +69,9 @@ class Hist1d_t(TDist):
         return self.dist1D, self.t_edges
 
 class Hist2d_tx(XTDist):
-    def __init__(self, events, t_bin_width = 10.,**kwargs):
+    def __init__(self, events, t_bin_width = 10., x_bin_width = 1., **kwargs):
         super().__init__(events)
-        self.x_bin_width = 1. # in px
+        self.x_bin_width = x_bin_width # in px
         self.t_bin_width = t_bin_width # in ms
         self.range = self.range()
         self.bins = self.bins()
@@ -99,9 +99,9 @@ class Hist2d_tx(XTDist):
     
 
 class Hist2d_ty(YTDist):
-    def __init__(self, events, t_bin_width = 10., **kwargs):
+    def __init__(self, events, t_bin_width = 10., x_bin_width = 1., **kwargs):
         super().__init__(events)
-        self.y_bin_width = 1. # in px
+        self.y_bin_width = x_bin_width # in px
         self.t_bin_width = t_bin_width # in ms
         self.range = self.range()
         self.bins = self.bins()
@@ -130,9 +130,9 @@ class Hist2d_ty(YTDist):
 class Hist2d_xy(XYDist):
     display_name = "2D histogram of x, y positions"
     description = "2D histogram of x, y position of all events."
-    def __init__(self, events, **kwargs):
+    def __init__(self, events, xy_bin_width = 1., **kwargs):
         super().__init__(events)
-        self.xy_bin_width = 1. # in px
+        self.xy_bin_width = xy_bin_width # in px
         self.range = self.range()
         self.bins = self.bins()
         self.dist2D, self.x_edges, self.y_edges = self(events, **kwargs)

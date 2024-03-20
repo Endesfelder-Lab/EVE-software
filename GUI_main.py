@@ -240,7 +240,12 @@ class MyGUI(QMainWindow):
         self.data['AveragePSFpos'] = pd.DataFrame(columns=['x', 'y', 't', 'p'])
         self.data['AveragePSFneg'] = pd.DataFrame(columns=['x', 'y', 't', 'p'])
         self.data['AveragePSFmix'] = pd.DataFrame(columns=['x', 'y', 't', 'p'])
-
+        self.data['avg_candidates_mix'] = 0
+        self.data['avg_candidates_pos'] = 0
+        self.data['avg_candidates_neg'] = 0
+        self.data['avg_cluster_size_mix'] = np.zeros(3)
+        self.data['avg_cluster_size_pos'] = np.zeros(3)
+        self.data['avg_cluster_size_neg'] = np.zeros(3)
 
         # self.thread = ProcessingThread()
         # self.thread.finished.connect(self.thread.quit)
@@ -4416,23 +4421,22 @@ class CandidatePreview(QWidget):
             pxsize = float(parent.globalSettings['PixelSize_nm']['value'])
 
             # get polarity options
-            polarity_option = list(parent.data['FittingResults'].groupby('p').groups.keys())
+            polarity_option = list(parent.data['FittingResult'][0].groupby('p').groups.keys())
 
             import copy
-
-            # parameter initialization
-            candidates_mix = 0
-            candidates_pos = 0
-            candidates_neg = 0
-            cluster_size_mix = [0,0,0]
-            cluster_size_pos = [0,0,0]
-            cluster_size_neg = [0,0,0]
             
             #We loop over all localizations:
-            if len(parent.data['AveragePSFmix']) == 0 and parent.data['AveragePSFpos'] == 0 and parent.data['AveragePSFneg'] == 0:
+            if len(parent.data['AveragePSFmix']) == 0 and len(parent.data['AveragePSFpos']) == 0 and len(parent.data['AveragePSFneg']) == 0:
+                # parameter initialization
+                parent.data['avg_candidates_mix'] = 0
+                parent.data['avg_candidates_pos'] = 0
+                parent.data['avg_candidates_neg'] = 0
+                parent.data['avg_cluster_size_mix'] *= 0.
+                parent.data['avg_cluster_size_pos'] *= 0.
+                parent.data['avg_cluster_size_neg'] *= 0.
                 for loc in range(0,len(parent.data['FittingResult'][0])):
                     if np.mod(loc,1000) == 0:
-                        logging.info(f"Currently at: {loc} of {len(parent.data['FittingResult'][0])}, or {100*loc/len(parent.data['FittingResult'][0])}%")
+                        logging.info(f"Currently at: {loc} of {len(parent.data['FittingResult'][0])}, or {100*loc/len(parent.data['FittingResult'][0]):.2f}%")
                     if parent.data['FittingResult'][0].iloc[loc]['fit_info'] != '':
                         continue
                     else: 
@@ -4450,19 +4454,27 @@ class CandidatePreview(QWidget):
 
                         if 2 in polarity_option: # mixed polarity case
                             parent.data['AveragePSFmix'] = pd.concat([parent.data['AveragePSFmix'], events], ignore_index=True)
-                            candidates_mix += 1
-                            cluster_size_mix += [np.max(events['x'])-np.min(events['x']), np.max(events['y'])-np.min(events['y']), np.max(events['t'])-np.min(events['t'])]
+                            parent.data['avg_candidates_mix'] += 1
+                            parent.data['avg_cluster_size_mix'] += np.array([np.max(events['x'])-np.min(events['x']), np.max(events['y'])-np.min(events['y']), np.max(events['t'])-np.min(events['t'])])
                         else: # seperate polarity case
                             if all(events['p'] == 1):
                                 #append all entries in events to sumalleventspos:
                                 parent.data['AveragePSFpos'] = pd.concat([parent.data['AveragePSFpos'], events], ignore_index=True)
-                                candidates_pos += 1
-                                cluster_size_pos += np.max(events['x'])-np.min(events['x']), np.max(events['y'])-np.min(events['y']), np.max(events['t'])-np.min(events['t'])
+                                parent.data['avg_candidates_pos'] += 1
+                                parent.data['avg_cluster_size_pos'] += np.array([np.max(events['x'])-np.min(events['x']), np.max(events['y'])-np.min(events['y']), np.max(events['t'])-np.min(events['t'])])
                             elif all(events['p'] == 0):
                                 parent.data['AveragePSFneg'] = pd.concat([parent.data['AveragePSFneg'], events], ignore_index=True)
-                                candidates_neg += 1
-                                cluster_size_neg += np.max(events['x'])-np.min(events['x']), np.max(events['y'])-np.min(events['y']), np.max(events['t'])-np.min(events['t'])
-
+                                parent.data['avg_candidates_neg'] += 1
+                                parent.data['avg_cluster_size_neg'] += np.array([np.max(events['x'])-np.min(events['x']), np.max(events['y'])-np.min(events['y']), np.max(events['t'])-np.min(events['t'])])
+                if parent.data['avg_candidates_mix'] > 0:
+                    parent.data['avg_cluster_size_mix'] /= parent.data['avg_candidates_mix']
+                    parent.data['AveragePSFmix'].sort_values(by='t', inplace=True)
+                if parent.data['avg_candidates_pos'] > 0:
+                    parent.data['avg_cluster_size_pos'] /= parent.data['avg_candidates_pos']
+                    parent.data['AveragePSFpos'].sort_values(by='t', inplace=True)
+                if parent.data['avg_candidates_neg'] > 0:
+                    parent.data['avg_cluster_size_neg'] /= parent.data['avg_candidates_neg']
+                    parent.data['AveragePSFneg'].sort_values(by='t', inplace=True)
             average_loc = pd.DataFrame({'x': [0], 'y': [0], 't': [0]})
 
             # First clear text and figures
@@ -4476,17 +4488,14 @@ class CandidatePreview(QWidget):
             # dependend on the polarity option display different plots
             if 2 in polarity_option: # mixed polarity
                 N_events = len(parent.data['AveragePSFmix'])
-                cluster_size_mix /= candidates_mix
-                self.candidate_info.setText(f"The average candidate has {N_events/candidates_mix} events and has dimensions ({cluster_size_mix[0]:.2f}, {cluster_size_mix[1]:.2f}, {cluster_size_mix[2]:.2f}).")
+                self.candidate_info.setText(f"The average candidate has {N_events/parent.data['avg_candidates_mix']} events and has dimensions ({parent.data['avg_cluster_size_mix'][0]:.2f}, {parent.data['avg_cluster_size_mix'][1]:.2f}, {parent.data['avg_cluster_size_mix'][2]:.2f}).")
                 FirstFunctionEvalText = self.getCanPrevFunctionEvalText("parent.data['AveragePSFmix']", "average_loc", "[]", "self.firstCandidateFigure","parent.globalSettings")
                 SecondFunctionEvalText = self.getCanPrevFunctionEvalText("parent.data['AveragePSFmix']", "average_loc", "[]", "self.secondCandidateFigure","parent.globalSettings")
 
-            elif 0 and 1 in polarity_option: # both polarities seperately
+            elif 0 in polarity_option and 1 in polarity_option: # both polarities seperately
                 N_events_pos = len(parent.data['AveragePSFpos'])
-                cluster_size_pos /= candidates_pos
                 N_events_neg = len(parent.data['AveragePSFneg'])
-                cluster_size_neg /= candidates_neg
-                cluster_info = f"The average positive candidate has {N_events_pos/candidates_pos:.2f} events and dimensions ({cluster_size_pos[0]:.2f}, {cluster_size_pos[1]:.2f}, {cluster_size_pos[2]:.2f}).\nThe average negative candidate has {N_events_neg/candidates_neg:.2f} events and has dimensions ({cluster_size_neg[0]:.2f}, {cluster_size_neg[1]:.2f}, {cluster_size_neg[2]:.2f})."
+                cluster_info = f"The average positive candidate has {N_events_pos/parent.data['avg_candidates_pos']:.2f} events and dimensions ({parent.data['avg_cluster_size_pos'][0]:.2f}, {parent.data['avg_cluster_size_pos'][1]:.2f}, {parent.data['avg_cluster_size_pos'][2]:.2f}).\nThe average negative candidate has {N_events_neg/parent.data['avg_candidates_neg']:.2f} events and has dimensions ({parent.data['avg_cluster_size_neg'][0]:.2f}, {parent.data['avg_cluster_size_neg'][1]:.2f}, {parent.data['avg_cluster_size_neg'][2]:.2f})."
                 self.candidate_info.setText(cluster_info)
                 FirstFunctionEvalText = self.getCanPrevFunctionEvalText("parent.data['AveragePSFpos']", "average_loc", "[]", "self.firstCandidateFigure","parent.globalSettings")
                 SecondFunctionEvalText = self.getCanPrevFunctionEvalText("parent.data['AveragePSFneg']", "average_loc", "[]", "self.secondCandidateFigure","parent.globalSettings")
@@ -4495,16 +4504,14 @@ class CandidatePreview(QWidget):
             
             elif 1 in polarity_option: # only positive polarity
                 N_events_pos = len(parent.data['AveragePSFpos'])
-                cluster_size_pos /= candidates_pos
-                cluster_info = f"The average positive candidate has {N_events_pos/candidates_pos:.2f} events and dimensions ({cluster_size_pos[0]:.2f}, {cluster_size_pos[1]:.2f}, {cluster_size_pos[2]:.2f})."
+                cluster_info = f"The average positive candidate has {N_events_pos/parent.data['avg_candidates_pos']:.2f} events and dimensions ({parent.data['avg_cluster_size_pos'][0]:.2f}, {parent.data['avg_cluster_size_pos'][1]:.2f}, {parent.data['avg_cluster_size_pos'][2]:.2f})."
                 self.candidate_info.setText(cluster_info)
                 FirstFunctionEvalText = self.getCanPrevFunctionEvalText("parent.data['AveragePSFpos']", "average_loc", "[]", "self.firstCandidateFigure","parent.globalSettings")
                 SecondFunctionEvalText = self.getCanPrevFunctionEvalText("parent.data['AveragePSFpos']", "average_loc", "[]", "self.secondCandidateFigure","parent.globalSettings")
             
             elif 0 in polarity_option: # only negative polarity
                 N_events_neg = len(parent.data['AveragePSFneg'])
-                cluster_size_neg /= candidates_neg
-                cluster_info = f"The average negative candidate has {N_events_neg/candidates_neg:.2f} events and dimensions ({cluster_size_neg[0]:.2f}, {cluster_size_neg[1]:.2f}, {cluster_size_neg[2]:.2f})."
+                cluster_info = f"The average negative candidate has {N_events_neg/parent.data['avg_candidates_neg']:.2f} events and dimensions ({parent.data['avg_cluster_size_neg'][0]:.2f}, {parent.data['avg_cluster_size_neg'][1]:.2f}, {parent.data['avg_cluster_size_neg'][2]:.2f})."
                 self.candidate_info.setText(cluster_info)
                 FirstFunctionEvalText = self.getCanPrevFunctionEvalText("parent.data['AveragePSFneg']", "average_loc", "[]", "self.firstCandidateFigure","parent.globalSettings")
                 SecondFunctionEvalText = self.getCanPrevFunctionEvalText("parent.data['AveragePSFneg']", "average_loc", "[]", "self.secondCandidateFigure","parent.globalSettings")
