@@ -100,6 +100,7 @@ class MyGUI(QMainWindow):
         self.data['prevFindingMethod'] = 'None'
         self.data['prevNrEvents'] = 0
         self.data['prevNrCandidates'] = 0
+        self.data['MetaDataOutput'] = ''
         #intialise preview events
         self.previewEvents = []
 
@@ -1505,6 +1506,7 @@ class MyGUI(QMainWindow):
         logging.info("")
         
         self.analysis_progressbar.setValue(0)
+        self.data['MetaDataOutput'] = ''
         
         #Switch the user to the Run info tab
         utils.changeTab(self, text='Run info')
@@ -1909,6 +1911,14 @@ class MyGUI(QMainWindow):
 
             logging.info('Finding results output stored')
 
+    def readableGlobalSettings(self):
+        #Returns readable global settings for metadata and such
+        output = ''
+        for key, value in self.globalSettings.items():
+            if key not in self.globalSettings['IgnoreInOptions']:
+                output+=f"{key}: {self.globalSettings[key]['value']}\n"
+        return output
+
     def createAndStoreFileMetadata(self):
         if self.globalSettings['StoreFileMetadata']['value'] > 0 :
             logging.debug('Attempting to create and store file metadata')
@@ -1916,30 +1926,24 @@ class MyGUI(QMainWindow):
                 metadatastring = dedent(f"""\
                 Metadata information for file {self.currentFileInfo['CurrentFileLoc']}
                 Analysis routine finished at {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
-
-                ---- Finding metadata output: ----
-                Methodology used:
-                {self.data['FindingMethod']}
-
-                Number of candidates found: {len(self.data['FindingResult'][0])}
-                Candidate finding took {self.currentFileInfo['FindingTime']} seconds.
-
+                
+                {self.data['MetaDataOutput']}
+                
+                ---- Global settings used ----
+                
+                {self.readableGlobalSettings()}
+                
+                ---- Additional custom output ----
+                
                 Custom output from finding function:\n""")\
-                + f"""{self.data['FindingResult'][1]}\n""" + dedent(f"""\
-
-                ---- Fitting metadata output: ----
-                Methodology used:
-                {self.data['FittingMethod']}
-
-                Number of localizations found: {len(self.data['FittingResult'][0].dropna(axis=0))}
-                Candidate fitting took {self.currentFileInfo['FittingTime']} seconds.
+                + f"""{self.data['FindingResult'][1]}\n\n""" + dedent(f"""\
 
                 Custom output from fitting function:\n""")\
                 + f"""{self.data['FittingResult'][1]}
                 """
                 #Store this metadatastring:
                 with open(self.getStoreLocationPartial()+'_RunInfo_'+self.storeNameDateTime+'.txt', 'w') as f:
-                    f.write(metadatastring)
+                    f.write(dedent(metadatastring))
                 logging.info('File metadata created and stored')
             except:
                 logging.error('Error in creating file metadata, not stored')
@@ -2047,8 +2051,9 @@ class MyGUI(QMainWindow):
 
     def save_entries_to_json(self):
         self.entries = {}
+        allEditableFields = self.get_editable_fields().items()
         # Iterate over all editable fields and store their values in the entries dictionary
-        for field_name, field_widget in self.get_editable_fields().items():
+        for field_name, field_widget in allEditableFields:
             # only store editable fields that have a name
             if not field_name=="":
                 if isinstance(field_widget, QLineEdit):
@@ -2084,7 +2089,8 @@ class MyGUI(QMainWindow):
 
             for polVal in ['Pos']:#["Pos","Neg","Mix"]:
                 # Set the values of the editable fields from the loaded entries
-                for field_name, field_widget in self.get_editable_fields().items():
+                allEditableFields = self.get_editable_fields().items()
+                for field_name, field_widget in allEditableFields:
                     if field_name in self.entries:
                         if isinstance(field_widget, QLineEdit):
                             if 'QLineEdit' in runParams:
@@ -2436,6 +2442,7 @@ class FindingAnalysis(FindingFittingAnalysis):
     
     def runFindingOnPolarity(self,singlePolarity):
         logging.info(f"Starting finding of polarity {singlePolarity}")
+        starttime = time.time()
         #check for disabling the run
         self.checkForRunDisableLoadPickleMismatch(singlePolarity)
         
@@ -2763,12 +2770,18 @@ class FindingAnalysis(FindingFittingAnalysis):
             #To be implemented
             pass
         
+        totaltime = time.time()-starttime
         #Logging feedback
         if 'findingResults' in locals():
             logging.info(f"Finding of polarity {singlePolarity} complete. {len(findingResults[0])} candidates found!")
+            #Add metadata info
+            self.GUIinfo.data['MetaDataOutput'] += '\n-----Information on finding of polarity '+singlePolarity+': -----\nMethodology Used:\n' +evalText+'\n\nNumber of candidates found: '+str(len(findingResults[0]))+'\nCandidate fitting took '+str(totaltime)+' seconds.\n\n'
         else:
             logging.info(f"Finding of polarity {singlePolarity} complete. {len(self.Results[0])} candidates found!")
+            #Add metadata info
+            self.GUIinfo.data['MetaDataOutput'] += '\n-----Information on finding of polarity '+singlePolarity+': -----\nMethodology Used:\n' +evalText+'\n\nNumber of candidates found: '+str(len(self.Results[0]))+'\nCandidate fitting took '+str(totaltime)+' seconds.\n\n'
         pass
+    
 
     def splitOnPolarity(self,singlePolarity):
         #Split the self.events on p data:
@@ -2937,6 +2950,7 @@ class FittingAnalysis(FindingFittingAnalysis):
         
     def runFittingOnPolarity(self,singlePolarity):
         logging.info(f"Starting fitting of polarity {singlePolarity}")
+        starttime = time.time()
         #Run the finding on a single polarity
         
         if len(self.findingResult[0]) > 0:
@@ -2982,6 +2996,8 @@ class FittingAnalysis(FindingFittingAnalysis):
         #Run the fitting
         fittingResults = self.runFitting()
         logging.info(f"Fitting of polarity {singlePolarity} complete. {len(fittingResults[0].dropna())} valid localizations found!")
+        totaltime = time.time() - starttime
+        self.GUIinfo.data['MetaDataOutput'] += '\n-----Information on fitting of polarity '+singlePolarity+': -----\nMethodology Used:\n' +self.GUIinfo.data['FittingMethod']+'\n\nNumber of valid localizations found: '+str(len(fittingResults[0].dropna()))+'\nCandidate fitting took '+str(totaltime)+' seconds.\n\n'
         
     """
     Fitting itself
