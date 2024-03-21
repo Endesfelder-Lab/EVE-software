@@ -3865,23 +3865,18 @@ class PreviewFindingFitting(QWidget):
 
         self.viewer.on_mouse_move = lambda event: self.currently_under_cursor(event)
         self.viewer.on_mouse_double_click = lambda event: self.napari_doubleClicked(event)
-        
-        #Test
-        # self.viewer.window.add_plugin_dock_widget('napari-1d', 'napari-1d')
-
-
 
         #Add widgets to the main layout
         self.mainRightlayout.addWidget(self.underCursorInfo) #Text box with info under cursor
         #Make it expand:
         self.viewer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.underCursorInfo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.mainRightlayout.addWidget(self.viewer) #The view itself
         self.mainlayout.addWidget(self.viewer.controls,1,1) #The controls for the viewer (contrast, etc)
         self.viewer.controls.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.mainlayout.addLayout(self.mainRightlayout,1,2)
-        # self.mainlayout.addWidget(self.viewer.layers)
 
+        #Possible layouts to give more napari information
+        # self.mainlayout.addWidget(self.viewer.layers)
         # self.mainlayout.addWidget(self.viewer.dockConsole)
         # self.mainlayout.addWidget(self.viewer.layerButtons)
         # self.mainlayout.addWidget(self.viewer.viewerButtons)
@@ -4543,7 +4538,6 @@ class CandidatePreview(QWidget):
             self.candidate_info.setText('Tried to visualise candidate but no data found!')
             logging.error('Tried to visualise candidate but no data found!')
 
-        
 class TableModel(QAbstractTableModel):
     """TableModel that heavily speedsup the table view
     Blatantly taken from https://stackoverflow.com/questions/71076164/fastest-way-to-fill-or-read-from-a-qtablewidget-in-pyqt5
