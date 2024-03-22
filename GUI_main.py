@@ -226,6 +226,10 @@ class MyGUI(QMainWindow):
 
         #Load the GUI settings from last time:
         self.load_entries_from_json()
+        
+        #Resize the GUI based from GUI settings
+        self.resize(float(self.globalSettings['GUIWindowWize']['value'][2]), float(self.globalSettings['GUIWindowWize']['value'][3]))
+        self.move(float(self.globalSettings['GUIWindowWize']['value'][0]), float(self.globalSettings['GUIWindowWize']['value'][1]))
 
         #Initialise polarity value thing (only affects very first run I believe):
         self.polarityDropdownChanged()
@@ -465,9 +469,13 @@ class MyGUI(QMainWindow):
         globalSettings['FindingBatchingTimeOverlapMs'] = {}
         globalSettings['FindingBatchingTimeOverlapMs']['value'] = 500
         globalSettings['FindingBatchingTimeOverlapMs']['input'] = float
+        globalSettings['GUIWindowWize'] = {}
+        globalSettings['GUIWindowWize']['value'] = [0,0,400,400]
+        globalSettings['GUIWindowWize']['input'] = list
+        
 
         #Add options here that should NOT show up in the global settings window - i.e. options that should not be changed
-        globalSettings['IgnoreInOptions'] = ('IgnoreInOptions','StoreFinalOutput', 'JSONGUIstorePath','GlobalOptionsStorePath')
+        globalSettings['IgnoreInOptions'] = ('IgnoreInOptions','StoreFinalOutput', 'JSONGUIstorePath','GlobalOptionsStorePath','GUIWindowWize')
         return globalSettings
 
     def datasetSearchButtonClicked(self):
@@ -1716,7 +1724,6 @@ class MyGUI(QMainWindow):
         else:
             self.analysis_progressbar.setValue(overwriteValue)
             QApplication.processEvents() #progress the changes to the gui
-        
 
     def findingAnalysisComplete(self):
         #Function is run as soon as finding is completed
@@ -2069,6 +2076,9 @@ class MyGUI(QMainWindow):
         # Write the entries dictionary to the JSON file
         with open(json_file_path, "w") as json_file:
             json.dump(self.entries, json_file)
+        
+        #Also store the global settings:
+        self.advancedSettingsWindow.save_global_settings()
 
     def load_entries_from_json(self):
         #First set all comboboxes
@@ -3168,6 +3178,10 @@ class AdvancedSettingsWindow(QMainWindow):
     def save_global_settings(self):
         # Specify the path and filename for the JSON file
         json_file_path = self.parent.globalSettings['GlobalOptionsStorePath']['value']
+
+        #Set the current GUI position/size to the global settings:
+        self.parent.globalSettings['GUIWindowWize']['value'] = [self.parent.pos().x(),self.parent.pos().y(),self.parent.width(),self.parent.height()]
+        
 
         # Serialize the globalSettings dictionary, skipping over the 'input' value
         serialized_settings = {}
