@@ -52,38 +52,51 @@ def subfunction_exists(module_name, subfunction_name):
     
 # Return all functions that are found in a specific directory
 def functionNamesFromDir(dirname):
-    #Get the absolute path, assuming that this file will stay in the sister-folder
-    absolute_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),dirname)
     #initialise empty array
     functionnamearr = []
-    #Loop over all files
-    for file in os.listdir(absolute_path):
-        #Check if they're .py files
-        if file.endswith(".py"):
-            #Check that they're not init files or similar
-            if not file.startswith("_") and not file == "utils.py" and not file == "utilsHelper.py":
-                #Get the function name
-                functionName = file[:-3]
-                #Get the metadata from this function and from there obtain
-                try:
-                    functionMetadata = eval(f'{str(functionName)}.__function_metadata__()')
-                    for singlefunctiondata in functionMetadata:
-                        #Also check this against the actual sub-routines and raise an error (this should also be present in the __init__ of the folders)
-                        subroutineName = f"{functionName}.{singlefunctiondata}"
-                        if subfunction_exists(f'{absolute_path}{os.sep}{functionName}.py',singlefunctiondata): #type:ignore
-                            functionnamearr.append(subroutineName)
-                        else:
-                            warnings.warn(f"Warning: {subroutineName} is present in __function_metadata__ but not in the actual file!")
-                #Error handling if __function_metadata__ doesn't exist
-                except AttributeError:
-                    #Get all callable subroutines and store those
-                    subroutines = []
-                    for subroutineName, obj in inspect.getmembers(eval(f'{functionName}')):
-                        if function_exists(obj):
-                            subroutines.append(subroutineName)
-                            functionnamearr.append(subroutineName)
-                    #Give the user the warning and the solution
-                    warnings.warn(f"Warning: {str(functionName)} does not have the required __function_metadata__ ! All functions that are found in this module are added! They are {subroutines}")
+    def addFilesToAbsolutePath(functionnamearr,absolute_path):
+        #Loop over all files
+        for file in os.listdir(absolute_path):
+            #Check if they're .py files
+            if file.endswith(".py"):
+                #Check that they're not init files or similar
+                if not file.startswith("_") and not file == "utils.py" and not file == "utilsHelper.py":
+                    #Get the function name
+                    functionName = file[:-3]
+                    #Get the metadata from this function and from there obtain
+                    try:
+                        functionMetadata = eval(f'{str(functionName)}.__function_metadata__()')
+                        for singlefunctiondata in functionMetadata:
+                            #Also check this against the actual sub-routines and raise an error (this should also be present in the __init__ of the folders)
+                            subroutineName = f"{functionName}.{singlefunctiondata}"
+                            if subfunction_exists(f'{absolute_path}{os.sep}{functionName}.py',singlefunctiondata): #type:ignore
+                                functionnamearr.append(subroutineName)
+                            else:
+                                warnings.warn(f"Warning: {subroutineName} is present in __function_metadata__ but not in the actual file!")
+                    #Error handling if __function_metadata__ doesn't exist
+                    except AttributeError:
+                        #Get all callable subroutines and store those
+                        subroutines = []
+                        for subroutineName, obj in inspect.getmembers(eval(f'{functionName}')):
+                            if function_exists(obj):
+                                subroutines.append(subroutineName)
+                                functionnamearr.append(subroutineName)
+                        #Give the user the warning and the solution
+                        warnings.warn(f"Warning: {str(functionName)} does not have the required __function_metadata__ ! All functions that are found in this module are added! They are {subroutines}")
+        return functionnamearr
+    
+    #Get the absolute path, assuming that this file will stay in the sister-folder
+    absolute_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),dirname)
+    functionnamearr = addFilesToAbsolutePath(functionnamearr,absolute_path)
+    
+    #Also do this on the app-data folder
+    #Try-except clause just if the folder isn't in appdata it shouldn't be an issue
+    try:
+        additional_folder_name = os.path.join("C:\\Users\\Koen Martens\\AppData\\Local\\UniBonn\\Eve",dirname)
+        functionnamearr = addFilesToAbsolutePath(functionnamearr,additional_folder_name)
+    except:
+        pass
+    
     #return all functions
     return functionnamearr
 
