@@ -231,7 +231,29 @@ class MyGUI(QMainWindow):
         self.data['avg_cluster_size_pos'] = np.zeros(3)
         self.data['avg_cluster_size_neg'] = np.zeros(3)
 
+        self.uselessWarningSupression()
+
         logging.info('Initialisation complete.')
+
+    def uselessWarningSupression(self):
+        #Script to supress warnings that we really don't care about
+        import warnings
+
+        # Define a filter function to suppress the specific warning
+        def warning_filter(message, category, filename, lineno, file=None, line=None):
+            patterns = [
+                "QCoreApplication::exec: The event loop is already running"
+                "QPainter::begin: Paint device returned engine == 0, type: 3"
+            ]
+            
+            # Compile regex patterns
+            compiled_patterns = [re.compile(pattern) for pattern in patterns]
+            for pattern in compiled_patterns:
+                if pattern.match(message):
+                    return False
+            return True
+
+        warnings.showwarning = warning_filter
 
     def createToolBar(self):
         menuBar = QMenuBar(self)
