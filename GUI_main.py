@@ -41,6 +41,7 @@ from vispy.color import Colormap
 #Custom imports
 # Add the folder 2 folders up to the system path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 #Import all scripts in the custom script folders
 # List all files in the CandidateFitting directory
 from CandidateFitting import *
@@ -146,7 +147,6 @@ class MyGUI(QMainWindow):
         self.layout = QGridLayout()
         content_widget.setLayout(self.layout)
 
-
         # Set the content widget to the scroll area
         scroll_area.setWidget(content_widget)
 
@@ -160,32 +160,8 @@ class MyGUI(QMainWindow):
         self.polarityDropdownNames = ['All events treated equal','Positive only','Negative only','Pos and neg seperately']
         self.polarityDropdownOrder = [0,1,2,3]
 
-        """
-        Global settings group box
-        """
-        #Create a global settings group box
-        self.globalSettingsGroupBox = QGroupBox("Global settings")
-        self.globalSettingsGroupBox.setLayout(QGridLayout()) #Give it a grid layout as well
-
-        #Create an advanced settings button that opens a new window
-        self.advancedSettingsButton = QPushButton("Advanced settings", self)
-        self.advancedSettingsButton.clicked.connect(self.open_advanced_settings)
-        self.globalSettingsGroupBox.layout().addWidget(self.advancedSettingsButton, 0, 0,1,2)
-
         #Initialise (but not show!) advanced window:
         self.advancedSettingsWindow = AdvancedSettingsWindow(self)
-
-        # Create a button to trigger saving the entries
-        self.save_button = QPushButton("Save GUI contents", self)
-        self.save_button.clicked.connect(self.save_entries_to_json)
-        self.globalSettingsGroupBox.layout().addWidget(self.save_button, 0, 3)
-        # Create a button to trigger loading the entries
-        self.load_button = QPushButton("Load GUI contents", self)
-        self.load_button.clicked.connect(self.load_entries_from_json)
-        self.globalSettingsGroupBox.layout().addWidget(self.load_button, 0,4)
-
-        #Add the global settings group box to the central widget
-        self.layout.addWidget(self.globalSettingsGroupBox, 0, 0)
 
         """
         Main tab widget (containing processing, post-processing etc tabs)
@@ -193,7 +169,7 @@ class MyGUI(QMainWindow):
         #Create a tab widget and add this to the main group box
         self.mainTabWidget = QTabWidget()
         self.mainTabWidget.setTabPosition(QTabWidget.South)
-        self.layout.addWidget(self.mainTabWidget, 2, 0)
+        self.layout.addWidget(self.mainTabWidget, 0, 0)
 
         #Add the individual tabs
         self.tab_processing = QWidget()
@@ -219,7 +195,6 @@ class MyGUI(QMainWindow):
         self.setup_tab('Run info')
         self.setup_tab('Preview visualisation')
         self.setup_tab('Candidate preview')
-
 
         #Loop through all combobox states briefly to initialise them (and hide them)
         self.set_all_combobox_states()
@@ -262,6 +237,19 @@ class MyGUI(QMainWindow):
         menuBar = QMenuBar(self)
         self.setMenuBar(menuBar)
         settingsMenu = menuBar.addMenu("&Settings")
+        openAdvancedSettings = settingsMenu.addAction("Advanced settings")
+        openAdvancedSettings.triggered.connect(self.open_advanced_settings)
+        settingsMenu.addSeparator()
+        saveGUIcontents = settingsMenu.addAction("Save GUI contents")
+        saveGUIcontents.triggered.connect(self.save_entries_to_json)
+        loadGUIcontents = settingsMenu.addAction("Load last GUI contents")
+        loadGUIcontents.triggered.connect(self.load_entries_from_json)
+        settingsMenu.addSeparator()
+        saveGUIcontents = settingsMenu.addAction("Save-as GUI contents")
+        saveGUIcontents.triggered.connect(self.saveas_entries_to_json)
+        loadGUIcontents = settingsMenu.addAction("Load specific GUI contents")
+        loadGUIcontents.triggered.connect(self.loadas_entries_from_json)
+        settingsMenu.addSeparator()
         changeColorAction = settingsMenu.addAction("Change appearance color")
         changeColorAction.triggered.connect(self.changeAppearanceColor)
         
@@ -2056,7 +2044,8 @@ class MyGUI(QMainWindow):
         widget.setCurrentText(f"{newMethod} ({polarity.lower()})")
         print(widget)
 
-    def save_entries_to_json(self):
+
+    def save_entries_to_json_core(self):
         self.entries = {}
         allEditableFields = self.get_editable_fields().items()
         # Iterate over all editable fields and store their values in the entries dictionary
@@ -2070,9 +2059,28 @@ class MyGUI(QMainWindow):
                 elif isinstance(field_widget, QComboBox):
                     self.entries[field_name] = field_widget.currentText()
 
+    def saveas_entries_to_json(self):
+        #Do save_entries_to_json, but to a user-definable location
+        #Do the bulk of the work
+        self.save_entries_to_json_core()
+    
+        #Get a location from the user
+        options = QFileDialog.Options()
+        file_path, _ = QFileDialog.getSaveFileName(self, "Select storage location", "", "JSON Files (*.json)", options=options)
+        if file_path:
+            with open(file_path, 'w') as json_file:
+                json.dump(self.entries, json_file)
+            #Also store the global settings:
+            self.advancedSettingsWindow.save_global_settings(jsonLocation=file_path[:-5]+'_advancedSettings.json')
+        else:
+            pass
+
+        
+    def save_entries_to_json(self):
+        #Do the bulk of the work
+        self.save_entries_to_json_core()
         # Specify the path and filename for the JSON file
         json_file_path = self.globalSettings['JSONGUIstorePath']['value']
-
         # Write the entries dictionary to the JSON file
         with open(json_file_path, "w") as json_file:
             json.dump(self.entries, json_file)
@@ -2080,18 +2088,42 @@ class MyGUI(QMainWindow):
         #Also store the global settings:
         self.advancedSettingsWindow.save_global_settings()
 
-    def load_entries_from_json(self):
-        #First set all comboboxes
-        self.load_entries_from_json_single(runParams=['QComboBox'])
-        #Then set all line edits
-        self.load_entries_from_json_single(runParams=['QLineEdit'])
-        #Then set all checkboxes
-        self.load_entries_from_json_single(runParams=['QCheckBox'])
+    def loadas_entries_from_json(self):
+        # Specify the path and filename for the JSON file
+        #Get a location from the user
+        options = QFileDialog.Options()
+        file_path, _ = QFileDialog.getOpenFileName(self, "Select storage location", "", "JSON Files (*.json)", options=options)
+        if file_path:
+            #First set all comboboxes
+            self.load_entries_from_json_single(json_file_path=file_path,runParams=['QComboBox'])
+            #Then set all line edits
+            self.load_entries_from_json_single(json_file_path=file_path,runParams=['QLineEdit'])
+            #Then set all checkboxes
+            self.load_entries_from_json_single(json_file_path=file_path,runParams=['QCheckBox'])
+            #try to load global settings next to it:
+            try:
+                self.advancedSettingsWindow.load_global_settings(jsonLocation=file_path[:-5]+'_advancedSettings.json')
+            except:
+                logging.warning('Could not load global settings from '+file_path[:-5]+'_advancedSettings.json')
+                
+        else:
+            pass
 
-    def load_entries_from_json_single(self,runParams=['QLineEdit','QComboBox','QCheckBox']):
+    def load_entries_from_json(self):
         # Specify the path and filename for the JSON file
         json_file_path = self.globalSettings['JSONGUIstorePath']['value']
-
+        #First set all comboboxes
+        self.load_entries_from_json_single(json_file_path=json_file_path,runParams=['QComboBox'])
+        #Then set all line edits
+        self.load_entries_from_json_single(json_file_path=json_file_path,runParams=['QLineEdit'])
+        #Then set all checkboxes
+        self.load_entries_from_json_single(json_file_path=json_file_path,runParams=['QCheckBox'])
+        #Also load global settings
+        self.advancedSettingsWindow.load_global_settings()
+        
+    def load_entries_from_json_single(self,json_file_path=None,runParams=['QLineEdit','QComboBox','QCheckBox']):
+        if json_file_path is None:
+            json_file_path = self.globalSettings['JSONGUIstorePath']['value']
         try:
             # Load the entries from the JSON file
             with open(json_file_path, "r") as json_file:
@@ -3168,10 +3200,12 @@ class AdvancedSettingsWindow(QMainWindow):
     def update_global_settings(self, setting, value):
         self.parent.globalSettings[setting]['value'] = value
 
-    def save_global_settings(self):
-        # Specify the path and filename for the JSON file
-        json_file_path = self.parent.globalSettings['GlobalOptionsStorePath']['value']
-
+    def save_global_settings(self,jsonLocation=None):
+        if jsonLocation == None:
+            # Specify the path and filename for the JSON file
+            json_file_path = self.parent.globalSettings['GlobalOptionsStorePath']['value']
+        else:
+            json_file_path = jsonLocation
         #Set the current GUI position/size to the global settings:
         self.parent.globalSettings['GUIWindowWize']['value'] = [self.parent.pos().x(),self.parent.pos().y(),self.parent.width(),self.parent.height()]
         
@@ -3194,9 +3228,12 @@ class AdvancedSettingsWindow(QMainWindow):
         logging.info('Global settings saved!')
         self.close()
 
-    def load_global_settings(self):
-        # Specify the path and filename for the JSON file
-        json_file_path = self.parent.globalSettings['GlobalOptionsStorePath']['value']
+    def load_global_settings(self,jsonLocation=None):
+        if jsonLocation == None:
+            # Specify the path and filename for the JSON file
+            json_file_path = self.parent.globalSettings['GlobalOptionsStorePath']['value']
+        else:
+            json_file_path = jsonLocation
         try:    # Load the globalSettings dictionary from the JSON file
             with open(json_file_path, "r") as json_file:
                 loaded_settings = json.load(json_file)
