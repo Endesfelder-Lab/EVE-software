@@ -2138,17 +2138,10 @@ class MyGUI(QMainWindow):
 
     def get_editable_fields(self):
         fields = {}
-
-        def find_editable_fields(widget):
-            if isinstance(widget, QLineEdit) or isinstance(widget, QComboBox) or isinstance(widget, QCheckBox):
-                fields[widget.objectName()] = widget
-            elif isinstance(widget, QWidget):
-                # for child_widget in widget.children():
-                #     find_editable_fields(child_widget)
-                for children_widget in widget.findChildren(QWidget):
-                    find_editable_fields(children_widget)
-
-        find_editable_fields(self)
+        all_widgets = self.findChildren((QLineEdit, QComboBox, QCheckBox))
+        for widget in all_widgets:
+            fields[widget.objectName()] = widget
+        
         return fields
 
     def reset_single_combobox_states(self):
