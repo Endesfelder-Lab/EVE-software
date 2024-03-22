@@ -1721,6 +1721,7 @@ class MyGUI(QMainWindow):
     def findingAnalysisComplete(self):
         #Function is run as soon as finding is completed
         self.currentFileInfo['FindingTime'] = time.time() - self.analysisStartTime 
+        self.storeFindingOutput()
     
     def fittingAnalysisComplete(self):
         #Function is run as soon as fitting is completed
@@ -1732,7 +1733,6 @@ class MyGUI(QMainWindow):
         #Store data... These functions have checks on what to store
         # if self.globalSettings['StoreFinalOutput']['value'] > 0:
         self.storeLocalizationOutput()
-        self.storeFindingOutput()
         self.createAndStoreFileMetadata()
         
         #restore global settings (can be changed in run_processing_i)
