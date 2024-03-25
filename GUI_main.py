@@ -16,7 +16,9 @@ from textwrap import dedent
 import h5py
 if platform.system() == 'Linux':
     # Add hdf5 plugin to read metavision hdf5 format encoded with ECF codec (see https://docs.prophesee.ai/stable/data/file_formats/hdf5.html)
-    h5py.h5pl.append(b"/usr/lib/x86_64-linux-gnu/hdf5/plugins")
+    # default hdf5 plugin path: b'/usr/local/hdf5/lib/plugin' remains unchanged index 0 (h5py.h5pl.get(0))
+    h5py.h5pl.append(b"/usr/lib/x86_64-linux-gnu/hdf5/plugins") # path for Ubuntu 20.04 (within Metavision SDK installation)
+    h5py.h5pl.append(b"/usr/lib/x86_64-linux-gnu/hdf5/serial/plugins") # path for Ubuntu 22.04 (within Metavision SDK installation)
 import traceback
 import re
 from joblib import Parallel, delayed
@@ -1292,21 +1294,22 @@ class MyGUI(QMainWindow):
     def updateLocList(self):
         #data is stored in self.data['FittingResult'][0]
         #fill the self.LocListTable QTableWidget with the data:
-        localizations = self.data['FittingResult'][0].dropna(axis=0, ignore_index=True)
-        try:
-            localizations = localizations.drop('fit_info', axis=1)
-        except:
-            pass
+        if len(self.data['FittingResult'][0]) > 0:
+            localizations = self.data['FittingResult'][0].dropna(axis=0, ignore_index=True)
+            try:
+                localizations = localizations.drop('fit_info', axis=1)
+            except:
+                pass
 
-        # Define the number of significant digits for each column
-        significant_digits = {'x': 2, 'y': 2, 'p': 0, 'id':0,'candidate_id':0,'del_x':2,'del_y':2, 't':2, 'del_t':2, 'N_events':0, 'x_dim':0, 'y_dim':0, 't_dim':2, 'sigma_x': 2, 'sigma_y': 2}
+            # Define the number of significant digits for each column
+            significant_digits = {'x': 2, 'y': 2, 'p': 0, 'id':0,'candidate_id':0,'del_x':2,'del_y':2, 't':2, 'del_t':2, 'N_events':0, 'x_dim':0, 'y_dim':0, 't_dim':2, 'sigma_x': 2, 'sigma_y': 2}
 
-        for y in range(len(localizations.columns)):
-            significant_digit = significant_digits.get(localizations.columns[y])
-            if significant_digit is not None:
-                localizations[localizations.columns[y]] = localizations[localizations.columns[y]].apply(lambda x: round(x, significant_digit))
+            for y in range(len(localizations.columns)):
+                significant_digit = significant_digits.get(localizations.columns[y])
+                if significant_digit is not None:
+                    localizations[localizations.columns[y]] = localizations[localizations.columns[y]].apply(lambda x: round(x, significant_digit))
 
-        self.LocListTable.setModel(TableModel(table_data = localizations))
+            self.LocListTable.setModel(TableModel(table_data = localizations))
         return
 
     def checkPolarity(self,npyData):
@@ -1852,7 +1855,7 @@ class MyGUI(QMainWindow):
 
     def storeLocalizationOutput(self):
         #Storing the .CSV
-        if self.globalSettings['StoreFinalOutput']['value'] > 0:
+        if self.globalSettings['StoreFinalOutput']['value'] > 0 and len(self.data['FittingResult'][0]) > 0:
             logging.debug('Attempting to store fitting results output')
             storeLocation = self.getStoreLocationPartial()+'_FitResults_'+self.storeNameDateTime+'.csv'
             #Store the localization output
@@ -1864,7 +1867,7 @@ class MyGUI(QMainWindow):
 
         #Also store pickle information:
         #Also save pos and neg seperately if so useful:
-        if self.globalSettings['StoreFittingOutput']['value'] > 0:
+        if self.globalSettings['StoreFittingOutput']['value'] > 0 and len(self.data['FittingResult'][0]) > 0:
             if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[3]:
                 try:
                     allPosFittingResults = self.data['FittingResult'][0][self.data['FittingResult'][0]['p']==1]
@@ -1896,7 +1899,7 @@ class MyGUI(QMainWindow):
             logging.info('Fitting results output stored')
 
     def storeFindingOutput(self):
-        if self.globalSettings['StoreFindingOutput']['value'] > 0:
+        if self.globalSettings['StoreFindingOutput']['value'] > 0 and len(self.data['FindingResult'][0]) > 0:
             logging.debug('Attempting to store finding results output')
             #Store the Finding results output
             file_path = self.currentFileInfo['CurrentFileLoc'][:-4]+'_FindingResults_'+self.storeNameDateTime+'.pickle'
@@ -3054,10 +3057,21 @@ class FittingAnalysis(FindingFittingAnalysis):
             self.fittingAdjustValue = 0
         
         #Run the fitting
-        fittingResults = self.runFitting()
-        logging.info(f"Fitting of polarity {singlePolarity} complete. {len(fittingResults[0].dropna())} valid localizations found!")
+        if self.partialFindingResults is not None:
+            fittingResults = self.runFitting()
+            logging.info(f"Fitting of polarity {singlePolarity} complete. {len(fittingResults[0].dropna())} valid localizations found!")
+            nLoc = len(fittingResults[0].dropna())
+        else:
+            fittingResults = pd.DataFrame()
+            self.Results = {}
+            self.Results[0] = fittingResults
+            self.Results[1] = fittingResults
+            logging.info(f"Fitting of polarity {singlePolarity} complete. No localizations found!")
+            nLoc = 0
+            pass
+
         totaltime = time.time() - starttime
-        self.GUIinfo.data['MetaDataOutput'] += '\n-----Information on fitting of polarity '+singlePolarity+': -----\nMethodology Used:\n' +self.GUIinfo.data['FittingMethod']+'\n\nNumber of valid localizations found: '+str(len(fittingResults[0].dropna()))+'\nCandidate fitting took '+str(totaltime)+' seconds.\n\n'
+        self.GUIinfo.data['MetaDataOutput'] += '\n-----Information on fitting of polarity '+singlePolarity+': -----\nMethodology Used:\n' +self.GUIinfo.data['FittingMethod']+'\n\nNumber of valid localizations found: '+str(nLoc)+'\nCandidate fitting took '+str(totaltime)+' seconds.\n\n'
         
     """
     Fitting itself
