@@ -14,6 +14,9 @@ import pickle
 import time
 from textwrap import dedent
 import h5py
+if platform.system() == 'Linux':
+    # Add hdf5 plugin to read metavision hdf5 format encoded with ECF codec (see https://docs.prophesee.ai/stable/data/file_formats/hdf5.html)
+    h5py.h5pl.append(b"/usr/lib/x86_64-linux-gnu/hdf5/plugins")
 import traceback
 import re
 from joblib import Parallel, delayed
