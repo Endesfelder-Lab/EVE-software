@@ -1598,6 +1598,16 @@ class MyGUI(QMainWindow):
         
         #'preview', not 'run'
         self.findingAnalysis.set_timeStretchMs([float(self.previewTimeStretch[0]),float(self.previewTimeStretch[0])+float(self.previewTimeStretch[1])])
+        #Check if any of previewXYstretch are non-floats:
+        xystretchisallfloats = True
+        for item in self.previewXYStretch:
+            try:
+                float(item)
+            except:
+                xystretchisallfloats = False
+        if not xystretchisallfloats:
+            self.previewXYStretch = [-np.inf,np.inf,-np.inf,np.inf]
+            logging.warning('Set preview XY stretch to -Inf,Inf,-Inf,Inf')
         self.findingAnalysis.set_xyStretch([[float(self.previewXYStretch[0]),float(self.previewXYStretch[1])],[float(self.previewXYStretch[2]),float(self.previewXYStretch[3])]])
         
         #Run the analysis
@@ -4110,6 +4120,9 @@ class PreviewFindingFitting(QWidget):
         self.maxFrames = n_frames
         #Create a fullh istogram to get the min/max xy pos and such
         self.hist_xy = eventDistributions.SumPolarity(events)
+        #Start keeping running total of min/max contrast limits
+        minContrastLimit,maxContrastLimit = 0,0
+        contrast_limit_percentile = 0.01
         for n in range(0,n_frames):
             #Get the events on this 'frame'
             events_this_frame = events[(events['t']>(float(timeStretch[0])*1000+n*frametime_ms*1000)) & (events['t']<(float(timeStretch[0])*1000+(n+1)*frametime_ms*1000))]
@@ -4118,6 +4131,13 @@ class PreviewFindingFitting(QWidget):
             thisHist_xy = self.hist_xy(events_this_frame)
             #Add it to our image
             preview_multiD_image.append(thisHist_xy[0])
+            #Keep a running total of minimum and maximum contrast limits
+            minContrastVal = np.percentile(thisHist_xy[0], contrast_limit_percentile)
+            maxContrastVal = np.percentile(thisHist_xy[0], 100-contrast_limit_percentile)
+            if minContrastVal < minContrastLimit:
+                minContrastLimit = minContrastVal
+            if maxContrastVal > maxContrastLimit:
+                maxContrastLimit = maxContrastVal
 
         #Scale should be the scale of pixel - to - um. E.g. a scale of 0.01 means 100 pixels = 1 um
         scale = ((float(settings['PixelSize_nm']['value']))/1000)
@@ -4135,6 +4155,10 @@ class PreviewFindingFitting(QWidget):
         
         #Select the original image-layer as selected
         self.napariviewer.layers.selection.active = self.napariviewer.layers[0]
+        
+        #Set a proper brightness/contrast range:
+        self.napariviewer.layers[0].contrast_limits = (minContrastLimit-2,maxContrastLimit+2)
+        
         self.update_visibility()
         self.napariviewer.dims.events.current_step.connect(self.update_visibility)
 
