@@ -133,6 +133,6 @@ Now, you can perform a NeNa fit by selecting `Nearest neighbour analysis (NeNA) 
 
 ### 9. Metadata, run and result files
 
-If selected correctly in the `Advanced Settings`, Eve will store a lot of metadata, run and result files automatically. 
+If selected correctly in the `Advanced Settings`, Eve will store a lot of metadata, run and result files automatically. In our "Getting Started" example, three finding and three fitting `.pickle` files are stored containing all, only positive and only negative candidates/localizations. In addition, a `.csv` file with all localizations and a metadata `Runinfo` file are stored.
 
 ![](Quick_Start/17_saved_files.png)
