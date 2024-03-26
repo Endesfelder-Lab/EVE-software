@@ -112,7 +112,7 @@ For Linux users currently only one method (`Drift correction by entropy minimiza
 
 ![](Quick_Start/10_drift_correction_linux.png)
 
-As you can see, the drift estimated by the two different drift correction methods is quite similar. 
+As you can see, the drift estimated by the two different drift correction methods is quite similar. You can now switch again to `Visualization` and press `Visualize!` to view the super-resolved event SMLM image.
 
 ![](Quick_Start/11_updated_visualization.png)
 
@@ -126,6 +126,6 @@ As you can see, the drift estimated by the two different drift correction method
 
 ![](Quick_Start/15_NeNa.png)
 
-### 9. All files stored for one run
+### 9. Metadata, run and result files
 
 ![](Quick_Start/17_saved_files.png)
