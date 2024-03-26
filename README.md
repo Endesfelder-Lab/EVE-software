@@ -87,7 +87,7 @@ By the `Previous` and `Next` buttons you can simply click through all the cluste
 
 ![](Quick_Start/7_candidate_preview_pos.png)
 
-### 4. Excute a full Run
+### 4. Execute a full Run
 If you are satisfied with the results of the current selection of finding and fitting parameters, you can start a complete run. To do so, switch back to the `Processing` tab and click `Run`. \ 
 The `Run Info` tab will again open automatically and show additional info regarding the current run, e.g. number of candidates and valid localizations found as well as a number of candidates (absolute and percentage) that was removed during fitting.
 
@@ -118,9 +118,13 @@ As you can see, the drift estimated by the two different drift correction method
 
 ### 7. The final Localization List
 
+The drift corrected localization list is not saved automatically. To export the list in `.csv` format, switch to the `Localization List` tab and press `Save CSV`.
+
 ![](Quick_Start/12_localization_list.png)
 
 ### 8. Estimate the Localization Precision
+
+To get an estimate on the localzation precision we can make use of the fact, that for each fluorophore blink we measure the on and off-switching. This means, that we have one cluster of positive polarity for the on switching and one cluster of negative cluster polarity. By comparing the distances between the corresponding positive and negative localizations we can get our localization precision 
 
 ![](Quick_Start/14_polarity_matching.png)
 
