@@ -44,7 +44,7 @@ Eve can read and process event-based data in `.npy` and `.hdf5` format. Addition
 ### Running Eve
 To open the graphical user interface and run Eve, first activate the python environment you created during the installation. Then run `GUI.py` with Python.
 ## Quick Start Guide
-### Set up the Processing Tab
+### 1. Set up the Processing Tab
 Running `GUI.py` will open Eve's graphical user interface which you can see on the right side of the figure.
 
 ![](Quick_Start/1_Setting_up_GUI_new.png)
@@ -67,7 +67,7 @@ Everything is now ready for the first run. Before you start the first run, save 
 5. **Run box:** When you click run, a full run will be executed.
 6. **Preview box:** To check whether the current selection of parameters for the candidate finding is suitable for your data or needs further fine tuning, you can perform a preview run. Doing so, will perform the analysis routines only on a smaller subset of the data that you can specify in the preview box. To view the event data, which in its raw form is just a list of events, it is converted into a format that is easier for humans to view and interpret (images). You must therefore specify a `display frame time` together with the data selection you would like to display. 
 7. **Tab menu:** Here, you can change between different tabs: `Processing` (current tab), `Post-processing` (follow up analysis after a full run), `Localization List` (view, import and export localization tables), `Visualization` (visualize the super-resolved event SMLM data), `Run Info` (info about current run), `Preview run` (preview of finding and fitting performance, useful for parameter tweaking) and `Candidate Preview` (view single candidate clusters and their x,y,t localization results)
-### Perform a Preview Run
+### 2. Perform a Preview Run
 Now, change the `Duration` in the preview box to 10000ms and then press `Preview`. This will immediately open the run info. 
 By leaving the settings `min` and `max` for x,y empty, you will get a preview for the entire FOV without spatial restrictions. \
 Switch to the `Preview run` tab, as soon as the preview run is complete (`UpdateShowPreview ran!` is printed in `Run info` tab). 
@@ -76,7 +76,7 @@ Switch to the `Preview run` tab, as soon as the preview run is complete (`Update
 
 Each candidate cluster found by the candidate finding routine will be highlighted with an orange or red box and gets a unique candidate ID that is here displayed in blue. A red box indicates that a failed fit, meaning that no localization could be generated. All localizations are marked as red crosses in the frame where the x,y,t localization is found.
 You can use the slider below the image to view all the frames that were created in the preview run.
-### Explore the Candidate Preview
+### 3. Explore the Candidate Preview
 By either double-clicking on a candidate in the preview image or switching to the last tab, you can open the `Candidate preview`.
 Change the plot options for the first plot to `3D point cloud of the candidate cluster` and for the second plot to `2D projections of candidate cluster`. 
 In a preview run you can also display surrounding events to evaluate if the full candidate cluster is found. To do so, set `show surrounding` to `True` and add a custom x,y and t-padding in the first plot options.
@@ -87,31 +87,45 @@ By the `Previous` and `Next` buttons you can simply click through all the cluste
 
 ![](Quick_Start/7_candidate_preview_pos.png)
 
-### Excute a full Run
-
+### 4. Excute a full Run
+If you are satisfied with the results of the current selection of finding and fitting parameters, you can start a complete run. To do so, switch back to the `Processing` tab and click `Run`. \ 
+The `Run Info` tab will again open automatically and show additional info regarding the current run, e.g. number of candidates and valid localizations found as well as a number of candidates (absolute and percentage) that was removed during fitting.
 
 ![](Quick_Start/8_full_run.png)
 
-### Visualize the Localization Results
+### 5. Visualize the Localization Results
+As soon as the full run is completed, you can visualize your results. Therefore, switch to the `Visualization` tab, select `Histogram_Convolution: Histogram_convolution` and press `Visualize`.
 
 ![](Quick_Start/9_visualization.png)
 
-### Apply a Drift Correction
+As you can see the sample data is rather drifty and we can't see our DNA nanorulers yet.
 
-![](Quick_Start/10_drift_correction_linux.png)![](Quick_Start/10_drift_correction_windows.png)
+### 6. Apply a Drift Correction
+To apply a drift correction, switch to the `Post-processing` tab.
+#### Under Windows
+Windows users can choose between two different drift correction routines. Select `DriftCorr_DME: DriftCorr_RCC` and press `Post processing!`. This will open a pop-up window showing the estimated x,y-drift. Additionally, an entry was added to the `Post-processing history` at the bottom of the tab. By clicking `Resotre to before this` you can undo the last post-processing step. 
+
+![](Quick_Start/10_drift_correction_windows.png)
+
+#### Under Linux
+For Linux users currently only one method (`Drift correction by entropy minimization`) is working. Select the method and set the `Use ConvHist(Linux)` flag to `True`. Now press `Post processing!` which will open a pop-up window showing the estimated x,y-drift. Additionally, an entry was added to the `Post-processing history` at the bottom of the tab. By clicking `Resotre to before this` you can undo the last post-processing step. 
+
+![](Quick_Start/10_drift_correction_linux.png)
+
+As you can see, the drift estimated by the two different drift correction methods is quite similar. 
 
 ![](Quick_Start/11_updated_visualization.png)
 
-### The final Localization List
+### 7. The final Localization List
 
 ![](Quick_Start/12_localization_list.png)
 
-### Estimate the Localization Precision
+### 8. Estimate the Localization Precision
 
 ![](Quick_Start/14_polarity_matching.png)
 
 ![](Quick_Start/15_NeNa.png)
 
-### All files stored for one run
+### 9. All files stored for one run
 
 ![](Quick_Start/17_saved_files.png)
