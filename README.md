@@ -103,12 +103,12 @@ As you can see the sample data is rather drifty and we can't see our DNA nanorul
 ### 6. Apply a Drift Correction
 To apply a drift correction, switch to the `Post-processing` tab.
 #### Under Windows
-Windows users can choose between two different drift correction routines. Select `DriftCorr_DME: DriftCorr_RCC` and press `Post processing!`. This will open a pop-up window showing the estimated x,y-drift. Additionally, an entry was added to the `Post-processing history` at the bottom of the tab. By clicking `Resotre to before this` you can undo the last post-processing step. 
+Windows users can choose between two different drift correction routines. Select `DriftCorr_DME: DriftCorr_RCC` and press `Post processing!`. This will open a pop-up window showing the estimated x,y-drift. Additionally, an entry was added to the `Post-processing history` at the bottom of the tab. By clicking `Restore to before this` you can undo the last post-processing step. 
 
 ![](Quick_Start/10_drift_correction_windows.png)
 
 #### Under Linux
-For Linux users currently only one method (`Drift correction by entropy minimization`) is working. Select the method and set the `Use ConvHist(Linux)` flag to `True`. Now press `Post processing!` which will open a pop-up window showing the estimated x,y-drift. Additionally, an entry was added to the `Post-processing history` at the bottom of the tab. By clicking `Resotre to before this` you can undo the last post-processing step. 
+For Linux users currently only one method (`Drift correction by entropy minimization`) is working. Select the method and set the `Use ConvHist(Linux)` flag to `True`. Now press `Post processing!` which will open a pop-up window showing the estimated x,y-drift. Additionally, an entry was added to the `Post-processing history` at the bottom of the tab. By clicking `Restore to before this` you can undo the last post-processing step. 
 
 ![](Quick_Start/10_drift_correction_linux.png)
 
@@ -117,19 +117,22 @@ As you can see, the drift estimated by the two different drift correction method
 ![](Quick_Start/11_updated_visualization.png)
 
 ### 7. The final Localization List
-
 The drift corrected localization list is not saved automatically. To export the list in `.csv` format, switch to the `Localization List` tab and press `Save CSV`.
 
 ![](Quick_Start/12_localization_list.png)
 
 ### 8. Estimate the Localization Precision
-
-To get an estimate on the localzation precision we can make use of the fact, that for each fluorophore blink we measure the on and off-switching. This means, that we have one cluster of positive polarity for the on switching and one cluster of negative cluster polarity. By comparing the distances between the corresponding positive and negative localizations we can get our localization precision 
+To get an estimate on the localzation precision we can make use of the fact, that for each fluorophore blink we measure the on and off-switching. This means, that we have one cluster of positive polarity for the on switching and one cluster of negative cluster polarity for the off switching. By comparing the distances between the corresponding positive and negative localizations we can get our localization precision via a Nearest neighbour analysis (NeNA). \
+To do so, we first need to do the polarity matching. Therefore, switch again to the `Post-processing` tab and select `Polarity Matching - match on and off events` and press `PostProcessing!`. 
 
 ![](Quick_Start/14_polarity_matching.png)
+
+Now, you can perform a NeNa fit by selecting `Nearest neighbour analysis (NeNA) precision on matched polarities` and pressing `PostProcessing!`. This will open a pop-up window showing the distance distribution of all matched localizations along with the NeNA fit. For our DNA nanoruler and the candidate finding and fitting methods and parameters we get a localization precision of (10.24±0.2)nm.
 
 ![](Quick_Start/15_NeNa.png)
 
 ### 9. Metadata, run and result files
+
+If selected correctly in the `Advanced Settings`, Eve will store a lot of metadata, run and result files automatically. 
 
 ![](Quick_Start/17_saved_files.png)
