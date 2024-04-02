@@ -14,6 +14,11 @@ import pickle
 import time
 from textwrap import dedent
 import h5py
+if platform.system() == 'Linux':
+    # Add hdf5 plugin to read metavision hdf5 format encoded with ECF codec (see https://docs.prophesee.ai/stable/data/file_formats/hdf5.html)
+    # default hdf5 plugin path: b'/usr/local/hdf5/lib/plugin' remains unchanged index 0 (h5py.h5pl.get(0))
+    h5py.h5pl.append(b"/usr/lib/x86_64-linux-gnu/hdf5/plugins") # path for Ubuntu 20.04 (within Metavision SDK installation)
+    h5py.h5pl.append(b"/usr/lib/x86_64-linux-gnu/hdf5/serial/plugins") # path for Ubuntu 22.04 (within Metavision SDK installation)
 import traceback
 import re
 from joblib import Parallel, delayed
@@ -41,6 +46,7 @@ from vispy.color import Colormap
 #Custom imports
 # Add the folder 2 folders up to the system path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 #Import all scripts in the custom script folders
 # List all files in the CandidateFitting directory
 from CandidateFitting import *
@@ -100,6 +106,7 @@ class MyGUI(QMainWindow):
         self.data['prevFindingMethod'] = 'None'
         self.data['prevNrEvents'] = 0
         self.data['prevNrCandidates'] = 0
+        self.data['MetaDataOutput'] = ''
         #intialise preview events
         self.previewEvents = []
 
@@ -145,7 +152,6 @@ class MyGUI(QMainWindow):
         self.layout = QGridLayout()
         content_widget.setLayout(self.layout)
 
-
         # Set the content widget to the scroll area
         scroll_area.setWidget(content_widget)
 
@@ -159,32 +165,8 @@ class MyGUI(QMainWindow):
         self.polarityDropdownNames = ['All events treated equal','Positive only','Negative only','Pos and neg seperately']
         self.polarityDropdownOrder = [0,1,2,3]
 
-        """
-        Global settings group box
-        """
-        #Create a global settings group box
-        self.globalSettingsGroupBox = QGroupBox("Global settings")
-        self.globalSettingsGroupBox.setLayout(QGridLayout()) #Give it a grid layout as well
-
-        #Create an advanced settings button that opens a new window
-        self.advancedSettingsButton = QPushButton("Advanced settings", self)
-        self.advancedSettingsButton.clicked.connect(self.open_advanced_settings)
-        self.globalSettingsGroupBox.layout().addWidget(self.advancedSettingsButton, 0, 0,1,2)
-
         #Initialise (but not show!) advanced window:
         self.advancedSettingsWindow = AdvancedSettingsWindow(self)
-
-        # Create a button to trigger saving the entries
-        self.save_button = QPushButton("Save GUI contents", self)
-        self.save_button.clicked.connect(self.save_entries_to_json)
-        self.globalSettingsGroupBox.layout().addWidget(self.save_button, 0, 3)
-        # Create a button to trigger loading the entries
-        self.load_button = QPushButton("Load GUI contents", self)
-        self.load_button.clicked.connect(self.load_entries_from_json)
-        self.globalSettingsGroupBox.layout().addWidget(self.load_button, 0,4)
-
-        #Add the global settings group box to the central widget
-        self.layout.addWidget(self.globalSettingsGroupBox, 0, 0)
 
         """
         Main tab widget (containing processing, post-processing etc tabs)
@@ -192,7 +174,7 @@ class MyGUI(QMainWindow):
         #Create a tab widget and add this to the main group box
         self.mainTabWidget = QTabWidget()
         self.mainTabWidget.setTabPosition(QTabWidget.South)
-        self.layout.addWidget(self.mainTabWidget, 2, 0)
+        self.layout.addWidget(self.mainTabWidget, 0, 0)
 
         #Add the individual tabs
         self.tab_processing = QWidget()
@@ -219,12 +201,15 @@ class MyGUI(QMainWindow):
         self.setup_tab('Preview visualisation')
         self.setup_tab('Candidate preview')
 
-
         #Loop through all combobox states briefly to initialise them (and hide them)
         self.set_all_combobox_states()
 
         #Load the GUI settings from last time:
         self.load_entries_from_json()
+        
+        #Resize the GUI based from GUI settings
+        self.resize(float(self.globalSettings['GUIWindowWize']['value'][2]), float(self.globalSettings['GUIWindowWize']['value'][3]))
+        self.move(float(self.globalSettings['GUIWindowWize']['value'][0]), float(self.globalSettings['GUIWindowWize']['value'][1]))
 
         #Initialise polarity value thing (only affects very first run I believe):
         self.polarityDropdownChanged()
@@ -251,12 +236,47 @@ class MyGUI(QMainWindow):
         self.data['avg_cluster_size_pos'] = np.zeros(3)
         self.data['avg_cluster_size_neg'] = np.zeros(3)
 
+        self.uselessWarningSupression()
+
         logging.info('Initialisation complete.')
+
+    def uselessWarningSupression(self):
+        #Script to supress warnings that we really don't care about
+        import warnings
+
+        # Define a filter function to suppress the specific warning
+        def warning_filter(message, category, filename, lineno, file=None, line=None):
+            patterns = [
+                "QCoreApplication::exec: The event loop is already running"
+                "QPainter::begin: Paint device returned engine == 0, type: 3"
+            ]
+            
+            # Compile regex patterns
+            compiled_patterns = [re.compile(pattern) for pattern in patterns]
+            for pattern in compiled_patterns:
+                if pattern.match(message):
+                    return False
+            return True
+
+        warnings.showwarning = warning_filter
 
     def createToolBar(self):
         menuBar = QMenuBar(self)
         self.setMenuBar(menuBar)
         settingsMenu = menuBar.addMenu("&Settings")
+        openAdvancedSettings = settingsMenu.addAction("Advanced settings")
+        openAdvancedSettings.triggered.connect(self.open_advanced_settings)
+        settingsMenu.addSeparator()
+        saveGUIcontents = settingsMenu.addAction("Save GUI contents")
+        saveGUIcontents.triggered.connect(self.save_entries_to_json)
+        loadGUIcontents = settingsMenu.addAction("Load last GUI contents")
+        loadGUIcontents.triggered.connect(self.load_entries_from_json)
+        settingsMenu.addSeparator()
+        saveGUIcontents = settingsMenu.addAction("Save-as GUI contents")
+        saveGUIcontents.triggered.connect(self.saveas_entries_to_json)
+        loadGUIcontents = settingsMenu.addAction("Load specific GUI contents")
+        loadGUIcontents.triggered.connect(self.loadas_entries_from_json)
+        settingsMenu.addSeparator()
         changeColorAction = settingsMenu.addAction("Change appearance color")
         changeColorAction.triggered.connect(self.changeAppearanceColor)
         
@@ -464,9 +484,13 @@ class MyGUI(QMainWindow):
         globalSettings['FindingBatchingTimeOverlapMs'] = {}
         globalSettings['FindingBatchingTimeOverlapMs']['value'] = 500
         globalSettings['FindingBatchingTimeOverlapMs']['input'] = float
+        globalSettings['GUIWindowWize'] = {}
+        globalSettings['GUIWindowWize']['value'] = [0,0,400,400]
+        globalSettings['GUIWindowWize']['input'] = list
+        
 
         #Add options here that should NOT show up in the global settings window - i.e. options that should not be changed
-        globalSettings['IgnoreInOptions'] = ('IgnoreInOptions','StoreFinalOutput', 'JSONGUIstorePath','GlobalOptionsStorePath')
+        globalSettings['IgnoreInOptions'] = ('IgnoreInOptions','StoreFinalOutput', 'JSONGUIstorePath','GlobalOptionsStorePath','GUIWindowWize')
         return globalSettings
 
     def datasetSearchButtonClicked(self):
@@ -1270,21 +1294,22 @@ class MyGUI(QMainWindow):
     def updateLocList(self):
         #data is stored in self.data['FittingResult'][0]
         #fill the self.LocListTable QTableWidget with the data:
-        localizations = self.data['FittingResult'][0].dropna(axis=0, ignore_index=True)
-        try:
-            localizations = localizations.drop('fit_info', axis=1)
-        except:
-            pass
+        if len(self.data['FittingResult'][0]) > 0:
+            localizations = self.data['FittingResult'][0].dropna(axis=0, ignore_index=True)
+            try:
+                localizations = localizations.drop('fit_info', axis=1)
+            except:
+                pass
 
-        # Define the number of significant digits for each column
-        significant_digits = {'x': 2, 'y': 2, 'p': 0, 'id':0,'candidate_id':0,'del_x':2,'del_y':2, 't':2, 'del_t':2, 'N_events':0, 'x_dim':0, 'y_dim':0, 't_dim':2, 'sigma_x': 2, 'sigma_y': 2}
+            # Define the number of significant digits for each column
+            significant_digits = {'x': 2, 'y': 2, 'p': 0, 'id':0,'candidate_id':0,'del_x':2,'del_y':2, 't':2, 'del_t':2, 'N_events':0, 'x_dim':0, 'y_dim':0, 't_dim':2, 'sigma_x': 2, 'sigma_y': 2}
 
-        for y in range(len(localizations.columns)):
-            significant_digit = significant_digits.get(localizations.columns[y])
-            if significant_digit is not None:
-                localizations[localizations.columns[y]] = localizations[localizations.columns[y]].apply(lambda x: round(x, significant_digit))
+            for y in range(len(localizations.columns)):
+                significant_digit = significant_digits.get(localizations.columns[y])
+                if significant_digit is not None:
+                    localizations[localizations.columns[y]] = localizations[localizations.columns[y]].apply(lambda x: round(x, significant_digit))
 
-        self.LocListTable.setModel(TableModel(table_data = localizations))
+            self.LocListTable.setModel(TableModel(table_data = localizations))
         return
 
     def checkPolarity(self,npyData):
@@ -1505,6 +1530,7 @@ class MyGUI(QMainWindow):
         logging.info("")
         
         self.analysis_progressbar.setValue(0)
+        self.data['MetaDataOutput'] = ''
         
         #Switch the user to the Run info tab
         utils.changeTab(self, text='Run info')
@@ -1572,6 +1598,16 @@ class MyGUI(QMainWindow):
         
         #'preview', not 'run'
         self.findingAnalysis.set_timeStretchMs([float(self.previewTimeStretch[0]),float(self.previewTimeStretch[0])+float(self.previewTimeStretch[1])])
+        #Check if any of previewXYstretch are non-floats:
+        xystretchisallfloats = True
+        for item in self.previewXYStretch:
+            try:
+                float(item)
+            except:
+                xystretchisallfloats = False
+        if not xystretchisallfloats:
+            self.previewXYStretch = [-np.inf,np.inf,-np.inf,np.inf]
+            logging.warning('Set preview XY stretch to -Inf,Inf,-Inf,Inf')
         self.findingAnalysis.set_xyStretch([[float(self.previewXYStretch[0]),float(self.previewXYStretch[1])],[float(self.previewXYStretch[2]),float(self.previewXYStretch[3])]])
         
         #Run the analysis
@@ -1714,11 +1750,11 @@ class MyGUI(QMainWindow):
         else:
             self.analysis_progressbar.setValue(overwriteValue)
             QApplication.processEvents() #progress the changes to the gui
-        
 
     def findingAnalysisComplete(self):
         #Function is run as soon as finding is completed
         self.currentFileInfo['FindingTime'] = time.time() - self.analysisStartTime 
+        self.storeFindingOutput()
     
     def fittingAnalysisComplete(self):
         #Function is run as soon as fitting is completed
@@ -1730,7 +1766,6 @@ class MyGUI(QMainWindow):
         #Store data... These functions have checks on what to store
         # if self.globalSettings['StoreFinalOutput']['value'] > 0:
         self.storeLocalizationOutput()
-        self.storeFindingOutput()
         self.createAndStoreFileMetadata()
         
         #restore global settings (can be changed in run_processing_i)
@@ -1830,7 +1865,7 @@ class MyGUI(QMainWindow):
 
     def storeLocalizationOutput(self):
         #Storing the .CSV
-        if self.globalSettings['StoreFinalOutput']['value'] > 0:
+        if self.globalSettings['StoreFinalOutput']['value'] > 0 and len(self.data['FittingResult'][0]) > 0:
             logging.debug('Attempting to store fitting results output')
             storeLocation = self.getStoreLocationPartial()+'_FitResults_'+self.storeNameDateTime+'.csv'
             #Store the localization output
@@ -1842,7 +1877,7 @@ class MyGUI(QMainWindow):
 
         #Also store pickle information:
         #Also save pos and neg seperately if so useful:
-        if self.globalSettings['StoreFittingOutput']['value'] > 0:
+        if self.globalSettings['StoreFittingOutput']['value'] > 0 and len(self.data['FittingResult'][0]) > 0:
             if self.dataSelectionPolarityDropdown.currentText() == self.polarityDropdownNames[3]:
                 try:
                     allPosFittingResults = self.data['FittingResult'][0][self.data['FittingResult'][0]['p']==1]
@@ -1874,7 +1909,7 @@ class MyGUI(QMainWindow):
             logging.info('Fitting results output stored')
 
     def storeFindingOutput(self):
-        if self.globalSettings['StoreFindingOutput']['value'] > 0:
+        if self.globalSettings['StoreFindingOutput']['value'] > 0 and len(self.data['FindingResult'][0]) > 0:
             logging.debug('Attempting to store finding results output')
             #Store the Finding results output
             file_path = self.currentFileInfo['CurrentFileLoc'][:-4]+'_FindingResults_'+self.storeNameDateTime+'.pickle'
@@ -1909,6 +1944,14 @@ class MyGUI(QMainWindow):
 
             logging.info('Finding results output stored')
 
+    def readableGlobalSettings(self):
+        #Returns readable global settings for metadata and such
+        output = ''
+        for key, value in self.globalSettings.items():
+            if key not in self.globalSettings['IgnoreInOptions']:
+                output+=f"{key}: {self.globalSettings[key]['value']}\n"
+        return output
+
     def createAndStoreFileMetadata(self):
         if self.globalSettings['StoreFileMetadata']['value'] > 0 :
             logging.debug('Attempting to create and store file metadata')
@@ -1916,30 +1959,24 @@ class MyGUI(QMainWindow):
                 metadatastring = dedent(f"""\
                 Metadata information for file {self.currentFileInfo['CurrentFileLoc']}
                 Analysis routine finished at {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
-
-                ---- Finding metadata output: ----
-                Methodology used:
-                {self.data['FindingMethod']}
-
-                Number of candidates found: {len(self.data['FindingResult'][0])}
-                Candidate finding took {self.currentFileInfo['FindingTime']} seconds.
-
+                
+                {self.data['MetaDataOutput']}
+                
+                ---- Global settings used ----
+                
+                {self.readableGlobalSettings()}
+                
+                ---- Additional custom output ----
+                
                 Custom output from finding function:\n""")\
-                + f"""{self.data['FindingResult'][1]}\n""" + dedent(f"""\
-
-                ---- Fitting metadata output: ----
-                Methodology used:
-                {self.data['FittingMethod']}
-
-                Number of localizations found: {len(self.data['FittingResult'][0].dropna(axis=0))}
-                Candidate fitting took {self.currentFileInfo['FittingTime']} seconds.
+                + f"""{self.data['FindingResult'][1]}\n\n""" + dedent(f"""\
 
                 Custom output from fitting function:\n""")\
                 + f"""{self.data['FittingResult'][1]}
                 """
                 #Store this metadatastring:
                 with open(self.getStoreLocationPartial()+'_RunInfo_'+self.storeNameDateTime+'.txt', 'w') as f:
-                    f.write(metadatastring)
+                    f.write(dedent(metadatastring))
                 logging.info('File metadata created and stored')
             except:
                 logging.error('Error in creating file metadata, not stored')
@@ -2045,10 +2082,12 @@ class MyGUI(QMainWindow):
         widget.setCurrentText(f"{newMethod} ({polarity.lower()})")
         print(widget)
 
-    def save_entries_to_json(self):
+
+    def save_entries_to_json_core(self):
         self.entries = {}
+        allEditableFields = self.get_editable_fields().items()
         # Iterate over all editable fields and store their values in the entries dictionary
-        for field_name, field_widget in self.get_editable_fields().items():
+        for field_name, field_widget in allEditableFields:
             # only store editable fields that have a name
             if not field_name=="":
                 if isinstance(field_widget, QLineEdit):
@@ -2058,25 +2097,71 @@ class MyGUI(QMainWindow):
                 elif isinstance(field_widget, QComboBox):
                     self.entries[field_name] = field_widget.currentText()
 
+    def saveas_entries_to_json(self):
+        #Do save_entries_to_json, but to a user-definable location
+        #Do the bulk of the work
+        self.save_entries_to_json_core()
+    
+        #Get a location from the user
+        options = QFileDialog.Options()
+        file_path, _ = QFileDialog.getSaveFileName(self, "Select storage location", "", "JSON Files (*.json)", options=options)
+        if file_path:
+            with open(file_path, 'w') as json_file:
+                json.dump(self.entries, json_file)
+            #Also store the global settings:
+            self.advancedSettingsWindow.save_global_settings(jsonLocation=file_path[:-5]+'_advancedSettings.json')
+        else:
+            pass
+
+        
+    def save_entries_to_json(self):
+        #Do the bulk of the work
+        self.save_entries_to_json_core()
         # Specify the path and filename for the JSON file
         json_file_path = self.globalSettings['JSONGUIstorePath']['value']
-
         # Write the entries dictionary to the JSON file
         with open(json_file_path, "w") as json_file:
             json.dump(self.entries, json_file)
+        
+        #Also store the global settings:
+        self.advancedSettingsWindow.save_global_settings()
+
+    def loadas_entries_from_json(self):
+        # Specify the path and filename for the JSON file
+        #Get a location from the user
+        options = QFileDialog.Options()
+        file_path, _ = QFileDialog.getOpenFileName(self, "Select storage location", "", "JSON Files (*.json)", options=options)
+        if file_path:
+            #First set all comboboxes
+            self.load_entries_from_json_single(json_file_path=file_path,runParams=['QComboBox'])
+            #Then set all line edits
+            self.load_entries_from_json_single(json_file_path=file_path,runParams=['QLineEdit'])
+            #Then set all checkboxes
+            self.load_entries_from_json_single(json_file_path=file_path,runParams=['QCheckBox'])
+            #try to load global settings next to it:
+            try:
+                self.advancedSettingsWindow.load_global_settings(jsonLocation=file_path[:-5]+'_advancedSettings.json')
+            except:
+                logging.warning('Could not load global settings from '+file_path[:-5]+'_advancedSettings.json')
+                
+        else:
+            pass
 
     def load_entries_from_json(self):
-        #First set all comboboxes
-        self.load_entries_from_json_single(runParams=['QComboBox'])
-        #Then set all line edits
-        self.load_entries_from_json_single(runParams=['QLineEdit'])
-        #Then set all checkboxes
-        self.load_entries_from_json_single(runParams=['QCheckBox'])
-
-    def load_entries_from_json_single(self,runParams=['QLineEdit','QComboBox','QCheckBox']):
         # Specify the path and filename for the JSON file
         json_file_path = self.globalSettings['JSONGUIstorePath']['value']
-
+        #First set all comboboxes
+        self.load_entries_from_json_single(json_file_path=json_file_path,runParams=['QComboBox'])
+        #Then set all line edits
+        self.load_entries_from_json_single(json_file_path=json_file_path,runParams=['QLineEdit'])
+        #Then set all checkboxes
+        self.load_entries_from_json_single(json_file_path=json_file_path,runParams=['QCheckBox'])
+        #Also load global settings
+        self.advancedSettingsWindow.load_global_settings()
+        
+    def load_entries_from_json_single(self,json_file_path=None,runParams=['QLineEdit','QComboBox','QCheckBox']):
+        if json_file_path is None:
+            json_file_path = self.globalSettings['JSONGUIstorePath']['value']
         try:
             # Load the entries from the JSON file
             with open(json_file_path, "r") as json_file:
@@ -2084,7 +2169,8 @@ class MyGUI(QMainWindow):
 
             for polVal in ['Pos']:#["Pos","Neg","Mix"]:
                 # Set the values of the editable fields from the loaded entries
-                for field_name, field_widget in self.get_editable_fields().items():
+                allEditableFields = self.get_editable_fields().items()
+                for field_name, field_widget in allEditableFields:
                     if field_name in self.entries:
                         if isinstance(field_widget, QLineEdit):
                             if 'QLineEdit' in runParams:
@@ -2122,17 +2208,10 @@ class MyGUI(QMainWindow):
 
     def get_editable_fields(self):
         fields = {}
-
-        def find_editable_fields(widget):
-            if isinstance(widget, QLineEdit) or isinstance(widget, QComboBox) or isinstance(widget, QCheckBox):
-                fields[widget.objectName()] = widget
-            elif isinstance(widget, QWidget):
-                # for child_widget in widget.children():
-                #     find_editable_fields(child_widget)
-                for children_widget in widget.findChildren(QWidget):
-                    find_editable_fields(children_widget)
-
-        find_editable_fields(self)
+        all_widgets = self.findChildren((QLineEdit, QComboBox, QCheckBox))
+        for widget in all_widgets:
+            fields[widget.objectName()] = widget
+        
         return fields
 
     def reset_single_combobox_states(self):
@@ -2436,6 +2515,7 @@ class FindingAnalysis(FindingFittingAnalysis):
     
     def runFindingOnPolarity(self,singlePolarity):
         logging.info(f"Starting finding of polarity {singlePolarity}")
+        starttime = time.time()
         #check for disabling the run
         self.checkForRunDisableLoadPickleMismatch(singlePolarity)
         
@@ -2763,12 +2843,18 @@ class FindingAnalysis(FindingFittingAnalysis):
             #To be implemented
             pass
         
+        totaltime = time.time()-starttime
         #Logging feedback
         if 'findingResults' in locals():
             logging.info(f"Finding of polarity {singlePolarity} complete. {len(findingResults[0])} candidates found!")
+            #Add metadata info
+            self.GUIinfo.data['MetaDataOutput'] += '\n-----Information on finding of polarity '+singlePolarity+': -----\nMethodology Used:\n' +evalText+'\n\nNumber of candidates found: '+str(len(findingResults[0]))+'\nCandidate fitting took '+str(totaltime)+' seconds.\n\n'
         else:
             logging.info(f"Finding of polarity {singlePolarity} complete. {len(self.Results[0])} candidates found!")
+            #Add metadata info
+            self.GUIinfo.data['MetaDataOutput'] += '\n-----Information on finding of polarity '+singlePolarity+': -----\nMethodology Used:\n' +evalText+'\n\nNumber of candidates found: '+str(len(self.Results[0]))+'\nCandidate fitting took '+str(totaltime)+' seconds.\n\n'
         pass
+    
 
     def splitOnPolarity(self,singlePolarity):
         #Split the self.events on p data:
@@ -2937,6 +3023,7 @@ class FittingAnalysis(FindingFittingAnalysis):
         
     def runFittingOnPolarity(self,singlePolarity):
         logging.info(f"Starting fitting of polarity {singlePolarity}")
+        starttime = time.time()
         #Run the finding on a single polarity
         
         if len(self.findingResult[0]) > 0:
@@ -2980,8 +3067,21 @@ class FittingAnalysis(FindingFittingAnalysis):
             self.fittingAdjustValue = 0
         
         #Run the fitting
-        fittingResults = self.runFitting()
-        logging.info(f"Fitting of polarity {singlePolarity} complete. {len(fittingResults[0].dropna())} valid localizations found!")
+        if self.partialFindingResults is not None:
+            fittingResults = self.runFitting()
+            logging.info(f"Fitting of polarity {singlePolarity} complete. {len(fittingResults[0].dropna())} valid localizations found!")
+            nLoc = len(fittingResults[0].dropna())
+        else:
+            fittingResults = pd.DataFrame()
+            self.Results = {}
+            self.Results[0] = fittingResults
+            self.Results[1] = fittingResults
+            logging.info(f"Fitting of polarity {singlePolarity} complete. No localizations found!")
+            nLoc = 0
+            pass
+
+        totaltime = time.time() - starttime
+        self.GUIinfo.data['MetaDataOutput'] += '\n-----Information on fitting of polarity '+singlePolarity+': -----\nMethodology Used:\n' +self.GUIinfo.data['FittingMethod']+'\n\nNumber of valid localizations found: '+str(nLoc)+'\nCandidate fitting took '+str(totaltime)+' seconds.\n\n'
         
     """
     Fitting itself
@@ -3149,9 +3249,15 @@ class AdvancedSettingsWindow(QMainWindow):
     def update_global_settings(self, setting, value):
         self.parent.globalSettings[setting]['value'] = value
 
-    def save_global_settings(self):
-        # Specify the path and filename for the JSON file
-        json_file_path = self.parent.globalSettings['GlobalOptionsStorePath']['value']
+    def save_global_settings(self,jsonLocation=None):
+        if jsonLocation == None:
+            # Specify the path and filename for the JSON file
+            json_file_path = self.parent.globalSettings['GlobalOptionsStorePath']['value']
+        else:
+            json_file_path = jsonLocation
+        #Set the current GUI position/size to the global settings:
+        self.parent.globalSettings['GUIWindowWize']['value'] = [self.parent.pos().x(),self.parent.pos().y(),self.parent.width(),self.parent.height()]
+        
 
         # Serialize the globalSettings dictionary, skipping over the 'input' value
         serialized_settings = {}
@@ -3171,9 +3277,12 @@ class AdvancedSettingsWindow(QMainWindow):
         logging.info('Global settings saved!')
         self.close()
 
-    def load_global_settings(self):
-        # Specify the path and filename for the JSON file
-        json_file_path = self.parent.globalSettings['GlobalOptionsStorePath']['value']
+    def load_global_settings(self,jsonLocation=None):
+        if jsonLocation == None:
+            # Specify the path and filename for the JSON file
+            json_file_path = self.parent.globalSettings['GlobalOptionsStorePath']['value']
+        else:
+            json_file_path = jsonLocation
         try:    # Load the globalSettings dictionary from the JSON file
             with open(json_file_path, "r") as json_file:
                 loaded_settings = json.load(json_file)
@@ -3849,23 +3958,18 @@ class PreviewFindingFitting(QWidget):
 
         self.viewer.on_mouse_move = lambda event: self.currently_under_cursor(event)
         self.viewer.on_mouse_double_click = lambda event: self.napari_doubleClicked(event)
-        
-        #Test
-        # self.viewer.window.add_plugin_dock_widget('napari-1d', 'napari-1d')
-
-
 
         #Add widgets to the main layout
         self.mainRightlayout.addWidget(self.underCursorInfo) #Text box with info under cursor
         #Make it expand:
         self.viewer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.underCursorInfo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.mainRightlayout.addWidget(self.viewer) #The view itself
         self.mainlayout.addWidget(self.viewer.controls,1,1) #The controls for the viewer (contrast, etc)
         self.viewer.controls.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.mainlayout.addLayout(self.mainRightlayout,1,2)
-        # self.mainlayout.addWidget(self.viewer.layers)
 
+        #Possible layouts to give more napari information
+        # self.mainlayout.addWidget(self.viewer.layers)
         # self.mainlayout.addWidget(self.viewer.dockConsole)
         # self.mainlayout.addWidget(self.viewer.layerButtons)
         # self.mainlayout.addWidget(self.viewer.viewerButtons)
@@ -4016,6 +4120,9 @@ class PreviewFindingFitting(QWidget):
         self.maxFrames = n_frames
         #Create a fullh istogram to get the min/max xy pos and such
         self.hist_xy = eventDistributions.SumPolarity(events)
+        #Start keeping running total of min/max contrast limits
+        minContrastLimit,maxContrastLimit = 0,0
+        contrast_limit_percentile = 0.01
         for n in range(0,n_frames):
             #Get the events on this 'frame'
             events_this_frame = events[(events['t']>(float(timeStretch[0])*1000+n*frametime_ms*1000)) & (events['t']<(float(timeStretch[0])*1000+(n+1)*frametime_ms*1000))]
@@ -4024,6 +4131,13 @@ class PreviewFindingFitting(QWidget):
             thisHist_xy = self.hist_xy(events_this_frame)
             #Add it to our image
             preview_multiD_image.append(thisHist_xy[0])
+            #Keep a running total of minimum and maximum contrast limits
+            minContrastVal = np.percentile(thisHist_xy[0], contrast_limit_percentile)
+            maxContrastVal = np.percentile(thisHist_xy[0], 100-contrast_limit_percentile)
+            if minContrastVal < minContrastLimit:
+                minContrastLimit = minContrastVal
+            if maxContrastVal > maxContrastLimit:
+                maxContrastLimit = maxContrastVal
 
         #Scale should be the scale of pixel - to - um. E.g. a scale of 0.01 means 100 pixels = 1 um
         scale = ((float(settings['PixelSize_nm']['value']))/1000)
@@ -4041,6 +4155,10 @@ class PreviewFindingFitting(QWidget):
         
         #Select the original image-layer as selected
         self.napariviewer.layers.selection.active = self.napariviewer.layers[0]
+        
+        #Set a proper brightness/contrast range:
+        self.napariviewer.layers[0].contrast_limits = (minContrastLimit-2,maxContrastLimit+2)
+        
         self.update_visibility()
         self.napariviewer.dims.events.current_step.connect(self.update_visibility)
 
@@ -4527,7 +4645,6 @@ class CandidatePreview(QWidget):
             self.candidate_info.setText('Tried to visualise candidate but no data found!')
             logging.error('Tried to visualise candidate but no data found!')
 
-        
 class TableModel(QAbstractTableModel):
     """TableModel that heavily speedsup the table view
     Blatantly taken from https://stackoverflow.com/questions/71076164/fastest-way-to-fill-or-read-from-a-qtablewidget-in-pyqt5

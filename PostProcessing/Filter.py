@@ -15,7 +15,8 @@ def __function_metadata__():
             ],
             "optional_kwargs": [
             ],
-            "help_string": "Normal filtering of data."
+            "help_string": "Normal filtering of data.",
+            "display_name": "Data filtering"
         }
     }
 

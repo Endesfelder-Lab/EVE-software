@@ -18,14 +18,16 @@ def __function_metadata__():
             ],
             "optional_kwargs": [
             ],
-            "help_string": "Link and filter on positive and negative events."
+            "help_string": "Link and filter on positive and negative events.",
+            "display_name": "Polarity Matching - match on and off events"
         },
         "PolarityMatching_NeNA": {
             "required_kwargs": [
             ],
             "optional_kwargs": [
             ],
-            "help_string": "Perform NeNA on the matched polarities."
+            "help_string": "Perform NeNA on the matched polarities.",
+            "display_name": "Nearest neighbour analysis (NeNA) precision on matched polarities"
         },
         "PolarityMatching_NeNASpatial": {
             "required_kwargs": [
@@ -34,14 +36,16 @@ def __function_metadata__():
             ],
             "optional_kwargs": [
             ],
-            "help_string": "Perform NeNA on the matched polarities."
+            "help_string": "Perform NeNA on the matched polarities.",
+            "display_name": "Spatial Nearest neighbour analysis (NeNA) precision on matched polarities"
         },
         "PolarityMatching_time": {
             "required_kwargs": [
             ],
             "optional_kwargs": [
             ],
-            "help_string": "Find the average lifetime of fluorophores."
+            "help_string": "Find the average lifetime of fluorophores.",
+            "display_name": "Lifetime analysis on matched polarities"
         }
     }
 

@@ -18,7 +18,8 @@ def __function_metadata__():
             ],
             "optional_kwargs": [
             ],
-            "help_string": "Drift correction from Cnossen et al.."
+            "help_string": "Drift correction from Cnossen et al..",
+            "display_name": "Drift correction by entropy minimization"
         },
         "DriftCorr_RCC": {
             "required_kwargs": [
@@ -30,7 +31,8 @@ def __function_metadata__():
             ],
             "optional_kwargs": [
             ],
-            "help_string": "RCC Drift correction from Cnossen et al.."
+            "help_string": "RCC Drift correction from Cnossen et al..",
+            "display_name": "Drift correction by RCC (redundant cross-correlation)"
         }
     }
 
