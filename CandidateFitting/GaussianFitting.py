@@ -65,21 +65,27 @@ class fit:
     def __init__(self, dist, candidateID):
         self.candidateID = candidateID
         self.ylim, self.xlim = dist.dist2D.shape
-        self.xmean = np.average(np.arange(1,self.xlim+1), weights=np.nansum(dist.dist2D, axis=0))-1. 
-        self.ymean = np.average(np.arange(1,self.ylim+1), weights=np.nansum(dist.dist2D, axis=1))-1.
         self.dist = dist
         self.image = dist.dist2D.ravel()
-        if hasattr(dist, 'weights'):
-            self.weights = dist.weights.ravel()
-            max_weight = np.nanmax(self.weights)
-            self.sigma = (max_weight - self.weights + 1)/max_weight
-            mask = ~np.isnan(self.sigma)
-            self.sigma = self.sigma[mask]
+        if np.isnan(self.image).all():
+            self.sigma = []
+            self.xmean = np.nan
+            self.ymean = np.nan
+            self.imstats = [np.nan, np.nan]
         else:
-            weights = np.ones_like(self.image)
-            mask = ~np.isnan(self.image)
-            self.sigma = weights[mask]
-        self.imstats = [np.nanpercentile(self.image, 90), np.nanpercentile(self.image, 10)] # [np.nanmax(self.image), np.nanmedian(self.image)]
+            self.xmean = np.average(np.arange(1,self.xlim+1), weights=np.nansum(dist.dist2D, axis=0))-1. 
+            self.ymean = np.average(np.arange(1,self.ylim+1), weights=np.nansum(dist.dist2D, axis=1))-1.
+            self.imstats = [np.nanpercentile(self.image, 90), np.nanpercentile(self.image, 10)] # [np.nanmax(self.image), np.nanmedian(self.image)]
+            if hasattr(dist, 'weights'):
+                self.weights = dist.weights.ravel()
+                max_weight = np.nanmax(self.weights)
+                self.sigma = (max_weight - self.weights + 1)/max_weight
+                mask = ~np.isnan(self.sigma)
+                self.sigma = self.sigma[mask]
+            else:
+                weights = np.ones_like(self.image)
+                mask = ~np.isnan(self.image)
+                self.sigma = weights[mask]
         self.mesh = self.meshgrid()
         self.fit_info = ''
     
@@ -91,6 +97,8 @@ class fit:
     
     def __call__(self, func, **kwargs):
         try:
+            if len(self.sigma) == 0:
+                raise ValueError('No data to fit.')
             popt, pcov = optimize.curve_fit(func, self.mesh, self.image, sigma=self.sigma, nan_policy='omit', **kwargs) #, gtol=1e-4,ftol=1e-4
             perr = np.sqrt(np.diag(pcov))
         except RuntimeError as warning:
