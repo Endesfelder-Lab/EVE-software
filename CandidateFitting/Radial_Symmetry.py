@@ -3,14 +3,16 @@ from Utils import utilsHelper
 import pandas as pd
 import numpy as np
 from scipy.ndimage import convolve
-from EventDistributions import eventDistributions
-from TemporalFitting import timeFitting
-import logging
 from scipy.optimize import least_squares
+from scipy import ndimage
+from scipy.optimize import minimize
 from scipy import linalg
 import warnings
 from scipy.optimize import OptimizeWarning
 warnings.simplefilter("error", OptimizeWarning)
+from EventDistributions import eventDistributions
+from TemporalFitting import timeFitting
+import logging
 
 from joblib import Parallel, delayed
 import multiprocessing
@@ -27,6 +29,15 @@ def __function_metadata__():
             ],
             "help_string": "Determines localization parameters via radial symmetry.",
             "display_name": "Radial Symmetry 2D"
+        },
+        "RadialSym3D": {
+            "required_kwargs": [
+                {"name": "time_bin_width", "display_text":"temporal bin width", "description": "Temporal bin width for 3d histogramming (in ms)","default":10.},
+            ],
+            "optional_kwargs": [
+            ],
+            "help_string": "Determines localization parameters via 3d radial symmetry.",
+            "display_name": "Radial Symmetry 3D"
         }
     }
 
@@ -309,6 +320,190 @@ def localize_canditates2D(i, candidate_dic, distfunc, time_fit, pixel_size):
     logging.info('Localizing PSFs (thread '+str(i)+') done!')
     return localizations, fails
 
+# helper function to calculate distance in 3d radial symmetry algorithm
+def distance(P, line_info):
+    '''
+    Outputs the sum of the perpendicular distances between point P(x,y,z) and lines with 
+    direction vectors (Gix, Giy, Giz), weighted by the gradient magnitude squared.
+
+    Parameters
+    ----------
+    P : tuple
+        (x,y,z) coordinates of point P
+
+    line_info : array
+        Array of lines with direction vectors (Gix, Giy, Giz), points A(x,y,z), and weights wi.
+        Form: [A1x, A1y, A1z, G1x, G1y, G1z, w1, A2x, A2y, A2z, G2x, G2y, G2z, w2, ...]
+
+    Returns
+    -------
+    sum_dsqrw : float
+        Sum of perpendicular distances squared weighted by the gradient magnitude squared
+    '''
+
+    px, py, pz = P
+
+    num_voxels = len(line_info)//7 # because 7 entries per line number (Ax, Ay, Az, Gx, Gy, Gz, w)
+    sum_dsqrw = 0
+
+    for voxel in range(num_voxels):
+        Ax = line_info[voxel*7]
+        Ay = line_info[voxel*7 + 1]
+        Az = line_info[voxel*7 + 2]
+        Gx = line_info[voxel*7 + 3]
+        Gy = line_info[voxel*7 + 4]
+        Gz = line_info[voxel*7 + 5]
+        w = line_info[voxel*7 + 6]
+
+        # Calculating AP: P coords - A coords
+        APx, APy, APz = (px - Ax, py - Ay, pz - Az)
+
+        # Calculating AP x G: using cartesian cross product formula
+        APGx, APGy, APGz = (APy*Gz - APz*Gy, APz*Gx - APx*Gz, APx*Gy - APy*Gx)
+
+        # Calculating magnitude of AP x G and of G
+        APxGx_mag = np.sqrt(APGx**2 + APGy**2 + APGz**2)
+        G_mag = np.sqrt(Gx**2 + Gy**2 + Gz**2)
+
+        # Calculating perpendicular distance between point P and 
+        if G_mag == 0:
+            D = 0
+        else:
+            D = APxGx_mag / G_mag
+        # print('D: ', D)
+
+        Dw = D**2 * w
+        sum_dsqrw += Dw
+
+    return sum_dsqrw
+
+# calculate radial symmetry center in 3d
+def radialcenter3d(candidateID, candidate, time_bin_width, pixel_size):
+    '''
+    Calculates the event-based radial center of a 3D image I
+
+    Parameters
+    ----------
+    I : 3D array
+        The image to be analyzed
+
+    Returns
+    -------
+    center : array
+        x, y, z coordinates of the radial center
+    
+    errors : array
+        x, y, z center coordinate errors
+
+    '''
+    # get 3d event histogram
+    I = eventDistributions.Hist3d_xyt(candidate['events'], t_bin_width=time_bin_width).dist3D
+
+    # Number of grid points
+    Nx, Ny, Nz = I.shape
+
+    # Grid Coorinates
+    xm_onerow = np.arange(-(Nx)/2.0+0.5, (Nx)/2.0+0.5)
+    ym_onecol = np.arange(-(Ny)/2.0+0.5, (Ny)/2.0+0.5) #Note that y increases "downward"
+    zm_onetile = np.arange(-(Nz)/2.0+0.5, (Nz)/2.0+0.5)
+
+    # Using a 3D meshgrid to create the coordinates
+    xm, ym, zm = np.meshgrid(xm_onerow, ym_onecol, zm_onetile)
+    ### The og code created a meshgrid corresponding to xy indexing but idk if that's what we still want in 3D
+    #print(xm.shape, ym.shape, zm.shape)
+
+    # Calculating derivatives in each direction using the sobel operator
+    Gx = ndimage.sobel(I, axis=0)
+    Gy = ndimage.sobel(I, axis=1)
+    Gz = ndimage.sobel(I, axis=2)
+
+    # Calculating the magnitude of the gradient
+    r = np.sqrt(Gx**2 + Gy**2 + Gz**2)
+    rsqr = r**2
+
+    # Weighting: square of gradient magnitude divided by distance to approximate centre
+    rsqr_sum = np.sum(rsqr)
+    xcentroid = np.sum(rsqr * xm) / rsqr_sum
+    ycentroid = np.sum(rsqr * ym) / rsqr_sum
+    zcentroid = np.sum(rsqr * zm) / rsqr_sum
+    print(xcentroid, ycentroid, zcentroid)
+    w = rsqr / (np.sqrt((xm-xcentroid)**2 + (ym-ycentroid)**2 + (zm-zcentroid)**2))
+
+    # Creating a long 1D array of all the line information to pass to curve fit for minimization:
+    # the form will be [A1x, A1y, A1z, G1x, G1y, G1z, w1, A2x, A2y, A2z, G2x, G2y, G2z, w2, ...]
+    line_info = []
+    for x in range(w.shape[0]):
+        for y in range(w.shape[1]):
+            for z in range(w.shape[2]):
+                # Iterating through each voxel index
+                point_on_line = (x,y,z) # Indices of voxel center = point on the gradient line
+                direction_vector = (Gx[x,y,z], Gy[x,y,z], Gz[x,y,z])
+                weight = w[x,y,z]
+                for item in point_on_line:
+                    line_info.append(item)
+                for item in direction_vector:
+                    line_info.append(item)
+                line_info.append(weight)
+
+    # Minimizing the distance from each gradient line to a point P (optimized P coords will be xc, yc, zc)
+    
+    # Using the estimated centroids to define an initial centre location guess
+    initial_guess = [xcentroid, ycentroid, zcentroid]
+    # Ensuring the optimized center is within the bounds of the image
+    bounds = [(-0.5, I.shape[0]-0.5), (-0.5, I.shape[1]-0.5), (0, I.shape[2])]
+
+    result = minimize(distance, initial_guess, args=(line_info,), method='L-BFGS-B', bounds=bounds, options={'ftol' : 0.001})
+    # center = result.x
+    # success = result.success
+    # message = result.message
+    fit_info = ''
+    if not result.success:
+        print(result.message)
+        print(result.hess_inv)
+        center = np.full(3, np.nan)
+        error = np.full(3, np.nan)
+        fit_info = 'MinimizeError: ' + result.message
+    else:
+        center = result.x
+        print(center)
+        center[0] = (center[0] + np.min(candidate['events']['x']))*pixel_size # xc in nm
+        center[1] = (center[1] + np.min(candidate['events']['y']))*pixel_size # yc in nm
+        center[2] = (center[2]*time_bin_width + np.min(candidate['events']['t'])*1e-3) # tc in ms
+        # Calculate errors for L-BFGS-B minimization
+        if result.hess_inv is not None:
+            error = np.sqrt(np.diag(result.hess_inv.todense()))
+            error[0] *= pixel_size
+            error[1] *= pixel_size
+            error[2] *= time_bin_width
+        else:
+            print("Optimization failed to provide Hessian matrix. No error estimates available.")
+            error = np.full(3, np.nan)
+
+    mean_polarity = candidate['events']['p'].mean()
+    p = int(mean_polarity == 1) + int(mean_polarity == 0) * 0 + int(mean_polarity > 0 and mean_polarity < 1) * 2
+
+    loc_df = pd.DataFrame({'candidate_id': candidateID, 'x': center[0], 'y': center[1], 'del_x': error[0], 'del_y': error[1], 'p': p, 't': center[2], 'del_t': error[2], 'N_events': candidate['N_events'], 'x_dim': candidate['cluster_size'][0], 'y_dim': candidate['cluster_size'][1], 't_dim': candidate['cluster_size'][2]*1e-3, 'fit_info': fit_info}, index=[0])
+    return loc_df
+
+# perform localization for part of candidate dictionary with 3d radial symmetry
+def localize_canditates3D(i, candidate_dic, time_bin_width, pixel_size):
+    logging.info('Localizing PSFs (thread '+str(i)+')...')
+    localizations = []
+    fails = pd.DataFrame()  # Initialize fails as an empty DataFrame
+    fail = pd.DataFrame()
+    for candidate_id in list(candidate_dic):
+        localization = radialcenter3d(candidate_id, candidate_dic[candidate_id], time_bin_width, pixel_size)
+        localizations.append(localization)
+        if localization['fit_info'][0] != '':
+            fail['candidate_id'] = localization['candidate_id']
+            fail['fit_info'] = localization['fit_info'].str.split(':').str[0][0]
+            fails = pd.concat([fails, fail], ignore_index=True)
+    if localizations == []:
+        localizations = pd.DataFrame()
+    else:
+        localizations = pd.concat(localizations, ignore_index=True)
+    logging.info('Localizing PSFs (thread '+str(i)+') done!')
+    return localizations, fails
 
 #-------------------------------------------------------------------------------------------------------------------------------
 #Callable functions
@@ -344,6 +539,46 @@ def RadialSym2D(candidate_dic,settings,**kwargs):
 
     # Determine all localizations
     RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(localize_canditates2D)(i, data_split[i], distfunc, time_fit, pixel_size) for i in range(len(data_split)))
+    
+    localization_list = [res[0] for res in RES]
+    localizations = pd.concat(localization_list, ignore_index=True)
+
+    fail_list = [res[1] for res in RES]
+    fails = pd.concat(fail_list, ignore_index=True)
+    
+    # Fit performance information
+    radSym_fit_info = utilsHelper.info(localizations, fails)
+
+    return localizations, radSym_fit_info
+
+# 3D radial symmetry
+def RadialSym3D(candidate_dic,settings,**kwargs):
+    # Check if we have the required kwargs
+    [provided_optional_args, missing_optional_args] = utilsHelper.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
+
+    logging.info("Load and initiate all parameters of candidate fitting...")
+
+    # Load the required kwargs
+    time_bin_width = float(kwargs['time_bin_width']) # in ms
+    # maybe add a smoothing parameter here
+
+    # Load the optional kwargs
+
+    # Initializations - general
+    multithread = bool(settings['Multithread']['value'])
+    pixel_size = float(settings['PixelSize_nm']['value']) # in nm
+
+    if multithread == True: num_cores = multiprocessing.cpu_count()
+    else: num_cores = 1
+    
+    # Determine number of jobs on CPU and slice data accordingly
+    njobs, num_cores = utilsHelper.nb_jobs(candidate_dic, num_cores)
+    data_split = utilsHelper.slice_data(candidate_dic, njobs)
+
+    logging.info("Candidate fitting split in "+str(njobs)+" job(s) and divided on "+str(num_cores)+" core(s).")
+
+    # Determine all localizations
+    RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(localize_canditates3D)(i, data_split[i], time_bin_width, pixel_size) for i in range(len(data_split)))
     
     localization_list = [res[0] for res in RES]
     localizations = pd.concat(localization_list, ignore_index=True)
