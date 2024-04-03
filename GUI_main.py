@@ -3250,7 +3250,7 @@ class AdvancedSettingsWindow(QMainWindow):
         self.parent.globalSettings[setting]['value'] = value
 
     def save_global_settings(self,jsonLocation=None):
-        if jsonLocation == None:
+        if jsonLocation == None or jsonLocation == False:
             # Specify the path and filename for the JSON file
             json_file_path = self.parent.globalSettings['GlobalOptionsStorePath']['value']
         else:
