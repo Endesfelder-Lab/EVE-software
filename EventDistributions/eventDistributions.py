@@ -38,6 +38,16 @@ class YTDist(Dist2d):
         self.ylim = [np.min(events['y']), np.max(events['y'])]
         self.tlim = [np.min(events['t'])*1e-3, np.max(events['t'])*1e-3]
 
+class Dist3d():
+    def __init__(self) -> None:
+        pass
+
+class XYTDist(Dist3d):
+    def __init__(self, events):
+        self.xlim = [np.min(events['x']), np.max(events['x'])]
+        self.ylim = [np.min(events['y']), np.max(events['y'])]
+        self.tlim = [np.min(events['t'])*1e-3, np.max(events['t'])*1e-3]
+
 # ToDo: Write a function that checks if a class is in the correct format and all used functions are defined
 
 #-------------------------------------------------------------------------------------------------------------------------------
@@ -299,3 +309,30 @@ class MaxTimeDiff(XYDist):
     def __call__(self, events):
         maxTimeDiff = self.get_maxTimeDiff(events)
         return super().measure(maxTimeDiff)
+    
+class Hist3d_xyt(XYTDist):
+    def __init__(self, events, t_bin_width = 10., xy_bin_width = 1., **kwargs):
+        super().__init__(events)
+        self.xy_bin_width = xy_bin_width # in px
+        self.t_bin_width = t_bin_width # in ms
+        self.range = self.range()
+        self.bins = self.bins()
+        self.dist3D, self.edges = self(events, **kwargs)
+
+    def range(self):
+        xrange = [self.xlim[0]-0.5, self.xlim[1]+0.5]
+        yrange = [self.ylim[0]-0.5, self.ylim[1]+0.5]
+        trange = self.tlim
+        return [xrange, yrange, trange]
+    
+    def bins(self): 
+        xbins = int((self.ylim[1]-self.ylim[0]+1)/self.xy_bin_width)
+        ybins = int((self.ylim[1]-self.ylim[0]+1)/self.xy_bin_width)
+        tbins = int(np.ceil((self.tlim[1]-self.tlim[0])/self.t_bin_width))
+        self.range[2][1] = self.tlim[0]+xbins*self.t_bin_width
+        #print(xbins, ybins, tbins)
+        return (xbins, ybins, tbins)
+
+    def __call__(self, events, **kwargs):
+        hist_xyt, edges = np.histogramdd((events['x'], events['y'], events['t']*1e-3), bins = self.bins, range = tuple(self.range), **kwargs)
+        return hist_xyt, edges
