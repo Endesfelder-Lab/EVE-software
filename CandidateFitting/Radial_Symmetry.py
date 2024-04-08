@@ -397,10 +397,7 @@ def radialcenter3d(candidateID, candidate, time_bin_width, pixel_size):
 
     '''
     # get 3d event histogram
-    print('Dimensions of candidate are: ', str(candidate['cluster_size']))
     I = eventDistributions.Hist3d_xyt(candidate['events'], t_bin_width=time_bin_width).dist3D
-    np.save('/home/laura/PhD/Event_Based_Sensor_Project/GUI_tests/3D_Hist/' + str(candidateID) + '.npy', I)
-    print(I.shape)
 
     # Number of grid points
     Nx, Ny, Nz = I.shape # is not transposed (see eventDistributions.Hist3d_xyt)
