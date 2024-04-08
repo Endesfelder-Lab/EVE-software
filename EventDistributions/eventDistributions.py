@@ -326,13 +326,14 @@ class Hist3d_xyt(XYTDist):
         return [xrange, yrange, trange]
     
     def bins(self): 
-        xbins = int((self.ylim[1]-self.ylim[0]+1)/self.xy_bin_width)
+        xbins = int((self.xlim[1]-self.xlim[0]+1)/self.xy_bin_width)
         ybins = int((self.ylim[1]-self.ylim[0]+1)/self.xy_bin_width)
         tbins = int(np.ceil((self.tlim[1]-self.tlim[0])/self.t_bin_width))
-        self.range[2][1] = self.tlim[0]+xbins*self.t_bin_width
-        #print(xbins, ybins, tbins)
+        self.range[2][1] = self.tlim[0]+tbins*self.t_bin_width
+        print(xbins, ybins, tbins)
         return (xbins, ybins, tbins)
 
     def __call__(self, events, **kwargs):
         hist_xyt, edges = np.histogramdd((events['x'], events['y'], events['t']*1e-3), bins = self.bins, range = tuple(self.range), **kwargs)
+        # Histogram does not follow Cartesian convention, so transpose hist_xyt = np.transpose(hist_xyt, axes=(1,0,2)) for visualization
         return hist_xyt, edges

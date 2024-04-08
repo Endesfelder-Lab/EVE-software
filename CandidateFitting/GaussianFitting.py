@@ -73,8 +73,8 @@ class fit:
             self.ymean = np.nan
             self.imstats = [np.nan, np.nan]
         else:
-            self.xmean = np.average(np.arange(1,self.xlim+1), weights=np.nansum(dist.dist2D, axis=0))-1. 
-            self.ymean = np.average(np.arange(1,self.ylim+1), weights=np.nansum(dist.dist2D, axis=1))-1.
+            self.xmean = np.average(np.arange(1,self.xlim+1), weights=np.nansum(dist.dist2D, axis=0))-1. # sum in y-direction
+            self.ymean = np.average(np.arange(1,self.ylim+1), weights=np.nansum(dist.dist2D, axis=1))-1. # sum in x-direction
             self.imstats = [np.nanpercentile(self.image, 90), np.nanpercentile(self.image, 10)] # [np.nanmax(self.image), np.nanmedian(self.image)]
             if hasattr(dist, 'weights'):
                 self.weights = dist.weights.ravel()

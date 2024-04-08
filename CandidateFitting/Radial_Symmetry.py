@@ -397,10 +397,13 @@ def radialcenter3d(candidateID, candidate, time_bin_width, pixel_size):
 
     '''
     # get 3d event histogram
+    print('Dimensions of candidate are: ', str(candidate['cluster_size']))
     I = eventDistributions.Hist3d_xyt(candidate['events'], t_bin_width=time_bin_width).dist3D
+    np.save('/home/laura/PhD/Event_Based_Sensor_Project/GUI_tests/3D_Hist/' + str(candidateID) + '.npy', I)
+    print(I.shape)
 
     # Number of grid points
-    Nx, Ny, Nz = I.shape
+    Nx, Ny, Nz = I.shape # is not transposed (see eventDistributions.Hist3d_xyt)
 
     # Grid Coorinates
     xm_onerow = np.arange(-(Nx)/2.0+0.5, (Nx)/2.0+0.5)
@@ -408,7 +411,7 @@ def radialcenter3d(candidateID, candidate, time_bin_width, pixel_size):
     zm_onetile = np.arange(-(Nz)/2.0+0.5, (Nz)/2.0+0.5)
 
     # Using a 3D meshgrid to create the coordinates
-    xm, ym, zm = np.meshgrid(xm_onerow, ym_onecol, zm_onetile)
+    xm, ym, zm = np.meshgrid(xm_onerow, ym_onecol, zm_onetile, indexing='ij')
     ### The og code created a meshgrid corresponding to xy indexing but idk if that's what we still want in 3D
     #print(xm.shape, ym.shape, zm.shape)
 
