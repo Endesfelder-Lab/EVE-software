@@ -75,7 +75,7 @@ class Hist1d_t(TDist):
         return tbins
 
     def __call__(self, events, **kwargs):
-        self.dist1D, self.t_edges = np.histogram(events['t']*1e-3, bins = self.bins, range = tuple(self.range), **kwargs)
+        self.dist1D, self.t_edges = np.histogram(events['t'].values*1e-3, bins = self.bins, range = tuple(self.range), **kwargs)
         return self.dist1D, self.t_edges
 
 class Hist2d_tx(XTDist):
