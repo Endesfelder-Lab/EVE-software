@@ -417,6 +417,12 @@ def radialcenter3d(candidateID, candidate, time_bin_width, pixel_size):
     Gy = ndimage.sobel(I, axis=1)
     Gz = ndimage.sobel(I, axis=2)
 
+    # Smoothing to reduce the effect of noise
+    h = np.ones((3, 3, 3)) / 27.0 # 3x3x3 averaging filter
+    Gx = ndimage.convolve(Gx, h, mode='constant')
+    Gy = ndimage.convolve(Gy, h, mode='constant')
+    Gz = ndimage.convolve(Gz, h, mode='constant')
+
     # Calculating the magnitude of the gradient
     r = np.sqrt(Gx**2 + Gy**2 + Gz**2)
     rsqr = r**2
