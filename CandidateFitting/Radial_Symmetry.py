@@ -403,9 +403,9 @@ def radialcenter3d(candidateID, candidate, time_bin_width, pixel_size):
     Nx, Ny, Nz = I.shape # is not transposed (see eventDistributions.Hist3d_xyt)
 
     # Grid Coorinates
-    xm_onerow = np.arange(-(Nx)/2.0+0.5, (Nx)/2.0+0.5)
-    ym_onecol = np.arange(-(Ny)/2.0+0.5, (Ny)/2.0+0.5) #Note that y increases "downward"
-    zm_onetile = np.arange(-(Nz)/2.0+0.5, (Nz)/2.0+0.5)
+    xm_onerow = np.arange(0, Nx)
+    ym_onecol = np.arange(0, Ny) #Note that y increases "downward"
+    zm_onetile = np.arange(0, Nz)
 
     # Using a 3D meshgrid to create the coordinates
     xm, ym, zm = np.meshgrid(xm_onerow, ym_onecol, zm_onetile, indexing='ij')
