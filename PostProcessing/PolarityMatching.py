@@ -41,6 +41,9 @@ def __function_metadata__():
         },
         "PolarityMatching_time": {
             "required_kwargs": [
+                {"name": "timeOffsetPerc", "description": "Percentage time offset","default":"20","type":float,"display_text":"Time offset (%)"},
+                {"name": "nPops", "description": "Number of populations to fit, max 3","default":"1","type":int,"display_text":"Number of populations (max 3)"},
+                
             ],
             "optional_kwargs": [
             ],
@@ -291,7 +294,7 @@ def PolarityMatching_NeNA(localizations,findingResult,settings,**kwargs):
         n_bins_nena = 99
         runNeNA(sublocs,n_bins_nena=n_bins_nena,loggingShow=True,visualisation=True)
         
-        
+
         
 def PolarityMatching_time(localizations,findingResult,settings,**kwargs):
 
@@ -309,22 +312,168 @@ def PolarityMatching_time(localizations,findingResult,settings,**kwargs):
         perc1 = np.percentile(sublocs['pol_link_time'],1)
         perc95 = np.percentile(sublocs['pol_link_time'],95)
         
-        #Create a plt figure with 2 subplots:
+        
+        histV,bin_edges = np.histogram(sublocs['pol_link_time'], bins=np.linspace(0, perc95, 100), density=True)
+        
+        #Perform a smoothing on the histogram:
+        from scipy.signal import savgol_filter
+        filterhistV = savgol_filter(histV, int(len(histV)/5), 4)
+        #Find the maximum of the smoothed histogram:
+        maxV = max(filterhistV)
+        maxBin = np.argmax(filterhistV)
+        peakTime = bin_edges[maxBin+1]
+        minTimeFit = peakTime*(1+float(kwargs['timeOffsetPerc'])/100)
+        minTimeFitBin = np.argmin(np.abs(bin_edges - minTimeFit))
+        
+        #List of values to fit, where valuesToFit[0] is times, valuesToFit[1] is prob
+        valuesToFit = [bin_edges[minTimeFitBin:],histV[minTimeFitBin-1:]]
+        
+        n_curves = int(kwargs['nPops'])
+        #Fit with n_curves exponential decays:
+        from scipy.optimize import curve_fit
+        def exponential_decay_1(x, a, b):
+            return a * np.exp(-b * x)
+        def exponential_decay_2(x, a, b, c, f1):
+            return a * (f1 * np.exp(-b * x) + (1-f1) * np.exp(-c * x))
+        def exponential_decay_3(x, a, b, c, d, f1, f2):
+            return a * (f1 * np.exp(-b * x) + f2 * np.exp(-c * x) + (1-f1-f2) * np.exp(-d * x))
+        if n_curves == 1:
+            popt, pcov = curve_fit(exponential_decay_1, valuesToFit[0], valuesToFit[1], p0=[1, 0.01], bounds=(0, np.inf), maxfev=5000)
+            #get RelUncertainty on popt[1]:
+            popt1Unc = np.sqrt(pcov[1][1])/popt[1]
+        elif n_curves == 2:
+            popt, pcov = curve_fit(exponential_decay_2, valuesToFit[0], valuesToFit[1], p0=[1, 0.01, 0.02, 0.5], bounds=(0, np.inf), maxfev=5000)
+            #get RelUncertainty on popt[1]:
+            popt1Unc = np.sqrt(pcov[1][1])/popt[1]
+            popt2Unc = np.sqrt(pcov[2][2])/popt[2]
+        elif n_curves == 3:
+            popt, pcov = curve_fit(exponential_decay_3, valuesToFit[0], valuesToFit[1], p0=[1, 0.01, 0.02, 0.03, 0.30, 0.33], bounds=(0, np.inf), maxfev=5000)
+            #get RelUncertainty on popt[1]:
+            popt1Unc = np.sqrt(pcov[1][1])/popt[1]
+            popt2Unc = np.sqrt(pcov[2][2])/popt[2]
+            popt3Unc = np.sqrt(pcov[3][3])/popt[3]
+        
         fig = plt.figure()
-        ax = fig.add_subplot(121)
-        #Create the histogram where the bins are defined by the 95th percentile:
-        ax.hist(sublocs['pol_link_time'], bins=np.linspace(0, perc95, 100), density=True)
+        #4 subplots. 2 top ones: linear. 2 bottom ones: log (y).
+        #            2 left ones: only in data range. 2 right ones: full exp decay
+        colHist = '#606060'
+        colHistFilt = 'k'
+        linestyleHist = '-'
+        linestyleHistFilt = '--'
+        colPeak = 'k'
+        linestylePeak = '-'
+        colOffset = 'r'
+        linestyleOffset = '-'
+        colDecay = 'b'
+        linestyleDecay1 = '-'
+        linestyleDecay2 = '--'
         
-        #Label
-        plt.xlabel('Time between pos/neg events (ms)')
-        plt.ylabel('Probability')
+        ax = fig.add_subplot(231)
+        ax.plot(bin_edges[1:],histV,colHist,linestyle=linestyleHist)
+        ax.plot(bin_edges[1:],filterhistV,colHistFilt,linestyle=linestyleHistFilt)
+        ax.plot([peakTime,peakTime],[0,maxV*1.25],colPeak,linestyle=linestylePeak)
+        ax.plot([minTimeFit,minTimeFit],[0,maxV*1.25],colOffset,linestyle=linestyleOffset)
+        if n_curves == 1:
+            ax.plot(valuesToFit[0],exponential_decay_1(valuesToFit[0], *popt), colDecay, linestyle=linestyleDecay1)
+            #let the ax title reflect the fit params:
+            fig.suptitle('t1/2 = ' + str(round(1/popt[1],2)) + '+-' + str(round(1/popt[1]*popt1Unc,2)) + 'ms')
+        elif n_curves == 2:
+            ax.plot(valuesToFit[0],exponential_decay_2(valuesToFit[0], *popt), colDecay, linestyle=linestyleDecay1)
+            #let the ax title reflect the fit params:
+            fig.suptitle('t1/2 = ' + str(round(1/popt[1],2)) + '+-' + str(round(1/popt[1]*popt1Unc,2)) + ' (' + str(round(popt[3]*100,1)) +'%) | ' + str(round(1/popt[2],2)) + '+-' + str(round(1/popt[2]*popt2Unc,2)) + '(' + str(round((1-popt[3])*100,1)) +'%)  (ms)')
+            # ax.set_title('a = ' + str(round(popt[0],4)) + ', b = ' + str(round(popt[1],4)) + ', c = ' + str(round(popt[2],4)) + ', f1 = ' + str(round(popt[3],4)))
+        elif n_curves == 3:
+            ax.plot(valuesToFit[0],exponential_decay_3(valuesToFit[0], *popt), colDecay, linestyle=linestyleDecay1)
+            #let the ax title reflect the fit params:
+            #set the ax title for 3 curves:
+            fig.suptitle('t1/2 = ' + str(round(1/popt[1],2)) + '+-' + str(round(1/popt[1]*popt1Unc,2)) + ' (' + str(round(popt[4]*100,1)) +'%) | ' + str(round(1/popt[2],2)) + '+-' + str(round(1/popt[2]*popt2Unc,2)) + ' (' + str(round((popt[5])*100,1)) +'%) | ' + str(round(1/popt[3],2)) + '+-' + str(round(1/popt[3]*popt3Unc,2)) + ' (' + str(round((1-popt[4]-popt[5])*100,1)) +'%)  (ms)')
+        ax.set_ylabel('Probability')
         
-        ax2 = fig.add_subplot(122)
-        #show the same data but on log x-scale:
-        ax2.hist(sublocs['pol_link_time'], bins=np.logspace(np.log10(perc1), np.log10(perc95), 100), density=True)
-        ax2.set_yscale('log')
-        plt.xlabel('Time between pos/neg events (ms)')
+        ax = fig.add_subplot(232)
+        ax.plot(bin_edges[1:],histV,colHist,linestyle=linestyleHist)
+        ax.plot(bin_edges[1:],filterhistV,colHistFilt,linestyle=linestyleHistFilt)
+        ax.plot([peakTime,peakTime],[0,maxV*1.25],colPeak,linestyle=linestylePeak)
+        ax.plot([minTimeFit,minTimeFit],[0,maxV*1.25],colOffset,linestyle=linestyleOffset)
+        if n_curves == 1:
+            ax.plot(bin_edges,exponential_decay_1(bin_edges, *popt), colDecay, linestyle=linestyleDecay2)
+            ax.plot(valuesToFit[0],exponential_decay_1(valuesToFit[0], *popt), colDecay, linestyle=linestyleDecay1)
+        elif n_curves == 2:
+            ax.plot(bin_edges,exponential_decay_2(bin_edges, *popt), colDecay, linestyle=linestyleDecay2)
+            ax.plot(valuesToFit[0],exponential_decay_2(valuesToFit[0], *popt), colDecay, linestyle=linestyleDecay1)
+        elif n_curves == 3:
+            ax.plot(bin_edges,exponential_decay_3(bin_edges, *popt), colDecay, linestyle=linestyleDecay2)
+            ax.plot(valuesToFit[0],exponential_decay_3(valuesToFit[0], *popt), colDecay, linestyle=linestyleDecay1)
+        
+        #add a legend:
+        ax.legend(['Data','Smoothed','Peak','Offset','Exp. fit'])
+        
+        #Plot the difference between expected and data
+        ax = fig.add_subplot(233)
+        ax.set_title('Expected minus Data')
+        
+        if n_curves == 1:
+            totVals = exponential_decay_1(bin_edges[1:], *popt)
+        elif n_curves == 2:
+            totVals = exponential_decay_2(bin_edges[1:], *popt)
+        elif n_curves == 3:
+            totVals = exponential_decay_3(bin_edges[1:], *popt)
+            
+        ax.plot(bin_edges[1:],totVals-histV,colHist,linestyle=linestyleHist)
+        ax.plot(bin_edges[1:],totVals-filterhistV,colHistFilt,linestyle=linestyleHistFilt)
+        ax.legend(['Difference','Smoothed difference'])
+        
+        
+        ax = fig.add_subplot(234)
+        ax.plot(bin_edges[1:],histV,colHist,linestyle=linestyleHist)
+        ax.plot(bin_edges[1:],filterhistV,colHistFilt,linestyle=linestyleHistFilt)
+        ax.plot([peakTime,peakTime],[0,maxV*1.25],colPeak,linestyle=linestylePeak)
+        ax.plot([minTimeFit,minTimeFit],[0,maxV*1.25],colOffset,linestyle=linestyleOffset)
+        if n_curves == 1:
+            ax.plot(valuesToFit[0],exponential_decay_1(valuesToFit[0], *popt), colDecay, linestyle=linestyleDecay1)
+        elif n_curves == 2:
+            ax.plot(valuesToFit[0],exponential_decay_2(valuesToFit[0], *popt), colDecay, linestyle=linestyleDecay1)
+        elif n_curves == 3:
+            ax.plot(valuesToFit[0],exponential_decay_3(valuesToFit[0], *popt), colDecay, linestyle=linestyleDecay1)
+        ax.set_yscale('log')
+        ax.set_ylabel('Probability')
+        ax.set_xlabel('Time between pos/neg events (ms)')
+            
+        ax = fig.add_subplot(235)
+        ax.plot(bin_edges[1:],histV,colHist,linestyle=linestyleHist)
+        ax.plot(bin_edges[1:],filterhistV,colHistFilt,linestyle=linestyleHistFilt)
+        ax.plot([peakTime,peakTime],[0,maxV*1.25],colPeak,linestyle=linestylePeak)
+        ax.plot([minTimeFit,minTimeFit],[0,maxV*1.25],colOffset,linestyle=linestyleOffset)
+        if n_curves == 1:
+            ax.plot(bin_edges,exponential_decay_1(bin_edges, *popt), colDecay, linestyle=linestyleDecay2)
+            ax.plot(valuesToFit[0],exponential_decay_1(valuesToFit[0], *popt), colDecay, linestyle=linestyleDecay1)
+        elif n_curves == 2:
+            ax.plot(bin_edges,exponential_decay_2(bin_edges, *popt), colDecay, linestyle=linestyleDecay2)
+            ax.plot(valuesToFit[0],exponential_decay_2(valuesToFit[0], *popt), colDecay, linestyle=linestyleDecay1)
+        elif n_curves == 3:
+            ax.plot(bin_edges,exponential_decay_3(bin_edges, *popt), colDecay, linestyle=linestyleDecay2)
+            ax.plot(valuesToFit[0],exponential_decay_3(valuesToFit[0], *popt), colDecay, linestyle=linestyleDecay1)
+        ax.set_yscale('log')
+        ax.set_xlabel('Time between pos/neg events (ms)')
+        
+        #Plot the difference between expected and data
+        ax = fig.add_subplot(236)
+        ax.set_title('Expected minus Data')
+        
+        if n_curves == 1:
+            totVals = exponential_decay_1(bin_edges[1:], *popt)
+        elif n_curves == 2:
+            totVals = exponential_decay_2(bin_edges[1:], *popt)
+        elif n_curves == 3:
+            totVals = exponential_decay_3(bin_edges[1:], *popt)
+            
+        ax.plot(bin_edges[1:],totVals-histV,colHist,linestyle=linestyleHist)
+        ax.plot(bin_edges[1:],totVals-filterhistV,colHistFilt,linestyle=linestyleHistFilt)
+        ax.legend(['Difference','Smoothed difference'])
+        ax.set_yscale('log')
+        ax.set_xlabel('Time between pos/neg events (ms)')
+        
         plt.show()
+        
 
 
 
