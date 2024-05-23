@@ -89,13 +89,10 @@ def PolarityMatching(localizations,findingResult,settings,**kwargs):
     else:
         #Need to copy for some reason
         localizations = localizations.copy()
-        
         #remove the nans:
         localizations = localizations.dropna()
-        
         #reset the index:
         localizations = localizations.reset_index()
-        
 
         #add empty columns to localizations:
         localizations.loc[:,'pol_link_id'] = -1
@@ -259,6 +256,20 @@ def runNeNA(sublocs,n_bins_nena=99,loggingShow=True,visualisation=True):
     
     return aF,aFerr
 
+def showWarningPolMatchingNotRan():
+    """
+    This function shows a warning dialog when e.g. PolarityMatching-NeNA is run before PolarityMatching..
+    """
+    #Show a dialog popup:
+    from PyQt5.QtWidgets import QMessageBox
+    msg = QMessageBox()
+    msg.setIcon(QMessageBox.Critical)
+    msg.setText("First run Polarity Matching itself!")
+    msg.setWindowTitle("Polarity Matching error")
+    msg.setStandardButtons(QMessageBox.Ok)
+    msg.exec()
+    logging.error('Polarity Matching is required!')
+
 def PolarityMatching_NeNA(localizations,findingResult,settings,**kwargs):
     """
     A function to perform NeNA (Nearest Neighbor Analysis) for polarity matching to assess localization precision.
@@ -268,7 +279,7 @@ def PolarityMatching_NeNA(localizations,findingResult,settings,**kwargs):
     """
     #Check if we have the pre-run polarity matching:
     if not ('pol_link_id' in localizations.columns and 'pol_link_time' in localizations.columns and 'pol_link_xy' in localizations.columns):
-        logging.error('PolarityMatching-NeNA requires to first run Polarity Matching!')
+        showWarningPolMatchingNotRan()
     else:
         #Create a new figure and plot the polarity_linked_xy as a histogram:
         #Pre-filter to only positive events (to only have all links once)
@@ -284,77 +295,85 @@ def PolarityMatching_NeNA(localizations,findingResult,settings,**kwargs):
         
 def PolarityMatching_time(localizations,findingResult,settings,**kwargs):
 
-    #Create a new figure and plot the polarity_linked_xy as a histogram:
-    #Pre-filter to only positive events (to only have all links once)
-    sublocs = localizations[localizations['p'] == 1]
-    #Also remove all -1 pol link xy:
-    sublocs = sublocs[sublocs['pol_link_xy']>0]
-    
-    #Find the 95th percentile:
-    perc1 = np.percentile(sublocs['pol_link_time'],1)
-    perc95 = np.percentile(sublocs['pol_link_time'],95)
-    
-    #Create a plt figure with 2 subplots:
-    fig = plt.figure()
-    ax = fig.add_subplot(121)
-    #Create the histogram where the bins are defined by the 95th percentile:
-    ax.hist(sublocs['pol_link_time'], bins=np.linspace(0, perc95, 100), density=True)
-    
-    #Label
-    plt.xlabel('Time between pos/neg events (ms)')
-    plt.ylabel('Probability')
-    
-    ax2 = fig.add_subplot(122)
-    #show the same data but on log x-scale:
-    ax2.hist(sublocs['pol_link_time'], bins=np.logspace(np.log10(perc1), np.log10(perc95), 100), density=True)
-    ax2.set_yscale('log')
-    plt.xlabel('Time between pos/neg events (ms)')
-    plt.show()
+    #Check if we have the pre-run polarity matching:
+    if not ('pol_link_id' in localizations.columns and 'pol_link_time' in localizations.columns and 'pol_link_xy' in localizations.columns):
+        showWarningPolMatchingNotRan()
+    else:
+        #Create a new figure and plot the polarity_linked_xy as a histogram:
+        #Pre-filter to only positive events (to only have all links once)
+        sublocs = localizations[localizations['p'] == 1]
+        #Also remove all -1 pol link xy:
+        sublocs = sublocs[sublocs['pol_link_xy']>0]
+        
+        #Find the 95th percentile:
+        perc1 = np.percentile(sublocs['pol_link_time'],1)
+        perc95 = np.percentile(sublocs['pol_link_time'],95)
+        
+        #Create a plt figure with 2 subplots:
+        fig = plt.figure()
+        ax = fig.add_subplot(121)
+        #Create the histogram where the bins are defined by the 95th percentile:
+        ax.hist(sublocs['pol_link_time'], bins=np.linspace(0, perc95, 100), density=True)
+        
+        #Label
+        plt.xlabel('Time between pos/neg events (ms)')
+        plt.ylabel('Probability')
+        
+        ax2 = fig.add_subplot(122)
+        #show the same data but on log x-scale:
+        ax2.hist(sublocs['pol_link_time'], bins=np.logspace(np.log10(perc1), np.log10(perc95), 100), density=True)
+        ax2.set_yscale('log')
+        plt.xlabel('Time between pos/neg events (ms)')
+        plt.show()
 
 
 
 def PolarityMatching_NeNASpatial(localizations,findingResult,settings,**kwargs):
     
     
-    #Pre-filter to only positive events (to only have all links once)
-    sublocs = localizations[localizations['p'] == 1]
-    #Also remove all -1 pol link xy:
-    sublocs = sublocs[sublocs['pol_link_xy']>0]
-    
-    #We will cluster the points in sublocs into n_bins
-    #But we base this on n_points_per bin
-    n_points_per_bin = int(kwargs['n_points_per_bin'])
-    n_bins = len(sublocs)//n_points_per_bin
-    
-    n_colsrows = int((np.sqrt(n_bins)))
-    logging.info("n_colsrows: " + str(n_colsrows))
-    
-    #Split the sublocs data in these bins in x,y:
-    #sort data on x:
-    sublocs = sublocs.sort_values(by=['x'])
-    #split
-    sublocssplit = np.array_split(sublocs, n_colsrows)
-    xcounter = 0
-    ycounter = 0
-    neNAval = np.zeros((n_colsrows,n_colsrows))
-    
-    for sublocssplit_i in sublocssplit:
-        sublocssplit_i = sublocssplit_i.sort_values(by=['y'])
-        sublocssplit_ij = np.array_split(sublocssplit_i, n_colsrows)
-        for sublocssplit_ij_i in sublocssplit_ij:
-            aF = runNeNA(sublocssplit_ij_i,n_bins_nena=99,loggingShow=False,visualisation=False)
-            neNAval[xcounter,ycounter] = aF[0][0]
-            ycounter+=1
-        xcounter+=1
+    #Check if we have the pre-run polarity matching:
+    if not ('pol_link_id' in localizations.columns and 'pol_link_time' in localizations.columns and 'pol_link_xy' in localizations.columns):
+        showWarningPolMatchingNotRan()
+    else:
+        #Pre-filter to only positive events (to only have all links once)
+        sublocs = localizations[localizations['p'] == 1]
+        #Also remove all -1 pol link xy:
+        sublocs = sublocs[sublocs['pol_link_xy']>0]
+        
+        #We will cluster the points in sublocs into n_bins
+        #But we base this on n_points_per bin
+        n_points_per_bin = int(kwargs['n_points_per_bin'])
+        n_bins = len(sublocs)//n_points_per_bin
+        
+        n_colsrows = int((np.sqrt(n_bins)))
+        logging.info("n_colsrows: " + str(n_colsrows))
+        
+        #Split the sublocs data in these bins in x,y:
+        #sort data on x:
+        sublocs = sublocs.sort_values(by=['x'])
+        #split
+        sublocssplit = np.array_split(sublocs, n_colsrows)
+        xcounter = 0
         ycounter = 0
-    
-    
-    #Plot the figure
-    plt.figure()
-    #plot a 2d image:
-    plt.imshow(neNAval, cmap='viridis', interpolation='nearest')
-    plt.colorbar()
-    plt.show()
+        neNAval = np.zeros((n_colsrows,n_colsrows))
+        
+        for sublocssplit_i in sublocssplit:
+            sublocssplit_i = sublocssplit_i.sort_values(by=['y'])
+            sublocssplit_ij = np.array_split(sublocssplit_i, n_colsrows)
+            for sublocssplit_ij_i in sublocssplit_ij:
+                aF = runNeNA(sublocssplit_ij_i,n_bins_nena=99,loggingShow=False,visualisation=False)
+                neNAval[xcounter,ycounter] = aF[0][0]
+                ycounter+=1
+            xcounter+=1
+            ycounter = 0
+        
+        
+        #Plot the figure
+        plt.figure()
+        #plot a 2d image:
+        plt.imshow(neNAval, cmap='viridis', interpolation='nearest')
+        plt.colorbar()
+        plt.show()
     
     
     #Percentage error
