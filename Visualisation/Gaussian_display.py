@@ -7,8 +7,8 @@ def __function_metadata__():
     return {
         "GaussianKernel_fixedSigma": {
             "required_kwargs": [
-                {"name": "px_size","display_text":"Pixel size (nm)","description": "Visualisation px size","default":10,"type":int,"display_text":"Pixel size (in nm)"},
-                {"name": "sigma","display_text":"Sigma (nm)", "description": "Gaussian sigma value in pixel","default":20.,"type":float,"display_text":"Sigma (in nm)"}
+                {"name": "px_size","display_text":"Pixel size (nm)","description": "Visualisation px size","default":10,"type":int},
+                {"name": "sigma","display_text":"Sigma (nm)", "description": "Gaussian sigma value in pixel","default":20.,"type":float,}
             ],
             "optional_kwargs": [
             ],
@@ -17,7 +17,7 @@ def __function_metadata__():
         },
         "GaussianKernel_locPrec": {
             "required_kwargs": [
-                {"name": "px_size","display_text":"Pixel size (nm)", "description": "Visualisation px size","default":10,"type":int,"display_text":"Pixel size (in nm)"}
+                {"name": "px_size","display_text":"Pixel size (nm)", "description": "Visualisation px size","default":10,"type":int}
             ],
             "optional_kwargs": [
             ],
