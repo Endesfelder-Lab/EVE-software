@@ -126,60 +126,7 @@ class gauss2D(TwoDfit):
                     opt[4] = (-1)*opt[4]*1e-3 # in ms
                     self.offset = dist.undo_trafo_gauss(self.offset)*1e-3 # in ms
         return t, del_t, self.fit_info, opt
-
-
-class hist_fit(fit):
-    def __init__(self, times, **kwargs):
-        super().__init__()
-        self.hist, self.hist_edges = np.histogram(times.values,**kwargs)
-        self.bincentres = (self.hist_edges[1:]-self.hist_edges[:-1])/2.0 + self.hist_edges[:-1]
-        self.t0 = times.values[0]*1e-3 # in ms
-        self.fit_info = ''
     
-    def __call__(self, func, **kwargs):
-        popt, perr = super().__call__(func, self.bincentres, self.hist, nan_policy='omit', **kwargs)
-        return popt, perr
-
-# rayleigh fit
-class rayleigh(hist_fit):
-    def __init__(self, times, **kwargs):
-        super().__init__(times, **kwargs)
-        self.bounds = self.bounds(times)
-        self.p0 = self.p0(times)
-
-    def bounds(self, times):
-        bounds = ([self.t0-2*np.std(times.values), np.finfo(np.float64).tiny, 0.5*np.sqrt(np.finfo(np.float64).tiny), 0.], [times.values[-1], np.inf, np.inf, np.inf])
-        return bounds
-    
-    def p0(self, times):
-        shift = np.percentile(times, 5)
-        sigma = np.max([np.mean(times) - shift, 0])
-        amplitude = np.sqrt(np.exp(1))*np.amax(self.hist)*sigma
-        p0 = [shift, sigma, amplitude, np.finfo(np.float64).tiny]
-        return p0
-    
-    def func(self, t, shift, sigma, amplitude, offset):
-        result = amplitude * (t - shift)/(sigma**2) * np.exp(-(t - shift)**2 / (2 * sigma**2))
-        result[t < shift] = 0  # Set the function to zero for x less than the shift
-        result += offset # Add an additional offset for x greater than the shift
-        return result
-    
-    def __call__(self, times, **kwargs):
-        opt, err = super().__call__(self.func, bounds=self.bounds, p0=self.p0, **kwargs)
-        t = np.mean(times)
-        del_t = np.std(times)
-        if self.fit_info == '': 
-            times_std = np.std(times)
-            if err[0] > times_std:
-                self.fit_info += 'TimeToleranceWarning: Temporal fitting uncertainties exceed the tolerance.'
-            elif opt[0]<self.bounds[0][2] or opt[0]>self.bounds[1][2]:
-                self.fit_info += 'TimeToleranceWarning: Estimated time out of bounds.'
-            else:
-                t = opt[0]
-                del_t = err[0]
-        return t, del_t, self.fit_info, opt
-    
-
 class cumsum_fit(fit):
     def __init__(self, events, **kwargs):
         super().__init__()
@@ -301,45 +248,6 @@ class TwoDGaussianFirstTime(TemporalFits):
         first_events = firstTimes.get_smallest_t(events)
         self.fit = gauss2D(firstTimes, use_weights=use_weights)
         t, del_t, self.fit_info, opt = self.fit(firstTimes, first_events, opt_loc, **kwargs)
-        return t, del_t, self.fit_info, opt
-    
-class RayleighAllEvents(TemporalFits):
-    display_name = "Rayleigh (all events)"
-    description = "Rayleigh fit of auto-binned numpy histogram of all events."
-    def __init__(self):
-        super().__init__()
-        self.fit = None
-
-    def __call__(self, events, opt_loc, bins='auto', **kwargs):
-        self.fit = rayleigh(events['t']*1e-3, bins=bins, **kwargs)
-        t, del_t, self.fit_info, opt = self.fit(events['t']*1e-3)
-        return t, del_t, self.fit_info, opt
-    
-class RayleighFirstEvents(TemporalFits):
-    display_name = "Rayleigh (first events)"
-    description = "Rayleigh fit of auto-binned numpy histogram of all first events per pixel."
-    def __init__(self):
-        super().__init__()
-        self.fit = None
-
-    def __call__(self, events, opt_loc, bins='auto', **kwargs):
-        first_events = eventDistributions.FirstTimestamp(events).get_smallest_t(events)
-        self.fit = rayleigh(first_events['t']*1e-3, bins=bins, **kwargs)
-        t, del_t, self.fit_info, opt = self.fit(first_events['t']*1e-3)
-        return t, del_t, self.fit_info, opt
-    
-class RayleighFirstEvents_weighted(TemporalFits):
-    display_name = "Rayleigh (first events, weighted)"
-    description = "Rayleigh fit of auto-binned numpy histogram of all events, each event is weighted by the number of events/pixel."
-    def __init__(self):
-        super().__init__()
-        self.fit = None
-
-    def __call__(self, events, opt_loc, bins='auto', **kwargs):
-        first_events = eventDistributions.FirstTimestamp(events).get_smallest_t(events)
-        counts, bins = np.histogram(first_events['t']*1e-3, bins=bins, **kwargs)
-        self.fit = rayleigh(first_events['t']*1e-3, weights = first_events['weight'],bins=bins)
-        t, del_t, self.fit_info, opt = self.fit(first_events['t']*1e-3)
         return t, del_t, self.fit_info, opt
     
 class LognormCDFAllEvents(TemporalFits):
