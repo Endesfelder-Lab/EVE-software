@@ -10,12 +10,13 @@ def __function_metadata__():
     return {
         "Histogram_convolution": {
             "required_kwargs": [
-                {"name": "ZoomValue", "description": "Pixel-to-pseudopixel ratio","default":10},
-                {"name": "Convolution_kernel", "description": "Convolution pixel size","default":3},
+                {"name": "ZoomValue","display_text": "Magnification", "description": "Pixel-to-pseudopixel ratio","default":10},
+                {"name": "Convolution_kernel","display_text": "Convolution kernel size (px)", "description": "Convolution pixel size","default":3},
             ],
             "optional_kwargs": [
             ],
-            "help_string": "Returns a test dictionary and metadata string, to check if the program is working properly."
+            "help_string": "Returns a test dictionary and metadata string, to check if the program is working properly.",
+            "display_name": "2D Histogram with circular kernel convolution"
         }
     }
 
