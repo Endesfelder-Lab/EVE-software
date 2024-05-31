@@ -1103,10 +1103,11 @@ class MyGUI(QMainWindow):
     def fileDialogCSVopen(self):
         #Open a file dialog:
         fname = QFileDialog.getOpenFileName(self, 'Select a localization CSV file', None,"CSV file (*.csv)")
-        #Set this selected file as line edit:
-        self.CSVlocationLineEdit.setText(fname[0])
-        #Then also read this file:
-        self.open_loclist_csv()
+        if fname[0] != '':
+            #Set this selected file as line edit:
+            self.CSVlocationLineEdit.setText(fname[0])
+            #Then also read this file:
+            self.open_loclist_csv()
 
     def save_loclist_csv(self):
         #Open a file dialog:
@@ -4635,6 +4636,10 @@ class CandidatePreview(QWidget):
                  
             eval(FirstFunctionEvalText)
             eval(SecondFunctionEvalText)
+            
+            # Quick lines if wanted to export the average PSF data
+            # parent.data['AveragePSFpos'].to_csv(os.path.join('C:/Data/EBS/', 'AveragePSFpos.csv'))
+            # parent.data['AveragePSFneg'].to_csv(os.path.join('C:/Data/EBS/', 'AveragePSFneg.csv'))
 
             # Improve figure layout and update the first canvases
             # self.firstCandidateFigure.tight_layout()
