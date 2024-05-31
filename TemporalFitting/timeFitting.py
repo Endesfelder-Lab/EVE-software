@@ -132,6 +132,8 @@ class cumsum_fit(fit):
         super().__init__()
         self.cumsum = np.cumsum(np.ones_like(events['t'].values))-1. # cumsum should start at 1
         self.times = events['t'].values*1e-3 # in ms
+        # make sure that self.times is sorted in time
+        self.times = np.sort(self.times)
         self.t0 = events['t'].values[0]*1e-3 # in ms
     
     def __call__(self, func, **kwargs):
