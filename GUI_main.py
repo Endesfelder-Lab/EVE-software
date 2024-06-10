@@ -2875,6 +2875,12 @@ class FindingAnalysis(FindingFittingAnalysis):
         #Return true if it should be in this chunk, false if not
 
         #Looking at end of chunk:
+
+        #When using finding with bbox padding, sometimes empty candidates are passed to this method
+        if len(candidate['events']['t']) == 0:
+            logging.warning('this candidate is empty, returning false')
+            return False
+
         #Special case: start is after the overlap-start of next, and end is before the overlap-end of this:
         if min(candidate['events']['t']) > chunking_limits[0][1]-(chunking_limits[1][1]-chunking_limits[0][1]) and max(candidate['events']['t']) < chunking_limits[1][1]:
             #This will mean this candidate will be found in this chunk and in the next chunk:
