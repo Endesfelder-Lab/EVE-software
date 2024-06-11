@@ -412,11 +412,17 @@ def radialcenter3d(candidateID, candidate, time_bin_width, pixel_size):
     ### The og code created a meshgrid corresponding to xy indexing but idk if that's what we still want in 3D
     #print(xm.shape, ym.shape, zm.shape)
 
-    # Calculating derivatives in each direction using the sobel operator
-    Gx = ndimage.sobel(I, axis=0)
-    Gy = ndimage.sobel(I, axis=1)
-    Gz = ndimage.sobel(I, axis=2)
-
+    #Compute Derivatives
+    #Using Central Difference instead of Sobel Operator, however the arrays must be big enough, otherwise Sobel must be used
+    if np.shape(I)[0] > 1 and np.shape(I)[1] > 1 and np.shape(I)[2] > 1:
+        Gx = np.gradient(I, axis=0)
+        Gy = np.gradient(I, axis=1)
+        Gz = np.gradient(I, axis=2)
+    else:
+        Gx = ndimage.sobel(I, axis=0)
+        Gy = ndimage.sobel(I, axis=1)
+        Gz = ndimage.sobel(I, axis=2)
+   
     # Smoothing to reduce the effect of noise
     h = np.ones((3, 3, 3)) / 27.0 # 3x3x3 averaging filter
     Gx = ndimage.convolve(Gx, h, mode='constant')
