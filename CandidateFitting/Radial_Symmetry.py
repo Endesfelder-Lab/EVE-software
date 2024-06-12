@@ -321,7 +321,7 @@ def localize_canditates2D(i, candidate_dic, distfunc, time_fit, pixel_size):
     return localizations, fails
 
 # helper function to calculate distance in 3d radial symmetry algorithm
-def distance(P, line_info):
+def distance(P, Gx ,Gy ,Gz ,w ):
     '''
     Outputs the sum of the perpendicular distances between point P(x,y,z) and lines with 
     direction vectors (Gix, Giy, Giz), weighted by the gradient magnitude squared.
@@ -331,9 +331,13 @@ def distance(P, line_info):
     P : tuple
         (x,y,z) coordinates of point P
 
-    line_info : array
-        Array of lines with direction vectors (Gix, Giy, Giz), points A(x,y,z), and weights wi.
-        Form: [A1x, A1y, A1z, G1x, G1y, G1z, w1, A2x, A2y, A2z, G2x, G2y, G2z, w2, ...]
+    Gx : 3D array containing gradient calculated along x axis
+    Gy : 3D array containing gradient calculated along y axis
+    Gz : 3D array containing gradient calculated along z axis
+
+    w : 3D weights to apply to the distances
+
+    Note: All 3D arrays are of the same shape
 
     Returns
     -------
@@ -341,39 +345,35 @@ def distance(P, line_info):
         Sum of perpendicular distances squared weighted by the gradient magnitude squared
     '''
 
-    px, py, pz = P
+    # We will now reshape the arrays to 2D for easier calculation and perform the same operation
+    
 
-    num_voxels = len(line_info)//7 # because 7 entries per line number (Ax, Ay, Az, Gx, Gy, Gz, w)
-    sum_dsqrw = 0
+    #For consistency we will index the arrays in the same way as the original code, not the default 'C' indexing
+    x_coords, y_coords, z_coords = np.meshgrid(np.arange(w.shape[0]), np.arange(w.shape[1]), np.arange(w.shape[2]), indexing='ij')
 
-    for voxel in range(num_voxels):
-        Ax = line_info[voxel*7]
-        Ay = line_info[voxel*7 + 1]
-        Az = line_info[voxel*7 + 2]
-        Gx = line_info[voxel*7 + 3]
-        Gy = line_info[voxel*7 + 4]
-        Gz = line_info[voxel*7 + 5]
-        w = line_info[voxel*7 + 6]
+    #First we create the distance array
+    APx = x_coords - P[0]
+    APy = y_coords - P[1]
+    APz = z_coords - P[2]
 
-        # Calculating AP: P coords - A coords
-        APx, APy, APz = (px - Ax, py - Ay, pz - Az)
+    #Now we format the arrays in the same 2D way
+    AP = np.vstack([APx.ravel(), APy.ravel(), APz.ravel()]).T
+    GP = np.vstack([Gx.ravel(), Gy.ravel(), Gz.ravel()]).T
 
-        # Calculating AP x G: using cartesian cross product formula
-        APGx, APGy, APGz = (APy*Gz - APz*Gy, APz*Gx - APx*Gz, APx*Gy - APy*Gx)
+    #Now we take the cross product
+    AP_cross_G = np.cross(AP, GP)
 
-        # Calculating magnitude of AP x G and of G
-        APxGx_mag = np.sqrt(APGx**2 + APGy**2 + APGz**2)
-        G_mag = np.sqrt(Gx**2 + Gy**2 + Gz**2)
+    #Now we calculate the magnitude of the cross product as well as the magnitude of the Gradient
+    AP_cross_G_mag = np.linalg.norm(AP_cross_G, axis=1)
+    G_mag = np.linalg.norm(GP, axis=1)
 
-        # Calculating perpendicular distance between point P and 
-        if G_mag == 0:
-            D = 0
-        else:
-            D = APxGx_mag / G_mag
-        # print('D: ', D)
+    #Now we calculate the perpendicular distance
+    valid_index = np.where(G_mag != 0)
+    D = np.zeros(len(G_mag))
+    D[valid_index] = AP_cross_G_mag[valid_index] / G_mag[valid_index]
 
-        Dw = D**2 * w
-        sum_dsqrw += Dw
+    #Now we square the distance and multiply by the weight
+    sum_dsqrw = np.sum(D**2 * w.ravel())
 
     return sum_dsqrw
 
@@ -441,21 +441,7 @@ def radialcenter3d(candidateID, candidate, time_bin_width, pixel_size):
     print(xcentroid, ycentroid, zcentroid)
     w = rsqr / (np.sqrt((xm-xcentroid)**2 + (ym-ycentroid)**2 + (zm-zcentroid)**2))
 
-    # Creating a long 1D array of all the line information to pass to curve fit for minimization:
-    # the form will be [A1x, A1y, A1z, G1x, G1y, G1z, w1, A2x, A2y, A2z, G2x, G2y, G2z, w2, ...]
-    line_info = []
-    for x in range(w.shape[0]):
-        for y in range(w.shape[1]):
-            for z in range(w.shape[2]):
-                # Iterating through each voxel index
-                point_on_line = (x,y,z) # Indices of voxel center = point on the gradient line
-                direction_vector = (Gx[x,y,z], Gy[x,y,z], Gz[x,y,z])
-                weight = w[x,y,z]
-                for item in point_on_line:
-                    line_info.append(item)
-                for item in direction_vector:
-                    line_info.append(item)
-                line_info.append(weight)
+    #Instead of looping through every voxel, instead reshape the 3D arrays as 1D array in the function   
 
     # Minimizing the distance from each gradient line to a point P (optimized P coords will be xc, yc, zc)
     
@@ -464,7 +450,7 @@ def radialcenter3d(candidateID, candidate, time_bin_width, pixel_size):
     # Ensuring the optimized center is within the bounds of the image
     bounds = [(-0.5, I.shape[0]-0.5), (-0.5, I.shape[1]-0.5), (0, I.shape[2])]
 
-    result = minimize(distance, initial_guess, args=(line_info,), method='L-BFGS-B', bounds=bounds, options={'ftol' : 0.001})
+    result = minimize(distance, initial_guess, args=(Gx,Gy,Gz,w), method='L-BFGS-B', bounds=bounds, options={'ftol' : 0.001})
     # center = result.x
     # success = result.success
     # message = result.message
