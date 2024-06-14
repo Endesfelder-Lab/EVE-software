@@ -391,6 +391,21 @@ class LognormCDFAllEvents_NoBackground(TemporalFits):
         t, del_t, self.fit_info, opt = self.fit()
         return t, del_t, self.fit_info, opt
 
+class LognormCDFFirstEvents_NoBackground(TemporalFits):
+    display_name = "Lognormal CDF (first events, no background)"
+    description = "Lognormal CDF fit of cumulative sum of all first events per pixel."
+    def __init__(self):
+        super().__init__()
+        self.fit = None
+
+    def __call__(self, events, opt_loc, **kwargs):
+        firstTimes = eventDistributions.FirstTimestamp(events)
+        first_events = firstTimes.get_smallest_t(events)
+        first_events = first_events.sort_values(by='t')
+        self.fit = lognormal_cdf_background_removed(first_events)
+        t, del_t, self.fit_info, opt = self.fit()
+        return t, del_t, self.fit_info, opt
+
 class LognormCDFFirstEvents_Weighted_NoBackground(TemporalFits):
     display_name = "Lognormal CDF (first events, weighted) Removed Backround"
     description = "Lognormal CDF fit of cumulative sum of all events, each event is weighted by the number of events/pixel. Background Parameter Removed"
