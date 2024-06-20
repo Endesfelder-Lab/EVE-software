@@ -48,6 +48,7 @@ def __function_metadata__():
                 {"name": "theta", "display_text":"rotation angle", "description": "Rotation angle (in degrees) of the Gaussian","default":0},
                 {"name": "expected_width", "display_text":"expected width", "description": "Expected width of Gaussian fit (in nm)","default":150.},
                 {"name": "fitting_tolerance", "display_text":"fitting tolerance", "description": "Discard localizations with uncertainties larger than this value times the pixel size. ","default":1.},
+                {"name": "calibration_file", "display_text":"Calibration file", "description": "Calibration parameters as .npy file","type":"fileLoc"},
             ],
             "optional_kwargs": [
             ],
@@ -192,9 +193,10 @@ class loggauss2D(gauss2D):
 # 3d gaussian fit
 class gauss3D(gauss2D):
 
-    def __init__(self, dist, candidateID, width, fitting_tolerance, pixel_size, theta):
+    def __init__(self, dist, candidateID, width, fitting_tolerance, pixel_size, theta, calibration):
         super().__init__(dist, candidateID, width, fitting_tolerance, pixel_size)
         self.theta = theta
+        self.calibration = calibration
 
     # 2D Gaussian with rotation (angle theta in [rad])
     def func(self, XY, x0, y0, sigma_x, sigma_y, amplitude, offset):  
@@ -206,9 +208,22 @@ class gauss3D(gauss2D):
                                 + c*((Y-y0)**2)))
         return g
     
+    def sigma_fit(self, z, a, b, c, d, e):
+        sigma = a*(z-c)**2+d*(z-c)**3+b + e*(z-c)**4
+        return sigma
+    
+    def distance(self, z, widths):
+        sigma_x, sigma_y = widths
+        # in ThunderSTORM they take sqrt(sigma)
+        ret = (sigma_x-self.sigma_fit(z, *self.calibration[['a1','b1','c1','d1','e1']].values[0]))**2 + (sigma_y-self.sigma_fit(z, *self.calibration[['a2','b2','c2','d2','e2']].values[0]))**2
+        return ret
+    
     def __call__(self, candidate, time_fit, **kwargs):
         opt, err = super(gauss2D, self).__call__(self.func, bounds=self.bounds, p0=self.p0, **kwargs)
+        # loc_params = ['x', 'y', 'del_x', 'del_y', 't', 'del_t', 'sigma_x', 'sigma_y', 'del_sigma_x', 'del_sigma_y', 'z', 'del_z']
         if self.fit_info != '':
+            # for var in loc_params:
+            #     globals()[var] = np.nan
             x = np.nan
             y = np.nan
             del_x = np.nan
@@ -219,6 +234,8 @@ class gauss3D(gauss2D):
             sigma_y = np.nan
             del_sigma_x = np.nan
             del_sigma_y = np.nan
+            z = np.nan
+            del_z = np.nan
         else: 
             x = (opt[0]+np.min(candidate['events']['x']))*self.pixel_size # in nm
             y = (opt[1]+np.min(candidate['events']['y']))*self.pixel_size # in nm
@@ -230,6 +247,8 @@ class gauss3D(gauss2D):
             del_sigma_y = err[3]*self.pixel_size # in nm
             if del_x > self.fitting_tolerance*self.pixel_size or del_y > self.fitting_tolerance*self.pixel_size:
                 self.fit_info = 'ToleranceWarning: Fitting uncertainties exceed the tolerance.'
+                # for var in loc_params:
+                #     globals()[var] = np.nan
                 x = np.nan
                 y = np.nan
                 del_x = np.nan
@@ -240,13 +259,40 @@ class gauss3D(gauss2D):
                 sigma_y = np.nan
                 del_sigma_x = np.nan
                 del_sigma_y = np.nan
+                z = np.nan
+                del_z = np.nan
             else:
                 t, del_t, t_fit_info, opt_t = time_fit(candidate['events'], opt) # t, del_t in ms
                 if t_fit_info != '':
                     self.fit_info = t_fit_info
+                # z minimization
+                widths = [sigma_x, sigma_y]
+                initial_guess = 0.0
+                z_min_max = self.calibration[['z_min','z_max']].values[0]
+                bounds = [(z_min_max[0],z_min_max[1])]
+                z_fit = optimize.minimize(self.distance, initial_guess, args=(widths,), bounds=bounds)
+                if not z_fit.success:
+                    self.fit_info = 'ZFitError: '+z_fit.message
+                    # for var in loc_params:
+                    #     globals()[var] = np.nan
+                    x = np.nan
+                    y = np.nan
+                    del_x = np.nan
+                    del_y = np.nan
+                    t = np.nan
+                    del_t = np.nan
+                    sigma_x = np.nan
+                    sigma_y = np.nan
+                    del_sigma_x = np.nan
+                    del_sigma_y = np.nan
+                    z = np.nan
+                    del_z = np.nan
+                else:
+                    z = z_fit.x
+                    del_z = np.sqrt(np.diag(z_fit.hess_inv.todense()))
         mean_polarity = candidate['events']['p'].mean()
         p = int(mean_polarity == 1) + int(mean_polarity == 0) * 0 + int(mean_polarity > 0 and mean_polarity < 1) * 2
-        loc_df = pd.DataFrame({'candidate_id': self.candidateID, 'x': x, 'y': y, 'del_x': del_x, 'del_y': del_y, 'sigma_x': sigma_x, 'sigma_y': sigma_y, 'del_sigma_x' : del_sigma_x, 'del_sigma_y' : del_sigma_y, 'p': p, 't': t, 'del_t': del_t, 'N_events': candidate['N_events'], 'x_dim': candidate['cluster_size'][0], 'y_dim': candidate['cluster_size'][1], 't_dim': candidate['cluster_size'][2]*1e-3, 'fit_info': self.fit_info}, index=[0])
+        loc_df = pd.DataFrame({'candidate_id': self.candidateID, 'x': x, 'y': y, 'del_x': del_x, 'del_y': del_y, 'z': z, 'del_z': del_z, 'sigma_x': sigma_x, 'sigma_y': sigma_y, 'del_sigma_x' : del_sigma_x, 'del_sigma_y' : del_sigma_y, 'p': p, 't': t, 'del_t': del_t, 'N_events': candidate['N_events'], 'x_dim': candidate['cluster_size'][0], 'y_dim': candidate['cluster_size'][1], 't_dim': candidate['cluster_size'][2]*1e-3, 'fit_info': self.fit_info}, index=[0])
         return loc_df
 
 
@@ -381,7 +427,19 @@ def Gaussian3D(candidate_dic,settings,**kwargs):
     fit_func = gauss3D
     dist_func = getattr(eventDistributions, kwargs['dist_kwarg'])
     time_fit = getattr(timeFitting, kwargs['time_kwarg'])()
-    params = expected_width, fitting_tolerance, pixel_size, theta
+
+    try:
+        #Check if calibration file ends with .csv:
+        if kwargs['calibration_file'][-4:] != '.csv':
+            kwargs['calibration_file'] = kwargs['calibration_file']+'.csv'
+
+        calibration = pd.read_csv(kwargs['calibration_file'], sep=',')
+        performance_metadata = f"Loaded file {kwargs['calibration_file']}."
+        logging.info('Existing calibration result correctly loaded.')
+    except:
+        logging.error('Issue with loading an calibration result!')
+
+    params = expected_width, fitting_tolerance, pixel_size, theta, calibration
 
     if multithread == True: num_cores = multiprocessing.cpu_count()
     else: num_cores = 1
@@ -402,6 +460,6 @@ def Gaussian3D(candidate_dic,settings,**kwargs):
     fails = pd.concat(fail_list)
     
     # Fit performance information
-    gaussian_fit_info = utilsHelper.info(localizations, fails)
+    gaussian_fit_info = performance_metadata + utilsHelper.info(localizations, fails)
 
     return localizations, gaussian_fit_info
