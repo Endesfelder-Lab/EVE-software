@@ -220,6 +220,84 @@ class lognormal_cdf(cumsum_fit):
             else:
                 t, del_t = time_fit_results[0:2]
         return t, del_t, self.fit_info, opt
+    
+class lognormal_cdf_background_removed(cumsum_fit):
+    def __init__(self, events, **kwargs):
+        super().__init__(events, **kwargs)
+        self.bounds = self.bounds()
+        self.p0 = self.p0()
+    
+    def bounds(self):
+        bounds = ((0., np.finfo(np.float64).tiny/np.sqrt(2.), self.t0-2*np.std(self.times), 0.0), (np.inf, np.inf, self.times[-1], np.inf))
+        return bounds
+    
+    def p0(self):
+        max_cumsum = np.max(self.cumsum)
+        i_half_max = np.argmax(self.cumsum >= 0.5 * max_cumsum)
+        shift = np.percentile(self.times, 5)
+        mu = np.max([np.log(np.max([self.times[i_half_max]-shift, 1])),0])
+        sigma = 1 # idea: set sigma to np.sqrt(2*(np.log(np.mean(times))-mu)), but this seems to be generally to high
+        scale = max_cumsum
+        p0 = [mu, sigma, shift, scale]
+        return p0
+    
+    def get_time(self, opt, err, mean_t, std_t):
+        mu, sigma, shift, scale, = opt
+        err_mu, err_sigma, err_shift, err_scale = err
+        t_fit_info = ''
+        warnings.simplefilter("error", RuntimeWarning)
+        try: 
+            alpha = alpha = 0.5*(1.+erf(-sigma/np.sqrt(2)))
+            x_hat = np.exp(mu-sigma**2)+shift
+            a_fac = np.exp(sigma**2/2.-mu)/(np.sqrt(2*np.pi)*sigma)
+            a = scale*a_fac
+            b = scale*(alpha-a_fac*x_hat)
+            t_intersect = x_hat-alpha/a_fac
+            # calculate error of t_intersect with Gaussian error propagation
+            fac_shift = 1.
+            fac_mu = np.exp(mu-sigma**2)-alpha/a_fac
+            fac_sigma = np.exp(mu-sigma**2)/sigma - np.sqrt(np.pi/2.)*sigma*(1-erf(sigma/np.sqrt(2))*np.exp(mu-sigma**2/2.))
+            del_t_intersect = np.sqrt((fac_shift*err_shift)**2+(fac_mu*err_mu)**2+(fac_sigma*err_sigma)**2)
+        except RuntimeWarning: # for very steep lognormal cdfs a approaches inf (a vertical line) and is thus not feasible
+            a = np.inf
+            b = np.inf
+            try:
+                x_hat = np.exp(mu-sigma**2)+shift
+                t_intersect = x_hat
+                fac_shift = 1.
+                fac_mu = np.exp(mu-sigma**2)
+                fac_sigma = -2.*sigma*np.exp(mu-sigma**2)
+                del_t_intersect = np.sqrt((fac_shift*err_shift)**2+(fac_mu*err_mu)**2+(fac_sigma*err_sigma)**2)
+            except RuntimeWarning:
+                t_intersect = mean_t
+                del_t_intersect = std_t
+                t_fit_info = 'TimeRuntimeWarning: Fit yields unphysical results.'
+        warnings.simplefilter("ignore", RuntimeWarning)
+        return t_intersect, del_t_intersect, a, b, t_fit_info
+    
+    def func(self, t, mu, sigma, shift, scale):
+        shift_t = (t - shift) # shift t
+        res = np.zeros_like(t)
+        condition = t>shift
+        shift_t_condition = shift_t[condition]
+        res[condition] = scale * (0.5 + 0.5 * erf((np.log(shift_t_condition)-mu) / (np.sqrt(2) * sigma)))
+        return res
+    
+    def __call__(self, **kwargs): # event-threshold defines how to get the fitted time
+        opt, err = super().__call__(self.func, p0=self.p0, bounds=self.bounds, **kwargs) # maxfev=5e4
+        t = np.mean(self.times)
+        del_t = np.std(self.times)
+        if self.fit_info == '':
+            time_fit_results = self.get_time(opt, err, t, del_t)
+            self.fit_info += time_fit_results[4]
+            tolerance_del_t = 1e9 # 1 s as upper limit for time uncertainty
+            if time_fit_results[0]<self.bounds[0][2] or time_fit_results[0]>self.bounds[1][2]:
+                self.fit_info += 'TimeToleranceWarning: Estimated time out of bounds.'
+            elif time_fit_results[1] > tolerance_del_t:
+                self.fit_info += 'TimeToleranceWarning: Estimated time uncertainty exceeds tolerance.'
+            else:
+                t, del_t = time_fit_results[0:2]
+        return t, del_t, self.fit_info, opt
 
 class TemporalFits:
     def __init__(self):
@@ -299,3 +377,50 @@ class LognormCDFFirstEvents_weighted(TemporalFits):
         t, del_t, self.fit_info, opt = self.fit(sigma=self.sigma)
         return t, del_t, self.fit_info, opt
 
+class LognormCDFAllEvents_NoBackground(TemporalFits):
+    display_name = "Lognormal CDF (all events)"
+    description = "Lognormal CDF fit of cumulative sum of all events."
+    def __init__(self):
+        super().__init__()
+        self.fit = None
+
+    def __call__(self, events, opt_loc, **kwargs):
+        # np.save("/home/laura/PhD/Event_Based_Sensor_Project/GUI_tests/MLE_fit/data.npy", events)
+        # events.to_pickle("/home/laura/PhD/Event_Based_Sensor_Project/GUI_tests/MLE_fit/data.pkl")
+        self.fit = lognormal_cdf_background_removed(events)
+        t, del_t, self.fit_info, opt = self.fit()
+        return t, del_t, self.fit_info, opt
+
+class LognormCDFFirstEvents_NoBackground(TemporalFits):
+    display_name = "Lognormal CDF (first events, no background)"
+    description = "Lognormal CDF fit of cumulative sum of all first events per pixel."
+    def __init__(self):
+        super().__init__()
+        self.fit = None
+
+    def __call__(self, events, opt_loc, **kwargs):
+        firstTimes = eventDistributions.FirstTimestamp(events)
+        first_events = firstTimes.get_smallest_t(events)
+        first_events = first_events.sort_values(by='t')
+        self.fit = lognormal_cdf_background_removed(first_events)
+        t, del_t, self.fit_info, opt = self.fit()
+        return t, del_t, self.fit_info, opt
+
+class LognormCDFFirstEvents_Weighted_NoBackground(TemporalFits):
+    display_name = "Lognormal CDF (first events, weighted) Removed Backround"
+    description = "Lognormal CDF fit of cumulative sum of all events, each event is weighted by the number of events/pixel. Background Parameter Removed"
+
+    def __init__(self):
+        super().__init__()
+        self.fit = None
+        self.sigma = None
+
+    def __call__(self, events, opt_loc, **kwargs):
+        firstTimes = eventDistributions.FirstTimestamp(events)
+        first_events = firstTimes.get_smallest_t(events)
+        first_events = first_events.sort_values(by='t')
+        max_weight = np.max(first_events['weight'])
+        self.sigma = (max_weight - first_events['weight'] + 1.)/max_weight
+        self.fit = lognormal_cdf_background_removed(first_events)
+        t, del_t, self.fit_info, opt = self.fit(sigma=self.sigma)
+        return t, del_t, self.fit_info, opt
