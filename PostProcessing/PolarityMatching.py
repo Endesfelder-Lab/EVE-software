@@ -511,12 +511,59 @@ def PolarityMatching_NeNASpatial(localizations,findingResult,settings,**kwargs):
             sublocssplit_ij = np.array_split(sublocssplit_i, n_colsrows)
             for sublocssplit_ij_i in sublocssplit_ij:
                 aF = runNeNA(sublocssplit_ij_i,n_bins_nena=99,loggingShow=False,visualisation=False)
+                #print(str(aF[0][0]) + ' at ' + str(xcounter) + ' ' + str(ycounter))
                 neNAval[xcounter,ycounter] = aF[0][0]
                 ycounter+=1
             xcounter+=1
             ycounter = 0
         
+
         
+        print("Average NeNA value: " + str(np.mean(neNAval)))
+        print("Median NeNA value: " + str(np.median(neNAval)))
+        print("Standard Deviation of NeNA value: " + str(np.std(neNAval)))
+
+        #Now we have the NeNA values in neNAval, we want to remove regions where precision is too low, we will classify this as regions 
+        #Where the NeNA value is greater than the average NeNA value + 2.5 standard deviations
+
+        erraniousRegions = np.where(neNAval > np.mean(neNAval) + 2.5*np.std(neNAval))
+        #print("Erranious regions: " + str(erraniousRegions))
+
+        #Now we will remove these regions from the data:
+        
+        #Without figuring out how to remove these from the original data (would require some arithmatic):
+        xcounter = 0
+        ycounter = 0
+
+        sublocsNoOutliers = []
+        for sublocssplit_i in sublocssplit:
+            sublocssplit_i = sublocssplit_i.sort_values(by=['y'])
+            sublocssplit_ij = np.array_split(sublocssplit_i, n_colsrows)
+            for sublocssplit_ij_i in sublocssplit_ij:
+                doAppend = True
+                for index in range(len(erraniousRegions[0])):
+                    if erraniousRegions[0][index] == xcounter and erraniousRegions[1][index] == ycounter:
+                        doAppend = False
+                        print("Dropping Region " + str(xcounter) + " " + str(ycounter))
+                if doAppend:
+                    #print("Appending: " + str(xcounter) + " " + str(ycounter))
+                    sublocsNoOutliers.append(sublocssplit_ij_i)
+                ycounter+=1
+            xcounter+=1
+            ycounter=0
+                
+        sublocsNoOutliers = pd.concat(sublocsNoOutliers)
+        pointsremove = len(sublocs) - len(sublocsNoOutliers)
+        pointsremovepercentage = pointsremove/len(sublocs)
+        print("\nRemoved: " + str(pointsremove) + " points out of " + str(len(sublocs)) + " points")
+        print("Percentage removed: " + str(pointsremovepercentage * 100) + "%" + "\n")  
+
+        NeNANoOutliers = runNeNA(sublocsNoOutliers,n_bins_nena=99,loggingShow=False,visualisation=False)
+        NeNAWithOutliers = runNeNA(sublocs,n_bins_nena=99,loggingShow=False,visualisation=False)
+        print("Total NeNA value with outliers: " + str(NeNAWithOutliers[0][0]))
+        print("Total NeNA value without outliers: " + str(NeNANoOutliers[0][0]))
+
+     
         #Plot the figure
         plt.figure()
         #plot a 2d image:
