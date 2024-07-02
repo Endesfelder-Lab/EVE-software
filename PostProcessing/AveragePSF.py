@@ -4,6 +4,9 @@ import pandas as pd
 import numpy as np
 import time
 import logging
+import copy
+import pickle
+from datetime import date
 
 # Required function __function_metadata__
 # Should have an entry for every function in this file
@@ -26,9 +29,10 @@ def AveragePSF(localizations,findingResult,settings,**kwargs):
     #Check if we have the required kwargs
     [provided_optional_args, missing_optional_args] = utilsHelper.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
 
-    sumAllEventsPos = pd.DataFrame(columns=['x', 'y', 't', 'p'])
-    sumAllEventsNeg = pd.DataFrame(columns=['x', 'y', 't', 'p'])
-    sumAllEventsMix = pd.DataFrame(columns=['x', 'y', 't', 'p'])
+    sumAllEventsPos = pd.DataFrame(columns=['x', 'y', 't', 'p', 'event_id', 'candidate_id', 'pixel_incident_count', 'pixel_incidence_tot'])
+    sumAllEventsNeg = pd.DataFrame(columns=['x', 'y', 't', 'p', 'event_id', 'candidate_id', 'pixel_incident_count', 'pixel_incidence_tot'])
+    sumAllEventsMix = pd.DataFrame(columns=['x', 'y', 't', 'p', 'event_id', 'candidate_id', 'pixel_incident_count', 'pixel_incidence_tot'])
+    
     import copy
     #We loop over all localizations:
     for loc in range(0,len(localizations)):
@@ -40,11 +44,43 @@ def AveragePSF(localizations,findingResult,settings,**kwargs):
         candidate = copy.deepcopy(findingResult[candidate_id])
         #We take the events in there:
         events = candidate['events'].copy()
-        
-        #Correct the event for the localization x, y, time:
+
+
+        #Now we need to count the events per pixel, at this point as well x and y values are integers:
+        candidate_width = events['x'].max() - events['x'].min() + 1
+        candidate_height = events['y'].max() - events['y'].min() + 1
+        #We create a 2d array of zeros:
+        count_grid = np.zeros((candidate_width, candidate_height))
+        pixel_incident_count = np.zeros(len(events))
+        #We loop over all events in the cluster and add 1 to the corresponding pixel:
+        for i in range(0,len(events)):
+           event = events.iloc[i]
+           x_location = event['x'] - events['x'].min()
+           y_location = event['y'] - events['y'].min()
+           count_grid[x_location, y_location] += 1
+           pixel_incident_count[i] = count_grid[x_location, y_location]
+        #We add the pixel incident count to the events:
+        events['pixel_incident_count'] = pixel_incident_count.astype(int)
+
+        #We also add the total pixel incidence to the events:
+        total_pixel_incidence_count = np.zeros(len(events))
+        for i in range(0,len(events)):
+            event = events.iloc[i]
+            x_location = event['x'] - events['x'].min()
+            y_location = event['y'] - events['y'].min()
+            total_pixel_incidence_count[i] = count_grid[x_location, y_location]
+        events['pixel_incidence_tot'] = total_pixel_incidence_count.astype(int)
+
+
+        #Correct the event for the localization x, y, time:l
         events['x'] = events['x'] - localizations.iloc[loc]['x']/float(settings['PixelSize_nm']['value'])
         events['y'] = events['y'] - localizations.iloc[loc]['y']/float(settings['PixelSize_nm']['value'])
-        events['t'] = events['t'] - localizations.iloc[loc]['t']*1000        
+        events['t'] = events['t'] - localizations.iloc[loc]['t']*1000
+        
+        #At this point the events are arranged in time order, so we will add their event_id and candidate_id based on timing information:
+        events['event_id'] = np.arange(1, len(events)+1)
+        events['candidate_id'] = np.full(len(events), candidate_id)
+
         #check if all p==1:
         if all(events['p'] == 1):
             #append all entries in events to sumalleventspos:
@@ -53,8 +89,8 @@ def AveragePSF(localizations,findingResult,settings,**kwargs):
             sumAllEventsNeg = pd.concat([sumAllEventsNeg, events], ignore_index=True)
         else:
             sumAllEventsMix = pd.concat([sumAllEventsMix, events], ignore_index=True)
-    
-    
+
+
     #Create a 2d histogram of this and show it:
     import matplotlib.pyplot as plt
     fig, ax = plt.subplots()
@@ -63,6 +99,17 @@ def AveragePSF(localizations,findingResult,settings,**kwargs):
     ax.hist2d(sumAllEventsPos['x'],sumAllEventsPos['y'],bins=50)
     #second subplot with a hist2d but logarithmic intensity:
     
-    fig.show()
+    
+    eventdict = {}
+    eventdict['pos'] = sumAllEventsPos
+    eventdict['neg'] = sumAllEventsNeg
+    eventdict['mix'] = sumAllEventsMix
+
+    #For now I will store the output in a pickle file to analyze:
+    filepath = "data/averagepsf_100sec_" + str(date.today()) + ".pickle"
+    with open(filepath, 'wb') as file:
+       pickle.dump(eventdict, file)
+
+    fig.show()  
 
     return '',''
