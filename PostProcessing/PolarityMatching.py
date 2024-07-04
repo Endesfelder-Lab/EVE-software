@@ -6,6 +6,7 @@ import time
 import logging
 from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
+#import matplotlib as mpl
 
 # Required function __function_metadata__
 # Should have an entry for every function in this file
@@ -144,6 +145,8 @@ def PolarityMatching(localizations,findingResult,settings,**kwargs):
                         foundNegEventId = np.argmax(foundNegEventId)
                         #Find the corresponding event
                         negEventsWithinDistance = negEventsInTime.iloc[foundNegEventId]
+
+
                         #And find the event distance belonging to it
                         eventDistance = distance[foundNegEventId]
                         
@@ -152,15 +155,54 @@ def PolarityMatching(localizations,findingResult,settings,**kwargs):
                         
                         negEventId = negEventFound._name
                         
-                        #Update the positive candidate
-                        posEvents.loc[posEventId,'pol_link_id'] = (negEventFound.candidate_id)
-                        posEvents.loc[posEventId,'pol_link_time'] = (negEventFound.t - posEvent.t)
-                        posEvents.loc[posEventId,'pol_link_xy'] = eventDistance
-                        
-                        #And update the negative candidate
-                        negEvents.loc[negEventId,'pol_link_id'] = (posEvent.candidate_id)
-                        negEvents.loc[negEventId,'pol_link_time'] = (posEvent.t-negEventFound.t)
-                        negEvents.loc[negEventId,'pol_link_xy'] = eventDistance
+                        #Here we will check to see if the negative event already has a positive link
+                        if negEvents.loc[negEventId,'pol_link_id'] == -1:
+                            #Update the positive candidate
+                            posEvents.loc[posEventId,'pol_link_id'] = (negEventFound.candidate_id)
+                            posEvents.loc[posEventId,'pol_link_time'] = (negEventFound.t - posEvent.t)
+                            posEvents.loc[posEventId,'pol_link_xy'] = eventDistance
+                            
+                            #And update the negative candidate
+                            negEvents.loc[negEventId,'pol_link_id'] = (posEvent.candidate_id)
+                            negEvents.loc[negEventId,'pol_link_time'] = (posEvent.t-negEventFound.t)
+                            negEvents.loc[negEventId,'pol_link_xy'] = eventDistance
+                        else:
+                            #This means the negative event already has a positive link, so we will compare disances of the two positive events
+                            #If the new positive event is closer, we will update the negative event to link to the new positive event
+                            oldLocID = negEvents.loc[negEventId,'pol_link_id']
+                            #Get the old positive event
+                            #Get the old distance
+                            oldxyDistance = negEvents.loc[negEventId,'pol_link_xy']
+                            oldxyLinkTime = negEvents.loc[negEventId,'pol_link_time']
+
+                            newxyDistance = eventDistance
+                            newxyLinkTime = posEvent.t - negEventFound.t
+
+                            #Now we compare them by the sum of the squares, weighting the distance more than the time
+                            scalefactor = float(kwargs['Max_xyDistance'])/float(kwargs['Max_tDistance'])
+                            oldxytDist = np.sqrt(oldxyDistance**2 + (oldxyLinkTime * scalefactor)**2) 
+                            newxytDist = np.sqrt(newxyDistance**2 + (newxyLinkTime * scalefactor)**2)
+
+                            if newxytDist < oldxytDist:
+                                #Remove previous match
+                                posEvents.loc[oldLocID,'pol_link_id'] = -1
+                                posEvents.loc[oldLocID,'pol_link_time'] = 0
+                                posEvents.loc[oldLocID,'pol_link_xy'] = 0
+
+                                #Update the positive candidate
+                                posEvents.loc[posEventId,'pol_link_id'] = (negEventFound.candidate_id)
+                                posEvents.loc[posEventId,'pol_link_time'] = (negEventFound.t - posEvent.t)
+                                posEvents.loc[posEventId,'pol_link_xy'] = eventDistance
+                                
+                                #And update the negative candidate
+                                negEvents.loc[negEventId,'pol_link_id'] = (posEvent.candidate_id)
+                                negEvents.loc[negEventId,'pol_link_time'] = (posEvent.t-negEventFound.t)
+                                negEvents.loc[negEventId,'pol_link_xy'] = eventDistance
+                            else:
+                                #No update
+                                pass                           
+
+
         else:
             mininAll = np.searchsorted(posEvents['t'], negEvents['t'] - float(kwargs['Max_tDistance']))
             maxinAll = np.searchsorted(posEvents['t'], negEvents['t'])
@@ -200,15 +242,52 @@ def PolarityMatching(localizations,findingResult,settings,**kwargs):
                         
                         posEventId = posEventFound._name
                         
-                        #Update the positive candidate
-                        posEvents.loc[posEventId,'pol_link_id'] = (negEventFound.candidate_id)
-                        posEvents.loc[posEventId,'pol_link_time'] = (negEventFound.t - posEvent.t)
-                        posEvents.loc[posEventId,'pol_link_xy'] = eventDistance
-                        
-                        #And update the negative candidate
-                        negEvents.loc[negEventId,'pol_link_id'] = (posEvent.candidate_id)
-                        negEvents.loc[negEventId,'pol_link_time'] = (posEvent.t-negEventFound.t)
-                        negEvents.loc[negEventId,'pol_link_xy'] = eventDistance
+                        #Here we will check to see if the negative event already has a positive link
+                        if posEvents.loc[posEventId,'pol_link_id'] == -1:
+
+                            #Update the positive candidate
+                            posEvents.loc[posEventId,'pol_link_id'] = (negEventFound.candidate_id)
+                            posEvents.loc[posEventId,'pol_link_time'] = (negEventFound.t - posEvent.t)
+                            posEvents.loc[posEventId,'pol_link_xy'] = eventDistance
+                            
+                            #And update the negative candidate
+                            negEvents.loc[negEventId,'pol_link_id'] = (posEvent.candidate_id)
+                            negEvents.loc[negEventId,'pol_link_time'] = (posEvent.t-negEventFound.t)
+                            negEvents.loc[negEventId,'pol_link_xy'] = eventDistance
+                        else:
+                            #This means the negative event already has a positive link, so we will compare disances of the two positive events
+                            #If the new positive event is closer, we will update the negative event to link to the new positive event
+                            oldLocID = posEvents.loc[posEventId,'pol_link_id']
+                            #Get the old positive event
+                            #Get the old distance
+                            oldxyDistance = posEvents.loc[posEventId,'pol_link_xy']
+                            oldxyLinkTime = posEvents.loc[posEventId,'pol_link_time']
+
+                            newxyDistance = eventDistance
+                            newxyLinkTime = negEvent.t - posEventFound.t
+
+                            #Now we compare them by the sum of the squares, weighting the distance more than the time
+                            scalefactor = float(kwargs['Max_xyDistance'])/float(kwargs['Max_tDistance'])
+                            oldxytDist = np.sqrt(oldxyDistance**2 + (oldxyLinkTime * scalefactor)**2) 
+                            newxytDist = np.sqrt(newxyDistance**2 + (newxyLinkTime * scalefactor)**2)
+
+                            if newxytDist < oldxytDist:
+                                #Update the positive candidate
+                                negEvents.loc[oldLocID,'pol_link_id'] = -1
+                                negEvents.loc[oldLocID,'pol_link_time'] = 0
+                                negEvents.loc[oldLocID,'pol_link_xy'] = 0
+
+                                posEvents.loc[posEventId,'pol_link_id'] = (negEventFound.candidate_id)
+                                posEvents.loc[posEventId,'pol_link_time'] = (negEventFound.t - posEvent.t)
+                                posEvents.loc[posEventId,'pol_link_xy'] = eventDistance
+                                
+                                #And update the negative candidate
+                                negEvents.loc[negEventId,'pol_link_id'] = (posEvent.candidate_id)
+                                negEvents.loc[negEventId,'pol_link_time'] = (posEvent.t-negEventFound.t)
+                                negEvents.loc[negEventId,'pol_link_xy'] = eventDistance
+                            else:
+                                #No update
+                                pass
                 
         #re-create localizations by adding these below one another again:
         localizations = pd.concat([posEvents, negEvents])
@@ -567,8 +646,11 @@ def PolarityMatching_NeNASpatial(localizations,findingResult,settings,**kwargs):
         #Plot the figure
         plt.figure()
         #plot a 2d image:
-        plt.imshow(neNAval, cmap='viridis', interpolation='nearest')
-        plt.colorbar()
+
+        #cmap = mpl.cm.viridis
+        #norm = mpl.colors.Normalize(vmin=0, vmax=30)
+        plt.imshow(neNAval, cmap='viridis', interpolation='nearest')    
+        #plt.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap=cmap))
         plt.show()
     
     
