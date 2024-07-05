@@ -29,9 +29,20 @@ def AveragePSF(localizations,findingResult,settings,**kwargs):
     #Check if we have the required kwargs
     [provided_optional_args, missing_optional_args] = utilsHelper.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
 
-    sumAllEventsPos = pd.DataFrame(columns=['x', 'y', 't', 'p', 'event_id', 'candidate_id', 'pixel_incident_count', 'pixel_incidence_tot'])
-    sumAllEventsNeg = pd.DataFrame(columns=['x', 'y', 't', 'p', 'event_id', 'candidate_id', 'pixel_incident_count', 'pixel_incidence_tot'])
-    sumAllEventsMix = pd.DataFrame(columns=['x', 'y', 't', 'p', 'event_id', 'candidate_id', 'pixel_incident_count', 'pixel_incidence_tot'])
+    #Explanation of columns in the dataframe:
+    #x: x position of the event
+    #y: y position of the event
+    #t: time of the event
+    #p: probability of the event
+    #event_id: ID for sequential order of events in cluster
+    #candidate_id: ID of the candidate the event belongs to
+    #pixel_incident_count: The number of events that have been detected in the same pixel as this event, including this event (a count of 5 means that this is the fifth event in this pixel in this candidate)
+    #pixel_incidence_tot: The total number of events that have been detected in the same pixel as this event (a count of 10 means there are 10 events in this pixel in this candidate)
+    #t_delay: The time delay of the event from the previous event on the same pixel (in us)
+
+    sumAllEventsPos = pd.DataFrame(columns=['x', 'y', 't', 'p', 'event_id', 'candidate_id', 'pixel_incident_count', 'pixel_incidence_tot', 't_delay'])
+    sumAllEventsNeg = pd.DataFrame(columns=['x', 'y', 't', 'p', 'event_id', 'candidate_id', 'pixel_incident_count', 'pixel_incidence_tot', 't_delay'])
+    sumAllEventsMix = pd.DataFrame(columns=['x', 'y', 't', 'p', 'event_id', 'candidate_id', 'pixel_incident_count', 'pixel_incidence_tot', 't_delay'])
     
     import copy
     #We loop over all localizations:
@@ -51,22 +62,37 @@ def AveragePSF(localizations,findingResult,settings,**kwargs):
         candidate_height = events['y'].max() - events['y'].min() + 1
         #We create a 2d array of zeros:
         count_grid = np.zeros((candidate_width, candidate_height))
-        pixel_incident_count = np.zeros(len(events))
-        #We loop over all events in the cluster and add 1 to the corresponding pixel:
-        for i in range(0,len(events)):
-           event = events.iloc[i]
-           x_location = event['x'] - events['x'].min()
-           y_location = event['y'] - events['y'].min()
-           count_grid[x_location, y_location] += 1
-           pixel_incident_count[i] = count_grid[x_location, y_location]
-        #We add the pixel incident count to the events:
-        events['pixel_incident_count'] = pixel_incident_count.astype(int)
+        time_prev_event = np.zeros((candidate_width, candidate_height))
 
-        #We also add the total pixel incidence to the events:
-        total_pixel_incidence_count = np.zeros(len(events))
+        #These arrays will be added as columns to the events dataframe:
+        pixel_incident_count = np.zeros(len(events))
+        time_delay = np.zeros(len(events))
+        #We loop over all events in the cluster and add 1 to the corresponding pixel:
         for i in range(0,len(events)):
             event = events.iloc[i]
             x_location = event['x'] - events['x'].min()
+            y_location = event['y'] - events['y'].min()
+            count_grid[x_location, y_location] += 1
+            pixel_incident_count[i] = count_grid[x_location, y_location]
+            if count_grid[x_location, y_location] > 1:
+                time_delay[i] = event['t'] - time_prev_event[x_location, y_location]
+            else:
+                time_delay[i] = 0
+            time_prev_event[x_location, y_location] = event['t']
+
+
+        #We add the pixel incident count to the events:
+        events['pixel_incident_count'] = pixel_incident_count.astype(int)
+
+        #We add the time delay to the events:
+        events['t_delay'] = time_delay.astype(int)
+
+        #We also add the total pixel incidence to the events:
+        total_pixel_incidence_count = np.zeros(len(events))
+        
+        for i in range(0,len(events)):
+            event = events.iloc[i]
+            x_location = event['x'] - events['x'].min()  
             y_location = event['y'] - events['y'].min()
             total_pixel_incidence_count[i] = count_grid[x_location, y_location]
         events['pixel_incidence_tot'] = total_pixel_incidence_count.astype(int)
@@ -106,7 +132,7 @@ def AveragePSF(localizations,findingResult,settings,**kwargs):
     eventdict['mix'] = sumAllEventsMix
 
     #For now I will store the output in a pickle file to analyze:
-    filepath = "data/averagepsf_100sec_" + str(date.today()) + ".pickle"
+    filepath = "data/averagepsf_50sec_" + str(date.today()) + ".pickle"
     with open(filepath, 'wb') as file:
        pickle.dump(eventdict, file)
 
