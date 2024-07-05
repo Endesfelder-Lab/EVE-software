@@ -209,7 +209,85 @@ def PolarityMatching(localizations,findingResult,settings,**kwargs):
                         negEvents.loc[negEventId,'pol_link_id'] = (posEvent.candidate_id)
                         negEvents.loc[negEventId,'pol_link_time'] = (posEvent.t-negEventFound.t)
                         negEvents.loc[negEventId,'pol_link_xy'] = eventDistance
+        #Now we filter for repeat links, and remove them. This will only occur for the larger set of events
+        if float(len(posEvents)) > float(len(negEvents)):
+            duplicatesSeries = posEvents.duplicated(subset=['pol_link_id'], keep=False)
+
+            #Get the duplicates
+            duplicatePosEventsAll = posEvents[duplicatesSeries]
+
+            #now we get the unique pol_link_id's
+            uniqueIds = np.unique(duplicatePosEventsAll['pol_link_id'])
+
+            #Now we loop over the unique ids, and find the one with the smallest time difference
+            for uniqueId in uniqueIds:
+                #Duplicated events for this unique id
+                duplicatePosEvents = duplicatePosEventsAll[duplicatePosEventsAll['pol_link_id'] == uniqueId]
+
+                #Now we will calculated a scale factor of time and xy distance using the maximum values
+                scalefactor = float(kwargs['Max_xyDistance']) / float(kwargs['Max_tDistance'])
+
+                xytScaledDist = np.sqrt(duplicatePosEvents['pol_link_xy']**2 + (duplicatePosEvents['pol_link_time']*scalefactor)**2)
+
+                #Find the minimum distance
+                minDistId = np.argmin(xytScaledDist)
+
+                #Now we keep the one with the minimum distance
+                keptEvent = duplicatePosEvents.iloc[minDistId]
+
+                #Now we update the linked Negative Event to the keptEvent
+                negEventID = keptEvent['pol_link_id']
+                negEvents.loc[negEventId,'pol_link_id'] = keptEvent['pol_link_id']
+                negEvents.loc[negEventId,'pol_link_time'] = keptEvent['pol_link_time'] * -1
+                negEvents.loc[negEventId,'pol_link_xy'] = keptEvent['pol_link_xy']
+
+                #Now we set the other events to -1
+                duplicatePosEvents = duplicatePosEvents.iloc[np.arange(len(duplicatePosEvents)) != minDistId]
+                for droppedEventId,droppedEvent in duplicatePosEvents.iterrows():
+                    posEvents.loc[droppedEventId,'pol_link_id'] = -1
+                    posEvents.loc[droppedEventId,'pol_link_time'] = 0
+                    posEvents.loc[droppedEventId,'pol_link_xy'] = 0
+        else:
+            #Same for negative events greater than positive
+            duplicatesSeries = negEvents.duplicated(subset=['pol_link_id'], keep=False)
+
+            #Get the duplicates
+            duplicateNegEventsAll = negEvents[duplicatesSeries]
+
+            #now we get the unique pol_link_id's
+            uniqueIds = np.unique(duplicateNegEventsAll['pol_link_id'])
+
+            #Now we loop over the unique ids, and find the one with the smallest time difference
+            for uniqueId in uniqueIds:
+                #Duplicated events for this unique id
+                duplicateNegEvents = duplicateNegEventsAll[duplicateNegEventsAll['pol_link_id'] == uniqueId]
+
+                #Now we will calculated a scale factor of time and xy distance using the maximum values
+                scalefactor = float(kwargs['Max_xyDistance']) / float(kwargs['Max_tDistance'])
+
+                xytScaledDist = np.sqrt(duplicateNegEvents['pol_link_xy']**2 + (duplicateNegEvents['pol_link_time']*scalefactor)**2)
+
+                #Find the minimum distance
+                minDistId = np.argmin(xytScaledDist)
+
+                #Now we keep the one with the minimum distance
+                keptEvent = duplicateNegEvents.iloc[minDistId]
+
+                #Now we update the linked Negative Event to the keptEvent
+                posEventID = keptEvent['pol_link_id']
+                posEvents.loc[posEventId,'pol_link_id'] = keptEvent['pol_link_id']
+                posEvents.loc[posEventId,'pol_link_time'] = keptEvent['pol_link_time'] * -1
+                posEvents.loc[posEventId,'pol_link_xy'] = keptEvent['pol_link_xy']
+
+                #Now we set the other events to -1
+                duplicateNegEvents = duplicateNegEvents.iloc[np.arange(len(duplicateNegEvents)) != minDistId]
+                for droppedEventId,droppedEvent in duplicateNegEvents.iterrows():
+                    negEvents.loc[droppedEventId,'pol_link_id'] = -1
+                    negEvents.loc[droppedEventId,'pol_link_time'] = 0
+                    negEvents.loc[droppedEventId,'pol_link_xy'] = 0
                 
+
+
         #re-create localizations by adding these below one another again:
         localizations = pd.concat([posEvents, negEvents])
                 
@@ -221,6 +299,8 @@ def PolarityMatching(localizations,findingResult,settings,**kwargs):
     return localizations,metadata
 
 def runNeNA(sublocs,n_bins_nena=99,loggingShow=True,visualisation=True):
+
+
     #Create a histogram for the fitting
     ahist=np.histogram(sublocs['pol_link_xy'],bins=n_bins_nena,density=True)
     #Get the x-values (relative distance)
