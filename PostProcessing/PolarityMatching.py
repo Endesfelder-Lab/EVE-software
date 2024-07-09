@@ -225,12 +225,12 @@ def PolarityMatching(localizations,findingResult,settings,**kwargs):
                 duplicatePosEvents = duplicatePosEventsAll[duplicatePosEventsAll['pol_link_id'] == uniqueId]
 
                 #Now we will calculated a scale factor of time and xy distance using the maximum values
-                scalefactor = float(kwargs['Max_xyDistance']) / float(kwargs['Max_tDistance'])
+                #scalefactor = float(kwargs['Max_xyDistance']) / float(kwargs['Max_tDistance'])
 
-                xytScaledDist = np.sqrt(duplicatePosEvents['pol_link_xy']**2 + (duplicatePosEvents['pol_link_time']*scalefactor)**2)
-
+                #xytScaledDist = np.sqrt(duplicatePosEvents['pol_link_xy']**2 + (duplicatePosEvents['pol_link_time']*scalefactor)**2)
+                timeDistances = duplicatePosEvents['pol_link_time']
                 #Find the minimum distance
-                minDistId = np.argmin(xytScaledDist)
+                minDistId = np.argmin(timeDistances)
 
                 #Now we keep the one with the minimum distance
                 keptEvent = duplicatePosEvents.iloc[minDistId]
