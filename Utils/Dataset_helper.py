@@ -90,7 +90,10 @@ def detectHotPixels_run(loadfile,maxTime,outputArea):
 def detectHotPixels(parent,**kwargs):#(dataLocation,xyStretch=(-np.Inf,-np.Inf,np.Inf,np.Inf)):
     #Create a small pyqt popup window which allows you to load a file:
 
-    from Utils import utils
+    try:
+        from eve_smlm.Utils import utils
+    except ImportError:
+        from Utils import utils
 
     window = utils.SmallWindow(parent,windowTitle="Detect Hot Pixels")
     window.addDescription("Detect likely hot pixels")

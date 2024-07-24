@@ -1,0 +1,25 @@
+New version --> create new folder.
+In new folder, have the following files:
+LICENCE
+pyproject.toml
+README.md
+and folder src
+In folder src, create a folder with the package name (eve_smlm)
+Add all .py files in there, and have an empty __init__.py file.
+
+run build via python -m build
+
+Test locally via 
+(C:\CondaEnvironments\DEBUGEnv_AlwaysEmpty_Py39) C:\Users\Koen Martens\Documents\DEBUG_condaEnvs>pip install "C:/Users/Koen Martens/Documents/GitHub/Eve/PyPI/v001/dist/eve_SMLM-0.0.1.3-py3-none-any.whl"
+
+
+Upload to test pypi via 
+python -m twine upload --repository testpypi dist/*
+
+PyPI TEST API:
+pypi-AgENdGVzdC5weXBpLm9yZwIkNzFkOTRmNGEtZmM2NC00NTVmLWE4NTYtYzUzNjU2NzYwZjNjAAIqWzMsIjVhNGVhYjdhLWE5NmMtNDA5Zi1hMDYyLWY5MjViYTBhZGM1OSJdAAAGIDFP83eVGI4cnn0U4XWXtRdR1X-g1qWk3bavgPSNqXee
+
+
+
+To install:
+pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple eve-SMLM==0.0.1.3

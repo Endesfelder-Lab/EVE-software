@@ -1,5 +1,8 @@
 import inspect
-from Utils import utilsHelper
+try:
+    from eve_smlm.Utils import utilsHelper
+except ImportError:
+    from Utils import utilsHelper
 import pandas as pd
 import numpy as np
 import time, logging

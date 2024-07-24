@@ -1,5 +1,9 @@
 
-from Utils import utilsHelper
+
+try:
+    from eve_smlm.Utils import utilsHelper
+except ImportError:
+    from Utils import utilsHelper
 
 # Required function __function_metadata__
 # Should have an entry for every function in this file
