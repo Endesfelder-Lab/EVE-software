@@ -1,5 +1,12 @@
 import inspect
-from Utils import utilsHelper
+try:
+    from eve_smlm.Utils import utilsHelper
+    from eve_smlm.EventDistributions import eventDistributions
+    from eve_smlm.TemporalFitting import timeFitting
+except ImportError:
+    from Utils import utilsHelper
+    from EventDistributions import eventDistributions
+    from TemporalFitting import timeFitting
 import pandas as pd
 import numpy as np
 from scipy.ndimage import convolve
@@ -10,8 +17,6 @@ from scipy import linalg
 import warnings
 from scipy.optimize import OptimizeWarning
 warnings.simplefilter("error", OptimizeWarning)
-from EventDistributions import eventDistributions
-from TemporalFitting import timeFitting
 import logging
 
 from joblib import Parallel, delayed

@@ -1,5 +1,8 @@
 import inspect
-from Utils import utilsHelper
+try:
+    from eve_smlm.Utils import utilsHelper
+except ImportError:
+    from Utils import utilsHelper
 import sys
 # Add /usr/lib/python3/dist-packages/ to PYTHONPATH to include Metavision libraries
 sys.path.append("/usr/lib/python3/dist-packages/") 

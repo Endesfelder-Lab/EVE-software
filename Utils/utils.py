@@ -6,18 +6,33 @@ import re
 import warnings, logging
 import numpy as np
 import itertools
-from EventDistributions import eventDistributions
 import time
 import h5py
 
-#Import all scripts in the custom script folders
-from CandidateFinding import *
-from CandidateFitting import *
-from TemporalFitting import timeFitting
-from Visualisation import *
-from PostProcessing import *
-from CandidatePreview import *
-from Utils import *
+try:
+    #Import all scripts in the custom script folders
+    # List all files in the CandidateFitting directory
+    from eve_smlm.CandidateFinding import *
+    from eve_smlm.CandidateFitting import *
+    from eve_smlm.TemporalFitting import timeFitting
+    from eve_smlm.Visualisation import *
+    from eve_smlm.PostProcessing import *
+    from eve_smlm.CandidatePreview import *
+    from eve_smlm.Utils import *
+    from eve_smlm.EventDistributions import eventDistributions
+
+except ImportError:
+    #Import all scripts in the custom script folders
+    # List all files in the CandidateFitting directory
+    from CandidateFinding import *
+    from CandidateFitting import *
+    from TemporalFitting import timeFitting
+    from Visualisation import *
+    from PostProcessing import *
+    from CandidatePreview import *
+    from Utils import *
+    from EventDistributions import eventDistributions
+
 
 #Imports for PyQt5 (GUI)
 from PyQt5 import QtWidgets, QtGui

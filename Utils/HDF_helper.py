@@ -48,7 +48,10 @@ def CutHDF_xy_run(loadfile,savefile,xyStretch):
 def CutHDF_xy(parent,**kwargs):#(dataLocation,xyStretch=(-np.Inf,-np.Inf,np.Inf,np.Inf)):
     #Create a small pyqt popup window which allows you to load a file:
 
-    from Utils import utils
+    try:
+        from eve_smlm.Utils import utils
+    except ImportError:
+        from Utils import utils
 
     window = utils.SmallWindow(parent,windowTitle="Cut HDF5 file in xy")
     window.addDescription("This function allows you to cut an hdf5 file between certain x,y coordinates. Please find the file location, specify the save location, and specify the XY boundaries (e.g. '(100,200,200,250)' to cut 100-200 in x, 200-250 in y)")

@@ -1,5 +1,8 @@
 import inspect
-from Utils import utilsHelper
+try:
+    from eve_smlm.Utils import utilsHelper
+except ImportError:
+    from Utils import utilsHelper
 import pandas as pd
 import numpy as np
 import time
@@ -201,13 +204,13 @@ def PolarityMatching(localizations,findingResult,settings,**kwargs):
                         posEventId = posEventFound._name
                         
                         #Update the positive candidate
-                        posEvents.loc[posEventId,'pol_link_id'] = (negEventFound.candidate_id)
-                        posEvents.loc[posEventId,'pol_link_time'] = (negEventFound.t - posEvent.t)
+                        posEvents.loc[posEventId,'pol_link_id'] = (negEvent.candidate_id)
+                        posEvents.loc[posEventId,'pol_link_time'] = (negEvent.t - posEventFound.t)
                         posEvents.loc[posEventId,'pol_link_xy'] = eventDistance
                         
                         #And update the negative candidate
-                        negEvents.loc[negEventId,'pol_link_id'] = (posEvent.candidate_id)
-                        negEvents.loc[negEventId,'pol_link_time'] = (posEvent.t-negEventFound.t)
+                        negEvents.loc[negEventId,'pol_link_id'] = (posEventFound.candidate_id)
+                        negEvents.loc[negEventId,'pol_link_time'] = (posEventFound.t-negEvent.t)
                         negEvents.loc[negEventId,'pol_link_xy'] = eventDistance
         #Now we filter for repeat links, and remove them. This will only occur for the larger set of events
         if float(len(posEvents)) > float(len(negEvents)):

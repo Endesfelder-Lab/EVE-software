@@ -1,3 +1,18 @@
+
+
+
+#Imports for PyQt5 (GUI)
+from PyQt5 import QtWidgets, QtGui
+from PyQt5.QtGui import QCursor, QTextCursor, QIntValidator, QColor
+from PyQt5.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QTableWidget, QTableWidgetItem, QLayout, QMainWindow, QLabel, QPushButton, QSizePolicy, QGroupBox, QTabWidget, QGridLayout, QWidget, QComboBox, QLineEdit, QFileDialog, QToolBar, QCheckBox,QDesktopWidget, QMessageBox, QTextEdit, QSlider, QSpacerItem, QTableView, QFrame, QScrollArea, QProgressBar, QMenu, QMenuBar, QColorDialog
+from PyQt5.QtCore import Qt, QPoint, QProcess, QCoreApplication, QTimer, QFileSystemWatcher, QFile, QThread, pyqtSignal, QObject
+import sys
+import typing
+
+import pandas as pd
+from PyQt5.QtCore import QAbstractTableModel, QModelIndex, Qt
+from PyQt5.QtWidgets import QApplication, QMainWindow, QTableView, QWidget, QGridLayout, QPushButton
+
 #General imports
 import sys, os, logging, json, argparse, datetime, glob, csv, ast, platform, threading
 import matplotlib.pyplot as plt
@@ -24,18 +39,6 @@ import re
 from joblib import Parallel, delayed
 from joblib import parallel_backend, cpu_count
 
-#Imports for PyQt5 (GUI)
-from PyQt5 import QtWidgets, QtGui
-from PyQt5.QtGui import QCursor, QTextCursor, QIntValidator, QColor
-from PyQt5.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QTableWidget, QTableWidgetItem, QLayout, QMainWindow, QLabel, QPushButton, QSizePolicy, QGroupBox, QTabWidget, QGridLayout, QWidget, QComboBox, QLineEdit, QFileDialog, QToolBar, QCheckBox,QDesktopWidget, QMessageBox, QTextEdit, QSlider, QSpacerItem, QTableView, QFrame, QScrollArea, QProgressBar, QMenu, QMenuBar, QColorDialog
-from PyQt5.QtCore import Qt, QPoint, QProcess, QCoreApplication, QTimer, QFileSystemWatcher, QFile, QThread, pyqtSignal, QObject
-import sys
-import typing
-
-import pandas as pd
-from PyQt5.QtCore import QAbstractTableModel, QModelIndex, Qt
-from PyQt5.QtWidgets import QApplication, QMainWindow, QTableView, QWidget, QGridLayout, QPushButton
-
 
 from napari import Viewer
 from napari.qt import QtViewer
@@ -47,20 +50,36 @@ from vispy.color import Colormap
 # Add the folder 2 folders up to the system path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-#Import all scripts in the custom script folders
-# List all files in the CandidateFitting directory
-from CandidateFitting import *
-from CandidateFinding import *
-from Visualisation import *
-from PostProcessing import *
-from CandidatePreview import *
-from Utils import *
+try:
+    #Import all scripts in the custom script folders
+    # List all files in the CandidateFitting directory
+    from eve_smlm.CandidateFitting import *
+    from eve_smlm.CandidateFinding import *
+    from eve_smlm.Visualisation import *
+    from eve_smlm.PostProcessing import *
+    from eve_smlm.CandidatePreview import *
+    from eve_smlm.Utils import *
 
-#Obtain the helperfunctions
-from Utils import utils, utilsHelper
+    #Obtain the helperfunctions
+    from eve_smlm.Utils import utils, utilsHelper
 
-#Obtain eventdistribution functions
-from EventDistributions import eventDistributions
+    #Obtain eventdistribution functions
+    from eve_smlm.EventDistributions import eventDistributions
+except ImportError:
+    #Import all scripts in the custom script folders
+    # List all files in the CandidateFitting directory
+    from CandidateFitting import *
+    from CandidateFinding import *
+    from Visualisation import *
+    from PostProcessing import *
+    from CandidatePreview import *
+    from Utils import *
+
+    #Obtain the helperfunctions
+    from Utils import utils, utilsHelper
+
+    #Obtain eventdistribution functions
+    from EventDistributions import eventDistributions
 
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
 # -----------------------------------------------------------------------------------------------------------------------------------------------------

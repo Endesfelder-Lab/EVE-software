@@ -6,7 +6,10 @@ import warnings
 from scipy.optimize import OptimizeWarning
 warnings.simplefilter("error", OptimizeWarning)
 import pandas as pd
-from EventDistributions import eventDistributions
+try:
+    from eve_smlm.EventDistributions import eventDistributions
+except ImportError:
+    from EventDistributions import eventDistributions
 from scipy.special import erf, erfinv
 
 class fit:

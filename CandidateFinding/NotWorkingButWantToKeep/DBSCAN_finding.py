@@ -1,4 +1,8 @@
-from Utils import utilsHelper
+
+try:
+    from eve_smlm.Utils import utilsHelper
+except ImportError:
+    from Utils import utilsHelper
 from sklearn.cluster import DBSCAN
 import matplotlib.pyplot as plt
 import numpy as np

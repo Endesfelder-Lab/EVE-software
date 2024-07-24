@@ -1,9 +1,16 @@
-from GUI_main import MyGUI
-import sys,argparse,colorsys
+
 from PyQt5.QtWidgets import QApplication
+try:
+    from eve_smlm.GUI_main import MyGUI
+except ImportError:
+    from GUI_main import MyGUI  # Fallback for direct execution
+
+import sys,argparse,colorsys
 import multiprocessing
 from PyQt5.QtGui import QIcon
 import os
+
+multiprocessing.freeze_support()
 
 def adjust_color_brightness(hex_color, percent):
     # Convert hexadecimal color to RGB
@@ -59,7 +66,8 @@ def get_stylesheet():
 
     return stylesheet
 
-if __name__ == "__main__":
+def main():
+    multiprocessing.freeze_support()
     app = QApplication(sys.argv)
     
     gui = MyGUI()
@@ -68,3 +76,6 @@ if __name__ == "__main__":
     gui.setStyleSheet(get_stylesheet())
     gui.show()
     sys.exit(app.exec_())
+
+if __name__ == "__main__":
+    main()
