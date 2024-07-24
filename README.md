@@ -76,6 +76,7 @@ Switch to the `Preview run` tab, as soon as the preview run is complete (`Update
 
 Each candidate cluster found by the candidate finding routine will be highlighted with an orange or red box and gets a unique candidate ID that is here displayed in blue. A red box indicates that a failed fit, meaning that no localization could be generated. All localizations are marked as red crosses in the frame where the x,y,t localization is found.
 You can use the slider below the image to view all the frames that were created in the preview run.
+
 ### 3. Explore the Candidate Preview
 By either double-clicking on a candidate in the preview image or switching to the last tab, you can open the `Candidate preview`.
 Change the plot options for the first plot to `3D point cloud of the candidate cluster` and for the second plot to `2D projections of candidate cluster`. 
@@ -87,20 +88,27 @@ By the `Previous` and `Next` buttons you can simply click through all the cluste
 
 ![](Quick_Start/7_candidate_preview_pos.png)
 
-### 4. Execute a full Run
+### 4. Notes of best finding/fitting algorithms and parameters
+Knowing which finding/fitting algorithms are best is a currently unsolved problem, and part of why EVE has its expandability. The `Preview run` and `Candidate preview` are designed specifically to give a user the required tools to fully explore the finding and fitting routines. Nonetheless, here are some recommendations to find the best finding and fitting routines at the beginning of a new dataset:
+
+For finding routines, it is recommended to first explore the `Eigen-feature analysis` method via `Preview`, which appears to work robustly. First, set `Maximum Eigenvalue cutoff` to `0`, and setting `Debug Boolean` to `True`: now, a debug figure will be shown. This figure contains a histogram of the maximum Eigenvalue for all events using these settings. Two populations should be clearly discriminatable: low values correspond to single-molecule clusters, while high values correspond to noise. Close the figure, and change the `Number of neighbours` to higher and lower values (e.g. `10` and `40`), and explore whether this discrimination becomes more pronounced or less pronounced. Do the same with `Ratio ms to px`, and note the single value that most clearly separates the two populations. Next, use this value in the `Maximum Eigenvalue cutoff`, and set `Debug Boolean` to `False`. Re-run the `Preview` and inspect the found clusters. If clusters are missed, try increasing `DBSCAN epsilon` and/or decreasing `DBSCAN nr. neighbours`. If clusters are over-represented, try decreasing `DBSCAN epsilon` and/or increasing `DBSCAN nr. neighbours`.
+
+For fitting routines, it is recommended to start with `2D LogGaussian` with `distribution` set to `Hist2d_xy` and `Time fit routine` set to `LognormCDFFirstEvents`, if normal, 2-dimensional SMLM is performed.  The `expected width` value should be set to roughly the expected sigma of the Point Spread Function (~150 nm for 561 excitation). Then, in `Candidate preview`, loop through a few candidates to see if the found localization agrees with visual inspection, both in its spatial and temporal profile. If many clusters seem to provide a localization where visually not enough events are present, try either decreasing the `fitting tolerance` (which leads to more fits being discarded), or try changing the `Finding` parameters so noisy clusters are discarded. If visually very good clusters are not localized and show a `No localization generated due to ...`-error, try increasing `fitting tolerance`.
+
+### 5. Execute a full Run
 If you are satisfied with the results of the current selection of finding and fitting parameters, you can start a complete run. To do so, switch back to the `Processing` tab and click `Run`. \ 
 The `Run Info` tab will again open automatically and show additional info regarding the current run, e.g. number of candidates and valid localizations found as well as a number of candidates (absolute and percentage) that was removed during fitting.
 
 ![](Quick_Start/8_full_run.png)
 
-### 5. Visualize the Localization Results
+### 6. Visualize the Localization Results
 As soon as the full run is completed, you can visualize your results. Therefore, switch to the `Visualization` tab, select `Histogram_Convolution: Histogram_convolution` and press `Visualize`.
 
 ![](Quick_Start/9_visualization.png)
 
 As you can see the sample data is rather drifty and we can't see our DNA nanorulers yet.
 
-### 6. Apply a Drift Correction
+### 7. Apply a Drift Correction
 To apply a drift correction, switch to the `Post-processing` tab.
 #### Under Windows
 Windows users can choose between two different drift correction routines. Select `DriftCorr_DME: DriftCorr_RCC` and press `Post processing!`. This will open a pop-up window showing the estimated x,y-drift. Additionally, an entry was added to the `Post-processing history` at the bottom of the tab. By clicking `Restore to before this` you can undo the last post-processing step. 
@@ -116,12 +124,12 @@ As you can see, the drift estimated by the two different drift correction method
 
 ![](Quick_Start/11_updated_visualization.png)
 
-### 7. The final Localization List
+### 8. The final Localization List
 The drift corrected localization list is not saved automatically. To export the list in `.csv` format, switch to the `Localization List` tab and press `Save CSV`.
 
 ![](Quick_Start/12_localization_list.png)
 
-### 8. Estimate the Localization Precision
+### 9. Estimate the Localization Precision
 To get an estimate on the localzation precision we can make use of the fact, that for each fluorophore blink we measure the on and off-switching. This means, that we have one cluster of positive polarity for the on switching and one cluster of negative cluster polarity for the off switching. By comparing the distances between the corresponding positive and negative localizations we can get our localization precision via a Nearest neighbour analysis (NeNA). \
 To do so, we first need to do the polarity matching. Therefore, switch again to the `Post-processing` tab and select `Polarity Matching - match on and off events` and press `PostProcessing!`. 
 
@@ -131,7 +139,7 @@ Now, you can perform a NeNa fit by selecting `Nearest neighbour analysis (NeNA) 
 
 ![](Quick_Start/15_NeNa.png)
 
-### 9. Metadata, run and result files
+### 10. Metadata, run and result files
 
 If selected correctly in the `Advanced Settings`, Eve will store a lot of metadata, run and result files automatically. In our "Getting Started" example, three finding and three fitting `.pickle` files are stored containing all, only positive and only negative candidates/localizations. In addition, a `.csv` file with all localizations and a metadata `Runinfo` file are stored.
 
