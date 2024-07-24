@@ -204,7 +204,7 @@ def DriftCorr_entropyMin_3D(resultArray,findingResult,settings,**kwargs):
     crlb = np.ones(locs_for_dme.shape) * np.array((0.5,0.5,0.5))[None]
     
     #Estimate the drift!
-    # estimated_drift = np.load('C:\\Users\\Koen Martens\\Documents\\TempData\\from_small_drift_estimation_my_array.npy')
+    # estimated_drift = np.load('C:\\Data\\EBS\\3D_Tubulin\\3d_drift_small_top_right.npy')
     estimated_drift = dme.dme_estimate(locs_for_dme, framenum, 
                 crlb, 
                 framesperbin = framesperbinv, 
@@ -247,13 +247,14 @@ def DriftCorr_entropyMin_3D(resultArray,findingResult,settings,**kwargs):
     framenumFull -= min(framenumFull)
     framenumFull = framenumFull.astype(int)
     #Get the drift of every localization - note the back-conversion from px to nm
-    drift_locs = ([estimated_drift[min(i,len(estimated_drift)-1)][0]*(float(settings['PixelSize_nm']['value'])) for i in framenumFull],[estimated_drift[min(i,len(estimated_drift)-1)][1]*(float(settings['PixelSize_nm']['value'])) for i in framenumFull])
+    drift_locs = ([estimated_drift[min(i,len(estimated_drift)-1)][0]*(float(settings['PixelSize_nm']['value'])) for i in framenumFull],[estimated_drift[min(i,len(estimated_drift)-1)][1]*(float(settings['PixelSize_nm']['value'])) for i in framenumFull], [estimated_drift[min(i,len(estimated_drift)-1)][2]*(float(settings['PixelSize_nm']['value'])) for i in framenumFull])
     
     import copy
     #Correct the resultarray for the drift
     drift_corr_locs = copy.deepcopy(resultArray)
     drift_corr_locs.loc[:,'x'] -= drift_locs[0]
     drift_corr_locs.loc[:,'y'] -= drift_locs[1]
+    drift_corr_locs.loc[:,'z [nm]'] -= drift_locs[2]
     
     print(drift_locs[0][0], drift_locs[1][0])
     print(drift_locs[0][-1], drift_locs[1][-1])
