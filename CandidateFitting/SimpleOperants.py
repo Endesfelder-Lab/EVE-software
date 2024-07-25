@@ -86,9 +86,13 @@ def AverageXYpos(candidate_dic,settings,**kwargs):
     RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(localize_canditates2D)(i, data_split[i], time_fit, pixel_size) for i in range(len(data_split)))
     
     localization_list = [res[0] for res in RES]
+    if len(localization_list) == 0:
+        localization_list = [pd.DataFrame()]
     localizations = pd.concat(localization_list, ignore_index=True)
 
     fail_list = [res[1] for res in RES]
+    if len(fail_list) == 0:
+        fail_list = [pd.DataFrame()]
     fails = pd.concat(fail_list, ignore_index=True)
     
     # Fit performance information

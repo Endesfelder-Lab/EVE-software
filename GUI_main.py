@@ -3178,13 +3178,17 @@ class FittingAnalysis(FindingFittingAnalysis):
                 if not hasattr(self,'fittingAdjustValue'):
                     self.fittingAdjustValue = len(self.Results[0])
                 #Add the candidate_id offset correctly:
-                FittingResult[0]['candidate_id'] = FittingResult[0]['candidate_id'] + self.fittingAdjustValue
-                origResults = self.Results
-                #append to self.results:
-                #Need to reset self.Result to avoid errors
-                self.Results = {}
-                self.Results[0] = pd.concat([origResults[0],FittingResult[0]],ignore_index=True)
-                self.Results[1] = origResults[1]+'\n\n\n'+FittingResult[1]
+                if not FittingResult[0].empty:
+                    FittingResult[0]['candidate_id'] = FittingResult[0]['candidate_id'] + self.fittingAdjustValue
+                    origResults = self.Results
+                    #append to self.results:
+                    #Need to reset self.Result to avoid errors
+                    self.Results = {}
+                    self.Results[0] = pd.concat([origResults[0],FittingResult[0]],ignore_index=True)
+                    self.Results[1] = origResults[1]+'\n\n\n'+FittingResult[1]
+                else: #if empty fitting results:
+                    self.Results = (resbackup[0], resbackup[1] + '\n\n\n' + FittingResult[1])
+
                 pass
             
             return FittingResult
