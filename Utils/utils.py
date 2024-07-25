@@ -257,6 +257,20 @@ def getInfoFromClass(class_name, class_type):
                 pass
     return description, display_name
 
+def helpStringFromFunction(functionname):
+    try:
+        #Check if parent function
+        if not '.' in functionname:
+            functionMetadata = eval(f'{str(functionname)}.__function_metadata__()')
+            return functionMetadata['help_string']
+        else: #or specific sub-function
+            #get the parent info
+            functionparent = functionname.split('.')[0]
+            functionMetadata = eval(f'{str(functionparent)}.__function_metadata__()')
+            return functionMetadata[functionname.split('.')[1]]['help_string']
+    except:
+        return ""
+
 #Obtain the kwargs from a function. Results in an array with entries
 def kwargsFromFunction(functionname):
     try:
@@ -621,9 +635,9 @@ def changeLayout_choice(curr_layout,className,displayNameToFunctionNameMap,paren
 
         #Find the time fit distributions
         [timeFitValues, timeFit_displayNames, timeFit_name_to_displayName_map, timeFit_descriptions] = classKwargValuesFromFittingFunction(current_selected_function, 'time')
-        parent.timeFit_name_to_displayName_map = timeFit_name_to_displayName_map
-        parent.timeFit_descriptions = timeFit_descriptions
         if len(timeFitValues) != 0:
+            parent.timeFit_name_to_displayName_map = timeFit_name_to_displayName_map
+            parent.timeFit_descriptions = timeFit_descriptions
             # Add a combobox containing all the possible kw-args
             label = QLabel("<b>Time fit routine</b>")
             label.setObjectName(f"Label#{current_selected_function}#time_kwarg#{current_selected_polarity}")
@@ -647,9 +661,9 @@ def changeLayout_choice(curr_layout,className,displayNameToFunctionNameMap,paren
 
         #Add a widget-pair for the distribution
         [distKwargValues, distKwarg_displayNames, distKwarg_name_to_displayName_map, distKwarg_descriptions] = classKwargValuesFromFittingFunction(current_selected_function, 'dist')
-        parent.distKwarg_name_to_displayName_map = distKwarg_name_to_displayName_map
-        parent.distKwarg_descriptions = distKwarg_descriptions
         if len(distKwargValues) != 0:
+            parent.distKwarg_name_to_displayName_map = distKwarg_name_to_displayName_map
+            parent.distKwarg_descriptions = distKwarg_descriptions
             # Add a combobox containing all the possible kw-args
             label = QLabel("<b>distribution</b>")
             label.setObjectName(f"Label#{current_selected_function}#dist_kwarg#{current_selected_polarity}")
@@ -777,6 +791,12 @@ def changeLayout_choice(curr_layout,className,displayNameToFunctionNameMap,paren
                     curr_layout.addWidget(line_edit,2+((k+labelposoffset+len(reqKwargs)))%maxNrRows,(((k+labelposoffset+len(reqKwargs)))//maxNrRows)*2+1)
                     #Add a on-change listener:
                     line_edit.textChanged.connect(lambda text,line_edit=line_edit: kwargValueInputChanged(line_edit))
+    
+    #Attempt a dropdown tooltip update:
+    if hasattr(parent,className):
+        if len(curr_dropdown) > 0:
+            current_selected_function = functionNameFromDisplayName(curr_dropdown.currentText(),displayNameToFunctionNameMap)
+            curr_dropdown.setToolTip(helpStringFromFunction(current_selected_function))
 
 def updateTimeFitTooltip(line_edit,parent):
     """

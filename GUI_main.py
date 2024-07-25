@@ -727,7 +727,13 @@ class MyGUI(QMainWindow):
             #Add the candidateFindingDropdown to the layout
             groupbox.layout().addWidget(candidateFittingDropdown,1,0,1,6)
 
+            #Set the mapping of the fitting functions...
             setattr(self, Fitting_functionNameToDisplayNameMapping_name, Fitting_functionNameToDisplayNameMapping)
+
+            #Set the mapping & descriptions of the dist/time functions...
+            selectedFunction = utils.functionNameFromDisplayName(candidateFittingDropdown.currentText(),Fitting_functionNameToDisplayNameMapping)
+            [self.timeFitValues, self.timeFit_displayNames, self.timeFit_name_to_displayName_map, self.timeFit_descriptions] = utils.classKwargValuesFromFittingFunction(selectedFunction, 'time')
+            [self.distKwargValues, self.distKwarg_displayNames, self.distKwarg_name_to_displayName_map, self.distKwarg_descriptions] = utils.classKwargValuesFromFittingFunction(selectedFunction, 'dist')
 
             #On startup/initiatlisation: also do changeLayout_choice
             utils.changeLayout_choice(groupbox.layout(),candidateFittingDropdown_name, getattr(self, Fitting_functionNameToDisplayNameMapping_name),parent=self)
