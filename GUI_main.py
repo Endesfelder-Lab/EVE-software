@@ -8,6 +8,7 @@ from PyQt5.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QTableWidget
 from PyQt5.QtCore import Qt, QPoint, QProcess, QCoreApplication, QTimer, QFileSystemWatcher, QFile, QThread, pyqtSignal, QObject
 import sys
 import typing
+from multiprocessing import Manager
 
 import pandas as pd
 from PyQt5.QtCore import QAbstractTableModel, QModelIndex, Qt
@@ -104,6 +105,10 @@ class MyGUI(QMainWindow):
         #Look for debug argument
         parser.add_argument('--debug', '-d', action='store_true', help='Enable debug')
         args=parser.parse_args()
+        
+        #Flag if the user wants to (gracefully) abort the analysis
+        global abortFlag
+        abortFlag = Manager().Value('abortFlag', False)
 
         """
         Dictionary creation used throughout GUI
@@ -751,6 +756,10 @@ class MyGUI(QMainWindow):
         self.buttonProcessingRun = QPushButton("Run")
         self.buttonProcessingRun.clicked.connect(lambda: self.run_processing())
         self.runLayout.layout().addWidget(self.buttonProcessingRun,2,0,1,6)
+        
+        # self.buttonProcessingAbort = QPushButton("Abort")
+        # self.buttonProcessingAbort.clicked.connect(lambda: self.abort_processing())
+        # self.runLayout.layout().addWidget(self.buttonProcessingAbort,2,7,1,6)
 
         tab_layout.addWidget(self.runLayout, 4, 0)
 
@@ -824,6 +833,12 @@ class MyGUI(QMainWindow):
                 float(self.preview_displayFrameTime.text())))
         #Add the button to the layout:
         self.previewLayout.layout().addWidget(self.buttonPreview, 4, 0)
+
+    def abort_processing(self):
+        abortFlag.value = True
+        self.analysis_stop_button.setText("Stopping...")
+        #set button inactive as well:
+        self.analysis_stop_button.setEnabled(False)
 
     def polarityDropdownChanged(self):
         # """
@@ -1040,10 +1055,23 @@ class MyGUI(QMainWindow):
 
         self.update_log()
         
-        #Add an analysis-progress-bar
+        #Add an analysis-progress-bar + stopbutton
+        self.analysis_stop_button = QPushButton("Stop")
+        self.analysis_stop_button.clicked.connect(lambda: self.abort_processing())
+        #Set it to have a fixed width:
+        self.analysis_stop_button.setFixedWidth(50)
+        
         self.analysis_progressbar = QProgressBar()
         self.analysis_progressbar.setValue(100)
-        tab_layout.addWidget(self.analysis_progressbar, 1, 0)
+        
+        qh = QHBoxLayout()
+        qh.addWidget(self.analysis_progressbar)
+        qh.addWidget(self.analysis_stop_button)
+        #add qh to a widget:
+        qh2 = QWidget()
+        qh2.setLayout(qh)
+        
+        tab_layout.addWidget(qh2, 1, 0)
 
     def check_logfile_modification(self):
         """
@@ -1503,7 +1531,6 @@ class MyGUI(QMainWindow):
         self.findingAnalysis.set_globalSettings(self.globalSettings)
         self.findingAnalysis.set_GPU(False)
         self.findingAnalysis.set_parrallellized(utilsHelper.strtobool(self.globalSettings['Multithread']['value']))
-        # self.findingAnalysis.set_fileLocation(self.dataLocationInput.text())
         self.findingAnalysis.set_fileLocation(self.currentFileInfo['CurrentFileLoc'])
         self.findingAnalysis.set_GUIinfo(self) #Pass the GUI info to the finding analysis
         self.findingAnalysis.set_chunkingTime([float(self.globalSettings['FindingBatchingTimeMs']['value']),float(self.globalSettings['FindingBatchingTimeOverlapMs']['value'])])
@@ -1551,6 +1578,11 @@ class MyGUI(QMainWindow):
         logging.info("")
         
         self.analysis_progressbar.setValue(0)
+        #Reset the abort to allow for aborting
+        abortFlag.value = False
+        self.analysis_stop_button.setText("Stop")
+        self.analysis_stop_button.setEnabled(True)
+        
         self.data['MetaDataOutput'] = ''
         
         #Switch the user to the Run info tab
@@ -1587,15 +1619,21 @@ class MyGUI(QMainWindow):
             
             self.analysisStartTime = time.time()
             #Await completion of finding  - i need to do this, since calling/emitting requires a QObject, which cannot be pickled for threading.
-            while self.FindingCompleted == False:
+            while self.FindingCompleted == False and abortFlag.value == False:
                 self.updateProgressBar(findorfit='find')
                 QApplication.processEvents() #continue as normal
+            if abortFlag.value == True:
+                logging.warning("Stopping request requested... EVE is stopping soon.")
+                return
             self.findingAnalysisComplete() #Run this function once finding is completed
             self.updateProgressBar(findorfit='find')
             
-            while self.FittingCompleted == False:
+            while self.FittingCompleted == False and abortFlag.value == False:
                 self.updateProgressBar(findorfit='fit')
                 QApplication.processEvents() #continue as normal
+            if abortFlag.value == True:
+                logging.warning("Stopping request requested... EVE is stopping soon.")
+                return
             self.fittingAnalysisComplete() #Run this function once fitting is completed
             self.updateProgressBar(findorfit='fit')
         elif os.path.isdir(self.dataLocationInput.text()):
@@ -1631,16 +1669,22 @@ class MyGUI(QMainWindow):
                     currentVisProgress = (index+.25) / len(fileList) * 90+5
                     self.analysisStartTime = time.time()
                     #Await completion of finding  - i need to do this, since calling/emitting requires a QObject, which cannot be pickled for threading.
-                    while self.FindingCompleted == False:
+                    while self.FindingCompleted == False and abortFlag.value == False:
                         self.updateProgressBar(overwriteValue = currentVisProgress)
                         QApplication.processEvents() #continue as normal
+                    if abortFlag.value == True:
+                        logging.warning("Stopping request requested... EVE is stopping soon.")
+                        return
                     self.findingAnalysisComplete() #Run this function once finding is completed
                     self.updateProgressBar(overwriteValue = currentVisProgress)
                     
                     currentVisProgress = (index+.75) / len(fileList) * 90+5
-                    while self.FittingCompleted == False:
+                    while self.FittingCompleted == False and abortFlag.value == False:
                         self.updateProgressBar(overwriteValue = currentVisProgress)
                         QApplication.processEvents() #continue as normal
+                    if abortFlag.value == True:
+                        logging.warning("Stopping request requested... EVE is stopping soon.")
+                        return
                     self.fittingAnalysisComplete() #Run this function once fitting is completed
                     self.updateProgressBar(overwriteValue = currentVisProgress)
                     
@@ -1720,7 +1764,6 @@ class MyGUI(QMainWindow):
         Returns:
             None
         """
-        
         #Switch the user to the Run info tab
         utils.changeTab(self, text='Run info')
 
@@ -1738,6 +1781,11 @@ class MyGUI(QMainWindow):
         logging.info("--------------- Preview Run Starting ---------------")
         logging.info("")
         logging.info("")
+        
+        #Reset the abort to allow for aborting
+        abortFlag.value = False
+        self.analysis_stop_button.setText("Stop")
+        self.analysis_stop_button.setEnabled(True)
         
         #Ensure final output is stored
         self.globalSettings['StoreFinalOutput']['value'] = False
@@ -2379,6 +2427,8 @@ class FindingFittingAnalysis():
         self.currentProgress = 0 #Progress of only this step from 0-1
         self.currentProgressStep = 0 #To do with progress
         self.totalProgressNrSteps = 1#To do with progress - current step, e.g. finding1-finding2 is 2 steps-  WHICH is 1 in python-counting
+        
+        global abortFlag
     
     #Some functions to set variables/values:
     def set_polarityAnalysis(self,polarityAnalysis):
@@ -2591,6 +2641,9 @@ class FindingAnalysis(FindingFittingAnalysis):
     
     def runFindingOnPolarity(self,singlePolarity):
         logging.info(f"Starting finding of polarity {singlePolarity}")
+        if abortFlag.value == True:
+            logging.error("Aborting fitting analysis due to abortFlag")
+            return
         starttime = time.time()
         #check for disabling the run
         self.checkForRunDisableLoadPickleMismatch(singlePolarity)
@@ -2838,7 +2891,7 @@ class FindingAnalysis(FindingFittingAnalysis):
                     results = None
                     #Run the analysis in parallel over all cpu cores
                     with parallel_backend('loky', n_jobs=-1):
-                        results = Parallel(max_nbytes=None,timeout=1e6)(delayed(self.process_hdf5_chunk_joblib)(n, hdf5_startstopindeces,singlePolarity) for n in range(0,len(hdf5_startstopindeces)))
+                        results = Parallel(max_nbytes=None,timeout=1e6)(delayed(self.process_hdf5_chunk_joblib)(n, hdf5_startstopindeces,singlePolarity,abortFlag) for n in range(0,len(hdf5_startstopindeces)))
                     
                     #reset GUIinfo in case we need it:
                     self.GUIinfo = GUIinfo
@@ -3037,9 +3090,12 @@ class FindingAnalysis(FindingFittingAnalysis):
                 logging.error("FindingEvalText is None")
                 pass
 
-    def process_hdf5_chunk_joblib(self,n,hdf5startstopindeces,singlePolarity):
+    def process_hdf5_chunk_joblib(self,n,hdf5startstopindeces,singlePolarity,abortFlag):
         #Allowing for multicore hdf5 chunking, or single-core
         # print('Running finding chunk '+str(n)+' of '+str(len(hdf5startstopindeces)) )
+        if abortFlag.value == True:
+            logging.error("Aborting fitting analysis due to abortFlag")
+            return
         st_time = time.time()
         #Get the events from these indeces (example at 0):
         self.events = utils.timeSliceFromHDFFromIndeces(self.fileLocation,hdf5startstopindeces,index=n)
@@ -3114,6 +3170,9 @@ class FittingAnalysis(FindingFittingAnalysis):
         
     def runFittingOnPolarity(self,singlePolarity):
         logging.info(f"Starting fitting of polarity {singlePolarity}")
+        if abortFlag.value == True:
+            logging.error("Aborting fitting analysis due to abortFlag")
+            return
         starttime = time.time()
         #Run the finding on a single polarity
         
