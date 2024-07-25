@@ -381,7 +381,7 @@ class LognormCDFFirstEvents_weighted(TemporalFits):
         return t, del_t, self.fit_info, opt
 
 class LognormCDFAllEvents_NoBackground(TemporalFits):
-    display_name = "Lognormal CDF (all events)"
+    display_name = "Lognormal CDF (all events, no background)"
     description = "Lognormal CDF fit of cumulative sum of all events."
     def __init__(self):
         super().__init__()
