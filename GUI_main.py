@@ -4121,6 +4121,7 @@ class PreviewFindingFitting(QWidget):
         #An array holding info about what's under the cursor
         underCursorInfo = {
             'current_pixel': [[-np.inf,-np.inf]],
+            'current_pixel_EBSCoord': [[-np.inf,-np.inf]],
             'current_time': [[-1,-1]],
             'current_candidate': [[-1]]
         }
@@ -4169,6 +4170,9 @@ class PreviewFindingFitting(QWidget):
             pixel_index = np.floor(highlighted_px_index).astype(int)
 
             self.underCursorInfoDF['current_pixel'][0] = np.floor(highlighted_px_index)
+            #Also get the pixel index from the original EBS size:
+            self.underCursorInfoDF['current_pixel_EBSCoord'][0] = [min(self.events['x']),min(self.events['y'])]+self.underCursorInfoDF['current_pixel'][0]
+            
             self.updateUnderCursorInfo()
             self.timeOfLastCursorUpdate = time.time()
 
@@ -4216,7 +4220,7 @@ class PreviewFindingFitting(QWidget):
                     fullText += f"; Candidate: {self.underCursorInfoDF['current_candidate'][0][0]}"
 
             if self.underCursorInfoDF['current_pixel'][0][0] > -np.inf:
-                fullText += f"; Pixel coords: {int(self.underCursorInfoDF['current_pixel'][0][0])}, {int(self.underCursorInfoDF['current_pixel'][0][1])}"
+                fullText += f"; Pixel coords: {int(self.underCursorInfoDF['current_pixel_EBSCoord'][0][0])}, {int(self.underCursorInfoDF['current_pixel_EBSCoord'][0][1])}"
                 
             self.underCursorInfo.setText(fullText)
 
