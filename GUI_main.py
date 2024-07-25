@@ -311,7 +311,7 @@ class MyGUI(QMainWindow):
         utilsDisplayNames = utils.displayNamesFromFunctionNames(utilsFunctions,'')
         utilActions = {}
         for i, utilsFunction in enumerate(utilsFunctions):
-            print(utilsFunction)
+            logging.debug(utilsFunction)
             utilActions[i] = utilsMenu.addAction(utilsDisplayNames[0][i])
             #Run "function(self)" when triggered - passing self to the function 
             utilActions[i].triggered.connect(lambda _, s=self, func=utilsFunction: eval(func+'(s)'))
@@ -1059,7 +1059,7 @@ class MyGUI(QMainWindow):
         self.analysis_stop_button = QPushButton("Stop")
         self.analysis_stop_button.clicked.connect(lambda: self.abort_processing())
         #Set it to have a fixed width:
-        self.analysis_stop_button.setFixedWidth(50)
+        self.analysis_stop_button.setFixedWidth(75)
         
         self.analysis_progressbar = QProgressBar()
         self.analysis_progressbar.setValue(100)
@@ -1825,7 +1825,7 @@ class MyGUI(QMainWindow):
         while self.FittingCompleted == False:
             QApplication.processEvents() #continue as normal
         
-        print('previewing finished')
+        logging.info('previewing finished')
         #Reset global settings
         self.globalSettings = globalSettingsOrig
 
@@ -2204,7 +2204,7 @@ class MyGUI(QMainWindow):
         dropdown = all_layouts.itemAt(0)
         widget = dropdown.widget()
         widget.setCurrentText(f"{newMethod} ({polarity.lower()})")
-        print(widget)
+        logging.debug(widget)
 
 
     def save_entries_to_json_core(self):
@@ -2784,7 +2784,7 @@ class FindingAnalysis(FindingFittingAnalysis):
                             self.events = utils.removeHotPixelEvents(self.events,hotpixelarray)
                             
                             if len(self.events) == 0:
-                                print('Final chunk reached!')
+                                logging.info('Final chunk reached!')
                                 chunkFinished = True
                                 break
                             
@@ -3155,11 +3155,11 @@ class FittingAnalysis(FindingFittingAnalysis):
             self.totalProgressNrSteps = 1
             self.currentProgressStep = 0
             self.runFittingOnPolarity('Pos')
-            print('Pos done')
+            logging.info('Pos done')
             self.setProgressInfo(1)
             self.currentProgressStep = 1
             self.runFittingOnPolarity('Neg')
-            print('Neg done')
+            logging.info('Neg done')
         else:
             logging.error('Polarity analysis must be either Pos, Neg, Mix, or Both')
         
@@ -3944,7 +3944,7 @@ class PostProcessing(QWidget):
 
         #Get the current function callback
         FunctionEvalText = self.getPostProcessingFunctionEvalText("parent.data['FittingResult'][0]","parent.data['FindingResult'][0]","parent.globalSettings")
-        print(FunctionEvalText)
+        logging.debug(FunctionEvalText)
 
         #Store the history of postprocessing
         current_postprocessinghistoryid = len(self.postProcessingHistory)
@@ -4192,7 +4192,7 @@ class PreviewFindingFitting(QWidget):
 
         """
         if self.underCursorInfoDF['current_candidate'][0][0] > -1:
-            print(self.underCursorInfoDF['current_candidate'][0][0])
+            logging.info(self.underCursorInfoDF['current_candidate'][0][0])
 
             #Set the value of the entry in the candidate preview tab
             self.parent.canPreviewtab_widget.entryCanPreview.setText(str(self.underCursorInfoDF['current_candidate'][0][0]))
