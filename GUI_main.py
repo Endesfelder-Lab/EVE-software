@@ -3647,6 +3647,23 @@ class VisualisationNapari(QWidget):
         self.VisualisationGroupbox.layout().addWidget(button,99,0,1,6)
         #And add a callback to this:
         button.clicked.connect(lambda text, parent=parent: self.visualise_callback(parent))
+        
+        #Create a Hbox:
+        self.visualisation_hbox_resetViews = QHBoxLayout()
+        self.visualisation_hbox_resetViews.setObjectName("VisualisationResetViewKEEP")
+        #Create a button to reset zoom/position:
+        button = QPushButton("Reset View", self)
+        button.setObjectName("VisualisationResetViewButtonKEEP")
+        button.clicked.connect(lambda text, parent=parent: self.reset_visualisation_view(parent, partialOrFull='Partial'))
+        self.visualisation_hbox_resetViews.addWidget(button)
+        #Create a button to reset zoom/position:
+        button = QPushButton("Reset entire visualisation", self)
+        button.setObjectName("VisualisationResetViewFullButtonKEEP")
+        button.clicked.connect(lambda text, parent=parent: self.reset_visualisation_view(parent, partialOrFull='Full'))
+        self.visualisation_hbox_resetViews.addWidget(button)
+        #Add the hbox to the groupbox
+        self.VisualisationGroupbox.layout().addLayout(self.visualisation_hbox_resetViews,100,0,1,6)
+        
 
         #Add the groupbox to the mainlayout
         self.mainlayout.layout().addWidget(self.VisualisationGroupbox,1,1,1,2)
@@ -3664,6 +3681,24 @@ class VisualisationNapari(QWidget):
         self.mainlayout.addWidget(self.viewer,2,2,1,1)
 
         logging.info('VisualisationNapari init')
+
+    def reset_visualisation_view(self,parent,partialOrFull='Partial'):
+        logging.info('Resetting visualisation view')
+        #Reset the view of the napari viewer
+        if partialOrFull == 'Partial':
+            self.napariviewer.reset_view()
+        elif partialOrFull == 'Full':
+            self.napariviewer.reset_view()
+            for layer in self.napariviewer.layers:
+                layer.rendering = 'attenuated_mip'
+                layer.visible = True
+                layer.reset_contrast_limits()
+                layer.colormap = 'gray'
+                layer.gamma = 1
+                layer.opacity = 1
+        else:
+            logging.error('Invalid partialOrFull argument passed to reset_visualisation_view')
+            return
 
     def visualise_callback(self,parent):
         #Visuliation method from https://www.frontiersin.org/articles/10.3389/fbinf.2021.817254/full
