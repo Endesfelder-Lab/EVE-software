@@ -2835,6 +2835,7 @@ class FindingAnalysis(FindingFittingAnalysis):
                     SelfResults = self.Results
                     self.Results = {}
                     
+                    results = None
                     #Run the analysis in parallel over all cpu cores
                     with parallel_backend('loky', n_jobs=-1):
                         results = Parallel(max_nbytes=None,timeout=1e6)(delayed(self.process_hdf5_chunk_joblib)(n, hdf5_startstopindeces,singlePolarity) for n in range(0,len(hdf5_startstopindeces)))
@@ -2842,14 +2843,15 @@ class FindingAnalysis(FindingFittingAnalysis):
                     #reset GUIinfo in case we need it:
                     self.GUIinfo = GUIinfo
                     self.Results = SelfResults
-                    
                     #If we have chunking - we should ensure we only keep the candidates that are in this 'real chunk' part of the chunk:
                     if len(hdf5_startstopindeces) > 0:
                         
                         #We loop over all results:
                         for chunk in range(0,len(results)):
                             result = results[chunk]
-                        
+                            if result == None:
+                                logging.error('No data found for this chunk')
+                                break
                             origfindingResults = result
                             
                             chunking_limits = [[requested_start_time_ms_arr[chunk]+self.chunkingTime[1],requested_end_time_ms_arr[chunk]-self.chunkingTime[1]],[requested_start_time_ms_arr[chunk],requested_end_time_ms_arr[chunk]]]
@@ -2869,38 +2871,44 @@ class FindingAnalysis(FindingFittingAnalysis):
                             
                             #Store back in original results
                             results[chunk] = result
-                    
+                            
+                    parr_batch_results = None
+                    parr_batch_metadata = None
                     #Get all results of all parrallell runs:
-                    parr_batch_results = [result[0] for result in results]
-                    parr_batch_metadata = [result[1] for result in results]
+                    parr_batch_results = [result[0] for result in results if result is not None]
+                    parr_batch_metadata = [result[1] for result in results if result is not None]
                     
-                    #Create the combined dictionary and metadata of all results:
-                    combined_dict = {}
-                    combined_metadata = ''
-                    
-                    #Ugliest way to add all to a single dictionary, but its fast and it works
-                    for n in range(0,len(results)):
-                        newent = parr_batch_results[n]
-                        for k in newent:
-                            combined_dict[len(combined_dict)] = newent[k]
-                        combined_metadata += '\n'+parr_batch_metadata[n]
+                    if parr_batch_results is not None and len(parr_batch_results) > 0:
+                        #Create the combined dictionary and metadata of all results:
+                        combined_dict = {}
+                        combined_metadata = ''
+                        
+                        #Ugliest way to add all to a single dictionary, but its fast and it works
+                        for n in range(0,len(results)):
+                            newent = parr_batch_results[n]
+                            for k in newent:
+                                combined_dict[len(combined_dict)] = newent[k]
+                            combined_metadata += '\n'+parr_batch_metadata[n]
 
-                    findingResults = {}
-                    findingResults[0] = combined_dict
-                    findingResults[1] = combined_metadata
-                    #Finally, store it as the Results data, or append it if Both polarity
-                    if self.Results == {}: #If it's the first data, just store it
-                        self.Results = findingResults
-                    else: #Otherwise append to previous data (i.e. first pos, then neg)
-                        oldResults = self.Results
-                        self.Results = {}
-                        combined_dict_index_offset = len(oldResults[0])
-                        self.Results[0] = oldResults[0]
-                        for k in combined_dict:
-                            self.Results[0][k + combined_dict_index_offset] = combined_dict[k]
-                        self.Results[1] = oldResults[1]+'\n\n'+combined_metadata
-                    
-                    pass
+                        findingResults = {}
+                        findingResults[0] = combined_dict
+                        findingResults[1] = combined_metadata
+                        #Finally, store it as the Results data, or append it if Both polarity
+                        if self.Results == {}: #If it's the first data, just store it
+                            self.Results = findingResults
+                        else: #Otherwise append to previous data (i.e. first pos, then neg)
+                            oldResults = self.Results
+                            self.Results = {}
+                            combined_dict_index_offset = len(oldResults[0])
+                            self.Results[0] = oldResults[0]
+                            for k in combined_dict:
+                                self.Results[0][k + combined_dict_index_offset] = combined_dict[k]
+                            self.Results[1] = oldResults[1]+'\n\n'+combined_metadata
+                        
+                        pass
+                    else:
+                        logging.error('No data found for any chunks')
+                        pass
                     
                 elif self.fileLocation.endswith('.raw'):
                     #To be implemented
@@ -2926,9 +2934,10 @@ class FindingAnalysis(FindingFittingAnalysis):
             #Add metadata info
             self.GUIinfo.data['MetaDataOutput'] += '\n-----Information on finding of polarity '+singlePolarity+': -----\nMethodology Used:\n' +evalText+'\n\nNumber of candidates found: '+str(len(findingResults[0]))+'\nCandidate fitting took '+str(totaltime)+' seconds.\n\n'
         else:
-            logging.info(f"Finding of polarity {singlePolarity} complete. {len(self.Results[0])} candidates found!")
-            #Add metadata info
-            self.GUIinfo.data['MetaDataOutput'] += '\n-----Information on finding of polarity '+singlePolarity+': -----\nMethodology Used:\n' +evalText+'\n\nNumber of candidates found: '+str(len(self.Results[0]))+'\nCandidate fitting took '+str(totaltime)+' seconds.\n\n'
+            if len(self.Results)>0:
+                logging.info(f"Finding of polarity {singlePolarity} complete. {len(self.Results[0])} candidates found!")
+                #Add metadata info
+                self.GUIinfo.data['MetaDataOutput'] += '\n-----Information on finding of polarity '+singlePolarity+': -----\nMethodology Used:\n' +evalText+'\n\nNumber of candidates found: '+str(len(self.Results[0]))+'\nCandidate fitting took '+str(totaltime)+' seconds.\n\n'
         pass
     
 
@@ -3108,7 +3117,7 @@ class FittingAnalysis(FindingFittingAnalysis):
         starttime = time.time()
         #Run the finding on a single polarity
         
-        if len(self.findingResult[0]) > 0:
+        if len(self.findingResult) > 0 and len(self.findingResult[0]) > 0:
             #Remove all finding results that are not this polarity:
             if singlePolarity != 'Mix':
                 self.partialFindingResults = self.findingResult[0].copy()
