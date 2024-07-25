@@ -1503,7 +1503,8 @@ class MyGUI(QMainWindow):
         self.findingAnalysis.set_globalSettings(self.globalSettings)
         self.findingAnalysis.set_GPU(False)
         self.findingAnalysis.set_parrallellized(utilsHelper.strtobool(self.globalSettings['Multithread']['value']))
-        self.findingAnalysis.set_fileLocation(self.dataLocationInput.text())
+        # self.findingAnalysis.set_fileLocation(self.dataLocationInput.text())
+        self.findingAnalysis.set_fileLocation(self.currentFileInfo['CurrentFileLoc'])
         self.findingAnalysis.set_GUIinfo(self) #Pass the GUI info to the finding analysis
         self.findingAnalysis.set_chunkingTime([float(self.globalSettings['FindingBatchingTimeMs']['value']),float(self.globalSettings['FindingBatchingTimeOverlapMs']['value'])])
 
@@ -1561,39 +1562,94 @@ class MyGUI(QMainWindow):
         # reset previewEvents array, every time run is pressed
         self.previewEvents = []
         
-        #Create the finding structure:
-        self.FindingCompleted = False
-        self.findingAnalysis = FindingAnalysis()
-        #Create the finding structure:
-        self.FittingCompleted = False
-        self.fittingAnalysis = FittingAnalysis()
-        self.signalEmitArray = None
         
-        #Prepare for saving/storing results later...
-        self.currentFileInfo['CurrentFileLoc'] = self.dataLocationInput.text()
-        self.storeNameDateTime = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        #Check if the input is a .hdf5, .npy or .raw:
+        if self.dataLocationInput.text().endswith(('.hdf5', '.npy', '.raw')):
+            #Create the finding structure:
+            self.FindingCompleted = False
+            self.findingAnalysis = FindingAnalysis()
+            #Create the finding structure:
+            self.FittingCompleted = False
+            self.fittingAnalysis = FittingAnalysis()
+            self.signalEmitArray = None
             
-        #Run the processing on a different thread for GUI proper working
-        thread = threading.Thread(target=self.run_processing_i)
-        thread.start()
-        # self.run_processing_i()
-        
-        #Visually show we're started by updating the progress bar to 5%
-        self.updateProgressBar(overwriteValue = 5)
-        
-        self.analysisStartTime = time.time()
-        #Await completion of finding  - i need to do this, since calling/emitting requires a QObject, which cannot be pickled for threading.
-        while self.FindingCompleted == False:
+            #Prepare for saving/storing results later...
+            self.currentFileInfo['CurrentFileLoc'] = self.dataLocationInput.text()
+            self.storeNameDateTime = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                
+            #Run the processing on a different thread for GUI proper working
+            thread = threading.Thread(target=self.run_processing_i)
+            thread.start()
+            # self.run_processing_i()
+            
+            #Visually show we're started by updating the progress bar to 5%
+            self.updateProgressBar(overwriteValue = 5)
+            
+            self.analysisStartTime = time.time()
+            #Await completion of finding  - i need to do this, since calling/emitting requires a QObject, which cannot be pickled for threading.
+            while self.FindingCompleted == False:
+                self.updateProgressBar(findorfit='find')
+                QApplication.processEvents() #continue as normal
+            self.findingAnalysisComplete() #Run this function once finding is completed
             self.updateProgressBar(findorfit='find')
-            QApplication.processEvents() #continue as normal
-        self.findingAnalysisComplete() #Run this function once finding is completed
-        self.updateProgressBar(findorfit='find')
-        
-        while self.FittingCompleted == False:
+            
+            while self.FittingCompleted == False:
+                self.updateProgressBar(findorfit='fit')
+                QApplication.processEvents() #continue as normal
+            self.fittingAnalysisComplete() #Run this function once fitting is completed
             self.updateProgressBar(findorfit='fit')
-            QApplication.processEvents() #continue as normal
-        self.fittingAnalysisComplete() #Run this function once fitting is completed
-        self.updateProgressBar(findorfit='fit')
+        elif os.path.isdir(self.dataLocationInput.text()):
+            #Find all files in the directory which end in .hdf5, .npy or .raw:
+            fileList = [f for f in os.listdir(self.dataLocationInput.text()) if f.endswith(('.hdf5', '.npy', '.raw'))]
+            for index, file in enumerate(fileList):
+                fullPath = os.path.join(self.dataLocationInput.text(), file)
+                try:
+                    
+                    logging.info("Starting batch run of file: " + fullPath)
+                    currentVisProgress = index / len(fileList) * 90+5
+                    
+                    #Create the finding structure:
+                    self.FindingCompleted = False
+                    self.findingAnalysis = FindingAnalysis()
+                    #Create the finding structure:
+                    self.FittingCompleted = False
+                    self.fittingAnalysis = FittingAnalysis()
+                    self.signalEmitArray = None
+                    
+                    #Prepare for saving/storing results later...
+                    self.currentFileInfo['CurrentFileLoc'] = fullPath
+                    self.storeNameDateTime = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                        
+                    #Run the processing on a different thread for GUI proper working
+                    thread = threading.Thread(target=self.run_processing_i)
+                    thread.start()
+                    # self.run_processing_i()
+                    
+                    #Visually show we're started by updating the progress bar to 5%
+                    self.updateProgressBar(overwriteValue = currentVisProgress)
+                    
+                    currentVisProgress = (index+.25) / len(fileList) * 90+5
+                    self.analysisStartTime = time.time()
+                    #Await completion of finding  - i need to do this, since calling/emitting requires a QObject, which cannot be pickled for threading.
+                    while self.FindingCompleted == False:
+                        self.updateProgressBar(overwriteValue = currentVisProgress)
+                        QApplication.processEvents() #continue as normal
+                    self.findingAnalysisComplete() #Run this function once finding is completed
+                    self.updateProgressBar(overwriteValue = currentVisProgress)
+                    
+                    currentVisProgress = (index+.75) / len(fileList) * 90+5
+                    while self.FittingCompleted == False:
+                        self.updateProgressBar(overwriteValue = currentVisProgress)
+                        QApplication.processEvents() #continue as normal
+                    self.fittingAnalysisComplete() #Run this function once fitting is completed
+                    self.updateProgressBar(overwriteValue = currentVisProgress)
+                    
+                    logging.info("Finished batch run of file: " + fullPath)
+                    logging.info("-----------------------------")
+                except:
+                    logging.error("Error encountered in file "+fullpath+", continuing with other files")
+            self.updateProgressBar(overwriteValue = 100)
+            logging.info("Fully completed all files in folder " + self.dataLocationInput.text())
     
     def run_preview_i(self,error=None):
         #Get polarity info:
