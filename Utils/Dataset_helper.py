@@ -91,7 +91,7 @@ def detectHotPixels_run(loadfile,maxTime,stdevString,outputArea,buttonTransfer=N
     logging.info('--------- Hotpixel utility -----------')
     for x,y in zip(hotPixels[0],hotPixels[1]):
         eventsatthispixel = len(events[(events['x'] == x) & (events['y'] == y)])
-        logging.info(f"Hotpixel at: {x},{y} | has {eventsatthispixel} events")
+        logging.info(f"Hotpixel: {x},{y} | {eventsatthispixel} ev ({(eventsatthispixel-meanTotEvents)/stdTotEvents:.2g}x std)")
         totnrhotpixelevents+=eventsatthispixel
     
     logging.info(f"Total number of events at hot pixels: {totnrhotpixelevents}")
