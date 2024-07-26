@@ -1342,6 +1342,19 @@ class SmallWindow(QMainWindow):
         self.centralWidget().layout().addLayout(layout)
         return self.textEdit
     
+    def addMultiLineTextEdit(self,labelText = "Text edit:", preFilledText = ""):
+        #Create a horizontal box layout:
+        layout = QHBoxLayout()
+        #add a label and text edit:
+        self.textEdit = QTextEdit()
+        self.textEdit.setText(preFilledText)
+        #Add the label and text edit to the layout:
+        layout.addWidget(QLabel(labelText))
+        layout.addWidget(self.textEdit)
+        #Add the layout to the central widget:
+        self.centralWidget().layout().addLayout(layout)
+        return self.textEdit
+    
     #Add a file information label/text/button:
     def addFileLocation(self, labelText="File location:", textAddPrePeriod = ""):
         #Create a horizontal box layout:

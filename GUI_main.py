@@ -1800,6 +1800,10 @@ class MyGUI(QMainWindow):
             #constrict to correct time:
             previewEvents = self.filterEvents_npy_t(previewEvents,timeStretch)
         
+        #Remove hotpixels
+        hotpixelarray = eval("["+self.globalSettings['HotPixelIndexes']['value']+"]")
+        previewEvents = utils.removeHotPixelEvents(previewEvents,hotpixelarray)
+        
         #Check if we have at least 1 event:
         if len(previewEvents) > 0:
             #Log the nr of events found:
@@ -1909,6 +1913,9 @@ class MyGUI(QMainWindow):
             #constrict to correct time:
             previewEvents = self.filterEvents_npy_t(previewEvents,timeStretch)
         
+        #Remove hotpixels
+        hotpixelarray = eval("["+self.globalSettings['HotPixelIndexes']['value']+"]")
+        previewEvents = utils.removeHotPixelEvents(previewEvents,hotpixelarray)
         
         self.updateProgressBar(overwriteValue = 95)
         #Check if we have at least 1 event:
@@ -3506,6 +3513,9 @@ class AdvancedSettingsWindow(QMainWindow):
         with open(json_file_path, "w") as json_file:
             json.dump(serialized_settings, json_file)
 
+        #Also update the global settings (required if called from outside the window, i.e. hotpixel removal utility)
+        self.load_global_settings()
+        
         #Close after saving
         logging.info('Global settings saved!')
         self.close()
@@ -4359,6 +4369,12 @@ class PreviewFindingFitting(QWidget):
 
             if self.underCursorInfoDF['current_pixel_EBSCoord'][0][0] > -np.inf and self.underCursorInfoDF['current_pixel_EBSCoord'][0][1] > -np.inf and self.underCursorInfoDF['current_pixel_EBSCoord'][0][0] < np.inf and self.underCursorInfoDF['current_pixel_EBSCoord'][0][1] < np.inf:
                 fullText += f"; Pixel coords: {int(self.underCursorInfoDF['current_pixel_EBSCoord'][0][0])}, {int(self.underCursorInfoDF['current_pixel_EBSCoord'][0][1])}"
+            
+            hotpixelarray = eval("["+self.settings['HotPixelIndexes']['value']+"]")
+            for hotpixel in hotpixelarray:
+                if self.underCursorInfoDF['current_pixel_EBSCoord'][0][0] == hotpixel[0] and self.underCursorInfoDF['current_pixel_EBSCoord'][0][1] == hotpixel[1]:
+                    fullText += f"; Hot pixel - removed!"
+                    break
                 
             self.underCursorInfo.setText(fullText)
 
