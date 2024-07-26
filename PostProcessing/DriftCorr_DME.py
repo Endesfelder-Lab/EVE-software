@@ -139,12 +139,6 @@ def DriftCorr_entropyMin(resultArray,findingResult,settings,**kwargs):
         logging.warning('Removing ' + str(len(resultArray[resultArray['t'] <= 0])) + ' negative times')
     resultArray = resultArray[resultArray['t'] > 0]
     
-    #Remove all entries that are stupidly high:
-    valcutoff = np.percentile(resultArray['t'], 99.9)*3
-    if len(resultArray[resultArray['t'] > valcutoff]):
-        logging.warning('Removing ' + str(len(resultArray[resultArray['t'] > valcutoff])) + ' very high times')
-    resultArray = resultArray[resultArray['t'] <= valcutoff]
-    
 
     framenumFull = np.floor(np.array(resultArray['t'].values)/(frame_time_for_dme))
     framenumFull -= min(framenumFull)
@@ -251,12 +245,6 @@ def DriftCorr_entropyMin_3D(resultArray,findingResult,settings,**kwargs):
         logging.warning('Removing ' + str(len(resultArray[resultArray['t'] <= 0])) + ' negative times')
     resultArray = resultArray[resultArray['t'] > 0]
     
-    #Remove all entries that are stupidly high:
-    valcutoff = np.percentile(resultArray['t'], 99.9)*3
-    if len(resultArray[resultArray['t'] > valcutoff]):
-        logging.warning('Removing ' + str(len(resultArray[resultArray['t'] > valcutoff])) + ' very high times')
-    resultArray = resultArray[resultArray['t'] <= valcutoff]
-    
 
     framenumFull = np.floor(np.array(resultArray['t'].values)/(frame_time_for_dme))
     framenumFull -= min(framenumFull)
@@ -348,12 +336,6 @@ def DriftCorr_RCC(resultArray,findingResult,settings,**kwargs):
     if len(resultArray[resultArray['t'] <= 0]):
         logging.warning('Removing ' + str(len(resultArray[resultArray['t'] <= 0])) + ' negative times')
     resultArray = resultArray[resultArray['t'] > 0]
-    
-    #Remove all entries that are stupidly high:
-    valcutoff = np.percentile(resultArray['t'], 99.9)*3
-    if len(resultArray[resultArray['t'] > valcutoff]):
-        logging.warning('Removing ' + str(len(resultArray[resultArray['t'] > valcutoff])) + ' very high times')
-    resultArray = resultArray[resultArray['t'] <= valcutoff]
     
 
     framenumFull = np.floor(np.array(resultArray['t'].values)/(frame_time_for_dme))
