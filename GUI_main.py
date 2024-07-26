@@ -830,7 +830,8 @@ class MyGUI(QMainWindow):
         self.preview_maxYLineEdit.setText("")
 
         #Add a preview button:
-        self.buttonPreview = QPushButton("Preview")
+        self.buttonPreview = QPushButton("Preview finding/fitting")
+        self.buttonPreview.setToolTip("Perform the finding/fitting routines on the subset determined by the Preview groupbox, and visualise it in the Preview run tab.")
         #Add a button press event:
         self.buttonPreview.clicked.connect(lambda: self.previewRun((self.preview_startTLineEdit.text(),
                 self.preview_durationTLineEdit.text()),
@@ -838,7 +839,20 @@ class MyGUI(QMainWindow):
                 self.preview_minYLineEdit.text(),self.preview_maxYLineEdit.text()),
                 float(self.preview_displayFrameTime.text())))
         #Add the button to the layout:
-        self.previewLayout.layout().addWidget(self.buttonPreview, 4, 0)
+        self.previewLayout.layout().addWidget(self.buttonPreview, 4, 0, 1, 2)
+        
+        
+        #Add a 'preview events only' button:
+        self.buttonEventsPreview = QPushButton("Preview events")
+        self.buttonEventsPreview.setToolTip("Only look at the events in this spatiotemporal window, don't do any fitting")
+        #Add a button press event:
+        self.buttonEventsPreview.clicked.connect(lambda: self.previewEventsCall((self.preview_startTLineEdit.text(),
+                self.preview_durationTLineEdit.text()),
+                (self.preview_minXLineEdit.text(),self.preview_maxXLineEdit.text(),
+                self.preview_minYLineEdit.text(),self.preview_maxYLineEdit.text()),
+                float(self.preview_displayFrameTime.text())))
+        #Add the button to the layout:
+        self.previewLayout.layout().addWidget(self.buttonEventsPreview, 4, 2, 1 ,2)
 
     def abort_processing(self):
         abortFlag.value = True
@@ -1758,7 +1772,53 @@ class MyGUI(QMainWindow):
         self.data['AveragePSFpos'] = pd.DataFrame(columns=['x', 'y', 't', 'p'])
         self.data['AveragePSFneg'] = pd.DataFrame(columns=['x', 'y', 't', 'p'])
         self.data['AveragePSFmix'] = pd.DataFrame(columns=['x', 'y', 't', 'p'])
+    
+    def previewEventsCall(self,timeStretch=(0,1000),xyStretch=(0,0,0,0),frameTime=100):
+        """
+        Generates the preview the events in the time/xy stretch.
+
+        Parameters:
+            timeStretch (tuple): A tuple containing the start and end times for the preview.
+            xyStretch (tuple): A tuple containing the minimum and maximum x and y coordinates for the preview.
+            frametime (int): The frame time in ms.
+
+        Returns:
+            None
+        """
+        #Switch the user to the Run info tab
+        utils.changeTab(self, text='Run info')
+        logging.info("Previewing events")
+        self.updateProgressBar(overwriteValue = 5)
+        #we need to find the events to display in the preview:
+        if self.dataLocationInput.text().endswith('.hdf5'):
+            previewEvents,_ = self.timeSliceFromHDF(self.dataLocationInput.text(),requested_start_time_ms = float(timeStretch[0]),requested_end_time_ms=float(timeStretch[0])+float(timeStretch[1]),howOftenCheckHdfTime = 50000)
+        elif self.dataLocationInput.text().endswith('.raw'):
+            previewEvents = utils.readRawTimeStretch(self.dataLocationInput.text(),self.globalSettings['MetaVisionPath']['value'],buffer_size = 5e7, n_batches=5e7, timeStretchMs=[float(timeStretch[0])*1000,float(timeStretch[1])*1000])
+        elif self.dataLocationInput.text().endswith('.npy'):
+            #Load the data:
+            previewEvents = np.load(self.dataLocationInput.text())
+            #constrict to correct time:
+            previewEvents = self.filterEvents_npy_t(previewEvents,timeStretch)
         
+        #Check if we have at least 1 event:
+        if len(previewEvents) > 0:
+            #Log the nr of events found:
+            logging.info(f"Preview - Found {len(previewEvents)} events in the chosen time frame.")
+        else:
+            logging.error("Preview - No events found in the chosen time frame.")
+            return
+        
+        #Load the events in self memory and filter on XY
+        self.previewEvents = previewEvents
+        self.previewEvents = self.filterEvents_xy(self.previewEvents,xyStretch)
+        
+        #Update the preview panel and localization list:
+        self.updateShowPreview(previewEvents=self.previewEvents,timeStretch=timeStretch,frameTime=frameTime)
+        
+        self.updateProgressBar(overwriteValue = 100)
+        #Switch the user to the Preview tab
+        utils.changeTab(self, text='Preview run')
+    
     def previewRun(self,timeStretch=(0,1000),xyStretch=(0,0,0,0),frameTime=100):
         """
         Generates the preview of a run analysis.
@@ -1868,6 +1928,8 @@ class MyGUI(QMainWindow):
         self.updateLocList()
         
         self.updateProgressBar(overwriteValue = 100)
+        #Switch the user to the Preview tab
+        utils.changeTab(self, text='Preview run')
 
     def updateProgressBar(self,overwriteValue = None,findorfit='fit'):
         #self.signalEmitArray is an array, which looks like this:
