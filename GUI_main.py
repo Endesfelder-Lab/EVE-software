@@ -1773,6 +1773,7 @@ class MyGUI(QMainWindow):
         #Switch the user to the Run info tab
         utils.changeTab(self, text='Run info')
 
+        self.updateProgressBar(overwriteValue = 5)
         # Empty the event preview list
         self.previewEvents = []
 
@@ -1828,8 +1829,10 @@ class MyGUI(QMainWindow):
         #Await completion of finding  - i need to do this, since calling/emitting requires a QObject, which cannot be pickled for threading.
         while self.FindingCompleted == False:
             QApplication.processEvents() #continue as normal
+        self.updateProgressBar(findorfit='find')
         while self.FittingCompleted == False:
             QApplication.processEvents() #continue as normal
+        self.updateProgressBar(findorfit='fit')
         
         logging.info('previewing finished')
         #Reset global settings
@@ -1846,6 +1849,8 @@ class MyGUI(QMainWindow):
             #constrict to correct time:
             previewEvents = self.filterEvents_npy_t(previewEvents,timeStretch)
         
+        
+        self.updateProgressBar(overwriteValue = 95)
         #Check if we have at least 1 event:
         if len(previewEvents) > 0:
             #Log the nr of events found:
@@ -1861,6 +1866,8 @@ class MyGUI(QMainWindow):
         #Update the preview panel and localization list:
         self.updateShowPreview(previewEvents=self.previewEvents,timeStretch=timeStretch,frameTime=frameTime)
         self.updateLocList()
+        
+        self.updateProgressBar(overwriteValue = 100)
 
     def updateProgressBar(self,overwriteValue = None,findorfit='fit'):
         #self.signalEmitArray is an array, which looks like this:
