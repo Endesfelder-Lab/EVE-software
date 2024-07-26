@@ -217,11 +217,20 @@ class gauss3D(gauss2D):
         sigma = a*(z-c)**2+d*(z-c)**3+b + e*(z-c)**4
         return sigma
     
+    def diff_sigma_fit(self, z, a1, b1, c1, d1, e1, a2, b2, c2, d2, e2):
+        # diff_sigma = (a1*(z-c1)**2+d1*(z-c1)**3+b1 + e1*(z-c1)**4) - (a2*(z-c2)**2+d2*(z-c2)**3+b2 + e2*(z-c2)**4)
+        diff_sigma = (a1*(z-c1)**2+d1*(z-c1)**3+b1 + e1*(z-c1)**4) / (a2*(z-c2)**2+d2*(z-c2)**3+b2 + e2*(z-c2)**4)
+        return diff_sigma
+    
     def distance(self, z, widths):
         sigma_x, sigma_y = widths
         # ret = (sigma_x-self.sigma_fit(z, *self.calibration[['a1','b1','c1','d1','e1']].values[0]))**2 + (sigma_y-self.sigma_fit(z, *self.calibration[['a2','b2','c2','d2','e2']].values[0]))**2
+        
         # in ThunderSTORM they take sqrt(sigma)
-        ret = (np.sqrt(sigma_x)-np.sqrt(self.sigma_fit(z, *self.calibration[['a1','b1','c1','d1','e1']].values[0])))**2 + (np.sqrt(sigma_y)-np.sqrt(self.sigma_fit(z, *self.calibration[['a2','b2','c2','d2','e2']].values[0])))**2
+        # ret = (np.sqrt(sigma_x)-np.sqrt(self.sigma_fit(z, *self.calibration[['a1','b1','c1','d1','e1']].values[0])))**2 + (np.sqrt(sigma_y)-np.sqrt(self.sigma_fit(z, *self.calibration[['a2','b2','c2','d2','e2']].values[0])))**2
+        
+        # minimize distance of widths-ratios to fit
+        ret = np.abs((sigma_x/sigma_y)-(self.diff_sigma_fit(z, *self.calibration[['a1','b1','c1','d1','e1']].values[0], *self.calibration[['a2','b2','c2','d2','e2']].values[0])))
         return ret
     
     def __call__(self, candidate, time_fit, **kwargs):
@@ -275,7 +284,7 @@ class gauss3D(gauss2D):
                 widths = [sigma_x, sigma_y]
                 initial_guess = 0.0
                 z_min_max = self.calibration[['z_min','z_max']].values[0]
-                bounds = [(-600.0,z_min_max[1])] # [(z_min_max[0],z_min_max[1])]
+                bounds = [(-725.0,z_min_max[1])] # [(z_min_max[0],z_min_max[1])]
                 z_fit = optimize.minimize(self.distance, initial_guess, args=(widths,), bounds=bounds)
                 if not z_fit.success:
                     self.fit_info = 'ZFitError: '+z_fit.message
