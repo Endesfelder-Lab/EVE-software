@@ -2155,8 +2155,9 @@ class MyGUI(QMainWindow):
         if self.globalSettings['StoreFileMetadata']['value'] > 0 :
             logging.debug('Attempting to create and store file metadata')
             try:
-                metadatastring = dedent(f"""\
+                metadatastring = (f"""\
                 Metadata information for file {self.currentFileInfo['CurrentFileLoc']}
+                Analysis routine started at {self.storeNameDateTime[0:4]}-{self.storeNameDateTime[4:6]}-{self.storeNameDateTime[6:8]} {self.storeNameDateTime[9:11]}:{self.storeNameDateTime[11:13]}:{self.storeNameDateTime[13:15]}
                 Analysis routine finished at {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
                 
                 {self.data['MetaDataOutput']}
