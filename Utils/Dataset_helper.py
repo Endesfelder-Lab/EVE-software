@@ -111,7 +111,6 @@ def transferOutputToAdvSettings_prewarn(parent):
     """
     Determines the hotpixel fulltext to be put in the globalsettings and double-checks if the user wants to overwrite.
     """
-    print('prewarn run')
     try:
         from eve_smlm.Utils import utils
     except ImportError:
