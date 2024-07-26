@@ -4353,7 +4353,7 @@ class PreviewFindingFitting(QWidget):
                 if self.underCursorInfoDF['current_candidate'][0][0] > -1:
                     fullText += f"; Candidate: {self.underCursorInfoDF['current_candidate'][0][0]}"
 
-            if self.underCursorInfoDF['current_pixel'][0][0] > -np.inf:
+            if self.underCursorInfoDF['current_pixel_EBSCoord'][0][0] > -np.inf and self.underCursorInfoDF['current_pixel_EBSCoord'][0][1] > -np.inf and self.underCursorInfoDF['current_pixel_EBSCoord'][0][0] < np.inf and self.underCursorInfoDF['current_pixel_EBSCoord'][0][1] < np.inf:
                 fullText += f"; Pixel coords: {int(self.underCursorInfoDF['current_pixel_EBSCoord'][0][0])}, {int(self.underCursorInfoDF['current_pixel_EBSCoord'][0][1])}"
                 
             self.underCursorInfo.setText(fullText)
