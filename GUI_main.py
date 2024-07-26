@@ -2035,7 +2035,8 @@ class MyGUI(QMainWindow):
             FindingResultFileName = self.data['FindingMethod'][self.data['FindingMethod'].index('File_Location="')+len('File_Location="'):self.data['FindingMethod'].index('")')]
             storeLocationPartial = FindingResultFileName[:-7]
         else:
-            storeLocationPartial = self.currentFileInfo['CurrentFileLoc'][:-4]
+            #Find the last . and remove everything after it - i.e. removing the extension:
+            storeLocationPartial = self.currentFileInfo['CurrentFileLoc'][:self.currentFileInfo['CurrentFileLoc'].rfind('.')]
         return storeLocationPartial
 
     def storeLocalization(self,storeLocation,localizations,outputType='thunderstorm'):
@@ -2169,14 +2170,16 @@ class MyGUI(QMainWindow):
                 ---- Additional custom output ----
                 
                 Custom output from finding function:\n""")\
-                + f"""{self.data['FindingResult'][1]}\n\n""" + dedent(f"""\
+                + f"""{self.data['FindingResult'][1]}\n\n""" + (f"""\
 
                 Custom output from fitting function:\n""")\
                 + f"""{self.data['FittingResult'][1]}
                 """
                 #Store this metadatastring:
                 with open(self.getStoreLocationPartial()+'_RunInfo_'+self.storeNameDateTime+'.txt', 'w') as f:
-                    f.write(dedent(metadatastring))
+                    metadatastringb = dedent(metadatastring)
+                    metadatastringb = metadatastringb.replace('                ', '')
+                    f.write(dedent(metadatastringb))
                 logging.info('File metadata created and stored')
             except:
                 logging.error('Error in creating file metadata, not stored')
