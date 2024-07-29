@@ -315,6 +315,68 @@ class MyGUI(QMainWindow):
             utilActions[i] = utilsMenu.addAction(utilsDisplayNames[0][i])
             #Run "function(self)" when triggered - passing self to the function 
             utilActions[i].triggered.connect(lambda _, s=self, func=utilsFunction: eval(func+'(s)'))
+        
+        
+        helpMenu = menuBar.addMenu("Help")
+        quickStartMenu = helpMenu.addAction("Quick start")
+        quickStartMenu.triggered.connect(lambda: self.quickStartMenu())
+        documentationMenu = helpMenu.addAction("User manual")
+        documentationMenu.triggered.connect(lambda: self.documentationMenu())
+        devManualMenu = helpMenu.addAction("Developer manual")
+        devManualMenu.triggered.connect(lambda: self.devManualMenu())
+        aboutMenu = helpMenu.addAction("About...")
+        aboutMenu.triggered.connect(lambda: self.aboutMenu())
+
+    def quickStartMenu(self):
+        """
+        Shows the README.md file
+        """
+        quickStartWindow = utils.SmallWindow(self)
+        quickStartWindow.setWindowTitle('Quick start')
+        newlayout = QVBoxLayout()
+        from PyQt5.QtWidgets import QTextBrowser
+        import markdown
+        markdownViewer = QTextBrowser()
+        quickStartWindow.setFixedHeight(800)
+        markdownViewer.setFixedWidth(1100)
+        md_file = 'README.md'
+        with open(md_file, 'r', encoding='utf-8') as file:
+            md_content = file.read()
+
+        # Convert Markdown to HTML
+        html_content = markdown.markdown(md_content,output_format="html5", safe_mode='escape')
+        html_content = html_content.replace("\n","<br>")
+        html_content = html_content.replace("<p>","<br>")
+        markdownViewer.setHtml(html_content)
+        newlayout.addWidget(markdownViewer)
+        quickStartWindow.centralWidget().layout().addLayout(newlayout)
+        quickStartWindow.show()
+        
+    def documentationMenu(self):
+        """
+        Opens the user manual .pdf externally
+        """
+        from PyQt5.QtGui import QDesktopServices
+        from PyQt5.QtCore import QUrl
+        url = QUrl.fromLocalFile('UserManual.pdf')
+        QDesktopServices.openUrl(url)
+    def devManualMenu(self):
+        """
+        Opens the developer manual .pdf externally
+        """
+        from PyQt5.QtGui import QDesktopServices
+        from PyQt5.QtCore import QUrl
+        url = QUrl.fromLocalFile('DeveloperManual.pdf')
+        QDesktopServices.openUrl(url)
+        
+    def aboutMenu(self):
+        """
+        Shows a small about-window
+        """
+        aboutWindow = utils.SmallWindow(self)
+        aboutWindow.setWindowTitle('About')
+        aboutWindow.addDescription('<b>EVE is created by</b> <br>Laura Weber, Koen J.A. Martens, Ulrike Endesfelder<br>Institute of Microbiology and Biotechnology<br>University of Bonn<br><br><b>Contact</b><br>koenjamartens@gmail.com<br>endesfelder@uni-bonn.de<br><br><b>Cite</b> <br>Please cite EVE as [TBD]')
+        aboutWindow.show()
 
     def changeAppearanceColor(self):
         #Function that changes the appearance color
