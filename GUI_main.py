@@ -4713,7 +4713,7 @@ class CandidatePreview(QWidget):
         self.firstCandidateFigure = plt.figure(figsize=(6.8,4))
         self.firstCandidateCanvas = FigureCanvas(self.firstCandidateFigure)
         self.mainlayout.addWidget(self.firstCandidateCanvas)
-
+        
         #Add a navigation toolbar (zoom, pan etc) and canvas to tab
         self.mainlayout.addWidget(NavigationToolbar(self.firstCandidateCanvas, self))
         #------------End of first candidate plot layout -----------------
@@ -4744,6 +4744,7 @@ class CandidatePreview(QWidget):
 
         #Add a callback to the changing of the dropdown:
         secondCanPrevDropdown.currentTextChanged.connect(lambda text: utils.changeLayout_choice(self.secondCandidatePreviewGroupbox.layout(),secondCanPrevDropdown_name,getattr(self, secondCanPrev_functionNameToDisplayNameMapping_name),parent=self,ignorePolarity=True, maxNrRows=1))
+        
         self.secondCandidatePreviewGroupbox.layout().addWidget(secondCanPrevDropdown,1,0,1,8)
 
         #On startup/initiatlisation: also do changeLayout_choice
@@ -4757,6 +4758,10 @@ class CandidatePreview(QWidget):
         plt.rcParams.update({'font.size': 9}) # global change of font size for all matplotlib figures
         self.secondCandidateCanvas = FigureCanvas(self.secondCandidateFigure)
         self.mainlayout.addWidget(self.secondCandidateCanvas)
+        
+        #Also update the show_candidate_callback if the dropdown is changed - needs to be after plt figurecanvas creation
+        firstCanPrevDropdown.currentTextChanged.connect(lambda: self.show_candidate_callback(parent))
+        secondCanPrevDropdown.currentTextChanged.connect(lambda: self.show_candidate_callback(parent))
 
         #Add a navigation toolbar (zoom, pan etc) and canvas to tab
         self.mainlayout.addWidget(NavigationToolbar(self.secondCandidateCanvas, self))
