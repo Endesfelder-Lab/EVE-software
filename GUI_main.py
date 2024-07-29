@@ -3059,7 +3059,8 @@ class FindingAnalysis(FindingFittingAnalysis):
                             chunking_limits = np.multiply(chunking_limits,1000) #ms to us
                         
                             #Loop over all candidates:
-                            for k in reversed(range(len(origfindingResults[0]))):
+                            origfindingResultsKeyCopy = list(origfindingResults[0].keys())
+                            for k in reversed(origfindingResultsKeyCopy):#reversed(range(len(origfindingResults[0]))):
                                 candidate = origfindingResults[0][k]
                                 if self.filter_finding_on_chunking(candidate,chunking_limits) == False:
                                     #pop it
