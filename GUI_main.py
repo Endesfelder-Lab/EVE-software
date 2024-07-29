@@ -4537,8 +4537,12 @@ class PreviewFindingFitting(QWidget):
         fittingResults = self.fittingResult
         pxsize = float(self.settings['PixelSize_nm']['value'])
         candidate_polygons = []
+        candidate_polygons_pos = []
+        candidate_polygons_neg = []
         unfitted_candidate_polygons = []
         fitting_polygons = []
+        candidates_ids_pos = []
+        candidates_ids_neg = []
         candidates_ids = []
         unfitted_candidate_ids = []
         fitting_ids = []
@@ -4557,8 +4561,19 @@ class PreviewFindingFitting(QWidget):
 
                 #Check if it succesfully fitted:
                 if not np.isnan(fittingResults['x'].iloc[f]):
-                    candidates_ids.append(str(f))
-                    candidate_polygons.append(np.array([[x_min, y_min], [x_max, y_min], [x_max, y_max], [x_min, y_max]]))
+                    if len(np.unique(findingResults[f]['events']['p'])) == 1:
+                        if np.all(np.unique(findingResults[f]['events']['p'])) == 0:
+                            #Negative
+                            candidates_ids_neg.append(str(f))
+                            candidate_polygons_neg.append(np.array([[x_min, y_min], [x_max, y_min], [x_max, y_max], [x_min, y_max]]))
+                        elif np.all(np.unique(findingResults[f]['events']['p'])) == 1:
+                            #Positive
+                            candidates_ids_pos.append(str(f))
+                            candidate_polygons_pos.append(np.array([[x_min, y_min], [x_max, y_min], [x_max, y_max], [x_min, y_max]]))
+                    else:
+                        #Unknown or mixed
+                        candidates_ids.append(str(f))
+                        candidate_polygons.append(np.array([[x_min, y_min], [x_max, y_min], [x_max, y_max], [x_min, y_max]]))
                 else:
                     unfitted_candidate_ids.append(str(f))
                     unfitted_candidate_polygons.append(np.array([[x_min, y_min], [x_max, y_min], [x_max, y_max], [x_min, y_max]]))
@@ -4582,7 +4597,7 @@ class PreviewFindingFitting(QWidget):
                 fitting_ids.append("")
                 fitting_ids.append("")
 
-        all_ids = candidates_ids+unfitted_candidate_ids+fitting_ids
+        all_ids = candidates_ids_neg+candidates_ids_pos+candidates_ids+unfitted_candidate_ids+fitting_ids
         # create features
         features = {
             'candidate_ids': all_ids,
@@ -4596,6 +4611,8 @@ class PreviewFindingFitting(QWidget):
         }
 
         #Add the finding result
+        self.findingFitting_overlay.add_rectangles(candidate_polygons_neg, edge_width=1*((float(settings['PixelSize_nm']['value']))/1000),edge_color=(79/255, 39/255, 119/255),face_color='transparent')
+        self.findingFitting_overlay.add_rectangles(candidate_polygons_pos, edge_width=1*((float(settings['PixelSize_nm']['value']))/1000),edge_color=(30/255, 93/255, 73/255),face_color='transparent')
         self.findingFitting_overlay.add_rectangles(candidate_polygons, edge_width=1*((float(settings['PixelSize_nm']['value']))/1000),edge_color='coral',face_color='transparent')
         self.findingFitting_overlay.add_rectangles(unfitted_candidate_polygons, edge_width=1*((float(settings['PixelSize_nm']['value']))/1000),edge_color='red',face_color='transparent')
         self.findingFitting_overlay.add_lines(fitting_polygons, edge_width=0.5*((float(settings['PixelSize_nm']['value']))/1000),edge_color='red',face_color='transparent')
