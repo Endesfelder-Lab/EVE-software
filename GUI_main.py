@@ -4304,8 +4304,19 @@ class PreviewFindingFitting(QWidget):
         #Make it expand:
         self.viewer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.mainRightlayout.addWidget(self.viewer) #The view itself
-        self.mainlayout.addWidget(self.viewer.controls,1,1) #The controls for the viewer (contrast, etc)
+        
+        controlVstack = QVBoxLayout()
+        controlVstack.addWidget(self.viewer.controls)#The controls for the viewer (contrast, etc)
         self.viewer.controls.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        buttonResetView = QPushButton("Reset View")
+        buttonResetView.clicked.connect(self.reset_view)
+        controlVstack.addWidget(buttonResetView)
+        buttonFullResetView = QPushButton("Reset entire visualisation")
+        controlVstack.addWidget(buttonFullResetView)
+        buttonFullResetView.clicked.connect(self.reset_full_view)
+        #Add a spacer so everything is pushed to top:
+        controlVstack.addStretch(1)
+        self.mainlayout.addLayout(controlVstack,1,1) 
         self.mainlayout.addLayout(self.mainRightlayout,1,2)
 
         #Possible layouts to give more napari information
@@ -4337,6 +4348,24 @@ class PreviewFindingFitting(QWidget):
         }
 
         self.underCursorInfoDF = pd.DataFrame(underCursorInfo)
+
+    def reset_view(self):
+        """
+        Reset the view (i.e. reset zoom/pan/etc)
+        """
+        self.napariviewer.reset_view()
+    
+    def reset_full_view(self):
+        """
+        Fully reset the view (i.e. reset zoom/pan/etc - also reset all colormaps/gamma/opacity/etc)
+        """
+        self.napariviewer.reset_view()
+        for layer in self.napariviewer.layers:
+            layer.rendering = 'attenuated_mip'
+            layer.visible = True
+            layer.colormap = 'gray'
+            layer.gamma = 1
+            layer.opacity = 1
 
     def napari_doubleClicked(self, event:Event):
         """Callback when the mouse is double clicked. Brings someone to the candidate preview tab if a candidate is clicked
