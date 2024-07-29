@@ -31,9 +31,7 @@ def __function_metadata__():
         "PhasorFitting_customTimeFit": {
             "dist_kwarg" : {"base": "XYDist", "description": "Two-dimensional event-distribution to fit to get x,y-localization.", "default_option": "Hist2d_xy"},
             "time_kwarg" : {"base": "TemporalFits", "description": "Temporal fitting routine to get time estimate.", "default_option": "LognormCDFFirstEvents_weighted"},
-            "required_kwargs": [
-                {"name": "UNUSED_KWARG", "display_text":"UNUSED_KWARG", "description": "ERROR _ UNUSED KWARG","default":0.},
-            ],
+            "required_kwargs": [            ],
             "optional_kwargs": [],
             "help_string": "2D phasor with custom time fit routine",
             "display_name": "Phasor - custom time fit"
