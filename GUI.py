@@ -67,6 +67,8 @@ def get_stylesheet():
     return stylesheet
 
 def main():
+    import gc
+    gc.enable()
     multiprocessing.freeze_support()
     app = QApplication(sys.argv)
     
