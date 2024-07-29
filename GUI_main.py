@@ -2666,8 +2666,10 @@ class FindingFittingAnalysis():
                 if isinstance(widget,QComboBox) and widget.isVisibleTo(GUIinfo.tab_processing) and className in widget.objectName():
                     if className == 'Finding':
                         methodName_method = utils.functionNameFromDisplayName(widget.currentText(),getattr(GUIinfo,f"Finding_functionNameToDisplayNameMapping{polarity}"))
+                        break
                     elif className == 'Fitting':
                         methodName_method = utils.functionNameFromDisplayName(widget.currentText(),getattr(GUIinfo,f"Fitting_functionNameToDisplayNameMapping{polarity}"))
+                        break
 
         #Function call: get the to-be-evaluated text out, giving the methodName, method KwargNames, methodKwargValues, and 'function Type (i.e. cellSegmentScripts, etc)' - do the same with scoring as with method
         if methodName_method != '':

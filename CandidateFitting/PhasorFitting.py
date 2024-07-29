@@ -23,9 +23,7 @@ def __function_metadata__():
     return {
         "PhasorFitting": {
             "dist_kwarg" : {"base": "XYDist", "description": "Two-dimensional event-distribution to fit to get x,y-localization.", "default_option": "Hist2d_xy"},
-            "required_kwargs": [
-                {"name": "UNUSED_KWARG", "display_text":"UNUSED_KWARG", "description": "ERROR _ UNUSED KWARG","default":0.},
-            ],
+            "required_kwargs": [            ],
             "optional_kwargs": [],
             "help_string": "3D phasor.",
             "display_name": "Phasor"
