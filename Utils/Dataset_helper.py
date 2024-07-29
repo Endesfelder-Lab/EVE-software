@@ -18,7 +18,8 @@ def __function_metadata__():
             ],
             "optional_kwargs": [
             ],
-            "help_string": ""
+            "help_string": "",
+            "display_name": "Detect hot pixels"
         }
     }
 
@@ -166,7 +167,7 @@ def detectHotPixels(parent,**kwargs):#(dataLocation,xyStretch=(-np.Inf,-np.Inf,n
     window.addDescription("Detect likely hot pixels")
     loadfileloc = window.addFileLocation()
     
-    maxTimeText = window.addTextEdit(labelText="Maximum time (in ms):",preFilledText="500000")
+    maxTimeText = window.addTextEdit(labelText="Maximum time (in ms):",preFilledText="50000")
     stdevMultText = window.addTextEdit(labelText="Stdev multiplier:",preFilledText="5")
     
     outputText = window.addMultiLineTextEdit(labelText="Output:",preFilledText="Nothing yet, Run first")
