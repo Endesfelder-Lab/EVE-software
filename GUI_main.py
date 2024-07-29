@@ -4607,7 +4607,7 @@ class PreviewFindingFitting(QWidget):
             'anchor': 'upper_left',
             'translation': [0, 0],
             'size': 8,
-            'color':'blue'
+            'color':'cyan'
         }
 
         #Add the finding result
@@ -4783,7 +4783,7 @@ class CandidatePreview(QWidget):
             # Check candidate entry field
             if self.entryCanPreview.text() == '':
                 self.candidate_info.setText('Tried to visualise candidate, but no ID was given!')
-                logging.error('Tried to visualise candidate, but no ID was given!')
+                logging.debug('Tried to visualise candidate, but no ID was given!')
             elif 'FindingMethod' in parent.data and int(self.entryCanPreview.text()) < len(parent.data['FindingResult'][0]):
                 self.CandidatePreviewID = int(self.entryCanPreview.text())
                 logging.debug(f"Attempting to show candidate {self.CandidatePreviewID}.")
