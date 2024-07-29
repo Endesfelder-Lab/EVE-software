@@ -155,7 +155,7 @@ def DriftCorr_entropyMin(resultArray,findingResult,settings,**kwargs):
     print(drift_locs[0][0], drift_locs[1][0])
     print(drift_locs[0][-1], drift_locs[1][-1])
 
-    performance_metadata = f"Dummy function ran for seconds."
+    performance_metadata = f"Driftcorrection DME-2D applied with settings {kwargs}."
     print('Function one ran!')
 
     return drift_corr_locs, performance_metadata
@@ -262,7 +262,7 @@ def DriftCorr_entropyMin_3D(resultArray,findingResult,settings,**kwargs):
     print(drift_locs[0][0], drift_locs[1][0])
     print(drift_locs[0][-1], drift_locs[1][-1])
 
-    performance_metadata = f"Dummy function ran for seconds."
+    performance_metadata = f"Driftcorrection DME-3D applied with settings {kwargs}."
     print('Function one ran!')
 
     return drift_corr_locs, performance_metadata
@@ -350,7 +350,7 @@ def DriftCorr_RCC(resultArray,findingResult,settings,**kwargs):
     drift_corr_locs.loc[:,'x'] -= drift_locs[0]
     drift_corr_locs.loc[:,'y'] -= drift_locs[1]
 
-    performance_metadata = f"Dummy function ran for seconds."
+    performance_metadata = f"Driftcorrection RCC applied with settings {kwargs}."
     print('Function one ran!')
 
     return drift_corr_locs, performance_metadata

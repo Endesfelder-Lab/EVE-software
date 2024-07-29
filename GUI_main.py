@@ -4106,8 +4106,11 @@ class PostProcessing(QWidget):
         self.postProcessingHistory[current_postprocessinghistoryid][2] = [len(self.postProcessingHistory[current_postprocessinghistoryid][0]),-1]
 
         postProcessingResult = eval(FunctionEvalText)
-        self.parent.data['FittingResult'][0] = postProcessingResult[0]
-
+        
+        metadata = self.parent.data['FittingResult'][1] + postProcessingResult[1]
+        # self.parent.data['FittingResult'][0] = postProcessingResult[0]
+        self.parent.data['FittingResult'] = (postProcessingResult[0],) + (metadata,)
+        
         self.postProcessingHistory[current_postprocessinghistoryid][2][1] = len(self.parent.data['FittingResult'][0])
 
         #Update the history grid-widget
@@ -4198,7 +4201,8 @@ class PostProcessing(QWidget):
 
         def historyRestore_callback(self,historyId):
             #First restore the localizations
-            self.parent.parent.data['FittingResult'][0] = self.parent.postProcessingHistory[historyId][0]
+            self.parent.parent.data['FittingResult'] = self.parent.postProcessingHistory[historyId]
+            # self.parent.parent.data['FittingResult'][0] = self.parent.postProcessingHistory[historyId][0]
             #Remove all history after this point
             keys_to_remove = [k for k in self.parent.postProcessingHistory if k >= historyId]
             for k in reversed(keys_to_remove):
