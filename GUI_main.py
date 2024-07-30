@@ -1659,7 +1659,6 @@ class MyGUI(QMainWindow):
         self.data['AveragePSFneg'] = pd.DataFrame(columns=['x', 'y', 't', 'p'])
         self.data['AveragePSFmix'] = pd.DataFrame(columns=['x', 'y', 't', 'p'])
         
-        # self.updateGUIafterNewResults(error)
         return
 
     def run_processing(self,error=None):
@@ -1669,6 +1668,7 @@ class MyGUI(QMainWindow):
         logging.info("--------------- Full Run Starting ---------------")
         logging.info("")
         logging.info("")
+        
         
         self.analysis_progressbar.setValue(0)
         #Reset the abort to allow for aborting
@@ -1686,7 +1686,6 @@ class MyGUI(QMainWindow):
 
         # reset previewEvents array, every time run is pressed
         self.previewEvents = []
-        
         
         #Check if the input is a .hdf5, .npy or .raw:
         if self.dataLocationInput.text().endswith(('.hdf5', '.npy', '.raw')):
@@ -1787,6 +1786,7 @@ class MyGUI(QMainWindow):
                     logging.error("Error encountered in file "+fullpath+", continuing with other files")
             self.updateProgressBar(overwriteValue = 100)
             logging.info("Fully completed all files in folder " + self.dataLocationInput.text())
+            self.updateGUIafterNewResults()
     
     def run_preview_i(self,error=None):
         #Get polarity info:
@@ -2025,6 +2025,7 @@ class MyGUI(QMainWindow):
         self.updateLocList()
         
         self.updateProgressBar(overwriteValue = 100)
+        self.updateGUIafterNewResults()
         #Switch the user to the Preview tab
         utils.changeTab(self, text='Preview run')
 
@@ -2068,12 +2069,6 @@ class MyGUI(QMainWindow):
         self.globalSettings = self.globalSettingsBeforeRun
         self.updateProgressBar(overwriteValue = 100)
         logging.info('Analysis completed!')
-
-    def updateGUIafterNewResults(self,error=None):
-        if error == None:
-            self.updateLocList()
-        # else:
-        #     self.open_critical_warning(error)
 
     def checkPolarity(self,npyData):
         #Ensure that polarity is 0/1, not -1/1. If it is -1/1, convert to 0/1. Otherwise, give error
@@ -4137,7 +4132,10 @@ class PostProcessing(QWidget):
 
         postProcessingResult = eval(FunctionEvalText)
         
-        metadata = self.parent.data['FittingResult'][1] + postProcessingResult[1]
+        if len(self.parent.data['FittingResult']) > 1:
+            metadata = self.parent.data['FittingResult'][1] + postProcessingResult[1]
+        else:
+            metadata = postProcessingResult[1]
         # self.parent.data['FittingResult'][0] = postProcessingResult[0]
         self.parent.data['FittingResult'] = (postProcessingResult[0],) + (metadata,)
         
