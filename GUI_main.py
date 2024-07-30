@@ -87,6 +87,7 @@ except ImportError:
 # Main script
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
+    
 class MyGUI(QMainWindow):
 #GUI class - needs to be initialised and is initalised in gui.py
     def __init__(self):
@@ -262,6 +263,7 @@ class MyGUI(QMainWindow):
 
         self.uselessWarningSupression()
 
+        
         logging.info('Initialisation complete.')
 
     def uselessWarningSupression(self):
@@ -850,7 +852,8 @@ class MyGUI(QMainWindow):
         #Populate with a start time and end time inputs:
         self.previewLayout.layout().addWidget(QLabel("Start time (ms):"), 0, 0, 1, 1)
         self.previewLayout.layout().addWidget(QLabel("Duration (ms):"), 0, 1, 1, 1)
-        self.previewLayout.layout().addWidget(QLabel("Display frame time (ms):"), 0,2,1,2)
+        self.previewLayout.layout().addWidget(QLabel("Display frame time (ms):"), 0,2,1,1)
+        self.previewLayout.layout().addWidget(QLabel("Display event type:"), 0,3,1,1)
         #Also the QLineEdits that have useful names:
         self.preview_startTLineEdit = QLineEdit()
         self.preview_startTLineEdit.setObjectName('preview_startTLineEdit')
@@ -865,8 +868,16 @@ class MyGUI(QMainWindow):
         #And for display frame time:
         self.preview_displayFrameTime = QLineEdit()
         self.preview_displayFrameTime.setObjectName('preview_displayFrameTime')
-        self.previewLayout.layout().addWidget(self.preview_displayFrameTime, 1, 2, 1, 2)
+        self.previewLayout.layout().addWidget(self.preview_displayFrameTime, 1, 2, 1, 1)
         self.preview_displayFrameTime.setText("100")
+        #And for display event type:
+        self.preview_eventType = QComboBox()
+        self.preview_eventType.setObjectName('preview_eventType')
+        self.previewLayout.layout().addWidget(self.preview_eventType, 1, 3, 1, 1)
+        self.preview_eventType.addItem("All events")
+        self.preview_eventType.addItem("Positive only")
+        self.preview_eventType.addItem("Negative only")
+        self.preview_eventType.setCurrentIndex(0)
 
         #Also give start/end x/y values:
         self.previewLayout.layout().addWidget(QLabel("Min X (px):"), 2, 0)
@@ -895,11 +906,11 @@ class MyGUI(QMainWindow):
         self.buttonPreview = QPushButton("Preview finding/fitting")
         self.buttonPreview.setToolTip("Perform the finding/fitting routines on the subset determined by the Preview groupbox, and visualise it in the Preview run tab.")
         #Add a button press event:
-        self.buttonPreview.clicked.connect(lambda: self.previewRun((self.preview_startTLineEdit.text(),
-                self.preview_durationTLineEdit.text()),
-                (self.preview_minXLineEdit.text(),self.preview_maxXLineEdit.text(),
-                self.preview_minYLineEdit.text(),self.preview_maxYLineEdit.text()),
-                float(self.preview_displayFrameTime.text())))
+        self.buttonPreview.clicked.connect(lambda: self.previewRun(
+            (self.preview_startTLineEdit.text(), self.preview_durationTLineEdit.text()),
+            (self.preview_minXLineEdit.text(),self.preview_maxXLineEdit.text(),
+            self.preview_minYLineEdit.text(),self.preview_maxYLineEdit.text()),
+            float(self.preview_displayFrameTime.text()),eventType=self.preview_eventType.currentText()))
         #Add the button to the layout:
         self.previewLayout.layout().addWidget(self.buttonPreview, 4, 0, 1, 2)
         
@@ -912,7 +923,7 @@ class MyGUI(QMainWindow):
                 self.preview_durationTLineEdit.text()),
                 (self.preview_minXLineEdit.text(),self.preview_maxXLineEdit.text(),
                 self.preview_minYLineEdit.text(),self.preview_maxYLineEdit.text()),
-                float(self.preview_displayFrameTime.text())))
+                float(self.preview_displayFrameTime.text()),eventType=self.preview_eventType.currentText()))
         #Add the button to the layout:
         self.previewLayout.layout().addWidget(self.buttonEventsPreview, 4, 2, 1 ,2)
 
@@ -1835,7 +1846,7 @@ class MyGUI(QMainWindow):
         self.data['AveragePSFneg'] = pd.DataFrame(columns=['x', 'y', 't', 'p'])
         self.data['AveragePSFmix'] = pd.DataFrame(columns=['x', 'y', 't', 'p'])
     
-    def previewEventsCall(self,timeStretch=(0,1000),xyStretch=(0,0,0,0),frameTime=100):
+    def previewEventsCall(self,timeStretch=(0,1000),xyStretch=(0,0,0,0),frameTime=100,eventType="All events"):
         """
         Generates the preview the events in the time/xy stretch.
 
@@ -1843,6 +1854,7 @@ class MyGUI(QMainWindow):
             timeStretch (tuple): A tuple containing the start and end times for the preview.
             xyStretch (tuple): A tuple containing the minimum and maximum x and y coordinates for the preview.
             frametime (int): The frame time in ms.
+            eventType (str): "All events", "Positive only", "Negative only"
 
         Returns:
             None
@@ -1867,16 +1879,23 @@ class MyGUI(QMainWindow):
         previewEvents = utils.removeHotPixelEvents(previewEvents,hotpixelarray)
         
         #Check if we have at least 1 event:
-        if len(previewEvents) > 0:
-            #Log the nr of events found:
-            logging.info(f"Preview - Found {len(previewEvents)} events in the chosen time frame.")
-        else:
+        if len(previewEvents) <= 0:
+        #     #Log the nr of events found:
+        #     logging.info(f"Preview - Found {len(previewEvents)} events in the chosen time frame.")
+        # else:
             logging.error("Preview - No events found in the chosen time frame.")
             return
         
         #Load the events in self memory and filter on XY
         self.previewEvents = previewEvents
         self.previewEvents = self.filterEvents_xy(self.previewEvents,xyStretch)
+        
+        if eventType == "Positive only":
+            self.previewEvents = self.filterEvents_npy_p(self.previewEvents,1)
+        elif eventType == "Negative only":
+            self.previewEvents = self.filterEvents_npy_p(self.previewEvents,0)
+        
+        logging.info(f"Preview - Displaying {len(self.previewEvents)} events ({eventType}) in the chosen time frame, no finding/fitting.")
         
         #Update the preview panel and localization list:
         self.updateShowPreview(previewEvents=self.previewEvents,timeStretch=timeStretch,frameTime=frameTime)
@@ -1885,13 +1904,15 @@ class MyGUI(QMainWindow):
         #Switch the user to the Preview tab
         utils.changeTab(self, text='Preview run')
     
-    def previewRun(self,timeStretch=(0,1000),xyStretch=(0,0,0,0),frameTime=100):
+    def previewRun(self,timeStretch=(0,1000),xyStretch=(0,0,0,0),frameTime=100,eventType="All events"):
         """
         Generates the preview of a run analysis.
 
         Parameters:
             timeStretch (tuple): A tuple containing the start and end times for the preview.
             xyStretch (tuple): A tuple containing the minimum and maximum x and y coordinates for the preview.
+            frametime (int): The frame time in ms.
+            eventType (str): "All events", "Positive only", "Negative only"
 
         Returns:
             None
@@ -1981,16 +2002,23 @@ class MyGUI(QMainWindow):
         
         self.updateProgressBar(overwriteValue = 95)
         #Check if we have at least 1 event:
-        if len(previewEvents) > 0:
-            #Log the nr of events found:
-            logging.info(f"Preview - Found {len(previewEvents)} events in the chosen time frame.")
-        else:
+        if len(previewEvents) <= 0:
+        #     #Log the nr of events found:
+        #     logging.info(f"Preview - Found {len(previewEvents)} events in the chosen time frame.")
+        # else:
             logging.error("Preview - No events found in the chosen time frame.")
             return
         
         #Load the events in self memory and filter on XY
         self.previewEvents = previewEvents
         self.previewEvents = self.filterEvents_xy(self.previewEvents,xyStretch)
+        
+        if eventType == "Positive only":
+            self.previewEvents = self.filterEvents_npy_p(self.previewEvents,1)
+        elif eventType == "Negative only":
+            self.previewEvents = self.filterEvents_npy_p(self.previewEvents,0)
+        
+        logging.info(f"Preview - Displaying {len(self.previewEvents)} events ({eventType}) in the chosen time frame.")
         
         #Update the preview panel and localization list:
         self.updateShowPreview(previewEvents=self.previewEvents,timeStretch=timeStretch,frameTime=frameTime)
