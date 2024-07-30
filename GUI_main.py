@@ -3897,22 +3897,6 @@ class VisualisationNapari(QWidget):
         #And add a callback to this:
         button.clicked.connect(lambda text, parent=parent: self.visualise_callback(parent))
         
-        #Create a Hbox:
-        self.visualisation_hbox_resetViews = QHBoxLayout()
-        self.visualisation_hbox_resetViews.setObjectName("VisualisationResetViewKEEP")
-        #Create a button to reset zoom/position:
-        button = QPushButton("Reset View", self)
-        button.setObjectName("VisualisationResetViewButtonKEEP")
-        button.clicked.connect(lambda text, parent=parent: self.reset_visualisation_view(parent, partialOrFull='Partial'))
-        self.visualisation_hbox_resetViews.addWidget(button)
-        #Create a button to reset zoom/position:
-        button = QPushButton("Reset entire visualisation", self)
-        button.setObjectName("VisualisationResetViewFullButtonKEEP")
-        button.clicked.connect(lambda text, parent=parent: self.reset_visualisation_view(parent, partialOrFull='Full'))
-        self.visualisation_hbox_resetViews.addWidget(button)
-        #Add the hbox to the groupbox
-        self.VisualisationGroupbox.layout().addLayout(self.visualisation_hbox_resetViews,100,0,1,6)
-        
 
         #Add the groupbox to the mainlayout
         self.mainlayout.layout().addWidget(self.VisualisationGroupbox,1,1,1,2)
@@ -3920,16 +3904,76 @@ class VisualisationNapari(QWidget):
         #------------End of GUI dynamic layout -----------------
 
 
+        #Create a new 'this is the events under the cursor' textbox
+        self.underCursorInfo = QLabel("")
+        self.mainlayout.addWidget(self.underCursorInfo,2,2,1,1)
+        
         # Create a napari viewer
         self.napariviewer = Viewer(show=False)
         #Add a napariViewer to the layout
         self.viewer = QtViewer(self.napariviewer)
         self.viewer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.mainlayout.addWidget(self.viewer.controls,2,1,1,1)
+        
+        qvbox = QVBoxLayout()
+        qvbox.addWidget(self.viewer.controls)
+        
+        #Create a button to reset zoom/position:
+        button = QPushButton("Reset View", self)
+        button.setObjectName("VisualisationResetViewButtonKEEP")
+        button.clicked.connect(lambda text, parent=parent: self.reset_visualisation_view(parent, partialOrFull='Partial'))
+        qvbox.addWidget(button)
+        #Create a button to reset zoom/position:
+        button = QPushButton("Reset entire visualisation", self)
+        button.setObjectName("VisualisationResetViewFullButtonKEEP")
+        button.clicked.connect(lambda text, parent=parent: self.reset_visualisation_view(parent, partialOrFull='Full'))
+        qvbox.addWidget(button)
+        #add a vertical stretch:
+        qvbox.addStretch()
+        
+        self.mainlayout.addLayout(qvbox,3,1,1,1)
         self.viewer.controls.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-        self.mainlayout.addWidget(self.viewer,2,2,1,1)
+        self.mainlayout.addWidget(self.viewer,3,2,1,1)
+        
+        self.timeOfLastCursorUpdate = 0
+        self.underCursorInfoDF = {}
+        self.underCursorInfoDF['current_pixel'] = {}
+        self.viewer.on_mouse_move = lambda event: self.currently_under_cursor(event)
 
         logging.info('VisualisationNapari init')
+
+    def currently_under_cursor(self,event):
+        """
+        Class that determines which pixel is currently under the cursor. The main task of this function is to go from cavnas position to image position.
+
+        Args:
+            event (Event): general Vispy event, containing, amongst others, the xy position of the curosr in the canvas.
+        """
+        #Vispy mouse position
+
+        timeBetweenCursorUpdates = 0.0 #in seconds
+        if self.timeOfLastCursorUpdate == 0 or (time.time() - self.timeOfLastCursorUpdate) >= timeBetweenCursorUpdates:
+            #We get the canvas size/position in image pixel units
+            canvas_size_in_px_units = event.source.size/self.viewer.camera.zoom
+            # camera_coords = [self.napariviewer.camera.center[2]+.5, self.napariviewer.camera.center[1]+.5]
+            camera_coords = [self.viewer.camera.center[2], self.viewer.camera.center[1]]
+            canvas_pos = np.vstack([camera_coords-(canvas_size_in_px_units/2),camera_coords+(canvas_size_in_px_units/2)])
+            #And we can normalize the cursor position to image pixels
+            cursor_unit_norm = event._pos/event.source.size
+            #Thus, we can find the position in um - at the moment we simply calculate this
+            pos_nm=np.zeros((2,))
+            pos_nm[0] = (cursor_unit_norm[0]*canvas_size_in_px_units[0]+canvas_pos[0][0])*1000
+            
+            pos_nm[1] = (cursor_unit_norm[1]*canvas_size_in_px_units[1]+canvas_pos[0][1])*1000
+
+            #Yep we're doing this.
+            GUIobject = self.parent().parent().parent().parent().parent().parent().parent().parent()
+            pxsize = float(GUIobject.globalSettings['PixelSize_nm']['value'])
+            
+            pos_EBSpx = np.array(np.round(pos_nm/pxsize)).astype(int)
+            
+            #Set the text
+            self.underCursorInfo.setText(f"Position: {int(pos_nm[0])},{int(pos_nm[1])} nm, EBS px: {pos_EBSpx[0]}, {pos_EBSpx[1]}")
+            self.timeOfLastCursorUpdate = time.time()
 
     def reset_visualisation_view(self,parent,partialOrFull='Partial'):
         logging.info('Resetting visualisation view')
