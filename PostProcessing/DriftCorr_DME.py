@@ -318,6 +318,21 @@ def DriftCorr_entropyMin_3D(resultArray,findingResult,settings,**kwargs):
         plt.title('Drift Estimation')
         plt.show()
 
+    #To store, we should store the following data: fraem_time_for_dme, estimated_drift, pixelsize_nm
+    storeLoc = kwargs['storeLoc']
+    if storeLoc != '':
+        try:
+            #Check if storeLoc ends in .npz, otherwise add it:
+            if storeLoc[-4:]!= '.npz':
+                storeLoc += '.npz'
+            # Save the variables to a single .npz file
+            np.savez(storeLoc, 
+                    frame_time_for_dme=frame_time_for_dme, 
+                    estimated_drift=estimated_drift, 
+                    pixelsize_nm=float(settings['PixelSize_nm']['value']))
+        except:
+            logging.error('Could not save drift correction data to'+ storeLoc)
+
     import logging
     #Remove all entries where a negative time was given:
     if len(resultArray[resultArray['t'] <= 0]):
@@ -405,6 +420,21 @@ def DriftCorr_RCC(resultArray,findingResult,settings,**kwargs):
         #Add a title:
         plt.title('Drift Estimation')
         plt.show()
+
+    #To store, we should store the following data: fraem_time_for_dme, estimated_drift, pixelsize_nm
+    storeLoc = kwargs['storeLoc']
+    if storeLoc != '':
+        try:
+            #Check if storeLoc ends in .npz, otherwise add it:
+            if storeLoc[-4:]!= '.npz':
+                storeLoc += '.npz'
+            # Save the variables to a single .npz file
+            np.savez(storeLoc, 
+                    frame_time_for_dme=frame_time_for_dme, 
+                    estimated_drift=estimated_drift, 
+                    pixelsize_nm=float(settings['PixelSize_nm']['value']))
+        except:
+            logging.error('Could not save drift correction data to'+ storeLoc)
 
     import logging
     #Remove all entries where a negative time was given:
