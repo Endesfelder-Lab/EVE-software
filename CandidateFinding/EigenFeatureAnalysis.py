@@ -44,7 +44,7 @@ def __function_metadata__():
             "optional_kwargs": [
                 {"name": "debug", "display_text":"Debug Boolean", "description": "Get some debug info.","default":False},
             ],
-            "help_string": "Eigen-feature analysis",
+            "help_string": "Eigen-feature analysis. Performs a spectral clustering method on the data to separate SMLM signal from noise.",
             "display_name": "Eigen-feature analysis"
         },
         "eigen_feature_analysis_autoRadiusSelect": {

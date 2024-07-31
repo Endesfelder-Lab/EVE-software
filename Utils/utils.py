@@ -67,6 +67,9 @@ def subfunction_exists(module_name, subfunction_name):
     
 # Return all functions that are found in a specific directory
 def functionNamesFromDir(dirname):
+    """ 
+    Return all functions that are found in a specific directory which have the correct function metadata
+    """
     #initialise empty array
     functionnamearr = []
     def addFilesToAbsolutePath(functionnamearr,absolute_path):
@@ -129,7 +132,7 @@ def reqKwargsFromFunction(functionname):
 def displayNameFromKwarg(functionname,name):
     #Get all kwarg info
     allkwarginfo = kwargsFromFunction(functionname)
-    
+    displayName = name
     #Look through optional args first, then req. kwargs (so that req. kwargs have priority in case something weirdi s happening):
     for optOrReq in range(1,-1,-1):
     
@@ -517,7 +520,7 @@ def defaultValueFromKwarg(functionname,kwargname):
     return defaultEntry
 
 
-def displayNamesFromFunctionNames(functionName, polval):
+def displayNamesFromFunctionNames(functionName, polval=''):
     displaynames = []
     functionName_to_displayName_map = []
     for function in functionName:
@@ -824,7 +827,6 @@ def updateDistKwargTooltip(line_edit,parent):
     #Set the tooltip if found
     if index > -1:
         line_edit.setToolTip(parent.distKwarg_descriptions[index])
-
 
 def kwargValueInputChanged(line_edit):
     #Get the function name
@@ -1382,7 +1384,7 @@ class SmallWindow(QMainWindow):
 
 
 
-#DEPRACATED
+#For CLI
 def timeSliceFromHDF(dataLocation,requested_start_time_ms = 0,requested_end_time_ms=1000,howOftenCheckHdfTime = 100000,loggingBool=False,curr_chunk = 0):
     """Function that returns all events between start/end time in a HDF5 file. Extremely sped-up since the HDF5 file is time-sorted, and only checked every 100k (howOftenCheckHdfTime) events.
 
@@ -1454,3 +1456,27 @@ def timeSliceFromHDF(dataLocation,requested_start_time_ms = 0,requested_end_time
 
     #Return the events
     return events_output,curr_chunk
+
+def printInformationFromFunction(functionName):
+    """ 
+    Provide information about a function in the terminal.
+    """
+    helpString = (helpStringFromFunction(functionName)
+    )
+    kwargsInfo = (kwargsFromFunction(functionName))
+    reqKwargs = reqKwargsFromFunction(functionName)
+    optKwargs = optKwargsFromFunction(functionName)
+    displayNamev = displayNamesFromFunctionNames([functionName],'')
+
+    InfoString = ''
+    InfoString += f"\033[1m{displayNamev[0][0]}\033[0m\n"
+    InfoString += f"\033[31mHelp info\033[0m \n\033[33m{helpString}\033[0m\n"
+    if len(reqKwargs) > 0:
+        InfoString += f"\033[31mRequired parameters\033[0m\n"
+        for i in range(len(reqKwargs)):
+            InfoString+=f"\033[33m{displayNameFromKwarg(functionName,reqKwargs[i])} [{reqKwargs[i]}]: \n\t{infoFromMetadata(functionName,specificKwarg=reqKwargs[i])} \n\tDefault value: {defaultValueFromKwarg(functionName,kwargname=reqKwargs[i])}\n\033[0m"
+    if len(optKwargs) > 0:
+        InfoString += f"\033[31mOptional parameters\033[0m\n"
+        for i in range(len(optKwargs)):
+            InfoString+=f"\033[33m{displayNameFromKwarg(functionName,optKwargs[i])} [{optKwargs[i]}]: \n\t{infoFromMetadata(functionName,specificKwarg=optKwargs[i])} \n\tDefault value: {defaultValueFromKwarg(functionName,kwargname=optKwargs[i])}\n\033[0m"
+    return InfoString
