@@ -4318,6 +4318,15 @@ class PostProcessing(QWidget):
 
                             #Widget.text() could contain a file location. Thus, we need to swap out all \ for /:
                             methodKwargValues_method.append(widget_sub.text().replace('\\','/'))
+                        elif ("ComboBox" in widget_sub.objectName()) and widget_sub.isVisibleTo(self.PostProcessingGroupbox):
+                            # The objectName will be along the lines of foo#bar#str
+                            #Check if the objectname is part of a method or part of a scoring
+                            split_list = widget_sub.objectName().split('#')
+                            methodName_method = split_list[1]
+                            methodKwargNames_method.append(split_list[2])
+
+                            #We get the current choice of the dropdown.
+                            methodKwargValues_method.append(widget_sub.currentText().replace('\\','/'))
                     except:
                         pass
         #If at this point there is no methodName_method, it means that the method has exactly 0 req or opt kwargs. Thus, we simply find the value of the QComboBox which should be the methodName:

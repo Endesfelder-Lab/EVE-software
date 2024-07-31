@@ -728,6 +728,46 @@ def changeLayout_choice(curr_layout,className,displayNameToFunctionNameMap,paren
                         
                         #Add an listener when the pushButton is pressed
                         line_edit_lookup.clicked.connect(lambda text2,line_edit_change_objName = line_edit,text="Select file",filter="*.*": lineEditFileLookup(line_edit_change_objName, text, filter,parent=parent))
+                elif type(typeFromKwarg(current_selected_function,reqKwargs[k])) == str and typeFromKwarg(current_selected_function,reqKwargs[k])[0:9] == 'dropDown(':
+                    centerText = typeFromKwarg(current_selected_function,reqKwargs[k])[9:-1]
+                    if centerText[0:2] == '__' and centerText[-2:] == '__':
+                        if centerText == '__locListHeaders__':
+                            try:
+                                dropDownOptions = parent.parent.data['FittingResult'][0].columns.tolist()
+                            except:
+                                dropDownOptions = ['Error in setting dropdown values (locListHeaders)']
+                    else:
+                        dropDownOptions = centerText.split(',')
+                    
+                    
+                    #Delete old dropdown:
+                    removeWidget(curr_layout,f"ComboBox#{current_selected_function}#{reqKwargs[k]}#{current_selected_polarity}")
+                    #allow the layout to actually process a deletelater event:
+                    QApplication.processEvents()
+                    
+                    #We want to add a dropdown!
+                    #Create a new qhboxlayout:
+                    hor_boxLayout = QHBoxLayout()
+                    #Add a line_edit to this:
+                    dropDown = QComboBox()
+                    dropDown.setObjectName(f"ComboBox#{current_selected_function}#{reqKwargs[k]}#{current_selected_polarity}")
+                    
+                    
+                    #Add the options to the dropdown:
+                    for option in dropDownOptions:
+                        dropDown.addItem(option)
+                    defaultValue = defaultValueFromKwarg(current_selected_function,reqKwargs[k])
+                    hor_boxLayout.addWidget(dropDown)
+                    
+                    #Actually placing it in the layout - this is different than other methods, in that it will be removed + re-added if it already exists.
+                    checkAndShowWidget(curr_layout,dropDown.objectName())
+                    if checkAndShowWidget(curr_layout,dropDown.objectName()) == False:
+                        dropDown.setToolTip(infoFromMetadata(current_selected_function,specificKwarg=reqKwargs[k]))
+                        if defaultValue is not None:
+                            index = dropDown.findText(str(defaultValue))
+                            if index >= 0:
+                                dropDown.setCurrentIndex(index)
+                        curr_layout.addLayout(hor_boxLayout,2+((k+labelposoffset))%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+1)
                         
                 else: #'normal' type - int, float, string, whatever
                     #Creating a line-edit...
@@ -871,6 +911,34 @@ def setLineEditStyle(line_edit,type='Normal'):
         line_edit.setStyleSheet("border: 1px  solid #D5D5E5;")
     elif type == 'Warning':
         line_edit.setStyleSheet("border: 1px solid red;")
+
+def removeWidget(layout,widgetName):
+    # Iterate over the layout's items
+    for index in range(layout.count()):
+        item = layout.itemAt(index)
+        # Check if the item is a widget
+        if item.widget() is not None:
+            widget = item.widget()
+            # Check if the widget has the desired name
+            if widget.objectName() == widgetName:
+                # Widget already exists, delete it
+                widget.setParent(None)
+                widget.setObjectName(None)
+                widget.deleteLater()
+                return
+        else:
+            for index2 in range(item.count()):
+                item_sub = item.itemAt(index2)
+                # Check if the item is a widget
+                if item_sub.widget() is not None:
+                    widget = item_sub.widget()
+                    # Check if the widget has the desired name
+                    if widget.objectName() == widgetName:
+                        # Widget already exists, delete it
+                        widget.setParent(None)
+                        widget.setObjectName(None)
+                        widget.deleteLater()
+                        return
 
 def checkAndShowWidget(layout, widgetName):
     # Iterate over the layout's items
