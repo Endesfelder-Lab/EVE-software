@@ -292,7 +292,7 @@ def DriftCorr_entropyMin_3D(resultArray,findingResult,settings,**kwargs):
                 framesperbin = framesperbinv, 
                 imgshape=[fov_width, fov_width,fov_width], 
                 coarseFramesPerBin=int(np.floor(min(framesperbinv*10,max(framenum)/20))),
-                coarseSigma=[3,3,10],
+                coarseSigma=[1,1,1],
                 useCuda=use_cuda,
                 useDebugLibrary=False,
                 estimatePrecision=False,
