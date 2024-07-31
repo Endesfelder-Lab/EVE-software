@@ -13,11 +13,21 @@ import time
 # Should have an entry for every function in this file
 def __function_metadata__():
     return {
+        "Load_storedData": {
+            "required_kwargs": [
+                {"name": "fileLoc", "description": "File location","default":'',"type":"fileLoc","display_text":"File location"},
+            ],
+            "optional_kwargs": [
+            ],
+            "help_string": "Drift correction from Cnossen et al..",
+            "display_name": "Load stored drift correction DME/RCC"
+        },
         "DriftCorr_entropyMin": {
             "required_kwargs": [
                 {"name": "frame_time_for_dme", "description": "Frame-time used for drift-correction (in ms)","default":100.,"type":float,"display_text":"Frame time used in DME"},
                 {"name": "frames_per_bin", "description": "Number of frames in every bin for dme drift correction ","default":50,"type":int,"display_text":"Frames per bin"},
                 {"name": "visualisation", "description": "Visualisation of the drift traces.","default":True,"display_text":"Visualisation"},
+                {"name": "storeLoc", "description": "File location","default":'',"type":"fileLoc","display_text":"Storage location"},
             ],
             "optional_kwargs": [
             ],
@@ -29,6 +39,7 @@ def __function_metadata__():
                 {"name": "frame_time_for_dme", "description": "Frame-time used for drift-correction (in ms)","default":100.,"type":float,"display_text":"Frame time used in DME"},
                 {"name": "frames_per_bin", "description": "Number of frames in every bin for dme drift correction ","default":50,"type":int,"display_text":"Frames per bin"},
                 {"name": "visualisation", "description": "Visualisation of the drift traces.","default":True,"display_text":"Visualisation"},
+                {"name": "storeLoc", "description": "File location","default":'',"type":"fileLoc","display_text":"Storage location"},
             ],
             "optional_kwargs": [
             ],
@@ -41,7 +52,8 @@ def __function_metadata__():
                 {"name": "nr_time_bins", "description": "Number of time bins","default":10,"type":int,"display_text":"Number of bins"},
                 {"name": "zoom_level", "description": "Zoom level","default":2,"type":int,"display_text":"Zoom of RCC plots"},
                 {"name": "visualisation", "description": "Visualisation of the drift traces.","default":True,"display_text":"Visualisation"},
-                {"name": "ConvHist", "description": "Use convoluted histogram, ideally do not use","default":False,"display_text":"Use ConvHist (Linux)"}
+                {"name": "ConvHist", "description": "Use convoluted histogram, ideally do not use","default":False,"display_text":"Use ConvHist (Linux)"},
+                {"name": "storeLoc", "description": "File location","default":'',"type":"fileLoc","display_text":"Storage location"},
             ],
             "optional_kwargs": [
             ],
@@ -58,6 +70,62 @@ def __function_metadata__():
 #-------------------------------------------------------------------------------------------------------------------------------
 #Callable functions
 #-------------------------------------------------------------------------------------------------------------------------------
+def Load_storedData(resultArray,findingResult,settings, **kwargs):
+    import logging
+    """
+    Load and apply stored drift correction data.
+    """
+    #Check if we have the required kwargs
+    [provided_optional_args, missing_optional_args] = utilsHelper.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
+    
+    # Load the .npz file
+    loaded_data = np.load(kwargs['fileLoc'])
+    try:
+    # Access the variables
+        frame_time_for_dme = loaded_data['frame_time_for_dme']
+        estimated_drift = loaded_data['estimated_drift']
+        pixelsize_nm = loaded_data['pixelsize_nm']
+    except: 
+        logging.error("Could not load the drift correction data from the file. Please check the file location.")
+        return
+
+    #2D drift corr
+    if estimated_drift.shape[1] == 2:
+        framenumFull = np.floor(np.array(resultArray['t'].values)/(frame_time_for_dme))
+        framenumFull -= min(framenumFull)
+        framenumFull = framenumFull.astype(int)
+        #Get the drift of every localization - note the back-conversion from px to nm
+        drift_locs = ([estimated_drift[min(i,len(estimated_drift)-1)][0]*(pixelsize_nm) for i in framenumFull],[estimated_drift[min(i,len(estimated_drift)-1)][1]*(pixelsize_nm) for i in framenumFull])
+        
+        import copy
+        #Correct the resultarray for the drift
+        drift_corr_locs = copy.deepcopy(resultArray)
+        drift_corr_locs.loc[:,'x'] -= drift_locs[0]
+        drift_corr_locs.loc[:,'y'] -= drift_locs[1]
+
+        performance_metadata = f"2D driftcorr-load applied with settings {kwargs}."
+        logging.info(f"2D drift corrected from file {kwargs['fileLoc']}.")
+
+        return drift_corr_locs, performance_metadata
+    elif estimated_drift.shape[1] == 3: #3D drift corr
+        framenumFull = np.floor(np.array(resultArray['t'].values)/(frame_time_for_dme))
+        framenumFull -= min(framenumFull)
+        framenumFull = framenumFull.astype(int)
+        #Get the drift of every localization - note the back-conversion from px to nm
+        drift_locs = ([estimated_drift[min(i,len(estimated_drift)-1)][0]*(pixelsize_nm) for i in framenumFull],[estimated_drift[min(i,len(estimated_drift)-1)][1]*(pixelsize_nm) for i in framenumFull], [estimated_drift[min(i,len(estimated_drift)-1)][2]*(pixelsize_nm) for i in framenumFull])
+        
+        import copy
+        #Correct the resultarray for the drift
+        drift_corr_locs = copy.deepcopy(resultArray)
+        drift_corr_locs.loc[:,'x'] -= drift_locs[0]
+        drift_corr_locs.loc[:,'y'] -= drift_locs[1]
+        drift_corr_locs.loc[:,'z [nm]'] -= drift_locs[2]
+        
+        performance_metadata = f"3D driftcorr-load applied with settings {kwargs}."
+        logging.info(f"3D drift corrected from file {kwargs['fileLoc']}.")
+
+        return drift_corr_locs, performance_metadata
+
 def DriftCorr_entropyMin(resultArray,findingResult,settings,**kwargs):
     """ 
     Implementation of DME drift correction based on Cnossen et al. 2021 (https://opg.optica.org/oe/fulltext.cfm?uri=oe-29-18-27961&id=457245). 
@@ -108,7 +176,7 @@ def DriftCorr_entropyMin(resultArray,findingResult,settings,**kwargs):
                 framesperbin = framesperbinv, 
                 imgshape=[fov_width, fov_width], 
                 coarseFramesPerBin=int(np.floor(min(framesperbinv*10,max(framenum)/20))),
-                coarseSigma=[0.2,0.2],
+                coarseSigma=[1,1],
                 useCuda=use_cuda,
                 useDebugLibrary=False,
                 estimatePrecision=False,
@@ -133,6 +201,21 @@ def DriftCorr_entropyMin(resultArray,findingResult,settings,**kwargs):
         plt.title('Drift Estimation')
         plt.show()
 
+    #To store, we should store the following data: fraem_time_for_dme, estimated_drift, pixelsize_nm
+    storeLoc = kwargs['storeLoc']
+    if storeLoc != '':
+        try:
+            #Check if storeLoc ends in .npz, otherwise add it:
+            if storeLoc[-4:]!= '.npz':
+                storeLoc += '.npz'
+            # Save the variables to a single .npz file
+            np.savez(storeLoc, 
+                    frame_time_for_dme=frame_time_for_dme, 
+                    estimated_drift=estimated_drift, 
+                    pixelsize_nm=float(settings['PixelSize_nm']['value']))
+        except:
+            logging.error('Could not save drift correction data to'+ storeLoc)
+
     import logging
     #Remove all entries where a negative time was given:
     if len(resultArray[resultArray['t'] <= 0]):
@@ -151,12 +234,8 @@ def DriftCorr_entropyMin(resultArray,findingResult,settings,**kwargs):
     drift_corr_locs = copy.deepcopy(resultArray)
     drift_corr_locs.loc[:,'x'] -= drift_locs[0]
     drift_corr_locs.loc[:,'y'] -= drift_locs[1]
-    
-    print(drift_locs[0][0], drift_locs[1][0])
-    print(drift_locs[0][-1], drift_locs[1][-1])
 
     performance_metadata = f"Driftcorrection DME-2D applied with settings {kwargs}."
-    print('Function one ran!')
 
     return drift_corr_locs, performance_metadata
 
@@ -213,7 +292,7 @@ def DriftCorr_entropyMin_3D(resultArray,findingResult,settings,**kwargs):
                 framesperbin = framesperbinv, 
                 imgshape=[fov_width, fov_width,fov_width], 
                 coarseFramesPerBin=int(np.floor(min(framesperbinv*10,max(framenum)/20))),
-                coarseSigma=[0.2,0.2,0.2],
+                coarseSigma=[3,3,10],
                 useCuda=use_cuda,
                 useDebugLibrary=False,
                 estimatePrecision=False,
@@ -258,12 +337,8 @@ def DriftCorr_entropyMin_3D(resultArray,findingResult,settings,**kwargs):
     drift_corr_locs.loc[:,'x'] -= drift_locs[0]
     drift_corr_locs.loc[:,'y'] -= drift_locs[1]
     drift_corr_locs.loc[:,'z [nm]'] -= drift_locs[2]
-    
-    print(drift_locs[0][0], drift_locs[1][0])
-    print(drift_locs[0][-1], drift_locs[1][-1])
 
     performance_metadata = f"Driftcorrection DME-3D applied with settings {kwargs}."
-    print('Function one ran!')
 
     return drift_corr_locs, performance_metadata
 

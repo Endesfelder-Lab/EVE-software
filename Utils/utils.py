@@ -941,7 +941,7 @@ def lineEditFileLookup(line_edit_objName, text, filter,parent=None):
     line_edit_objName.setText(file_path)
         
 def generalFileSearchButtonAction(parent=None,text='Select File',filter='*.txt',parentFolder=""):
-    file_path, _ = QFileDialog.getOpenFileName(parent,text,parentFolder,filter=filter)
+    file_path, _ = QFileDialog.getSaveFileName(parent,text,parentFolder,filter=filter)
     return file_path
 
     
@@ -1288,7 +1288,7 @@ class SmallWindow(QMainWindow):
         except:
             folderName = ""
         
-        file_name, _ = QFileDialog.getOpenFileName(None, "Open File", folderName, fileArgs, options=options)
+        file_name, _ = QFileDialog.getSaveFileName(None, "Open File", folderName, fileArgs, options=options)
         if file_name:
             self.fileLocationLineEdit.setText(file_name)
         
