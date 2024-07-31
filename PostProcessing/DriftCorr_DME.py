@@ -15,7 +15,7 @@ def __function_metadata__():
     return {
         "Load_storedData": {
             "required_kwargs": [
-                {"name": "fileLoc", "description": "File location","default":'',"type":"fileLoc","display_text":"File location"},
+                {"name": "fileLoc", "description": "File location (*.npz file)","default":'',"type":"fileLoc","display_text":"File location"},
             ],
             "optional_kwargs": [
             ],
@@ -27,7 +27,7 @@ def __function_metadata__():
                 {"name": "frame_time_for_dme", "description": "Frame-time used for drift-correction (in ms)","default":100.,"type":float,"display_text":"Frame time used in DME"},
                 {"name": "frames_per_bin", "description": "Number of frames in every bin for dme drift correction ","default":50,"type":int,"display_text":"Frames per bin"},
                 {"name": "visualisation", "description": "Visualisation of the drift traces.","default":True,"display_text":"Visualisation"},
-                {"name": "storeLoc", "description": "File location","default":'',"type":"fileLoc","display_text":"Storage location"},
+                {"name": "storeLoc", "description": "File location (*.npz file)","default":'',"type":"fileLoc","display_text":"Storage location"},
             ],
             "optional_kwargs": [
             ],
@@ -39,7 +39,7 @@ def __function_metadata__():
                 {"name": "frame_time_for_dme", "description": "Frame-time used for drift-correction (in ms)","default":100.,"type":float,"display_text":"Frame time used in DME"},
                 {"name": "frames_per_bin", "description": "Number of frames in every bin for dme drift correction ","default":50,"type":int,"display_text":"Frames per bin"},
                 {"name": "visualisation", "description": "Visualisation of the drift traces.","default":True,"display_text":"Visualisation"},
-                {"name": "storeLoc", "description": "File location","default":'',"type":"fileLoc","display_text":"Storage location"},
+                {"name": "storeLoc", "description": "File location (*.npz file)","default":'',"type":"fileLoc","display_text":"Storage location"},
             ],
             "optional_kwargs": [
             ],
@@ -53,7 +53,7 @@ def __function_metadata__():
                 {"name": "zoom_level", "description": "Zoom level","default":2,"type":int,"display_text":"Zoom of RCC plots"},
                 {"name": "visualisation", "description": "Visualisation of the drift traces.","default":True,"display_text":"Visualisation"},
                 {"name": "ConvHist", "description": "Use convoluted histogram, ideally do not use","default":False,"display_text":"Use ConvHist (Linux)"},
-                {"name": "storeLoc", "description": "File location","default":'',"type":"fileLoc","display_text":"Storage location"},
+                {"name": "storeLoc", "description": "File location (*.npz file)","default":'',"type":"fileLoc","display_text":"Storage location"},
             ],
             "optional_kwargs": [
             ],
