@@ -12,7 +12,7 @@ EVE is designed to quickly and directly process and analyse event-based single m
 
 EVE allows flexible combinations of different finding and fitting routines to optimize the localization results for the specific event-based dataset. Besides a variety of different finding and fitting algorithms, EVE also offers various preview options, visualisation tools and post-processing and evaluation functions. A detailed description of the algorithms can be found here **LINK Scientific Background**.
 
-EVE is written in Python and structured in such a way, that is easy to implement and add new functionalties in form of new finding, fitting routines, etc. Details about this can be found in the ** LINK Developer's Manual**. 
+EVE is written in Python and structured in such a way, that is easy to implement and add new functionalties in form of new finding, fitting routines, etc. Details about this can be found in the **LINK Developer's Manual**. 
 
 ## Version
 The `main` branch contains the latest running version of the software. The latest developments are stored in the `develop` branch.
