@@ -451,7 +451,7 @@ def eigenFeature_analysis(npy_array,settings,**kwargs):
         maxeigenvalcutoff = determineEigenValueCutoffComputationally(maxeigenval,kwargs)
     
     #Visualise the histogram
-    if kwargs['debug']:
+    if kwargs['debug'] == 'True':
         showDebugInfo(maxeigenval,maxeigenvalcutoff)
 
         # Display the plot
@@ -517,7 +517,7 @@ def eigenFeature_analysis_and_bbox_finding(npy_array,settings,**kwargs):
         maxeigenvalcutoff = determineEigenValueCutoffComputationally(maxeigenval,kwargs)
     
     #Visualise the histogram
-    if kwargs['debug']:
+    if kwargs['debug'] == 'True':
         showDebugInfo(maxeigenval,maxeigenvalcutoff)
         
     points = np.asarray(point_cloud.points)
