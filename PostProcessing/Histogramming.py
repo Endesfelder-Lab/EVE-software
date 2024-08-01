@@ -73,6 +73,5 @@ def histogramming(localizations,findingResult,settings,**kwargs):
     plt.tight_layout()
     plt.show()
     
-    #Required output: localizations
-    metadata = '-'
-    return localizations,metadata
+    #Required output: localizations, metadata - or None to ignore in postprocess history
+    return None

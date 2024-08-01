@@ -4176,19 +4176,20 @@ class PostProcessing(QWidget):
 
         postProcessingResult = eval(FunctionEvalText)
         
-        if len(self.parent.data['FittingResult']) > 1:
-            metadata = self.parent.data['FittingResult'][1] + postProcessingResult[1]
-        else:
-            metadata = postProcessingResult[1]
-        # self.parent.data['FittingResult'][0] = postProcessingResult[0]
-        self.parent.data['FittingResult'] = (postProcessingResult[0],) + (metadata,)
-        
-        self.postProcessingHistory[current_postprocessinghistoryid][2][1] = len(self.parent.data['FittingResult'][0])
+        if postProcessingResult is not None:
+            if len(self.parent.data['FittingResult']) > 1:
+                metadata = self.parent.data['FittingResult'][1] + postProcessingResult[1]
+            else:
+                metadata = postProcessingResult[1]
+            # self.parent.data['FittingResult'][0] = postProcessingResult[0]
+            self.parent.data['FittingResult'] = (postProcessingResult[0],) + (metadata,)
+            
+            self.postProcessingHistory[current_postprocessinghistoryid][2][1] = len(self.parent.data['FittingResult'][0])
 
-        #Update the history grid-widget
-        self.PostProcessingHistoryGrid.addHistoryEntryToGrid(current_postprocessinghistoryid)
+            #Update the history grid-widget
+            self.PostProcessingHistoryGrid.addHistoryEntryToGrid(current_postprocessinghistoryid)
 
-        self.parent.updateLocList()
+            self.parent.updateLocList()
 
     class PostProcessingHistoryGrid(QWidget):
         def __init__(self,parent):
