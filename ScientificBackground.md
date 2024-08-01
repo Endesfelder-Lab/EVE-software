@@ -130,7 +130,7 @@ The aim of all temporal fitting methods is to get an accurate estimate for the t
 In this temporal fitting method, the cumulative number of events is fitted by a lognormal CDF to obtain the starting time t0 of the candidate cluster. Throughout the data, we observ e a wide variety of different temporal profiles for candidate clusters. We therefore chose the cumulative distribution function (CDF) of the lognormal function for fitting, as it allows a large freedom in shape, while a starting time t0 can be estimated consistently. 
 
 $$ \Large
-\text{CDF}(t) = \frac{A_1}{2} \cdot \left(1 + \operatorname{erf} \left(\frac{\ln(t - t_s) - \mu}{\sqrt{2} \cdot \sigma}\right)\right) + A_2 \cdot (t - t_s) + A_3
+\text{CDF}(t) = \frac{A_1}{2} \cdot \left(1 + {erf} \left(\frac{\ln(t - t_s) - \mu}{\sqrt{2} \cdot \sigma}\right)\right) + A_2 \cdot (t - t_s) + A_3
 $$
 
 To account for background noise, the fit consists of a first term containing the lognormal, and two additional terms that describe a linear dependency following from the assumption that the noise event rate is constant. A1-3 are the amplitudes of each term, erf is the Gaussian error function, ts is the shift of the fitting function, μ and σ² describe the mean and variance of the underlying normal function. 
