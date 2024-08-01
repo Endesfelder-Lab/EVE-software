@@ -10,9 +10,9 @@ EVE is designed to quickly and directly process and analyse event-based single m
 2. **Candidate Fitting:** The x,y,(z),t-localization is determined for each candidate cluster.
 3. **Postprocessing and Evaluation:** This module includes various analytical routines to process and interpret the data.
 
-EVE allows flexible combinations of different finding and fitting routines to optimize the localization results for the specific event-based dataset. Besides a variety of different finding and fitting algorithms, EVE also offers various preview options, visualisation tools and post-processing and evaluation functions. A detailed description of the algorithms can be found here **(link:Scientific Background)**.
+EVE allows flexible combinations of different finding and fitting routines to optimize the localization results for the specific event-based dataset. Besides a variety of different finding and fitting algorithms, EVE also offers various preview options, visualisation tools and post-processing and evaluation functions. A detailed description of the algorithms can be found here **LINK Scientific Background**.
 
-EVE is written in Python and structured in such a way, that is easy to implement and add new functionalties in form of new finding, fitting routines, etc. Details about this can be found in the **Developer's Manual**. 
+EVE is written in Python and structured in such a way, that is easy to implement and add new functionalties in form of new finding, fitting routines, etc. Details about this can be found in the ** LINK Developer's Manual**. 
 
 ## Version
 The `main` branch contains the latest running version of the software. The latest developments are stored in the `develop` branch.
@@ -41,7 +41,7 @@ The software requires Python 3.9.18.
     conda activate Eve
     ```
 3. Optional:\
-EVE can read and process event-based data in `.npy` and `.hdf5` format. Additionally the `.raw` format of [Prophesee](https://www.prophesee.ai/) can be used. If you have `.raw` data that you want to analyze you need to install the [Metavision SDK from Prophesee](https://docs.prophesee.ai/stable/installation/index.html) in addition.
+EVE can read and process event-based data in `.npy` and `.hdf5` format. Additionally the `.raw` format of [Prophesee](https://www.prophesee.ai/) can be used. If you have `.raw` data that you want to analyze you need to install the [Metavision SDK from Prophesee](https://docs.prophesee.ai/stable/installation/index.html) beforehand.
 ### Running EVE
 To open the graphical user interface and run EVE, first activate the python environment you created during the installation. Then run `GUI.py` with Python.
 ## Quick Start Guide
