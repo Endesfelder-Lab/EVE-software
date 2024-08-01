@@ -28,7 +28,7 @@ def __function_metadata__():
             "required_kwargs": [
                 {"name": "distance_radius_lookup", "description": "Outer radius (in px) to count the neighbours in.","default":7,"type":int,"display_text":"Average-density sphere radius"},
                 {"name": "density_multiplier", "description": "Density multiplier","default":1.5,"type":float,"display_text":"Density multiplier"},
-                {"name": "min_cluster_size", "description": "Minimum number of events to be considered a Core point in DBSCAN","default":17,"type":int,"display_text":"DBSCAN Core point threshold event number"},
+                {"name": "min_cluster_size", "description": "Minimum number of events to be considered a Core point in DBSCAN","default":17,"type":int,"display_text":"DBSCAN Core threshold"},
                 {"name": "ratio_ms_to_px", "description": "Ratio of milliseconds to pixels.","default":35.0,"type":float,"display_text":"Ratio ms to px"},
                 {"name": "DBSCAN_eps", "description": "Epsilon of DBSCAN. This is the radius of the DBSCAN sphere.","default":6,"type":int,"display_text":"DBSCAN epsilon"},
             ],
@@ -43,7 +43,7 @@ def __function_metadata__():
             "required_kwargs": [
                 {"name": "distance_radius_lookup", "description": "Outer radius (in px) to count the neighbours in.","default":7,"type":int,"display_text":"Average-density sphere radius"},
                 {"name": "density_multiplier", "description": "Density multiplier","default":1.5,"type":float,"display_text":"Density multiplier"},
-                {"name": "min_cluster_size", "description": "Minimum number of events to be considered a Core point in DBSCAN","default":17,"type":int,"display_text":"DBSCAN Core point threshold event number"},
+                {"name": "min_cluster_size", "description": "Minimum number of events to be considered a Core point in DBSCAN","default":17,"type":int,"display_text":"DBSCAN Core threshold"},
                 {"name": "ratio_ms_to_px", "description": "Ratio of milliseconds to pixels.","default":35.0,"type":float,"display_text":"Ratio ms to px"},
                 {"name": "DBSCAN_eps", "description": "Epsilon of DBSCAN. This is the radius of the DBSCAN sphere.","default":6,"type":int,"display_text":"DBSCAN epsilon"},
                 {"name": "padding_xy", "description": "Result padding in x,y pixels.","default":0,"type":int,"display_text":"XY padding"},
@@ -59,7 +59,7 @@ def __function_metadata__():
             "required_kwargs": [
                 {"name": "distance_radius_lookup", "description": "Outer radius (in px) to count the neighbours in.","default":7,"type":int,"display_text":"Average-density sphere radius"},
                 {"name": "density_multiplier", "description": "Density multiplier","default":1.5,"type":float,"display_text":"Density multiplier"},
-                {"name": "min_cluster_size", "description": "Minimum number of events to be considered a Core point in DBSCAN","default":17,"type":int,"display_text":"DBSCAN Core point threshold event number"},
+                {"name": "min_cluster_size", "description": "Minimum number of events to be considered a Core point in DBSCAN","default":17,"type":int,"display_text":"DBSCAN Core threshold"},
                 {"name": "ratio_ms_to_px", "description": "Ratio of milliseconds to pixels.","default":35.0,"type":float,"display_text":"Ratio ms to px"},
                 {"name": "DBSCAN_eps", "description": "Epsilon of DBSCAN. This is the radius of the DBSCAN sphere.","default":6,"type":int,"display_text":"DBSCAN epsilon"},
                 {"name": "padding_xy", "description": "Result padding in x,y pixels.","default":2,"type":int,"display_text":"XY padding"},
