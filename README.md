@@ -10,9 +10,10 @@ EVE is designed to quickly and directly process and analyse event-based single m
 2. **Candidate Fitting:** The x,y,(z),t-localization is determined for each candidate cluster.
 3. **Postprocessing and Evaluation:** This module includes various analytical routines to process and interpret the data.
 
-EVE allows flexible combinations of different finding and fitting routines to optimize the localization results for the specific event-based dataset. Besides a variety of different finding and fitting algorithms, EVE also offers various preview options, visualisation tools and post-processing and evaluation functions.
+EVE allows flexible combinations of different finding and fitting routines to optimize the localization results for the specific event-based dataset. Besides a variety of different finding and fitting algorithms, EVE also offers various preview options, visualisation tools and post-processing and evaluation functions. A detailed description of the algorithms can be found here -- color #f03c15(link:Scientific Background).
 
-EVE is written in Python and structured in such a way, that is easy to implement and add new functionalties in form of new finding, fitting routines, etc. 
+EVE is written in Python and structured in such a way, that is easy to implement and add new functionalties in form of new finding, fitting routines, etc. Details about this can be found in the Developer's Manual. 
+
 ## Version
 The `main` branch contains the latest running version of the software. The latest developments are stored in the `develop` branch.
 ## How to install and run EVE
