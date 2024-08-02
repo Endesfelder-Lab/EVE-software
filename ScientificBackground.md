@@ -135,7 +135,7 @@ $$
 The z-uncertainty is determined via the inverse Hessian matrix returned by the minimization routine.
 
 ### 6. Phasor-based Fitting
-The phasor-based fitting routine is directly adapted from the pSMLM fitting for camera-based SMLM data [@martens_phasor_2018]. Briefly, the algorithm converts the 2d distribution to two phase vectors (or phasors) by calculating the first Fourier coefficients in x and y. The angles of these phasors are used to localize the center of the event distribution.
+The phasor-based fitting routine is directly adapted from the pSMLM fitting for camera-based SMLM data [@martens_phasor_2018]. Briefly, the algorithm converts the 2D distribution to two phase vectors (or phasors) by calculating the first Fourier coefficients in x and y. The angles of these phasors are used to localize the center of the event distribution.
 
 This concept can be expanded to the third dimension if a temporal binning is employed as well as a spatial binning.
 
