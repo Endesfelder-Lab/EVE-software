@@ -1,5 +1,5 @@
 ---
-bibliography: citations.bib
+bibliography: Markdown_info/citations.bib
 ---
 
 
