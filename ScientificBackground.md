@@ -134,12 +134,12 @@ $$
 
 The z-uncertainty is determined via the inverse Hessian matrix returned by the minimization routine.
 
-### 6. Phasor-based Fitting
+## 6. Phasor-based Fitting
 The phasor-based fitting routine is directly adapted from the pSMLM fitting for camera-based SMLM data [@martens_phasor_2018]. Briefly, the algorithm converts the 2D distribution to two phase vectors (or phasors) by calculating the first Fourier coefficients in x and y. The angles of these phasors are used to localize the center of the event distribution.
 
 This concept can be expanded to the third dimension if a temporal binning is employed as well as a spatial binning.
 
-### 7. Radial Symmetry Fitting
+## 7. Radial Symmetry Fitting
 
 This fitting routine is an adapted version of the calculation of the radial symmetry centers for localization described in [@parthasarathy_rapid_2012]. The general idea is to estimate the center of radially symmetric intensity distributions, by tracing lines parallel to the image gradients in each point, where the distance of all lines is minimal at the center. This approach does not require knowledge of the exact shape of the distribution.
 In the two-dimensional version, an array of event numbers per pixel is used instead of an array of pixel intensities. As shown in Figure \ref{fig:fittingDistr}, the two-dimensional event distribution also shows a clear radial symmetry. 
