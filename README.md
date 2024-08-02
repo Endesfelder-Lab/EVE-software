@@ -55,11 +55,12 @@ virtualenv -p PYTHON_PATH/python3.9.18 ENVIRONMENT_PATH/Eve
 pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple eve-SMLM"
 ```
 
+#### Optional 
+EVE can read and process event-based data in `.npy` and `.hdf5` format. Additionally the `.raw` format of [Prophesee](https://www.prophesee.ai/) can be used. If you have `.raw` data that you want to analyze you need to install the [Metavision SDK from Prophesee](https://docs.prophesee.ai/stable/installation/index.html) beforehand. We recommend using `.hdf5` whenever possible, as this is a hierarchical data format optimized for efficient saving and reading of large files.
+
+
 ### Running instructions
 Start the software by running `eve-SMLM` in the terminal
-
-Optional:<br>  
-EVE can read and process event-based data in `.npy` and `.hdf5` format. Additionally the `.raw` format of [Prophesee](https://www.prophesee.ai/) can be used. If you have `.raw` data that you want to analyze you need to install the [Metavision SDK from Prophesee](https://docs.prophesee.ai/stable/installation/index.html) beforehand. We recommend using `.hdf5` whenever possible, as this is a hierarchical data format optimized for efficient saving and reading of large files.
 
 
 ## Quick Start Guide
@@ -70,8 +71,8 @@ Running `GUI.py` will open EVE's graphical user interface which you can see on t
 ![](Quick_Start/1_Setting_up_GUI_new.png)
 
 The main window has 7 major parts that are marked with red boxes and are described in more detail in the following.  
-1. **Menu bar:** By clicking on `Settings`, you can open the `Advanced settings`, save the current GUI configuration and settings or load a specific GUI configuration. Under `Utilities` you will find some additional functionalities to pre-process the raw event data files before processing them with Eve.<br>  
-Now, open the advaced settings, and change the settings in accordance with the image below.<br>  
+1. **Menu bar:** BBy clicking on `Settings`, you can open the `Advanced settings`, save or load the current GUI configuration. Under `Utilities` you will find some additional functionalities to pre-process the raw event data files before processing them with Eve. Under `Help` you have access to all important information around EVE, such as the **LINK** Users manual, the **LINK** Developers manual and the **LINK** Scientific information.<br>  
+The folder `Data` contains the GUI configuration (`settings.json`) that we will use throughout this users manual. You can load the GUI configuration via `Settings -> Load specific GUI contents` and selecting the correct path. Now, open the `Advanced settings`, where you can adapt all global settings.<br>  
    <br>  
    ![](Quick_Start/3_advanced_settings.png)<br>  
 2. **Data to analyse:** Here, you specify the data that will be analysed in the following. You can either select a single file (in `.npy`, `.hdf5` or `.raw` format) or a folder. If you select a folder all files in the folder will be analysed one after another.
@@ -79,7 +80,7 @@ Now, open the advaced settings, and change the settings in accordance with the i
    The folder `Data` contains an exemplary event-based acquisition of a DNA nanoruler (`DNAPAINT.hdf5`) which we will use in this tutorial. Fill the path entry field `Dataset location:` with the corresponding path to the nanoruler dataset.
 
    In the `Data selection` box, you can now further specify which parts of the data should be analysed and how. You have different options for `Polarity`, `Time` and `Position`. Choose `Pos and neg seperately` as `Polarity` option while leaving the remaining settings unchanged. Thereby, you simply load the all events without temporal or spatial constraints. By selecting `Pos and neg seperately` all subsequent analysis steps will be run on the positive and negative events distinctly. As you can see, the GUI has adapted to your selection and you can now choose finding and fitting routines for positive and negative events seperatly.<br>  
- \
+ 
  
 ![](Quick_Start/4_change_and_save_GUI_contents.png)<br>  
 3. **Candidate Finding routine:** Here, you can select among different candidate finding routines. Choose `Eigen-feature analysis`, both for positive and negative events and change the settings as shown in the screenshot above.<br>  
