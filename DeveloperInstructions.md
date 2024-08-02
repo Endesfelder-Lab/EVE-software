@@ -53,7 +53,7 @@ EVE is a software platform developed for the analysis of single-molecule imaging
 
   **Input**: Localizations, settings, function arguments
 
-  **Output**: 2d array containing image data, scale of the image
+  **Output**: 2D array containing image data, scale of the image
 
 - **Candidate preview**
 
