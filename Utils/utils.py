@@ -1388,7 +1388,7 @@ class SmallWindow(QMainWindow):
         with open(md_file, 'r', encoding='utf-8') as file:
             md_content = file.read()
         # Convert Markdown to HTML
-        html_content = markdown.markdown(md_content, extensions=['fenced_code', 'codehilite'])
+        html_content = markdown.markdown(md_content, extensions=['markdown_captions','fenced_code', 'codehilite', 'toc', 'attr_list', 'meta'])
         # Get the directory of the Markdown file
         base_dir = os.path.dirname(os.path.abspath(md_file))
         # Create a complete HTML document with MathJax support
