@@ -40,6 +40,9 @@ from PyQt5.QtGui import QCursor, QTextCursor, QIntValidator
 from PyQt5.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QTableWidget, QTableWidgetItem, QLayout, QMainWindow, QLabel, QPushButton, QSizePolicy, QGroupBox, QTabWidget, QGridLayout, QWidget, QComboBox, QLineEdit, QFileDialog, QToolBar, QCheckBox,QDesktopWidget, QMessageBox, QTextEdit, QSlider, QSpacerItem
 from PyQt5.QtCore import Qt, QPoint, QProcess, QCoreApplication, QTimer, QFileSystemWatcher, QFile, QThread, pyqtSignal, QObject
 
+from PyQt5.QtCore import QUrl
+import markdown
+from PyQt5.QtWebEngineWidgets import QWebEngineView
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
 # Function declarations
@@ -1376,11 +1379,7 @@ class SmallWindow(QMainWindow):
                 pass
         lineedit.setText(LineEditText)
     
-    def addMarkdown(self,mdfile,width=1100,height=800):
-        from PyQt5.QtCore import QUrl
-        import markdown
-        from PyQt5.QtWebEngineWidgets import QWebEngineView
-        print('a')
+    def addMarkdown(self,mdfile,width=700,height=800):
         newlayout = QVBoxLayout()
         markdownViewer = QWebEngineView()
         markdownViewer.setFixedHeight(height)
@@ -1393,7 +1392,6 @@ class SmallWindow(QMainWindow):
         # Get the directory of the Markdown file
         base_dir = os.path.dirname(os.path.abspath(md_file))
         # Create a complete HTML document with MathJax support
-        print('b')
         full_html = f"""
         <!DOCTYPE html>
         <html>
@@ -1420,13 +1418,10 @@ class SmallWindow(QMainWindow):
         </html>
         """
 
-        print('c')
         # Load the HTML content into the web view
         markdownViewer.setHtml(full_html, QUrl.fromLocalFile(base_dir + "/"))
         newlayout.addWidget(markdownViewer)
-        print('d')
         self.centralWidget().layout().addLayout(newlayout)
-        print('e')
     
     def addDescription(self,description):
         #Create a horizontal box layout:
