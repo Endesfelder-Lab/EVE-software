@@ -22,37 +22,44 @@ EVE is written in Python and structured in such a way, that is easy to implement
 
 ## Version
 The `main` branch contains the latest running version of the software. The latest developments are stored in the `develop` branch.
+
 ## How to install and run EVE
 This software was tested under Linux (Ubuntu 20.04) and Windows 10. Besides the drift correction module `DriftCorr_DME: DriftCorr_entropyMin` and the Gaussian visualization methods (`Gaussian_display: GaussianKernal_fixedSigma`, `Gaussian_display: GaussianKernal_locPrec`) that use pre-compiled dll-files and are therefore only running on Windows, everthing is running under Linux and Windows.
 
-The software requires Python 3.9.18.
-### Installation instructions
-1. First download EVE or clone it to your local repository using git:
-    ```bash
-    git clone https://github.com/Endesfelder-Lab/Eve.git
-    ```
-2. Install required python dependencies
-   
-    #### With `virtualenv`
-    Replace `PYTHON_PATH` by your python path, e.g. `/usr/bin` and `ENVIRONMENT_PATH` by the path to the virtual environments on your machine and follow the instructions below:
-    ```bash
-    virtualenv -p PYTHON_PATH/python3.9.18 ENVIRONMENT_PATH/Eve
-    source ENVIRONMENT_PATH/Eve/bin/activate
-    pip install -r requirements.txt
-    ```
+The software requires Python 3.9.
 
-    #### With `conda`
-   Simply follow the instructions below, this will also install the correct python version on your system:
-    ```bash
-    cd Eve
-    conda env create -f environment_eve.yml
-    conda activate Eve
-    ```
-    
-3. Optional:<br>
+### Installation instructions
+First download EVE or clone it to your local repository using git:  
+
+```bash
+git clone https://github.com/Endesfelder-Lab/Eve.git
+```
+
+Create a virtual environment, and install EVE
+
+**With `conda`**  
+Install conda from the website (www.conda.io)  
+Run the following lines in the terminal:  
+```bash
+conda env create --name EVE python=3.9
+conda activate EVE
+pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple eve-SMLM"
+```
+
+**With `virtualenv`**  
+
+First, install python 3.9 from python.org.
+
+Replace `PYTHON_PATH` by your python path, e.g. `/usr/bin` and `ENVIRONMENT_PATH` by the path to the virtual environments on your machine and follow the instructions below:
+```bash
+virtualenv -p PYTHON_PATH/python3.9.18 ENVIRONMENT_PATH/Eve
+pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple eve-SMLM"
+```
+
+Optional:<br>
 EVE can read and process event-based data in `.npy` and `.hdf5` format. Additionally the `.raw` format of [Prophesee](https://www.prophesee.ai/) can be used. If you have `.raw` data that you want to analyze you need to install the [Metavision SDK from Prophesee](https://docs.prophesee.ai/stable/installation/index.html) beforehand. We recommend using `.hdf5` whenever possible, as this is a hierarchical data format optimized for efficient saving and reading of large files.
-### Running EVE
-To open the graphical user interface and run EVE, first activate the python environment you created during the installation. Then run `GUI.py` with Python.
+
+
 ## Quick Start Guide
 ### 1. Set up the Processing Tab
 Running `GUI.py` will open EVE's graphical user interface which you can see on the right side of the figure.
@@ -77,6 +84,7 @@ Everything is now ready for the first run. Before you start the first run, save 
 5. **Run box:** When you click run, a full run will be executed.<br>
 6. **Preview box:** To check whether the current selection of parameters for the candidate finding is suitable for your data or needs further fine tuning, you can perform a preview run. Doing so, will perform the analysis routines only on a smaller subset of the data that you can specify in the preview box. To view the event data, which in its raw form is just a list of events, it is converted into a format that is easier for humans to view and interpret (images). You must therefore specify a `display frame time` together with the data selection you would like to display. <br>
 7. **Tab menu:** Here, you can change between different tabs: `Processing` (current tab), `Post-processing` (follow up analysis after a full run), `Localization List` (view, import and export localization tables), `Visualization` (visualize the super-resolved event SMLM data), `Run Info` (info about current run), `Preview run` (preview of finding and fitting performance, useful for parameter tweaking) and `Candidate Preview` (view single candidate clusters and their x,y,t localization results)<br>
+
 ### 2. Perform a Preview Run
 Now, change the `Duration` in the preview box to 10000ms and then press `Preview`. This will immediately open the run info. 
 By leaving the settings `min` and `max` for x,y empty, you will get a preview for the entire FOV without spatial restrictions. <br>
@@ -120,6 +128,7 @@ As you can see the sample data is rather drifty and we can't see our DNA nanorul
 
 ### 7. Apply a Drift Correction
 To apply a drift correction, switch to the `Post-processing` tab.
+
 #### Under Windows
 Windows users can choose between two different drift correction routines. Select `DriftCorr_DME: DriftCorr_RCC` and press `Post processing!`. This will open a pop-up window showing the estimated x,y-drift. Additionally, an entry was added to the `Post-processing history` at the bottom of the tab. By clicking `Restore to before this` you can undo the last post-processing step. 
 
