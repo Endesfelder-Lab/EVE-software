@@ -219,7 +219,7 @@ Each Event distribution is defined by a class (e.g. *class Hist1d\_t()* ). These
 
 Please use the existing classes in *eventDistributions.py* for detailed info.
 
-### Temporal Fitting
+## Temporal Fitting
 Same structure as Event distributions, only for fitting time distributions.
 
 
