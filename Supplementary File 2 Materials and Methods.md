@@ -8,13 +8,15 @@
 ### Microscopy details – DNA-PAINT origami and E. coli imaging
 A custom laser-based fluorescence microscopy setup was used for imaging. 561 nm laser light (gem 561 1000, Laser Quantum) was modulated by an AOTF (G&H; AOMO 3080-125 & AODR 1080AF-AINA-1.0 HCR) and directed via a reflective collimator (RC04FC-P01, Thorlabs) into a custom fibre (70x70 µm multimode square core fibre, NA 0.22, FC/PC connectors, CeramOptec). 405 nm laser light (LBX-405-1200-HPE-PPA, RPMC) was co-aligned and also directed into the same fibre. The fibre output was collimated via a Multimode Collimator (F950FC-A 350-700nm, Thorlabs), and the beam was expanded via a set of lenses (LB1471-A-ML and LA4725-A, Thorlabs), and cleaned up via a ZET405/488/561/640 filter (QuadLineLaserClean-Up, AHF analysentechnik). This beam was then focused via an achromatic lens (AC254-400-A-ML, Thorlabs) and a dichroic mirror (ZT405/488/561rpc, Chroma, Bellows Falls, VT, USA) embedded in a commercial inverted microscope body (Nikon Eclipse Ti-E, Nikon, Tokyo, Japan) equipped with a focus stabilization system (Perfect focus system) on the back-focal plane of a 60x Apochromat TIRF 1.49 NA objective (Nikon). Emission from the sample passed via the objective and dichroic mirror through a filter (ZET405/488/561m-TRF, Chroma) and a 4f system via two convex achromatic lenses (AC508-100-A, Thorlabs), and optionally passed through an emission filter (ET610/75m, Chroma). The light was then directed either towards a Prime BSI sCMOS camera (Teledyne Photometrics, Tucson, AZ, USA; 107 nm pixel size), or towards an event-based sensor (Metavision Gen4.1-HD EVK, Prophesee). The microscope, camera, and peripherals were controlled via MicroManager 2.0, and laser triggering was controlled via a TriggerScope 4 (Advanced Research Consulting, Newcastle, CA, USA).
 
-For *E. coli* rpoC imaging, the sample was illuminated with ~2 kW/cm<sup>2</sup> 561 nm laser, while the 405nm laser was increased by hand from 0 to ~8 W/cm<sup>2</sup> to have a low and steady photoactivation rate, until no new signal appeared. For the Nile Red imaging, the buffer was exchanged for PBS containing 12.5 nM Nile Red, and the sample was illuminated with ~2 kW/cm<sup>2</sup> 561 nm laser and the data was recorded for 3 minutes.
+For *E. coli* rpoC imaging, the sample was illuminated with ~2 kW/cm<sup>2</sup> 561 nm laser, while the 405nm laser was increased manually from 0 to ~8 W/cm<sup>2</sup> to have a low and steady photoactivation rate, until no new signal appeared. For the Nile Red imaging, the buffer was exchanged for PBS containing 12.5 nM Nile Red, and the sample was illuminated with ~2 kW/cm<sup>2</sup> 561 nm laser and the data was recorded for 3 minutes.
+
+For E. coli Nile Red analysis, the frame based finding method (Detection threshold = 3.0, Exclusion radius = 4.0, Min. Radius = 1.25, Max. Radius = 4.0, Frame time (ms) = 100.0 and Candidate radius = 4.0) was used for positive and negative events separately.  
 
 For DNA-PAINT nanoruler (80RG, Gattaquant) imaging, the sample was illuminated with ~2 kW/cm<sup>2</sup> 561 nm laser in TIRF mode by moving the focused spot to the side of the back-focal plane of the objective, and ~20 minutes of data was recorded.
 
-For E. coli rpoC analysis, the frame based finding method (Detection threshold = 3.0, Exclusion radius = 4.0, Min. Radius = 1.25, Max. Radius = 4.0, Frame time (ms) = 100.0 and Candidate radius = 4.0) was used for positive and negative events separately.  
+*Analysis method nanoruler - Laura
 
-\* Analysis methods – Joel
+\* Analysis methods – Joel - rpoC
 
 # A-tubulin
 \* Biological – Manon/Clement

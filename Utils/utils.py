@@ -1376,6 +1376,58 @@ class SmallWindow(QMainWindow):
                 pass
         lineedit.setText(LineEditText)
     
+    def addMarkdown(self,mdfile,width=1100,height=800):
+        from PyQt5.QtCore import QUrl
+        import markdown
+        from PyQt5.QtWebEngineWidgets import QWebEngineView
+        print('a')
+        newlayout = QVBoxLayout()
+        markdownViewer = QWebEngineView()
+        markdownViewer.setFixedHeight(height)
+        markdownViewer.setFixedWidth(width)
+        md_file = mdfile
+        with open(md_file, 'r', encoding='utf-8') as file:
+            md_content = file.read()
+        # Convert Markdown to HTML
+        html_content = markdown.markdown(md_content, extensions=['fenced_code', 'codehilite'])
+        # Get the directory of the Markdown file
+        base_dir = os.path.dirname(os.path.abspath(md_file))
+        # Create a complete HTML document with MathJax support
+        print('b')
+        full_html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <script type="text/javascript" async
+                src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/MathJax.js?config=TeX-MML-AM_CHTML">
+            </script>
+            <script type="text/x-mathjax-config">
+                MathJax.Hub.Config({{
+                    tex2jax: {{
+                        inlineMath: [['$','$']],
+                        processEscapes: true
+                    }} 
+                }});
+            </script>
+            <style>
+                body {{ font-family: Arial, sans-serif; line-height: 1.6; padding: 20px; }}
+                img {{ max-width: 100%; height: auto; }}
+            </style>
+        </head>
+        <body>
+            {html_content}
+        </body>
+        </html>
+        """
+
+        print('c')
+        # Load the HTML content into the web view
+        markdownViewer.setHtml(full_html, QUrl.fromLocalFile(base_dir + "/"))
+        newlayout.addWidget(markdownViewer)
+        print('d')
+        self.centralWidget().layout().addLayout(newlayout)
+        print('e')
+    
     def addDescription(self,description):
         #Create a horizontal box layout:
         layout = QHBoxLayout()
