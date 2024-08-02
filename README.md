@@ -1,5 +1,11 @@
+---
+bibliography: citations.bib
+---
+
+
 # EVE - General-purpose software for eve-SMLM localization
 ![](Eve.png)
+
 ## About EVE
 EVE is a user-interfaced software package that provides several methods to localize emitters from single molecule localization microscopy (SMLM) experiments performed on event-based sensors (eve-SMLM).
 
@@ -10,9 +16,9 @@ EVE is designed to quickly and directly process and analyse event-based single m
 2. **Candidate Fitting:** The x,y,(z),t-localization is determined for each candidate cluster.<br>
 3. **Postprocessing and Evaluation:** This module includes various analytical routines to process and interpret the data.<br>
 
-EVE allows flexible combinations of different finding and fitting routines to optimize the localization results for the specific event-based dataset. Besides a variety of different finding and fitting algorithms, EVE also offers various preview options, visualisation tools and post-processing and evaluation functions. A detailed description of the algorithms can be found here **LINK Scientific Background**.
+EVE allows flexible combinations of different finding and fitting routines to optimize the localization results for the specific event-based dataset. Besides a variety of different finding and fitting algorithms, EVE also offers various preview options, visualisation tools and post-processing and evaluation functions. A detailed description of the algorithms can be found in **Supplementary Note 1: Scientific Background**.
 
-EVE is written in Python and structured in such a way, that is easy to implement and add new functionalties in form of new finding, fitting routines, etc. Details about this can be found in the **LINK Developer's Manual**. EVE can also be run via the command line interface, `EVE_CommandLine.ipynb` for detailed information.
+EVE is written in Python and structured in such a way, that is easy to implement and add new functionalties in form of new finding, fitting routines, etc. Details about this can be found in the **Developer's Manual**. EVE can also be run via the command line interface, `EVE_CommandLine.ipynb` for detailed information.
 
 ## Version
 The `main` branch contains the latest running version of the software. The latest developments are stored in the `develop` branch.
