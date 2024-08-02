@@ -78,8 +78,7 @@ def AverageXYpos(candidate_dic,settings,**kwargs):
     
     # Determine number of jobs on CPU and slice data accordingly
     njobs, num_cores = utilsHelper.nb_jobs(candidate_dic, num_cores)
-    data_split = utilsHelper.slice_data(candidate_dic, njobs)
-
+    data_split = utilsHelper.slice_data(candidate_dic, njobs) 
     logging.info("Candidate fitting split in "+str(njobs)+" job(s) and divided on "+str(num_cores)+" core(s).")
 
     # Determine all localizations

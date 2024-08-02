@@ -298,7 +298,7 @@ def PolarityMatching(localizations,findingResult,settings,**kwargs):
     logging.info(f'Polarity Matching took {end_time-start_time} seconds')
     
     #Required output: localizations
-    metadata = 'Information or so'
+    metadata = f'Polarity Matching took {end_time-start_time} seconds'
     return localizations,metadata
 
 def runNeNA(sublocs,n_bins_nena=99,loggingShow=True,visualisation=True):
@@ -376,9 +376,9 @@ def PolarityMatching_NeNA(localizations,findingResult,settings,**kwargs):
         #Define the nr of bins for nena
         n_bins_nena = 99
         runNeNA(sublocs,n_bins_nena=n_bins_nena,loggingShow=True,visualisation=True)
-        
 
-        
+    return None
+
 def PolarityMatching_time(localizations,findingResult,settings,**kwargs):
 
     #Check if we have the pre-run polarity matching:
@@ -414,23 +414,31 @@ def PolarityMatching_time(localizations,findingResult,settings,**kwargs):
         n_curves = int(kwargs['nPops'])
         #Fit with n_curves exponential decays:
         from scipy.optimize import curve_fit
+        # def exponential_decay_1(x, a, b):
+        #     return a * np.exp(-b * x)
+        # def exponential_decay_2(x, a, b, c, f1):
+        #     return a * (f1 * np.exp(-b * x) + (1-f1) * np.exp(-c * x))
+        # def exponential_decay_3(x, a, b, c, d, f1, f2):
+        #     return a * (f1 * np.exp(-b * x) + f2 * np.exp(-c * x) + (1-f1-f2) * np.exp(-d * x))
+        
+        
         def exponential_decay_1(x, a, b):
-            return a * np.exp(-b * x)
+            return a * .5**(b * x)
         def exponential_decay_2(x, a, b, c, f1):
-            return a * (f1 * np.exp(-b * x) + (1-f1) * np.exp(-c * x))
+            return a * (f1 * .5**(b * x) + (1-f1) * .5**(c * x))
         def exponential_decay_3(x, a, b, c, d, f1, f2):
-            return a * (f1 * np.exp(-b * x) + f2 * np.exp(-c * x) + (1-f1-f2) * np.exp(-d * x))
+            return a * (f1 * .5**(b * x) + f2 * .5**(c * x) + (1-f1-f2) * .5**(d * x))
         if n_curves == 1:
             popt, pcov = curve_fit(exponential_decay_1, valuesToFit[0], valuesToFit[1], p0=[1, 0.01], bounds=(0, np.inf), maxfev=5000)
             #get RelUncertainty on popt[1]:
             popt1Unc = np.sqrt(pcov[1][1])/popt[1]
         elif n_curves == 2:
-            popt, pcov = curve_fit(exponential_decay_2, valuesToFit[0], valuesToFit[1], p0=[1, 0.01, 0.02, 0.5], bounds=(0, np.inf), maxfev=5000)
+            popt, pcov = curve_fit(exponential_decay_2, valuesToFit[0], valuesToFit[1], p0=[1, 0.01, 5.02, 0.5], bounds=(0, np.inf), maxfev=5000)
             #get RelUncertainty on popt[1]:
             popt1Unc = np.sqrt(pcov[1][1])/popt[1]
             popt2Unc = np.sqrt(pcov[2][2])/popt[2]
         elif n_curves == 3:
-            popt, pcov = curve_fit(exponential_decay_3, valuesToFit[0], valuesToFit[1], p0=[1, 0.01, 0.02, 0.03, 0.30, 0.33], bounds=(0, np.inf), maxfev=5000)
+            popt, pcov = curve_fit(exponential_decay_3, valuesToFit[0], valuesToFit[1], p0=[1, 0.01, 5.02, 30.03, 0.30, 0.33], bounds=(0, np.inf), maxfev=5000)
             #get RelUncertainty on popt[1]:
             popt1Unc = np.sqrt(pcov[1][1])/popt[1]
             popt2Unc = np.sqrt(pcov[2][2])/popt[2]
@@ -556,8 +564,8 @@ def PolarityMatching_time(localizations,findingResult,settings,**kwargs):
         ax.set_xlabel('Time between pos/neg events (ms)')
         
         plt.show()
-        
-
+    
+    return None
 
 
 def PolarityMatching_NeNASpatial(localizations,findingResult,settings,**kwargs):
@@ -654,59 +662,4 @@ def PolarityMatching_NeNASpatial(localizations,findingResult,settings,**kwargs):
         plt.colorbar()
         plt.show()
     
-    
-    #Percentage error
-    # pcterr = 0.2
-    
-    # subsamplerate = 50
-    # #We do a contrained k_means clustering
-    # from k_means_constrained import KMeansConstrained
-    # clf = KMeansConstrained(
-    #     n_clusters=n_bins,
-    #     size_min=n_points_per_bin*(1-pcterr)//subsamplerate,
-    #     size_max=int(np.ceil(n_points_per_bin*(1+pcterr)/subsamplerate)),
-    #     random_state=0
-    # )
-    # #randomly subsample the data:
-    # sublocspartial = sublocs.sample(frac=1/subsamplerate, random_state=0)
-    # clf.fit_predict(sublocspartial[['x','y']].values)
-        
-    # #create a figure:
-    # pxsizenm = 10;
-    # figxsize = int(np.ceil(np.ceil(localizations['x'].max() - localizations['x'].min())//pxsizenm))
-    # figysize = int(np.ceil(np.ceil(localizations['y'].max() - localizations['y'].min())//pxsizenm))
-    
-    # # Create grid of x and y coordinates
-    # x_coords, y_coords = np.meshgrid(np.arange(figxsize), np.arange(figysize))
-
-    # # Adjust cluster centers
-    # adjusted_cluster_centers = clf.cluster_centers_ - np.array([localizations['x'].min(), localizations['y'].min()])
-
-    # # Calculate distances
-    # distances = np.sum((adjusted_cluster_centers[:, np.newaxis, np.newaxis, :] - 
-    #                     np.stack([x_coords*pxsizenm, y_coords*pxsizenm], axis=-1))**2, axis=-1)
-
-    # # Find index of minimum distance
-    # closest_cluster = np.argmin(distances, axis=0)
-
-    # #Calculate NeNA for entries in each cluster
-    # neNAval = np.zeros(n_bins)
-    # for l in range(0,n_bins):
-    #     locs = sublocs[clf.labels_==l]
-    #     #Calculate NeNA of this cluster:
-    #     aF = runNeNA(locs,n_bins_nena=99,loggingShow=True,visualisation=False)
-    #     neNAval[l] = aF[0][0]
-
-    # # Assign values to the imagearray
-    # imagearray = neNAval[closest_cluster]
-    
-    # #Plot the figure
-    # plt.figure()
-    # #plot a 2d image:
-    # plt.imshow(imagearray, cmap='viridis', interpolation='nearest')
-    # plt.colorbar()
-    # plt.show()
-
-    #Required output: localizations
-    metadata = 'Information or so'
-    return localizations,metadata
+    return None
