@@ -320,10 +320,8 @@ class MyGUI(QMainWindow):
         
         
         helpMenu = menuBar.addMenu("Help")
-        quickStartMenu = helpMenu.addAction("Quick start")
+        quickStartMenu = helpMenu.addAction("Quick start / User Manual")
         quickStartMenu.triggered.connect(lambda: self.quickStartMenu())
-        documentationMenu = helpMenu.addAction("User manual")
-        documentationMenu.triggered.connect(lambda: self.documentationMenu())
         devManualMenu = helpMenu.addAction("Developer manual")
         devManualMenu.triggered.connect(lambda: self.devManualMenu())
         sciBGMenu = helpMenu.addAction("Scientific information")
@@ -338,7 +336,7 @@ class MyGUI(QMainWindow):
         try:
             quickStartWindow = utils.SmallWindow(self)
             QApplication.processEvents()
-            quickStartWindow.setWindowTitle('Quick start')
+            quickStartWindow.setWindowTitle('Quick start / User Manual')
             QApplication.processEvents()
             quickStartWindow.addMarkdown('README.md')
             QApplication.processEvents()

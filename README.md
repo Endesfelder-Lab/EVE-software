@@ -26,6 +26,7 @@ The software requires Python 3.9.18.
     git clone https://github.com/Endesfelder-Lab/Eve.git
     ```
 2. Install required python dependencies
+   
     #### With `virtualenv`
     Replace `PYTHON_PATH` by your python path, e.g. `/usr/bin` and `ENVIRONMENT_PATH` by the path to the virtual environments on your machine and follow the instructions below:
     ```bash
@@ -33,6 +34,7 @@ The software requires Python 3.9.18.
     source ENVIRONMENT_PATH/Eve/bin/activate
     pip install -r requirements.txt
     ```
+
     #### With `conda`
    Simply follow the instructions below, this will also install the correct python version on your system:
     ```bash
@@ -40,6 +42,7 @@ The software requires Python 3.9.18.
     conda env create -f environment_eve.yml
     conda activate Eve
     ```
+    
 3. Optional:<br>
 EVE can read and process event-based data in `.npy` and `.hdf5` format. Additionally the `.raw` format of [Prophesee](https://www.prophesee.ai/) can be used. If you have `.raw` data that you want to analyze you need to install the [Metavision SDK from Prophesee](https://docs.prophesee.ai/stable/installation/index.html) beforehand.
 ### Running EVE
