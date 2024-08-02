@@ -113,11 +113,13 @@ The function\_metadata function describes important metadata for the function(s)
   type (optional): the expected type of the input, options are [float, int, str, “fileLoc”]
 
   The “fileLoc” value indicates a file which can be found by the user
+
 ## <a name="_toc3"></a>Detailed information on input/output data of EVE
 All data has these two input variables:
 
 *settings*: named dictionary with (advanced) settings.
 *kwargs*: dictionary with named entries of the function (as defined in *\_\_function\_metadata\_\_()*)
+
 ### <a name="_toc4"></a>Candidate Finding
 **Function definition**
 <br>*def function(npy\_array, settings,\*\*kwargs):
@@ -134,6 +136,22 @@ return candidates, performance\_metadata*
 
 *performance\_metadata*: string with details on the performance. Will be stored in the metadata.txt output.
 
+#### Pseudo-code explaining the structure of candidates finding output
+```python
+candidates = {}
+for cluster in all_clusters:
+    clusterEvents = all_cluster_events(cluster_id==cluster)
+    candidates[cluster] = {}
+    candidates[cluster]['events'] = clusterEvents
+    candidates[cluster]['N_events'] = len(clusterEvents)
+    candidates[cluster]['cluster_size'] =...
+    [np.max(clusterEvents['y'])-np.min(clusterEvents['y']),...
+    np.max(clusterEvents['x'])-np.min(clusterEvents['x']),...
+    np.max(clusterEvents['t'])-np.min(clusterEvents['t'])]
+
+metadata = 'The file ran as expected!'
+```
+
 ### <a name="_toc5"></a>Candidate Fitting
 For the candidate fitting, the *\_\_function\_metadata\_\_()* needs to be expanded to provide information about the dist\_kwarg and time\_kwarg. These structures contain information about which XY distribution and Time distribution can be selected by the user. If these are not defined, an XYT-combined fitting is ran (which should result in XY ánd time fitting results). In an XY+Time distribution, the candidate fitting routine should only provide the XY fitting result, since the Time distribution is handled independently. Please look at the following examples for implementation details:
 
@@ -144,6 +162,23 @@ Example for XYT: Radial\_Symmetry – RadialSym3D.
 **Function definition**
 <br>*def function(candidate\_dic, settings,\*\*kwargs):
 return localizations, fit\_i o of metadata. Will be stored in the metadata.txt output.*
+
+#### Pseudo-code explaining the structure of candidate fitting output
+
+```python
+localizations = {}
+for i in np.unique(list(candidate_dic)):
+    localizations[i]={}
+    localizations[i]['x'] = np.mean(candidate_dic[i]['events']['x'])*float(settings['PixelSize_nm']['value']) #X position in nm
+    localizations[i]['y'] = np.mean(candidate_dic[i]['events']['y'])*float(settings['PixelSize_nm']['value']) #Y position in nm
+    localizations[i]['p'] = 1 #Polarisation: 0 or 1
+    localizations[i]['t'] = np.mean(candidate_dic[i]['events']['t'])/1000 #time in ms
+
+#Make a pd dataframe out of it - needs to be transposed
+localizations = pd.DataFrame(localizations).T
+
+metadata = 'The file ran as expected!'
+```
 
 ### <a name="_toc6"></a>Post-processing
 **Function definition**
@@ -168,6 +203,7 @@ return image, scale*
 **Output**
 <br>*image*: numpy.ndarray of pixel-values of the resulted image. Will be displayed in the ‘Visualization’ tab
 <br>*scale*: float value of pixel-to-micrometer size (e.g. value of 0.01 means 0.01 micrometer per pixel, or 10 nm per pixel). Used to set the scale bar in the ‘Visualization’ tab.
+
 ### <a name="_toc8"></a>Candidate preview
 **Function definition**
 <br>*def function(findingResult, fittingResult, previewEvents, figure, settings,\*\*kwargs):
