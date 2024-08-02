@@ -44,7 +44,7 @@ The software requires Python 3.9.18.
     ```
     
 3. Optional:<br>
-EVE can read and process event-based data in `.npy` and `.hdf5` format. Additionally the `.raw` format of [Prophesee](https://www.prophesee.ai/) can be used. If you have `.raw` data that you want to analyze you need to install the [Metavision SDK from Prophesee](https://docs.prophesee.ai/stable/installation/index.html) beforehand.
+EVE can read and process event-based data in `.npy` and `.hdf5` format. Additionally the `.raw` format of [Prophesee](https://www.prophesee.ai/) can be used. If you have `.raw` data that you want to analyze you need to install the [Metavision SDK from Prophesee](https://docs.prophesee.ai/stable/installation/index.html) beforehand. We recommend using `.hdf5` whenever possible, as this is a hierarchical data format optimized for efficient saving and reading of large files.
 ### Running EVE
 To open the graphical user interface and run EVE, first activate the python environment you created during the installation. Then run `GUI.py` with Python.
 ## Quick Start Guide
