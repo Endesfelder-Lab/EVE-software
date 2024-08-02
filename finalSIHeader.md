@@ -1,7 +1,7 @@
 ﻿
 <!--
 cd C:\Users\Koen Martens\Documents\GitHub\Eve
-pandoc "Supplementary File 2 Materials and Methods.md"ScientificBackgroundSI_20240802.md DeveloperInstructionsSI.md finalSIHeader.md -o SupplementaryInfo.pdf --bibliography=Markdown_info\citations.bib --csl=ieee.csl --citeproc --pdf-engine=xelatex -V geometry:margin=1in --css=Markdown_info\styles.css --top-level-division=chapter -H header.tex
+pandoc "Supplementary File 2 Materials and Methods.md" README.md ScientificBackgroundSI_20240802.md DeveloperInstructionsSI.md finalSIHeader.md -o SupplementaryInfo.pdf --bibliography=Markdown_info\citations.bib --csl=ieee.csl --citeproc --pdf-engine=xelatex -V geometry:margin=1in --css=Markdown_info\styles.css --top-level-division=chapter -H header.tex
 -->
 
 # Supplementary References
