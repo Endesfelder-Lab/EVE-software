@@ -4,11 +4,11 @@
 <!-- TOC -->
 - [Introduction](#introduction)
 - [Expandability of EVE](#expandability-of-eve)
-    - [Detailed information on input/output data of EVE](#detailed-information-on-inputoutput-data-of-eve)
-        - [Candidate Finding](#candidate-finding)
-            - [Pseudo-code explaining the structure of candidates finding output](#pseudo-code-explaining-the-structure-of-candidates-finding-output)
-        - [Candidate Fitting](#candidate-fitting)
-            - [Pseudo-code explaining the structure of candidate fitting output](#pseudo-code-explaining-the-structure-of-candidate-fitting-output)
+- [Detailed information on input/output data of EVE](#detailed-information-on-inputoutput-data-of-eve)
+     - [Candidate Finding](#candidate-finding)
+         - [Pseudo-code explaining the structure of candidates finding output](#pseudo-code-explaining-the-structure-of-candidates-finding-output)
+     - [Candidate Fitting](#candidate-fitting)
+         - [Pseudo-code explaining the structure of candidate fitting output](#pseudo-code-explaining-the-structure-of-candidate-fitting-output)
 
 <!-- /TOC -->
 
@@ -115,13 +115,13 @@ The function\_metadata function describes important metadata for the function(s)
 
   The “fileLoc” value indicates a file which can be found by the user
 
-## Detailed information on input/output data of EVE
+# Detailed information on input/output data of EVE
 All data has these two input variables:
 
 *settings*: named dictionary with (advanced) settings.  
 *kwargs*: dictionary with named entries of the function (as defined in *\_\_function\_metadata\_\_()*)
 
-### Candidate Finding
+## Candidate Finding
 **Function definition**  
 <br>*def function(npy\_array, settings,\*\*kwargs):
 return candidates, performance\_metadata*
@@ -137,7 +137,7 @@ return candidates, performance\_metadata*
 
 *performance\_metadata*: string with details on the performance. Will be stored in the metadata.txt output.
 
-#### Pseudo-code explaining the structure of candidates finding output
+### Pseudo-code explaining the structure of candidates finding output
 ```python
 candidates = {}
 for cluster in all_clusters:
@@ -153,7 +153,7 @@ for cluster in all_clusters:
 metadata = 'The file ran as expected!'
 ```
 
-### Candidate Fitting
+## Candidate Fitting
 For the candidate fitting, the *\_\_function\_metadata\_\_()* needs to be expanded to provide information about the dist\_kwarg and time\_kwarg. These structures contain information about which XY distribution and Time distribution can be selected by the user. If these are not defined, an XYT-combined fitting is ran (which should result in XY ánd time fitting results). In an XY+Time distribution, the candidate fitting routine should only provide the XY fitting result, since the Time distribution is handled independently. Please look at the following examples for implementation details:
 
 Example for XY+Time: GaussianFitting
@@ -164,7 +164,7 @@ Example for XYT: Radial\_Symmetry – RadialSym3D.
 <br>*def function(candidate\_dic, settings,\*\*kwargs):
 return localizations, fit\_i o of metadata. Will be stored in the metadata.txt output.*
 
-#### Pseudo-code explaining the structure of candidate fitting output
+### Pseudo-code explaining the structure of candidate fitting output
 
 ```python
 <!-- TOC -->
@@ -186,7 +186,7 @@ return localizations, fit\_i o of metadata. Will be stored in the metadata.txt o
 
 <!-- /TOC -->*: string with info of metadata. Will be shown in the Run info GUI tab.
 
-### Visualization
+## Visualization
 **Function definition**  
 <br>*def function(resultArray, settings,\*\*kwargs):
 return image, scale*  
@@ -198,7 +198,7 @@ return image, scale*
 <br>*image*: numpy.ndarray of pixel-values of the resulted image. Will be displayed in the ‘Visualization’ tab  
 <br>*scale*: float value of pixel-to-micrometer size (e.g. value of 0.01 means 0.01 micrometer per pixel, or 10 nm per pixel). Used to set the scale bar in the ‘Visualization’ tab.  
 
-### Candidate preview
+## Candidate preview
 **Function definition**  
 <br>*def function(findingResult, fittingResult, previewEvents, figure, settings,\*\*kwargs):
 return None*
@@ -212,7 +212,7 @@ return None*
 **Output**  
 <br>*None*. Expected that *figure* is updated properly.
 
-### Event distributions
+## Event distributions
 These Event distributions follow a different expandability method, and cannot be adapted from the AppData folder, but only from changing the EventDistributions/eventDistributions.py file in the EVE installation folder.
 
 Each Event distribution is defined by a class (e.g. *class Hist1d\_t()* ). These classes should have a *\_\_call\_\_(self, events, \*\*kwargs)* function, which should return the wanted distribution and bin edge positions.
