@@ -67,6 +67,9 @@ def subfunction_exists(module_name, subfunction_name):
     
 # Return all functions that are found in a specific directory
 def functionNamesFromDir(dirname):
+    """ 
+    Return all functions that are found in a specific directory which have the correct function metadata
+    """
     #initialise empty array
     functionnamearr = []
     def addFilesToAbsolutePath(functionnamearr,absolute_path):
@@ -129,7 +132,7 @@ def reqKwargsFromFunction(functionname):
 def displayNameFromKwarg(functionname,name):
     #Get all kwarg info
     allkwarginfo = kwargsFromFunction(functionname)
-    
+    displayName = name
     #Look through optional args first, then req. kwargs (so that req. kwargs have priority in case something weirdi s happening):
     for optOrReq in range(1,-1,-1):
     
@@ -517,7 +520,7 @@ def defaultValueFromKwarg(functionname,kwargname):
     return defaultEntry
 
 
-def displayNamesFromFunctionNames(functionName, polval):
+def displayNamesFromFunctionNames(functionName, polval=''):
     displaynames = []
     functionName_to_displayName_map = []
     for function in functionName:
@@ -725,6 +728,46 @@ def changeLayout_choice(curr_layout,className,displayNameToFunctionNameMap,paren
                         
                         #Add an listener when the pushButton is pressed
                         line_edit_lookup.clicked.connect(lambda text2,line_edit_change_objName = line_edit,text="Select file",filter="*.*": lineEditFileLookup(line_edit_change_objName, text, filter,parent=parent))
+                elif type(typeFromKwarg(current_selected_function,reqKwargs[k])) == str and typeFromKwarg(current_selected_function,reqKwargs[k])[0:9] == 'dropDown(':
+                    centerText = typeFromKwarg(current_selected_function,reqKwargs[k])[9:-1]
+                    if centerText[0:2] == '__' and centerText[-2:] == '__':
+                        if centerText == '__locListHeaders__':
+                            try:
+                                dropDownOptions = parent.parent.data['FittingResult'][0].columns.tolist()
+                            except:
+                                dropDownOptions = ['Error in setting dropdown values (locListHeaders)']
+                    else:
+                        dropDownOptions = centerText.split(',')
+                    
+                    
+                    #Delete old dropdown:
+                    removeWidget(curr_layout,f"ComboBox#{current_selected_function}#{reqKwargs[k]}#{current_selected_polarity}")
+                    #allow the layout to actually process a deletelater event:
+                    QApplication.processEvents()
+                    
+                    #We want to add a dropdown!
+                    #Create a new qhboxlayout:
+                    hor_boxLayout = QHBoxLayout()
+                    #Add a line_edit to this:
+                    dropDown = QComboBox()
+                    dropDown.setObjectName(f"ComboBox#{current_selected_function}#{reqKwargs[k]}#{current_selected_polarity}")
+                    
+                    
+                    #Add the options to the dropdown:
+                    for option in dropDownOptions:
+                        dropDown.addItem(option)
+                    defaultValue = defaultValueFromKwarg(current_selected_function,reqKwargs[k])
+                    hor_boxLayout.addWidget(dropDown)
+                    
+                    #Actually placing it in the layout - this is different than other methods, in that it will be removed + re-added if it already exists.
+                    checkAndShowWidget(curr_layout,dropDown.objectName())
+                    if checkAndShowWidget(curr_layout,dropDown.objectName()) == False:
+                        dropDown.setToolTip(infoFromMetadata(current_selected_function,specificKwarg=reqKwargs[k]))
+                        if defaultValue is not None:
+                            index = dropDown.findText(str(defaultValue))
+                            if index >= 0:
+                                dropDown.setCurrentIndex(index)
+                        curr_layout.addLayout(hor_boxLayout,2+((k+labelposoffset))%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+1)
                         
                 else: #'normal' type - int, float, string, whatever
                     #Creating a line-edit...
@@ -825,7 +868,6 @@ def updateDistKwargTooltip(line_edit,parent):
     if index > -1:
         line_edit.setToolTip(parent.distKwarg_descriptions[index])
 
-
 def kwargValueInputChanged(line_edit):
     #Get the function name
     function = line_edit.objectName().split("#")[1]
@@ -869,6 +911,34 @@ def setLineEditStyle(line_edit,type='Normal'):
         line_edit.setStyleSheet("border: 1px  solid #D5D5E5;")
     elif type == 'Warning':
         line_edit.setStyleSheet("border: 1px solid red;")
+
+def removeWidget(layout,widgetName):
+    # Iterate over the layout's items
+    for index in range(layout.count()):
+        item = layout.itemAt(index)
+        # Check if the item is a widget
+        if item.widget() is not None:
+            widget = item.widget()
+            # Check if the widget has the desired name
+            if widget.objectName() == widgetName:
+                # Widget already exists, delete it
+                widget.setParent(None)
+                widget.setObjectName(None)
+                widget.deleteLater()
+                return
+        else:
+            for index2 in range(item.count()):
+                item_sub = item.itemAt(index2)
+                # Check if the item is a widget
+                if item_sub.widget() is not None:
+                    widget = item_sub.widget()
+                    # Check if the widget has the desired name
+                    if widget.objectName() == widgetName:
+                        # Widget already exists, delete it
+                        widget.setParent(None)
+                        widget.setObjectName(None)
+                        widget.deleteLater()
+                        return
 
 def checkAndShowWidget(layout, widgetName):
     # Iterate over the layout's items
@@ -941,7 +1011,7 @@ def lineEditFileLookup(line_edit_objName, text, filter,parent=None):
     line_edit_objName.setText(file_path)
         
 def generalFileSearchButtonAction(parent=None,text='Select File',filter='*.txt',parentFolder=""):
-    file_path, _ = QFileDialog.getOpenFileName(parent,text,parentFolder,filter=filter)
+    file_path, _ = QFileDialog.getSaveFileName(parent,text,parentFolder,filter=filter)
     return file_path
 
     
@@ -1288,7 +1358,7 @@ class SmallWindow(QMainWindow):
         except:
             folderName = ""
         
-        file_name, _ = QFileDialog.getOpenFileName(None, "Open File", folderName, fileArgs, options=options)
+        file_name, _ = QFileDialog.getSaveFileName(None, "Open File", folderName, fileArgs, options=options)
         if file_name:
             self.fileLocationLineEdit.setText(file_name)
         
@@ -1342,6 +1412,19 @@ class SmallWindow(QMainWindow):
         self.centralWidget().layout().addLayout(layout)
         return self.textEdit
     
+    def addMultiLineTextEdit(self,labelText = "Text edit:", preFilledText = ""):
+        #Create a horizontal box layout:
+        layout = QHBoxLayout()
+        #add a label and text edit:
+        self.textEdit = QTextEdit()
+        self.textEdit.setText(preFilledText)
+        #Add the label and text edit to the layout:
+        layout.addWidget(QLabel(labelText))
+        layout.addWidget(self.textEdit)
+        #Add the layout to the central widget:
+        self.centralWidget().layout().addLayout(layout)
+        return self.textEdit
+    
     #Add a file information label/text/button:
     def addFileLocation(self, labelText="File location:", textAddPrePeriod = ""):
         #Create a horizontal box layout:
@@ -1369,7 +1452,7 @@ class SmallWindow(QMainWindow):
 
 
 
-#DEPRACATED
+#For CLI
 def timeSliceFromHDF(dataLocation,requested_start_time_ms = 0,requested_end_time_ms=1000,howOftenCheckHdfTime = 100000,loggingBool=False,curr_chunk = 0):
     """Function that returns all events between start/end time in a HDF5 file. Extremely sped-up since the HDF5 file is time-sorted, and only checked every 100k (howOftenCheckHdfTime) events.
 
@@ -1441,3 +1524,27 @@ def timeSliceFromHDF(dataLocation,requested_start_time_ms = 0,requested_end_time
 
     #Return the events
     return events_output,curr_chunk
+
+def printInformationFromFunction(functionName):
+    """ 
+    Provide information about a function in the terminal.
+    """
+    helpString = (helpStringFromFunction(functionName)
+    )
+    kwargsInfo = (kwargsFromFunction(functionName))
+    reqKwargs = reqKwargsFromFunction(functionName)
+    optKwargs = optKwargsFromFunction(functionName)
+    displayNamev = displayNamesFromFunctionNames([functionName],'')
+
+    InfoString = ''
+    InfoString += f"\033[1m{displayNamev[0][0]}\033[0m\n"
+    InfoString += f"\033[31mHelp info\033[0m \n\033[33m{helpString}\033[0m\n"
+    if len(reqKwargs) > 0:
+        InfoString += f"\033[31mRequired parameters\033[0m\n"
+        for i in range(len(reqKwargs)):
+            InfoString+=f"\033[33m{displayNameFromKwarg(functionName,reqKwargs[i])} [{reqKwargs[i]}]: \n\t{infoFromMetadata(functionName,specificKwarg=reqKwargs[i])} \n\tDefault value: {defaultValueFromKwarg(functionName,kwargname=reqKwargs[i])}\n\033[0m"
+    if len(optKwargs) > 0:
+        InfoString += f"\033[31mOptional parameters\033[0m\n"
+        for i in range(len(optKwargs)):
+            InfoString+=f"\033[33m{displayNameFromKwarg(functionName,optKwargs[i])} [{optKwargs[i]}]: \n\t{infoFromMetadata(functionName,specificKwarg=optKwargs[i])} \n\tDefault value: {defaultValueFromKwarg(functionName,kwargname=optKwargs[i])}\n\033[0m"
+    return InfoString

@@ -87,6 +87,7 @@ except ImportError:
 # Main script
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
+    
 class MyGUI(QMainWindow):
 #GUI class - needs to be initialised and is initalised in gui.py
     def __init__(self):
@@ -262,6 +263,7 @@ class MyGUI(QMainWindow):
 
         self.uselessWarningSupression()
 
+        
         logging.info('Initialisation complete.')
 
     def uselessWarningSupression(self):
@@ -315,6 +317,68 @@ class MyGUI(QMainWindow):
             utilActions[i] = utilsMenu.addAction(utilsDisplayNames[0][i])
             #Run "function(self)" when triggered - passing self to the function 
             utilActions[i].triggered.connect(lambda _, s=self, func=utilsFunction: eval(func+'(s)'))
+        
+        
+        helpMenu = menuBar.addMenu("Help")
+        quickStartMenu = helpMenu.addAction("Quick start")
+        quickStartMenu.triggered.connect(lambda: self.quickStartMenu())
+        documentationMenu = helpMenu.addAction("User manual")
+        documentationMenu.triggered.connect(lambda: self.documentationMenu())
+        devManualMenu = helpMenu.addAction("Developer manual")
+        devManualMenu.triggered.connect(lambda: self.devManualMenu())
+        aboutMenu = helpMenu.addAction("About...")
+        aboutMenu.triggered.connect(lambda: self.aboutMenu())
+
+    def quickStartMenu(self):
+        """
+        Shows the README.md file
+        """
+        quickStartWindow = utils.SmallWindow(self)
+        quickStartWindow.setWindowTitle('Quick start')
+        newlayout = QVBoxLayout()
+        from PyQt5.QtWidgets import QTextBrowser
+        import markdown
+        markdownViewer = QTextBrowser()
+        quickStartWindow.setFixedHeight(800)
+        markdownViewer.setFixedWidth(1100)
+        md_file = 'README.md'
+        with open(md_file, 'r', encoding='utf-8') as file:
+            md_content = file.read()
+
+        # Convert Markdown to HTML
+        html_content = markdown.markdown(md_content,output_format="html5", safe_mode='escape')
+        html_content = html_content.replace("\n","<br>")
+        html_content = html_content.replace("<p>","<br>")
+        markdownViewer.setHtml(html_content)
+        newlayout.addWidget(markdownViewer)
+        quickStartWindow.centralWidget().layout().addLayout(newlayout)
+        quickStartWindow.show()
+        
+    def documentationMenu(self):
+        """
+        Opens the user manual .pdf externally
+        """
+        from PyQt5.QtGui import QDesktopServices
+        from PyQt5.QtCore import QUrl
+        url = QUrl.fromLocalFile('UserManual.pdf')
+        QDesktopServices.openUrl(url)
+    def devManualMenu(self):
+        """
+        Opens the developer manual .pdf externally
+        """
+        from PyQt5.QtGui import QDesktopServices
+        from PyQt5.QtCore import QUrl
+        url = QUrl.fromLocalFile('DeveloperManual.pdf')
+        QDesktopServices.openUrl(url)
+        
+    def aboutMenu(self):
+        """
+        Shows a small about-window
+        """
+        aboutWindow = utils.SmallWindow(self)
+        aboutWindow.setWindowTitle('About')
+        aboutWindow.addDescription('<b>EVE is created by</b> <br>Laura Weber, Koen J.A. Martens, Ulrike Endesfelder<br>Institute of Microbiology and Biotechnology<br>University of Bonn<br><br><b>Contact</b><br>koenjamartens@gmail.com<br>endesfelder@uni-bonn.de<br><br><b>Cite</b> <br>Please cite EVE as [TBD]')
+        aboutWindow.show()
 
     def changeAppearanceColor(self):
         #Function that changes the appearance color
@@ -788,7 +852,8 @@ class MyGUI(QMainWindow):
         #Populate with a start time and end time inputs:
         self.previewLayout.layout().addWidget(QLabel("Start time (ms):"), 0, 0, 1, 1)
         self.previewLayout.layout().addWidget(QLabel("Duration (ms):"), 0, 1, 1, 1)
-        self.previewLayout.layout().addWidget(QLabel("Display frame time (ms):"), 0,2,1,2)
+        self.previewLayout.layout().addWidget(QLabel("Display frame time (ms):"), 0,2,1,1)
+        self.previewLayout.layout().addWidget(QLabel("Display event type:"), 0,3,1,1)
         #Also the QLineEdits that have useful names:
         self.preview_startTLineEdit = QLineEdit()
         self.preview_startTLineEdit.setObjectName('preview_startTLineEdit')
@@ -803,8 +868,16 @@ class MyGUI(QMainWindow):
         #And for display frame time:
         self.preview_displayFrameTime = QLineEdit()
         self.preview_displayFrameTime.setObjectName('preview_displayFrameTime')
-        self.previewLayout.layout().addWidget(self.preview_displayFrameTime, 1, 2, 1, 2)
+        self.previewLayout.layout().addWidget(self.preview_displayFrameTime, 1, 2, 1, 1)
         self.preview_displayFrameTime.setText("100")
+        #And for display event type:
+        self.preview_eventType = QComboBox()
+        self.preview_eventType.setObjectName('preview_eventType')
+        self.previewLayout.layout().addWidget(self.preview_eventType, 1, 3, 1, 1)
+        self.preview_eventType.addItem("All events")
+        self.preview_eventType.addItem("Positive only")
+        self.preview_eventType.addItem("Negative only")
+        self.preview_eventType.setCurrentIndex(0)
 
         #Also give start/end x/y values:
         self.previewLayout.layout().addWidget(QLabel("Min X (px):"), 2, 0)
@@ -833,11 +906,11 @@ class MyGUI(QMainWindow):
         self.buttonPreview = QPushButton("Preview finding/fitting")
         self.buttonPreview.setToolTip("Perform the finding/fitting routines on the subset determined by the Preview groupbox, and visualise it in the Preview run tab.")
         #Add a button press event:
-        self.buttonPreview.clicked.connect(lambda: self.previewRun((self.preview_startTLineEdit.text(),
-                self.preview_durationTLineEdit.text()),
-                (self.preview_minXLineEdit.text(),self.preview_maxXLineEdit.text(),
-                self.preview_minYLineEdit.text(),self.preview_maxYLineEdit.text()),
-                float(self.preview_displayFrameTime.text())))
+        self.buttonPreview.clicked.connect(lambda: self.previewRun(
+            (self.preview_startTLineEdit.text(), self.preview_durationTLineEdit.text()),
+            (self.preview_minXLineEdit.text(),self.preview_maxXLineEdit.text(),
+            self.preview_minYLineEdit.text(),self.preview_maxYLineEdit.text()),
+            float(self.preview_displayFrameTime.text()),eventType=self.preview_eventType.currentText()))
         #Add the button to the layout:
         self.previewLayout.layout().addWidget(self.buttonPreview, 4, 0, 1, 2)
         
@@ -850,7 +923,7 @@ class MyGUI(QMainWindow):
                 self.preview_durationTLineEdit.text()),
                 (self.preview_minXLineEdit.text(),self.preview_maxXLineEdit.text(),
                 self.preview_minYLineEdit.text(),self.preview_maxYLineEdit.text()),
-                float(self.preview_displayFrameTime.text())))
+                float(self.preview_displayFrameTime.text()),eventType=self.preview_eventType.currentText()))
         #Add the button to the layout:
         self.previewLayout.layout().addWidget(self.buttonEventsPreview, 4, 2, 1 ,2)
 
@@ -1586,7 +1659,6 @@ class MyGUI(QMainWindow):
         self.data['AveragePSFneg'] = pd.DataFrame(columns=['x', 'y', 't', 'p'])
         self.data['AveragePSFmix'] = pd.DataFrame(columns=['x', 'y', 't', 'p'])
         
-        # self.updateGUIafterNewResults(error)
         return
 
     def run_processing(self,error=None):
@@ -1596,6 +1668,7 @@ class MyGUI(QMainWindow):
         logging.info("--------------- Full Run Starting ---------------")
         logging.info("")
         logging.info("")
+        
         
         self.analysis_progressbar.setValue(0)
         #Reset the abort to allow for aborting
@@ -1613,7 +1686,6 @@ class MyGUI(QMainWindow):
 
         # reset previewEvents array, every time run is pressed
         self.previewEvents = []
-        
         
         #Check if the input is a .hdf5, .npy or .raw:
         if self.dataLocationInput.text().endswith(('.hdf5', '.npy', '.raw')):
@@ -1714,6 +1786,7 @@ class MyGUI(QMainWindow):
                     logging.error("Error encountered in file "+fullpath+", continuing with other files")
             self.updateProgressBar(overwriteValue = 100)
             logging.info("Fully completed all files in folder " + self.dataLocationInput.text())
+            self.updateGUIafterNewResults()
     
     def run_preview_i(self,error=None):
         #Get polarity info:
@@ -1773,7 +1846,7 @@ class MyGUI(QMainWindow):
         self.data['AveragePSFneg'] = pd.DataFrame(columns=['x', 'y', 't', 'p'])
         self.data['AveragePSFmix'] = pd.DataFrame(columns=['x', 'y', 't', 'p'])
     
-    def previewEventsCall(self,timeStretch=(0,1000),xyStretch=(0,0,0,0),frameTime=100):
+    def previewEventsCall(self,timeStretch=(0,1000),xyStretch=(0,0,0,0),frameTime=100,eventType="All events"):
         """
         Generates the preview the events in the time/xy stretch.
 
@@ -1781,6 +1854,7 @@ class MyGUI(QMainWindow):
             timeStretch (tuple): A tuple containing the start and end times for the preview.
             xyStretch (tuple): A tuple containing the minimum and maximum x and y coordinates for the preview.
             frametime (int): The frame time in ms.
+            eventType (str): "All events", "Positive only", "Negative only"
 
         Returns:
             None
@@ -1800,17 +1874,28 @@ class MyGUI(QMainWindow):
             #constrict to correct time:
             previewEvents = self.filterEvents_npy_t(previewEvents,timeStretch)
         
+        #Remove hotpixels
+        hotpixelarray = eval("["+self.globalSettings['HotPixelIndexes']['value']+"]")
+        previewEvents = utils.removeHotPixelEvents(previewEvents,hotpixelarray)
+        
         #Check if we have at least 1 event:
-        if len(previewEvents) > 0:
-            #Log the nr of events found:
-            logging.info(f"Preview - Found {len(previewEvents)} events in the chosen time frame.")
-        else:
+        if len(previewEvents) <= 0:
+        #     #Log the nr of events found:
+        #     logging.info(f"Preview - Found {len(previewEvents)} events in the chosen time frame.")
+        # else:
             logging.error("Preview - No events found in the chosen time frame.")
             return
         
         #Load the events in self memory and filter on XY
         self.previewEvents = previewEvents
         self.previewEvents = self.filterEvents_xy(self.previewEvents,xyStretch)
+        
+        if eventType == "Positive only":
+            self.previewEvents = self.filterEvents_npy_p(self.previewEvents,1)
+        elif eventType == "Negative only":
+            self.previewEvents = self.filterEvents_npy_p(self.previewEvents,0)
+        
+        logging.info(f"Preview - Displaying {len(self.previewEvents)} events ({eventType}) in the chosen time frame, no finding/fitting.")
         
         #Update the preview panel and localization list:
         self.updateShowPreview(previewEvents=self.previewEvents,timeStretch=timeStretch,frameTime=frameTime)
@@ -1819,13 +1904,15 @@ class MyGUI(QMainWindow):
         #Switch the user to the Preview tab
         utils.changeTab(self, text='Preview run')
     
-    def previewRun(self,timeStretch=(0,1000),xyStretch=(0,0,0,0),frameTime=100):
+    def previewRun(self,timeStretch=(0,1000),xyStretch=(0,0,0,0),frameTime=100,eventType="All events"):
         """
         Generates the preview of a run analysis.
 
         Parameters:
             timeStretch (tuple): A tuple containing the start and end times for the preview.
             xyStretch (tuple): A tuple containing the minimum and maximum x and y coordinates for the preview.
+            frametime (int): The frame time in ms.
+            eventType (str): "All events", "Positive only", "Negative only"
 
         Returns:
             None
@@ -1909,13 +1996,16 @@ class MyGUI(QMainWindow):
             #constrict to correct time:
             previewEvents = self.filterEvents_npy_t(previewEvents,timeStretch)
         
+        #Remove hotpixels
+        hotpixelarray = eval("["+self.globalSettings['HotPixelIndexes']['value']+"]")
+        previewEvents = utils.removeHotPixelEvents(previewEvents,hotpixelarray)
         
         self.updateProgressBar(overwriteValue = 95)
         #Check if we have at least 1 event:
-        if len(previewEvents) > 0:
-            #Log the nr of events found:
-            logging.info(f"Preview - Found {len(previewEvents)} events in the chosen time frame.")
-        else:
+        if len(previewEvents) <= 0:
+        #     #Log the nr of events found:
+        #     logging.info(f"Preview - Found {len(previewEvents)} events in the chosen time frame.")
+        # else:
             logging.error("Preview - No events found in the chosen time frame.")
             return
         
@@ -1923,11 +2013,19 @@ class MyGUI(QMainWindow):
         self.previewEvents = previewEvents
         self.previewEvents = self.filterEvents_xy(self.previewEvents,xyStretch)
         
+        if eventType == "Positive only":
+            self.previewEvents = self.filterEvents_npy_p(self.previewEvents,1)
+        elif eventType == "Negative only":
+            self.previewEvents = self.filterEvents_npy_p(self.previewEvents,0)
+        
+        logging.info(f"Preview - Displaying {len(self.previewEvents)} events ({eventType}) in the chosen time frame.")
+        
         #Update the preview panel and localization list:
         self.updateShowPreview(previewEvents=self.previewEvents,timeStretch=timeStretch,frameTime=frameTime)
         self.updateLocList()
         
         self.updateProgressBar(overwriteValue = 100)
+        self.updateGUIafterNewResults()
         #Switch the user to the Preview tab
         utils.changeTab(self, text='Preview run')
 
@@ -1971,12 +2069,6 @@ class MyGUI(QMainWindow):
         self.globalSettings = self.globalSettingsBeforeRun
         self.updateProgressBar(overwriteValue = 100)
         logging.info('Analysis completed!')
-
-    def updateGUIafterNewResults(self,error=None):
-        if error == None:
-            self.updateLocList()
-        # else:
-        #     self.open_critical_warning(error)
 
     def checkPolarity(self,npyData):
         #Ensure that polarity is 0/1, not -1/1. If it is -1/1, convert to 0/1. Otherwise, give error
@@ -2035,7 +2127,8 @@ class MyGUI(QMainWindow):
             FindingResultFileName = self.data['FindingMethod'][self.data['FindingMethod'].index('File_Location="')+len('File_Location="'):self.data['FindingMethod'].index('")')]
             storeLocationPartial = FindingResultFileName[:-7]
         else:
-            storeLocationPartial = self.currentFileInfo['CurrentFileLoc'][:-4]
+            #Find the last . and remove everything after it - i.e. removing the extension:
+            storeLocationPartial = self.currentFileInfo['CurrentFileLoc'][:self.currentFileInfo['CurrentFileLoc'].rfind('.')]
         return storeLocationPartial
 
     def storeLocalization(self,storeLocation,localizations,outputType='thunderstorm'):
@@ -2155,8 +2248,9 @@ class MyGUI(QMainWindow):
         if self.globalSettings['StoreFileMetadata']['value'] > 0 :
             logging.debug('Attempting to create and store file metadata')
             try:
-                metadatastring = dedent(f"""\
+                metadatastring = (f"""\
                 Metadata information for file {self.currentFileInfo['CurrentFileLoc']}
+                Analysis routine started at {self.storeNameDateTime[0:4]}-{self.storeNameDateTime[4:6]}-{self.storeNameDateTime[6:8]} {self.storeNameDateTime[9:11]}:{self.storeNameDateTime[11:13]}:{self.storeNameDateTime[13:15]}
                 Analysis routine finished at {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
                 
                 {self.data['MetaDataOutput']}
@@ -2168,14 +2262,16 @@ class MyGUI(QMainWindow):
                 ---- Additional custom output ----
                 
                 Custom output from finding function:\n""")\
-                + f"""{self.data['FindingResult'][1]}\n\n""" + dedent(f"""\
+                + f"""{self.data['FindingResult'][1]}\n\n""" + (f"""\
 
                 Custom output from fitting function:\n""")\
                 + f"""{self.data['FittingResult'][1]}
                 """
                 #Store this metadatastring:
                 with open(self.getStoreLocationPartial()+'_RunInfo_'+self.storeNameDateTime+'.txt', 'w') as f:
-                    f.write(dedent(metadatastring))
+                    metadatastringb = dedent(metadatastring)
+                    metadatastringb = metadatastringb.replace('                ', '')
+                    f.write(dedent(metadatastringb))
                 logging.info('File metadata created and stored')
             except:
                 logging.error('Error in creating file metadata, not stored')
@@ -2593,8 +2689,10 @@ class FindingFittingAnalysis():
                 if isinstance(widget,QComboBox) and widget.isVisibleTo(GUIinfo.tab_processing) and className in widget.objectName():
                     if className == 'Finding':
                         methodName_method = utils.functionNameFromDisplayName(widget.currentText(),getattr(GUIinfo,f"Finding_functionNameToDisplayNameMapping{polarity}"))
+                        break
                     elif className == 'Fitting':
                         methodName_method = utils.functionNameFromDisplayName(widget.currentText(),getattr(GUIinfo,f"Fitting_functionNameToDisplayNameMapping{polarity}"))
+                        break
 
         #Function call: get the to-be-evaluated text out, giving the methodName, method KwargNames, methodKwargValues, and 'function Type (i.e. cellSegmentScripts, etc)' - do the same with scoring as with method
         if methodName_method != '':
@@ -2986,7 +3084,8 @@ class FindingAnalysis(FindingFittingAnalysis):
                             chunking_limits = np.multiply(chunking_limits,1000) #ms to us
                         
                             #Loop over all candidates:
-                            for k in reversed(range(len(origfindingResults[0]))):
+                            origfindingResultsKeyCopy = list(origfindingResults[0].keys())
+                            for k in reversed(origfindingResultsKeyCopy):#reversed(range(len(origfindingResults[0]))):
                                 candidate = origfindingResults[0][k]
                                 if self.filter_finding_on_chunking(candidate,chunking_limits) == False:
                                     #pop it
@@ -3502,6 +3601,9 @@ class AdvancedSettingsWindow(QMainWindow):
         with open(json_file_path, "w") as json_file:
             json.dump(serialized_settings, json_file)
 
+        #Also update the global settings (required if called from outside the window, i.e. hotpixel removal utility)
+        self.load_global_settings()
+        
         #Close after saving
         logging.info('Global settings saved!')
         self.close()
@@ -3795,22 +3897,6 @@ class VisualisationNapari(QWidget):
         #And add a callback to this:
         button.clicked.connect(lambda text, parent=parent: self.visualise_callback(parent))
         
-        #Create a Hbox:
-        self.visualisation_hbox_resetViews = QHBoxLayout()
-        self.visualisation_hbox_resetViews.setObjectName("VisualisationResetViewKEEP")
-        #Create a button to reset zoom/position:
-        button = QPushButton("Reset View", self)
-        button.setObjectName("VisualisationResetViewButtonKEEP")
-        button.clicked.connect(lambda text, parent=parent: self.reset_visualisation_view(parent, partialOrFull='Partial'))
-        self.visualisation_hbox_resetViews.addWidget(button)
-        #Create a button to reset zoom/position:
-        button = QPushButton("Reset entire visualisation", self)
-        button.setObjectName("VisualisationResetViewFullButtonKEEP")
-        button.clicked.connect(lambda text, parent=parent: self.reset_visualisation_view(parent, partialOrFull='Full'))
-        self.visualisation_hbox_resetViews.addWidget(button)
-        #Add the hbox to the groupbox
-        self.VisualisationGroupbox.layout().addLayout(self.visualisation_hbox_resetViews,100,0,1,6)
-        
 
         #Add the groupbox to the mainlayout
         self.mainlayout.layout().addWidget(self.VisualisationGroupbox,1,1,1,2)
@@ -3818,16 +3904,76 @@ class VisualisationNapari(QWidget):
         #------------End of GUI dynamic layout -----------------
 
 
+        #Create a new 'this is the events under the cursor' textbox
+        self.underCursorInfo = QLabel("")
+        self.mainlayout.addWidget(self.underCursorInfo,2,2,1,1)
+        
         # Create a napari viewer
         self.napariviewer = Viewer(show=False)
         #Add a napariViewer to the layout
         self.viewer = QtViewer(self.napariviewer)
         self.viewer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.mainlayout.addWidget(self.viewer.controls,2,1,1,1)
+        
+        qvbox = QVBoxLayout()
+        qvbox.addWidget(self.viewer.controls)
+        
+        #Create a button to reset zoom/position:
+        button = QPushButton("Reset View", self)
+        button.setObjectName("VisualisationResetViewButtonKEEP")
+        button.clicked.connect(lambda text, parent=parent: self.reset_visualisation_view(parent, partialOrFull='Partial'))
+        qvbox.addWidget(button)
+        #Create a button to reset zoom/position:
+        button = QPushButton("Reset entire visualisation", self)
+        button.setObjectName("VisualisationResetViewFullButtonKEEP")
+        button.clicked.connect(lambda text, parent=parent: self.reset_visualisation_view(parent, partialOrFull='Full'))
+        qvbox.addWidget(button)
+        #add a vertical stretch:
+        qvbox.addStretch()
+        
+        self.mainlayout.addLayout(qvbox,3,1,1,1)
         self.viewer.controls.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-        self.mainlayout.addWidget(self.viewer,2,2,1,1)
+        self.mainlayout.addWidget(self.viewer,3,2,1,1)
+        
+        self.timeOfLastCursorUpdate = 0
+        self.underCursorInfoDF = {}
+        self.underCursorInfoDF['current_pixel'] = {}
+        self.viewer.on_mouse_move = lambda event: self.currently_under_cursor(event)
 
         logging.info('VisualisationNapari init')
+
+    def currently_under_cursor(self,event):
+        """
+        Class that determines which pixel is currently under the cursor. The main task of this function is to go from cavnas position to image position.
+
+        Args:
+            event (Event): general Vispy event, containing, amongst others, the xy position of the curosr in the canvas.
+        """
+        #Vispy mouse position
+
+        timeBetweenCursorUpdates = 0.0 #in seconds
+        if self.timeOfLastCursorUpdate == 0 or (time.time() - self.timeOfLastCursorUpdate) >= timeBetweenCursorUpdates:
+            #We get the canvas size/position in image pixel units
+            canvas_size_in_px_units = event.source.size/self.viewer.camera.zoom
+            # camera_coords = [self.napariviewer.camera.center[2]+.5, self.napariviewer.camera.center[1]+.5]
+            camera_coords = [self.viewer.camera.center[2], self.viewer.camera.center[1]]
+            canvas_pos = np.vstack([camera_coords-(canvas_size_in_px_units/2),camera_coords+(canvas_size_in_px_units/2)])
+            #And we can normalize the cursor position to image pixels
+            cursor_unit_norm = event._pos/event.source.size
+            #Thus, we can find the position in um - at the moment we simply calculate this
+            pos_nm=np.zeros((2,))
+            pos_nm[0] = (cursor_unit_norm[0]*canvas_size_in_px_units[0]+canvas_pos[0][0])*1000
+            
+            pos_nm[1] = (cursor_unit_norm[1]*canvas_size_in_px_units[1]+canvas_pos[0][1])*1000
+
+            #Yep we're doing this.
+            GUIobject = self.parent().parent().parent().parent().parent().parent().parent().parent()
+            pxsize = float(GUIobject.globalSettings['PixelSize_nm']['value'])
+            
+            pos_EBSpx = np.array(np.round(pos_nm/pxsize)).astype(int)
+            
+            #Set the text
+            self.underCursorInfo.setText(f"Position: {int(pos_nm[0])},{int(pos_nm[1])} nm, EBS px: {pos_EBSpx[0]}, {pos_EBSpx[1]}")
+            self.timeOfLastCursorUpdate = time.time()
 
     def reset_visualisation_view(self,parent,partialOrFull='Partial'):
         logging.info('Resetting visualisation view')
@@ -4029,14 +4175,21 @@ class PostProcessing(QWidget):
         self.postProcessingHistory[current_postprocessinghistoryid][2] = [len(self.postProcessingHistory[current_postprocessinghistoryid][0]),-1]
 
         postProcessingResult = eval(FunctionEvalText)
-        self.parent.data['FittingResult'][0] = postProcessingResult[0]
+        
+        if postProcessingResult is not None:
+            if len(self.parent.data['FittingResult']) > 1:
+                metadata = self.parent.data['FittingResult'][1] + postProcessingResult[1]
+            else:
+                metadata = postProcessingResult[1]
+            # self.parent.data['FittingResult'][0] = postProcessingResult[0]
+            self.parent.data['FittingResult'] = (postProcessingResult[0],) + (metadata,)
+            
+            self.postProcessingHistory[current_postprocessinghistoryid][2][1] = len(self.parent.data['FittingResult'][0])
 
-        self.postProcessingHistory[current_postprocessinghistoryid][2][1] = len(self.parent.data['FittingResult'][0])
+            #Update the history grid-widget
+            self.PostProcessingHistoryGrid.addHistoryEntryToGrid(current_postprocessinghistoryid)
 
-        #Update the history grid-widget
-        self.PostProcessingHistoryGrid.addHistoryEntryToGrid(current_postprocessinghistoryid)
-
-        self.parent.updateLocList()
+            self.parent.updateLocList()
 
     class PostProcessingHistoryGrid(QWidget):
         def __init__(self,parent):
@@ -4121,7 +4274,8 @@ class PostProcessing(QWidget):
 
         def historyRestore_callback(self,historyId):
             #First restore the localizations
-            self.parent.parent.data['FittingResult'][0] = self.parent.postProcessingHistory[historyId][0]
+            self.parent.parent.data['FittingResult'] = self.parent.postProcessingHistory[historyId]
+            # self.parent.parent.data['FittingResult'][0] = self.parent.postProcessingHistory[historyId][0]
             #Remove all history after this point
             keys_to_remove = [k for k in self.parent.postProcessingHistory if k >= historyId]
             for k in reversed(keys_to_remove):
@@ -4165,6 +4319,15 @@ class PostProcessing(QWidget):
 
                             #Widget.text() could contain a file location. Thus, we need to swap out all \ for /:
                             methodKwargValues_method.append(widget_sub.text().replace('\\','/'))
+                        elif ("ComboBox" in widget_sub.objectName()) and widget_sub.isVisibleTo(self.PostProcessingGroupbox):
+                            # The objectName will be along the lines of foo#bar#str
+                            #Check if the objectname is part of a method or part of a scoring
+                            split_list = widget_sub.objectName().split('#')
+                            methodName_method = split_list[1]
+                            methodKwargNames_method.append(split_list[2])
+
+                            #We get the current choice of the dropdown.
+                            methodKwargValues_method.append(widget_sub.currentText().replace('\\','/'))
                     except:
                         pass
         #If at this point there is no methodName_method, it means that the method has exactly 0 req or opt kwargs. Thus, we simply find the value of the QComboBox which should be the methodName:
@@ -4228,8 +4391,19 @@ class PreviewFindingFitting(QWidget):
         #Make it expand:
         self.viewer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.mainRightlayout.addWidget(self.viewer) #The view itself
-        self.mainlayout.addWidget(self.viewer.controls,1,1) #The controls for the viewer (contrast, etc)
+        
+        controlVstack = QVBoxLayout()
+        controlVstack.addWidget(self.viewer.controls)#The controls for the viewer (contrast, etc)
         self.viewer.controls.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        buttonResetView = QPushButton("Reset View")
+        buttonResetView.clicked.connect(self.reset_view)
+        controlVstack.addWidget(buttonResetView)
+        buttonFullResetView = QPushButton("Reset entire visualisation")
+        controlVstack.addWidget(buttonFullResetView)
+        buttonFullResetView.clicked.connect(self.reset_full_view)
+        #Add a spacer so everything is pushed to top:
+        controlVstack.addStretch(1)
+        self.mainlayout.addLayout(controlVstack,1,1) 
         self.mainlayout.addLayout(self.mainRightlayout,1,2)
 
         #Possible layouts to give more napari information
@@ -4261,6 +4435,24 @@ class PreviewFindingFitting(QWidget):
         }
 
         self.underCursorInfoDF = pd.DataFrame(underCursorInfo)
+
+    def reset_view(self):
+        """
+        Reset the view (i.e. reset zoom/pan/etc)
+        """
+        self.napariviewer.reset_view()
+    
+    def reset_full_view(self):
+        """
+        Fully reset the view (i.e. reset zoom/pan/etc - also reset all colormaps/gamma/opacity/etc)
+        """
+        self.napariviewer.reset_view()
+        for layer in self.napariviewer.layers:
+            layer.rendering = 'attenuated_mip'
+            layer.visible = True
+            layer.colormap = 'gray'
+            layer.gamma = 1
+            layer.opacity = 1
 
     def napari_doubleClicked(self, event:Event):
         """Callback when the mouse is double clicked. Brings someone to the candidate preview tab if a candidate is clicked
@@ -4355,6 +4547,12 @@ class PreviewFindingFitting(QWidget):
 
             if self.underCursorInfoDF['current_pixel_EBSCoord'][0][0] > -np.inf and self.underCursorInfoDF['current_pixel_EBSCoord'][0][1] > -np.inf and self.underCursorInfoDF['current_pixel_EBSCoord'][0][0] < np.inf and self.underCursorInfoDF['current_pixel_EBSCoord'][0][1] < np.inf:
                 fullText += f"; Pixel coords: {int(self.underCursorInfoDF['current_pixel_EBSCoord'][0][0])}, {int(self.underCursorInfoDF['current_pixel_EBSCoord'][0][1])}"
+            
+            hotpixelarray = eval("["+self.settings['HotPixelIndexes']['value']+"]")
+            for hotpixel in hotpixelarray:
+                if self.underCursorInfoDF['current_pixel_EBSCoord'][0][0] == hotpixel[0] and self.underCursorInfoDF['current_pixel_EBSCoord'][0][1] == hotpixel[1]:
+                    fullText += f"; Hot pixel - removed!"
+                    break
                 
             self.underCursorInfo.setText(fullText)
 
@@ -4455,8 +4653,12 @@ class PreviewFindingFitting(QWidget):
         fittingResults = self.fittingResult
         pxsize = float(self.settings['PixelSize_nm']['value'])
         candidate_polygons = []
+        candidate_polygons_pos = []
+        candidate_polygons_neg = []
         unfitted_candidate_polygons = []
         fitting_polygons = []
+        candidates_ids_pos = []
+        candidates_ids_neg = []
         candidates_ids = []
         unfitted_candidate_ids = []
         fitting_ids = []
@@ -4475,8 +4677,19 @@ class PreviewFindingFitting(QWidget):
 
                 #Check if it succesfully fitted:
                 if not np.isnan(fittingResults['x'].iloc[f]):
-                    candidates_ids.append(str(f))
-                    candidate_polygons.append(np.array([[x_min, y_min], [x_max, y_min], [x_max, y_max], [x_min, y_max]]))
+                    if len(np.unique(findingResults[f]['events']['p'])) == 1:
+                        if np.all(np.unique(findingResults[f]['events']['p'])) == 0:
+                            #Negative
+                            candidates_ids_neg.append(str(f))
+                            candidate_polygons_neg.append(np.array([[x_min, y_min], [x_max, y_min], [x_max, y_max], [x_min, y_max]]))
+                        elif np.all(np.unique(findingResults[f]['events']['p'])) == 1:
+                            #Positive
+                            candidates_ids_pos.append(str(f))
+                            candidate_polygons_pos.append(np.array([[x_min, y_min], [x_max, y_min], [x_max, y_max], [x_min, y_max]]))
+                    else:
+                        #Unknown or mixed
+                        candidates_ids.append(str(f))
+                        candidate_polygons.append(np.array([[x_min, y_min], [x_max, y_min], [x_max, y_max], [x_min, y_max]]))
                 else:
                     unfitted_candidate_ids.append(str(f))
                     unfitted_candidate_polygons.append(np.array([[x_min, y_min], [x_max, y_min], [x_max, y_max], [x_min, y_max]]))
@@ -4500,7 +4713,7 @@ class PreviewFindingFitting(QWidget):
                 fitting_ids.append("")
                 fitting_ids.append("")
 
-        all_ids = candidates_ids+unfitted_candidate_ids+fitting_ids
+        all_ids = candidates_ids_neg+candidates_ids_pos+candidates_ids+unfitted_candidate_ids+fitting_ids
         # create features
         features = {
             'candidate_ids': all_ids,
@@ -4510,10 +4723,12 @@ class PreviewFindingFitting(QWidget):
             'anchor': 'upper_left',
             'translation': [0, 0],
             'size': 8,
-            'color':'blue'
+            'color':'cyan'
         }
 
         #Add the finding result
+        self.findingFitting_overlay.add_rectangles(candidate_polygons_neg, edge_width=1*((float(settings['PixelSize_nm']['value']))/1000),edge_color=(79/255, 39/255, 119/255),face_color='transparent')
+        self.findingFitting_overlay.add_rectangles(candidate_polygons_pos, edge_width=1*((float(settings['PixelSize_nm']['value']))/1000),edge_color=(30/255, 93/255, 73/255),face_color='transparent')
         self.findingFitting_overlay.add_rectangles(candidate_polygons, edge_width=1*((float(settings['PixelSize_nm']['value']))/1000),edge_color='coral',face_color='transparent')
         self.findingFitting_overlay.add_rectangles(unfitted_candidate_polygons, edge_width=1*((float(settings['PixelSize_nm']['value']))/1000),edge_color='red',face_color='transparent')
         self.findingFitting_overlay.add_lines(fitting_polygons, edge_width=0.5*((float(settings['PixelSize_nm']['value']))/1000),edge_color='red',face_color='transparent')
@@ -4614,7 +4829,7 @@ class CandidatePreview(QWidget):
         self.firstCandidateFigure = plt.figure(figsize=(6.8,4))
         self.firstCandidateCanvas = FigureCanvas(self.firstCandidateFigure)
         self.mainlayout.addWidget(self.firstCandidateCanvas)
-
+        
         #Add a navigation toolbar (zoom, pan etc) and canvas to tab
         self.mainlayout.addWidget(NavigationToolbar(self.firstCandidateCanvas, self))
         #------------End of first candidate plot layout -----------------
@@ -4645,6 +4860,7 @@ class CandidatePreview(QWidget):
 
         #Add a callback to the changing of the dropdown:
         secondCanPrevDropdown.currentTextChanged.connect(lambda text: utils.changeLayout_choice(self.secondCandidatePreviewGroupbox.layout(),secondCanPrevDropdown_name,getattr(self, secondCanPrev_functionNameToDisplayNameMapping_name),parent=self,ignorePolarity=True, maxNrRows=1))
+        
         self.secondCandidatePreviewGroupbox.layout().addWidget(secondCanPrevDropdown,1,0,1,8)
 
         #On startup/initiatlisation: also do changeLayout_choice
@@ -4658,6 +4874,10 @@ class CandidatePreview(QWidget):
         plt.rcParams.update({'font.size': 9}) # global change of font size for all matplotlib figures
         self.secondCandidateCanvas = FigureCanvas(self.secondCandidateFigure)
         self.mainlayout.addWidget(self.secondCandidateCanvas)
+        
+        #Also update the show_candidate_callback if the dropdown is changed - needs to be after plt figurecanvas creation
+        firstCanPrevDropdown.currentTextChanged.connect(lambda: self.show_candidate_callback(parent))
+        secondCanPrevDropdown.currentTextChanged.connect(lambda: self.show_candidate_callback(parent))
 
         #Add a navigation toolbar (zoom, pan etc) and canvas to tab
         self.mainlayout.addWidget(NavigationToolbar(self.secondCandidateCanvas, self))
@@ -4679,7 +4899,7 @@ class CandidatePreview(QWidget):
             # Check candidate entry field
             if self.entryCanPreview.text() == '':
                 self.candidate_info.setText('Tried to visualise candidate, but no ID was given!')
-                logging.error('Tried to visualise candidate, but no ID was given!')
+                logging.debug('Tried to visualise candidate, but no ID was given!')
             elif 'FindingMethod' in parent.data and int(self.entryCanPreview.text()) < len(parent.data['FindingResult'][0]):
                 self.CandidatePreviewID = int(self.entryCanPreview.text())
                 logging.debug(f"Attempting to show candidate {self.CandidatePreviewID}.")

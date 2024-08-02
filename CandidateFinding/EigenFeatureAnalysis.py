@@ -44,7 +44,7 @@ def __function_metadata__():
             "optional_kwargs": [
                 {"name": "debug", "display_text":"Debug Boolean", "description": "Get some debug info.","default":False},
             ],
-            "help_string": "Eigen-feature analysis",
+            "help_string": "Eigen-feature analysis. Performs a spectral clustering method on the data to separate SMLM signal from noise.",
             "display_name": "Eigen-feature analysis"
         },
         "eigen_feature_analysis_autoRadiusSelect": {
@@ -266,21 +266,6 @@ def determineEigenValueCutoffComputationally(maxeigenval,kwargs):
             peakind = signal.find_peaks_cwt(max(hist)-hist, np.arange(1,nbins/4))
             print(bin_edges[peakind]+bin_edges[1])
             
-
-            fig, ax1 = plt.subplots()
-
-            # Plot the histogram on the first y-axis
-            ax1.hist(maxeigenval, np.linspace(0,max(maxeigenval),nbins), alpha=0.5, label='Histogram', density=True, color='tab:blue')
-            ax1.set_xlabel('X data')
-            ax1.set_ylabel('Histogram', color='tab:blue')
-
-            # Create a second y-axis
-            ax2 = ax1.twinx()
-
-            # Display the plot
-            plt.show()
-            
-            
         except:
             pass
         
@@ -412,6 +397,29 @@ def dbscan_with_trialError(clusterpoints,eps=3,n_neighbours=15):
         logging.info("Number of clusters found:"+ str(max(cluster_labels)+1))
         return cluster_labels
 
+def showDebugInfo(maxeigenval,maxeigenvalcutoff):
+    nbins=100
+    fig, ax1 = plt.subplots()
+
+    # Plot the histogram on the first y-axis
+    counts, bin_edges = np.histogram(maxeigenval, np.linspace(0,max(maxeigenval),nbins), density=True)
+    # Create color array
+    colors = ['tab:red' if edge < maxeigenvalcutoff else 'black' for edge in bin_edges[:-1]]
+    # Plot the histogram with color-coding
+    ax1.bar(bin_edges[:-1], counts, width=np.diff(bin_edges), alpha=0.5, color=colors, align='edge')
+    
+    #Add a vertical line at maxeigenvalcutoff:
+    ax1.axvline(x=maxeigenvalcutoff, color='tab:red', linestyle='dashed', linewidth=1, label='Max eigenvalue cutoff')
+    ax1.set_ylabel('Probability')
+    ax1.set_xlabel('Maximum eigenvalue')
+    legend = ax1.legend(loc='upper right')
+    
+    #Add a title:
+    ax1.set_title('Histogram of maximum eigenvalues')
+
+    # Display the plot
+    plt.show()
+
 def eigenFeature_analysis(npy_array,settings,**kwargs):
     #Check if we have the required kwargs
     [provided_optional_args, missing_optional_args] = utilsHelper.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
@@ -441,6 +449,13 @@ def eigenFeature_analysis(npy_array,settings,**kwargs):
     #If set to zero, we do it computationally:
     if maxeigenvalcutoff == 0:
         maxeigenvalcutoff = determineEigenValueCutoffComputationally(maxeigenval,kwargs)
+    
+    #Visualise the histogram
+    if kwargs['debug'] == 'True':
+        showDebugInfo(maxeigenval,maxeigenvalcutoff)
+
+        # Display the plot
+        plt.show()
     
     points = np.asarray(point_cloud.points)
     #Add polarity back to points
@@ -501,6 +516,10 @@ def eigenFeature_analysis_and_bbox_finding(npy_array,settings,**kwargs):
     if maxeigenvalcutoff == 0:
         maxeigenvalcutoff = determineEigenValueCutoffComputationally(maxeigenval,kwargs)
     
+    #Visualise the histogram
+    if kwargs['debug'] == 'True':
+        showDebugInfo(maxeigenval,maxeigenvalcutoff)
+        
     points = np.asarray(point_cloud.points)
     #Add polarity back to points
     points = np.concatenate((points, polarities.reshape(-1,1)), axis=1)

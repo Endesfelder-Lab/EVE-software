@@ -12,7 +12,8 @@ def __function_metadata__():
             ],
             "optional_kwargs": [
             ],
-            "help_string": ""
+            "help_string": "",
+            "display_name": "Cut HDF5 in XY"
         }
     }
 

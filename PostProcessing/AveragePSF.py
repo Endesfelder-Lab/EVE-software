@@ -141,4 +141,4 @@ def AveragePSF(localizations,findingResult,settings,**kwargs):
 
     fig.show()  
 
-    return '',''
+    return None
