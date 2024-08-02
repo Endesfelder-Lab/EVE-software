@@ -8,20 +8,20 @@ A custom laser-based fluorescence microscopy setup was used for imaging. 561 nm 
 
 For *E. coli* rpoC imaging, the sample was illuminated with ~2 kW/cm<sup>2</sup> 561 nm laser, while the 405nm laser was increased manually from 0 to ~8 W/cm<sup>2</sup> to have a low and steady photoactivation rate, until no new signal appeared. For the Nile Red imaging, the buffer was exchanged for PBS containing 12.5 nM Nile Red, and the sample was illuminated with ~2 kW/cm<sup>2</sup> 561 nm laser and the data was recorded for 3 minutes.
 
-For E. coli Nile Red analysis, the frame based finding method (Detection threshold = 3.0, Exclusion radius = 4.0, Min. Radius = 1.25, Max. Radius = 4.0, Frame time (ms) = 100.0 and Candidate radius = 4.0) was used for positive and negative events separately.  
+For *E. coli* Nile Red analysis, the frame-based finding method (Detection threshold = 3.0, Exclusion radius = 4.0, Min. Radius = 1.25, Max. Radius = 4.0, Frame time (ms) = 100.0 and Candidate radius = 4.0) was used with the same parameters for positive and negative event polarities separately. For *E. coli* rpoC analysis, the Eigenfeature-based finding method (*Positive polarity:* Linearity cutoff = 0.7, Maximum Eigenvalue cutoff = 45, Number of neighbours = 50, Ratio ms to px = 40, DBSCAN epsilon = 4 and DBSCAN nr. neighbours = 8; *Negative Polarity:* Linearity cutoff = 0.7, Maximum Eigenvalue cutoff = 75, Number of neighbours = 50, Ratio ms to px = 40, DBSCAN epsilon = 4 and DBSCAN nr. neighbours = 5) was used. Logarithmic Gaussian fitting (Time fit routine = Lognormal CDF (first events, weighted), distribution = 2D histogram of x,y positions, expected width = 150.0, fitting tolerance = 4.0) was used for both Nile Red and rpoC.
 
 For DNA-PAINT nanoruler (80RG, Gattaquant) imaging, the sample was illuminated with ~2 kW/cm<sup>2</sup> 561 nm laser in TIRF mode by moving the focused spot to the side of the back-focal plane of the objective, and ~20 minutes of data was recorded.
 
-*Analysis method nanoruler - Laura
-
-\* Analysis methods – Joel - rpoC
+For DNA-PAINT nanoruler analysis, the Eigenfeature-based finding routine (*Positive polarity:* Linearity cutoff = 0.7, Maximum Eigenvalue cutoff = 18, Number of neighbours = 50, Ratio ms to px = 10, DBSCAN epsilon = 3 and DBSCAN nr. neighbours = 12; *Negative Polarity:* Linearity cutoff = 0.7, Maximum Eigenvalue cutoff = 18, Number of neighbours = 20, Ratio ms to px = 18, DBSCAN epsilon = 3 and DBSCAN nr. neighbours = 8) was combined with logarithmic Gaussian fitting (Time fit routine = Lognormal CDF (first events, weighted), distribution = 2D histogram of x,y positions, expected width = 150.0, fitting tolerance = 1.0; same parameters for both event polarities).
 
 ## A-tubulin
 \* Biological – Manon/Clement
 
 \* France setup– Manon/Clement
 
-\* Analysis methods - Laura
+All calibration files (each containing data aquired at different z-positions) were analyzed with EVE, treating all event polarities equally and performing a frame-based finding (Detection threshold = 3.0, Exclusion radius = 4.0, Min. Radius = 1.25, Max. Radius = 4.0, Frame time (ms) = 3200 and Candidate radius = 4.0) and 2D Gaussian fitting (Time fit routine = Average time, distribution = 2D histogram of x,y positions, expected width = 200.0, fitting tolerance = 10.0). The maximum size of a bounding box was adjusted to the frame time of 3200 ms in the advanced settings. For each calibration file analyzed, the x,y-widths of all localizations were then averaged and finally all average localizations were fitted with a fourth degree polynomial depending on their z-position. Hereby, the first 4 datapoints were excluded from the fit due to strong spherical aberrations.
+
+The full dataset was then analyzed with Eigenfeature-based finding (*Positive polarity:* Linearity cutoff = 0.7, Maximum Eigenvalue cutoff = 23.5, Number of neighbours = 30, Ratio ms to px = 2.5, DBSCAN epsilon = 3 and DBSCAN nr. neighbours = 15; *Negative Polarity:* Linearity cutoff = 0.7, Maximum Eigenvalue cutoff = 17.2, Number of neighbours = 30, Ratio ms to px = 6.0, DBSCAN epsilon = 3 and DBSCAN nr. neighbours = 15) and astigmatic Gaussian fitting (Time fit routine = Average time, distribution = 2D histogram of x,y positions, expected width = 200., fitting tolerance = 5.0; same parameters for both event polarities). 
 
 ## Hardware and software environment
 All analysis was performed on a 64-bit PC equipped with a i5-12400 12th gen Intel Core processor (6 cores, 12 threads) at 2.50 GHz, 32 GB RAM (3600 MT/s), NVIDIA RTX 4070 Ti (7680 cores, 12 GB memory), on a PRIME B660M-K D4 motherboard. EVE was run via Python 3.9.18 running in a Conda environment in Windows 11 Pro, and analysis was performed with processing parallelization turned on.
