@@ -1461,7 +1461,25 @@ class MyGUI(QMainWindow):
                 if significant_digit is not None:
                     localizations[localizations.columns[y]] = localizations[localizations.columns[y]].apply(lambda x: round(x, significant_digit))
 
-            self.LocListTable.setModel(TableModel(table_data = localizations))
+            #Replace common headers
+            header_data = localizations.columns.tolist()
+            changes = [
+                ['x','x [nm]'],
+                ['y','y [nm]'],
+                ['del_x','Δ x [nm]'],
+                ['del_y','Δ y [nm]'],
+                ['t','t [ms]'],
+                ['del_t','Δ t [ms]'],
+                ['x_dim','x_dim [px]'],
+                ['y_dim','y_dim [px]'],
+                ['t_dim','t_dim [ms]'],
+                ['p','polarity'],
+            ]
+            for change in changes:
+                header_data = [change[1] if item == change[0] else item for item in header_data]
+
+
+            self.LocListTable.setModel(TableModel(table_data = localizations, header_names = header_data))
         return
 
     def checkPolarity(self,npyData):
@@ -5156,9 +5174,10 @@ class TableModel(QAbstractTableModel):
     Blatantly taken from https://stackoverflow.com/questions/71076164/fastest-way-to-fill-or-read-from-a-qtablewidget-in-pyqt5
     """
 
-    def __init__(self, table_data, parent=None):
+    def __init__(self, table_data, parent=None, header_names = None):
         super().__init__(parent)
         self.table_data = table_data
+        self._header = header_names if header_names else table_data.columns
 
     def rowCount(self, parent: QModelIndex = ...) -> int:
         return self.table_data.shape[0]
@@ -5172,7 +5191,8 @@ class TableModel(QAbstractTableModel):
 
     def headerData(self, section: int, orientation: Qt.Orientation, role: int = ...) -> typing.Any:
         if orientation == Qt.Horizontal and role == Qt.DisplayRole:
-            return str(self.table_data.columns[section])
+            return str(self._header[section])
+        return super().headerData(section, orientation, role)
 
     def setColumn(self, col, array_items):
         """Set column data"""
