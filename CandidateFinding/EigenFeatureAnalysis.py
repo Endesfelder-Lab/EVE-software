@@ -477,8 +477,8 @@ def eigenFeature_analysis(npy_array,settings,**kwargs):
     candidates, _, _ = utilsHelper.removeCandidatesWithLargeSmallBoundingBox(candidates,settings)
     time1 = time.time()
     
-    #Remove xytOutliers
-    candidates = utilsHelper.removeCandidates_xytoutliers(candidates,settings)
+    #Remove xytOutliers-  removed in pre-release, probably a bad idea
+    # candidates = utilsHelper.removeCandidates_xytoutliers(candidates,settings)
     time2 = time.time()
     
     
