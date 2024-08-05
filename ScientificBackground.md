@@ -10,20 +10,21 @@ pandoc ScientificBackground.md -o ScientificBackground.pdf --bibliography=Markdo
 -->
 
 # Scientific background of EVE
+<!--Analysis methods implemented in EVE-->
 
-# Contents
+## Contents
 <!-- TOC -->
 - [Introduction](#introduction)
 - [Finding](#finding)
-    - [Eigenfeature-based finding](#eigen-feature-based-finding)
+    - [Eigenfeature-based finding](#eigenfeature-based-finding)
     - [DBSCAN-based cluster finding](#dbscan-based-cluster-finding)
     - [Frame-based finding](#frame-based-finding)
 - [Fitting](#fitting)
     - [Fitting distributions](#fitting-distributions)
     - [Mean X,Y position](#mean-xy-position)
-    - [2D Gaussian](#2d-gaussian)
-    - [2D Logarithmic Gaussian](#2d-logarithmic-gaussian)
-    - [3D Astigmatic Gaussian](#3d-astigmatic-gaussian)
+    - [2D Gaussian](#d-gaussian)
+    - [2D Logarithmic Gaussian](#d-logarithmic-gaussian)
+    - [3D Astigmatic Gaussian](#d-astigmatic-gaussian)
         - [Model function](#model-function)
         - [Calibration](#calibration)
         - [Estimating the axial position](#estimating-the-axial-position)
@@ -39,7 +40,6 @@ pandoc ScientificBackground.md -o ScientificBackground.pdf --bibliography=Markdo
         - [Estimation of the emitter fluorescent On-time](#estimation-of-the-emitter-fluorescent-on-time)
     - [Drift correction](#drift-correction)
     - [Visualisation](#visualisation)
-- [References](#references)
 
 <!-- /TOC -->
 
