@@ -58,7 +58,21 @@ def __function_metadata__():
             "optional_kwargs": [
             ],
             "help_string": "Makes a 2D gaussian fit with rotation angle theta to determine the 3D localization parameters.",
-            "display_name": "3D Gaussian: astigmatism"
+            "display_name": "3D Gaussian: Astigmatism"
+        }, 
+        "LogGaussian3D": {
+            "dist_kwarg" : {"base": "XYDist", "description": "Two-dimensional event-distribution to fit to get x,y-localization.", "default_option": "Hist2d_xy"},
+            "time_kwarg" : {"base": "TemporalFits", "description": "Temporal fitting routine to get time estimate.", "default_option": "LognormCDFFirstEvents_weighted"},
+            "required_kwargs": [
+                {"name": "theta", "display_text":"rotation angle", "description": "Rotation angle (in degrees) of the Gaussian","default":0},
+                {"name": "expected_width", "display_text":"expected width", "description": "Expected width of Gaussian fit (in nm)","default":150.},
+                {"name": "fitting_tolerance", "display_text":"fitting tolerance", "description": "Discard localizations with uncertainties larger than this value times the pixel size. ","default":1.},
+                {"name": "calibration_file", "display_text":"Calibration file", "description": "Calibration parameters as .npy file","type":"fileLoc"},
+            ],
+            "optional_kwargs": [
+            ],
+            "help_string": "Makes a 2D gaussian fit with rotation angle theta to determine the 3D localization parameters.",
+            "display_name": "3D LogGaussian: Astigmatism"
         }
     }
 
@@ -186,13 +200,14 @@ class loggauss2D(gauss2D):
     
     def update_p0(self):
         mod_p0 = list(self.p0)
-        mod_p0[4] = np.exp(self.imstats[0])
-        mod_p0[5] = np.exp(self.imstats[1])
+        mod_p0[4] = (self.imstats[0]-self.imstats[1])/np.log(2) # np.exp(self.imstats[0])
+        mod_p0[5] = self.imstats[1] # np.exp(self.imstats[1])
         self.p0 = tuple(mod_p0)
     
     def func(self, XY, x0, y0, sigma_x, sigma_y, amplitude, offset):
         X, Y = XY
-        g = np.log(offset + amplitude * np.exp( - ((X-x0)**2/(2*sigma_x**2) + (Y-y0)**2/(2*sigma_y**2))))
+        g = offset + amplitude * np.log(1 + np.exp( - ((X-x0)**2/(2*sigma_x**2) + (Y-y0)**2/(2*sigma_y**2))))
+        # g = np.log(offset + amplitude * np.exp( - ((X-x0)**2/(2*sigma_x**2) + (Y-y0)**2/(2*sigma_y**2))))
         return g
     
 # 3d gaussian fit
@@ -206,11 +221,15 @@ class gauss3D(gauss2D):
     # 2D Gaussian with rotation (angle theta in [rad])
     def func(self, XY, x0, y0, sigma_x, sigma_y, amplitude, offset):  
         X, Y = XY
-        a = (np.cos(self.theta)**2)/(2*sigma_x**2) + (np.sin(self.theta)**2)/(2*sigma_y**2)
-        b = -(np.sin(2*self.theta))/(4*sigma_x**2) + (np.sin(2*self.theta))/(4*sigma_y**2)
-        c = (np.sin(self.theta)**2)/(2*sigma_x**2) + (np.cos(self.theta)**2)/(2*sigma_y**2)
-        g = offset + amplitude * np.exp( - (a*((X-x0)**2) + 2*b*(X-x0)*(Y-y0) 
-                                + c*((Y-y0)**2)))
+        x_hat = np.cos(self.theta)*(X-x0) - np.sin(self.theta)*(Y-y0)
+        y_hat = np.sin(self.theta)*(X-x0) + np.cos(self.theta)*(Y-y0)
+        g = offset + amplitude * np.exp( - (x_hat**2/(2*sigma_x**2) + y_hat**2/(2*sigma_y**2)))
+
+        # a = (np.cos(self.theta)**2)/(2*sigma_x**2) + (np.sin(self.theta)**2)/(2*sigma_y**2)
+        # b = -(np.sin(2*self.theta))/(4*sigma_x**2) + (np.sin(2*self.theta))/(4*sigma_y**2)
+        # c = (np.sin(self.theta)**2)/(2*sigma_x**2) + (np.cos(self.theta)**2)/(2*sigma_y**2)
+        # g = offset + amplitude * np.exp( - (a*((X-x0)**2) + 2*b*(X-x0)*(Y-y0) 
+        #                         + c*((Y-y0)**2)))
         return g
     
     def sigma_fit(self, z, a, b, c, d, e):
@@ -230,7 +249,7 @@ class gauss3D(gauss2D):
         # ret = (np.sqrt(sigma_x)-np.sqrt(self.sigma_fit(z, *self.calibration[['a1','b1','c1','d1','e1']].values[0])))**2 + (np.sqrt(sigma_y)-np.sqrt(self.sigma_fit(z, *self.calibration[['a2','b2','c2','d2','e2']].values[0])))**2
         
         # minimize distance of widths-ratios to fit
-        ret = ((sigma_x/sigma_y)-(self.diff_sigma_fit(z, *self.calibration[['a1','b1','c1','d1','e1']].values[0], *self.calibration[['a2','b2','c2','d2','e2']].values[0])))**2
+        ret = np.abs((sigma_x/sigma_y)-(self.diff_sigma_fit(z, *self.calibration[['a1','b1','c1','d1','e1']].values[0], *self.calibration[['a2','b2','c2','d2','e2']].values[0])))
         return ret
     
     def __call__(self, candidate, time_fit, **kwargs):
@@ -309,7 +328,27 @@ class gauss3D(gauss2D):
         p = int(mean_polarity == 1) + int(mean_polarity == 0) * 0 + int(mean_polarity > 0 and mean_polarity < 1) * 2
         loc_df = pd.DataFrame({'candidate_id': self.candidateID, 'x': x, 'y': y, 'del_x': del_x, 'del_y': del_y, 'z': z, 'del_z': del_z, 'sigma_x': sigma_x, 'sigma_y': sigma_y, 'del_sigma_x' : del_sigma_x, 'del_sigma_y' : del_sigma_y, 'p': p, 't': t, 'del_t': del_t, 'N_events': candidate['N_events'], 'x_dim': candidate['cluster_size'][0], 'y_dim': candidate['cluster_size'][1], 't_dim': candidate['cluster_size'][2]*1e-3, 'fit_info': self.fit_info}, index=[0])
         return loc_df
+    
+# 3d gaussian fit
+class loggauss3D(gauss3D):
 
+    def __init__(self, dist, candidateID, width, fitting_tolerance, pixel_size, theta, calibration):
+        super().__init__(dist, candidateID, width, fitting_tolerance, pixel_size, theta, calibration)
+        self.update_p0()
+    
+    def update_p0(self):
+        mod_p0 = list(self.p0)
+        mod_p0[4] = (self.imstats[0]-self.imstats[1])/np.log(2) # np.exp(self.imstats[0])
+        mod_p0[5] = self.imstats[1] # np.exp(self.imstats[1])
+        self.p0 = tuple(mod_p0)
+    
+     # 2D LogGaussian with rotation (angle theta in [rad])
+    def func(self, XY, x0, y0, sigma_x, sigma_y, amplitude, offset):  
+        X, Y = XY
+        x_hat = np.cos(self.theta)*(X-x0) - np.sin(self.theta)*(Y-y0)
+        y_hat = np.sin(self.theta)*(X-x0) + np.cos(self.theta)*(Y-y0)
+        g = offset + amplitude * np.log(1 + np.exp( - (x_hat**2/(2*sigma_x**2) + y_hat**2/(2*sigma_y**2))))
+        return g
 
 # perform localization for part of candidate dictionary
 def localize_canditates2D(i, candidate_dic, func, distfunc, time_fit, *args, **kwargs):
@@ -423,7 +462,6 @@ def LogGaussian2D(candidate_dic,settings,**kwargs):
 
     return localizations, gaussian_fit_info
 
-# ToDo: Include calibration file to transform sigma_x/sigma_y to z height
 def Gaussian3D(candidate_dic,settings,**kwargs):
     # Check if we have the required kwargs
     [provided_optional_args, missing_optional_args] = utilsHelper.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
@@ -440,6 +478,62 @@ def Gaussian3D(candidate_dic,settings,**kwargs):
     expected_width = expected_width/pixel_size
     theta = np.radians(float(kwargs['theta']))
     fit_func = gauss3D
+    dist_func = getattr(eventDistributions, kwargs['dist_kwarg'])
+    time_fit = getattr(timeFitting, kwargs['time_kwarg'])()
+
+    try:
+        #Check if calibration file ends with .csv:
+        if kwargs['calibration_file'][-4:] != '.csv':
+            kwargs['calibration_file'] = kwargs['calibration_file']+'.csv'
+
+        calibration = pd.read_csv(kwargs['calibration_file'], sep=',')
+        performance_metadata = f"Loaded file {kwargs['calibration_file']}."
+        logging.info('Existing calibration result correctly loaded.')
+    except:
+        logging.error('Issue with loading an calibration result!')
+
+    params = expected_width, fitting_tolerance, pixel_size, theta, calibration
+
+    if multithread == True: num_cores = multiprocessing.cpu_count()
+    else: num_cores = 1
+    
+    # Determine number of jobs on CPU and slice data accordingly
+    njobs, num_cores = utilsHelper.nb_jobs(candidate_dic, num_cores)
+    data_split = utilsHelper.slice_data(candidate_dic, njobs)
+
+    logging.info("Candidate fitting split in "+str(njobs)+" job(s) and divided on "+str(num_cores)+" core(s).")
+
+    # Determine all localizations
+    RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(localize_canditates2D)(i, data_split[i], fit_func, dist_func, time_fit, *params) for i in range(len(data_split)))
+    
+    localization_list = [res[0] for res in RES]
+    localizations = pd.concat(localization_list)
+
+    fail_list = [res[1] for res in RES]
+    fails = pd.concat(fail_list)
+    
+    # Fit performance information
+    gaussian_fit_info = performance_metadata + utilsHelper.info(localizations, fails)
+
+    return localizations, gaussian_fit_info
+
+
+def LogGaussian3D(candidate_dic,settings,**kwargs):
+    # Check if we have the required kwargs
+    [provided_optional_args, missing_optional_args] = utilsHelper.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
+
+    logging.info("Load and initiate all parameters of candidate fitting...")
+
+    # Load the required kwargs
+    expected_width = float(kwargs['expected_width'])
+    fitting_tolerance = float(kwargs['fitting_tolerance'])
+
+    # Initializations - general
+    multithread = bool(settings['Multithread']['value'])
+    pixel_size = float(settings['PixelSize_nm']['value']) # in nm
+    expected_width = expected_width/pixel_size
+    theta = np.radians(float(kwargs['theta']))
+    fit_func = loggauss3D
     dist_func = getattr(eventDistributions, kwargs['dist_kwarg'])
     time_fit = getattr(timeFitting, kwargs['time_kwarg'])()
 
