@@ -249,7 +249,7 @@ class gauss3D(gauss2D):
         # ret = (np.sqrt(sigma_x)-np.sqrt(self.sigma_fit(z, *self.calibration[['a1','b1','c1','d1','e1']].values[0])))**2 + (np.sqrt(sigma_y)-np.sqrt(self.sigma_fit(z, *self.calibration[['a2','b2','c2','d2','e2']].values[0])))**2
         
         # minimize distance of widths-ratios to fit
-        ret = np.abs((sigma_x/sigma_y)-(self.diff_sigma_fit(z, *self.calibration[['a1','b1','c1','d1','e1']].values[0], *self.calibration[['a2','b2','c2','d2','e2']].values[0])))
+        ret = ((sigma_x/sigma_y)-(self.diff_sigma_fit(z, *self.calibration[['a1','b1','c1','d1','e1']].values[0], *self.calibration[['a2','b2','c2','d2','e2']].values[0])))**2
         return ret
     
     def __call__(self, candidate, time_fit, **kwargs):
@@ -487,7 +487,7 @@ def Gaussian3D(candidate_dic,settings,**kwargs):
             kwargs['calibration_file'] = kwargs['calibration_file']+'.csv'
 
         calibration = pd.read_csv(kwargs['calibration_file'], sep=',')
-        performance_metadata = f"Loaded file {kwargs['calibration_file']}."
+        performance_metadata = f"Loaded file {kwargs['calibration_file']}.\n"
         logging.info('Existing calibration result correctly loaded.')
     except:
         logging.error('Issue with loading an calibration result!')
@@ -543,7 +543,7 @@ def LogGaussian3D(candidate_dic,settings,**kwargs):
             kwargs['calibration_file'] = kwargs['calibration_file']+'.csv'
 
         calibration = pd.read_csv(kwargs['calibration_file'], sep=',')
-        performance_metadata = f"Loaded file {kwargs['calibration_file']}."
+        performance_metadata = f"Loaded file {kwargs['calibration_file']}.\n"
         logging.info('Existing calibration result correctly loaded.')
     except:
         logging.error('Issue with loading an calibration result!')
