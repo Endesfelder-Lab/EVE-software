@@ -18,7 +18,7 @@ def __function_metadata__():
             ],
             "optional_kwargs": [
             ],
-            "help_string": "Normal filtering of data.",
+            "help_string": "Normal filtering of data. Use for instance \"x < 50 & y > 100\".",
             "display_name": "Data filtering"
         }
     }
@@ -28,6 +28,9 @@ def __function_metadata__():
 #Callable functions
 #-------------------------------------------------------------------------------------------------------------------------------
 def Regular_filter(localizations,findingResult,settings,**kwargs):
+    """
+    Callable filter function
+    """
     #Check if we have the required kwargs
     [provided_optional_args, missing_optional_args] = utilsHelper.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
 
@@ -82,5 +85,5 @@ def Regular_filter(localizations,findingResult,settings,**kwargs):
     
     logging.info(f'Went from {orig_len_localizations} to {new_len_localizations} localizations in {elapsed_time} seconds.')
     #Required output: localizations
-    metadata = 'Information or so'
+    metadata = f'Filtering - {filter_text} - Went from {orig_len_localizations} to {new_len_localizations} localizations in {elapsed_time} seconds.'
     return localizations,metadata

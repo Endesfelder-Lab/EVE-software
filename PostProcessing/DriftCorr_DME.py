@@ -19,19 +19,19 @@ def __function_metadata__():
             ],
             "optional_kwargs": [
             ],
-            "help_string": "Drift correction from Cnossen et al..",
+            "help_string": "Load a stored .npz obtained from DME/RCC drift correction performed in EVE.",
             "display_name": "Load stored drift correction DME/RCC"
         },
         "DriftCorr_entropyMin": {
             "required_kwargs": [
                 {"name": "frame_time_for_dme", "description": "Frame-time used for drift-correction (in ms)","default":100.,"type":float,"display_text":"Frame time used in DME"},
                 {"name": "frames_per_bin", "description": "Number of frames in every bin for dme drift correction ","default":50,"type":int,"display_text":"Frames per bin"},
-                {"name": "visualisation", "description": "Visualisation of the drift traces.","default":True,"display_text":"Visualisation"},
-                {"name": "storeLoc", "description": "File location (*.npz file)","default":'',"type":"fileLoc","display_text":"Storage location"},
+                {"name": "visualisation", "description": "Visualisation of the drift traces (Boolean).","default":True,"display_text":"Visualisation"},
+                {"name": "storeLoc", "description": "File location (*.npz file)","default":'',"type":"fileLoc","display_text":"Storage location (*.npz)"},
             ],
             "optional_kwargs": [
             ],
-            "help_string": "Drift correction from Cnossen et al..",
+            "help_string": "Corrects drift based on entropy minimization in two dimensions. Original implementation from Cnossen et al., Optics Express, 2021.",
             "display_name": "Drift correction by entropy minimization [2D]"
         },
         "DriftCorr_entropyMin_3D": {
@@ -39,11 +39,11 @@ def __function_metadata__():
                 {"name": "frame_time_for_dme", "description": "Frame-time used for drift-correction (in ms)","default":100.,"type":float,"display_text":"Frame time used in DME"},
                 {"name": "frames_per_bin", "description": "Number of frames in every bin for dme drift correction ","default":50,"type":int,"display_text":"Frames per bin"},
                 {"name": "visualisation", "description": "Visualisation of the drift traces.","default":True,"display_text":"Visualisation"},
-                {"name": "storeLoc", "description": "File location (*.npz file)","default":'',"type":"fileLoc","display_text":"Storage location"},
+                {"name": "storeLoc", "description": "File location (*.npz file)","default":'',"type":"fileLoc","display_text":"Storage location (*.npz)"},
             ],
             "optional_kwargs": [
             ],
-            "help_string": "Drift correction from Cnossen et al..",
+            "help_string": "Corrects drift based on entropy minimization in three dimensions. Original implementation from Cnossen et al., Optics Express, 2021.",
             "display_name": "Drift correction by entropy minimization [3D]"
         },
         "DriftCorr_RCC": {
@@ -52,12 +52,12 @@ def __function_metadata__():
                 {"name": "nr_time_bins", "description": "Number of time bins","default":10,"type":int,"display_text":"Number of bins"},
                 {"name": "zoom_level", "description": "Zoom level","default":2,"type":int,"display_text":"Zoom of RCC plots"},
                 {"name": "visualisation", "description": "Visualisation of the drift traces.","default":True,"display_text":"Visualisation"},
-                {"name": "ConvHist", "description": "Use convoluted histogram, ideally do not use","default":False,"display_text":"Use ConvHist (Linux)"},
-                {"name": "storeLoc", "description": "File location (*.npz file)","default":'',"type":"fileLoc","display_text":"Storage location"},
+                {"name": "ConvHist", "description": "Use convoluted histogram, ideally do not use - required for Linux","default":False,"display_text":"Use ConvHist (Linux; Boolean)"},
+                {"name": "storeLoc", "description": "File location (*.npz file)","default":'',"type":"fileLoc","display_text":"Storage location (*.npz)"},
             ],
             "optional_kwargs": [
             ],
-            "help_string": "RCC Drift correction from Cnossen et al..",
+            "help_string": "Redudant cross-correlation drift correction. Based on the implementation from Cnossen et al., Optics Express, 2021; on linux, based on the implementatino from Martens et al., 2022",
             "display_name": "Drift correction by RCC (redundant cross-correlation)"
         }
     }
@@ -456,13 +456,15 @@ def DriftCorr_RCC(resultArray,findingResult,settings,**kwargs):
     drift_corr_locs.loc[:,'y'] -= drift_locs[1]
 
     performance_metadata = f"Driftcorrection RCC applied with settings {kwargs}."
-    print('Function one ran!')
 
     return drift_corr_locs, performance_metadata
 
 
 def rcc_own(xy, framenum, timebins, zoom=1, 
         sigma=1, maxpairs=1000, use_cuda=False, use_conv_hist = False):
+    """
+    Child function to do RCC
+    """
     
     from .dme.dme import dme
     from .dme.dme.rcc import findshift_pairs, InterpolatedUnivariateSpline
@@ -475,6 +477,7 @@ def rcc_own(xy, framenum, timebins, zoom=1,
     imgshape = area*zoom
     images = np.zeros((timebins, *imgshape))
 
+    #Normally use Cnossen's RCC
     if use_conv_hist == False:
         from .dme.dme.native_api import NativeAPI
         with NativeAPI(use_cuda) as dll:
@@ -495,6 +498,7 @@ def rcc_own(xy, framenum, timebins, zoom=1,
 
                 images[k] = dll.DrawGaussians(img, spots)
     elif use_conv_hist == True:
+        #On Linux, use Martens' implementation -- slower
         maxx = imgshape[0]/zoom
         maxy = imgshape[1]/zoom
         for k in range(timebins):
@@ -558,6 +562,9 @@ def rcc_own(xy, framenum, timebins, zoom=1,
     return shift_interp, shift_estim, images
 
 def create_kernel(size):
+    """
+    Kernel required for frame visualisation for RCC
+    """
     #Check if size is odd:
     if size % 2 == 0:
         import logging

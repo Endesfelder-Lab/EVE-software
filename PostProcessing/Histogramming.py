@@ -14,13 +14,13 @@ def __function_metadata__():
     return {
         "histogramming": {
             "required_kwargs": [
-                {"name": "Value", "description": "Filter text. E.g. \"x < 50 & y > 100\". ","default":"x [nm]","display_text":"Key","type":"dropDown(__locListHeaders__)"},
+                {"name": "Value", "description": "Column to filter on. E.g. \"x\" or \"y\". ","default":"x","display_text":"Key","type":"dropDown(__locListHeaders__)"},
                 {"name": "n_bins", "description": "Number of histogram bins ","default":100,"display_text":"Number of bins","type":int},
             ],
             "optional_kwargs": [
             ],
             "help_string": "Histograms result data",
-            "display_name": "Histogramming"
+            "display_name": "Create histogram"
         }
     }
 
@@ -29,6 +29,10 @@ def __function_metadata__():
 #Callable functions
 #-------------------------------------------------------------------------------------------------------------------------------
 def histogramming(localizations,findingResult,settings,**kwargs):
+    """
+    Histogram result data
+    """
+    
     #Check if we have the required kwargs
     [provided_optional_args, missing_optional_args] = utilsHelper.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
 
@@ -38,6 +42,10 @@ def histogramming(localizations,findingResult,settings,**kwargs):
     start_time = time.time()
     
     key = kwargs['Value']
+    
+    if key not in localizations.columns:
+        logging.error(f"Key {key} not found in localizations. Possible keys: {localizations.columns}")
+        return None
     
     data_to_hist = localizations[key]
     from matplotlib import pyplot as plt
