@@ -34,7 +34,7 @@ def __function_metadata__():
             ],
             "optional_kwargs": [
                 {"name": "min_consec", "description": "Minimum number of consecutive events","default":1,"type":int,"display_text":"Min. consec events"},
-                {"name": "max_consec", "description": "Maximum number of consecutive events, discards hot pixels","default":30,"type":int,"display_text":"Max. consec events"},
+                # {"name": "max_consec", "description": "Maximum number of consecutive events, discards hot pixels","default":30,"type":int,"display_text":"Max. consec events"},
             ],
             "help_string": "DBSCAN, only return events that are considered high-density. High-density is determined via the 'Density multiplier' variable (i.e. events with density > avg(density)*multiplier are high-density).",
             "display_name": "DBSCAN returning high-density events"
@@ -50,7 +50,7 @@ def __function_metadata__():
             ],
             "optional_kwargs": [
                 {"name": "min_consec", "description": "Minimum number of consecutive events","default":1,"type":int,"display_text":"Min. consec events"},
-                {"name": "max_consec", "description": "Maximum number of consecutive events, discards hot pixels","default":30,"type":int,"display_text":"Max. consec events"},
+                # {"name": "max_consec", "description": "Maximum number of consecutive events, discards hot pixels","default":30,"type":int,"display_text":"Max. consec events"},
             ],
             "help_string": "See DBSCAN-high density. This expands on it by returning all events in the bounding box specified by DBSCAN. Note that this will always give a rectangular bounding box..",
             "display_name": "DBSCAN returning all events"
@@ -68,7 +68,7 @@ def __function_metadata__():
             ],
             "optional_kwargs": [
                 {"name": "min_consec", "description": "Minimum number of consecutive events","default":1,"type":int,"display_text":"Min. consec events"},
-                {"name": "max_consec", "description": "Maximum number of consecutive events, discards hot pixels","default":30,"type":int,"display_text":"Max. consec events"},
+                # {"name": "max_consec", "description": "Maximum number of consecutive events, discards hot pixels","default":30,"type":int,"display_text":"Max. consec events"},
             ],
             "help_string": "See DBSCAN-allEvents. Additionally, removes points that have few neighbours in the Event-sphere. Uses o3d's remove_radius_outlier.",
             "display_name": "DBSCAN returning all events, removing events with few neighbours in Event-sphere"
@@ -695,7 +695,7 @@ def DBSCAN_allEvents(npy_array,settings,**kwargs):
         max_consec_ev = float(kwargs["max_consec"])
     else:
         # Default value for max number of consecutive events
-        max_consec_ev = 30
+        max_consec_ev = 1e10
 
     # Start the timer
     start_time = time.time()
@@ -746,7 +746,7 @@ def DBSCAN_onlyHighDensity(npy_array,settings,**kwargs):
         max_consec_ev = float(kwargs["max_consec"])
     else:
         # Default value for max number of consecutive events
-        max_consec_ev = 30
+        max_consec_ev = 1e10
 
     # Start the timer
     start_time = time.time()
@@ -844,7 +844,7 @@ def DBSCAN_allEvents_remove_outliers(npy_array,settings,**kwargs):
         max_consec_ev = float(kwargs["max_consec"])
     else:
         # Default value for max number of consecutive events
-        max_consec_ev = 30
+        max_consec_ev = 1e10
     
     
     weights,df_events = determineWeights(npy_array)
