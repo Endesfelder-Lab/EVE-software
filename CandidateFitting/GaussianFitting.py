@@ -169,11 +169,19 @@ class gauss2D(fit):
             del_y = np.nan
             t = np.nan
             del_t = np.nan
+            sigma_x = np.nan
+            sigma_y = np.nan
+            del_sigma_x = np.nan
+            del_sigma_y = np.nan
         else: 
             x = (opt[0]+np.min(candidate['events']['x']))*self.pixel_size # in nm
             y = (opt[1]+np.min(candidate['events']['y']))*self.pixel_size # in nm
             del_x = err[0]*self.pixel_size # in nm
             del_y = err[1]*self.pixel_size # in nm
+            sigma_x = opt[2]*self.pixel_size # in nm
+            sigma_y = opt[3]*self.pixel_size # in nm
+            del_sigma_x = err[2]*self.pixel_size # in nm
+            del_sigma_y = err[3]*self.pixel_size # in nm
             if del_x > self.fitting_tolerance*self.pixel_size or del_y > self.fitting_tolerance*self.pixel_size:
                 self.fit_info = 'ToleranceWarning: Fitting uncertainties exceed the tolerance.'
                 x = np.nan
@@ -182,13 +190,17 @@ class gauss2D(fit):
                 del_y = np.nan
                 t = np.nan
                 del_t = np.nan
+                sigma_x = np.nan
+                sigma_y = np.nan
+                del_sigma_x = np.nan
+                del_sigma_y = np.nan
             else:
                 t, del_t, t_fit_info, opt_t = time_fit(candidate['events'], opt) # t, del_t in ms
                 if t_fit_info != '':
                     self.fit_info = t_fit_info
         mean_polarity = candidate['events']['p'].mean()
         p = int(mean_polarity == 1) + int(mean_polarity == 0) * 0 + int(mean_polarity > 0 and mean_polarity < 1) * 2
-        loc_df = pd.DataFrame({'candidate_id': self.candidateID, 'x': x, 'y': y, 'del_x': del_x, 'del_y': del_y, 'p': p, 't': t, 'del_t': del_t, 'N_events': candidate['N_events'], 'x_dim': candidate['cluster_size'][0], 'y_dim': candidate['cluster_size'][1], 't_dim': candidate['cluster_size'][2]*1e-3, 'fit_info': self.fit_info}, index=[0])
+        loc_df = pd.DataFrame({'candidate_id': self.candidateID, 'x': x, 'y': y, 'del_x': del_x, 'del_y': del_y, 'sigma_x': sigma_x, 'sigma_y': sigma_y, 'del_sigma_x': del_sigma_x, 'del_sigma_y': del_sigma_y, 'p': p, 't': t, 'del_t': del_t, 'N_events': candidate['N_events'], 'x_dim': candidate['cluster_size'][0], 'y_dim': candidate['cluster_size'][1], 't_dim': candidate['cluster_size'][2]*1e-3, 'fit_info': self.fit_info}, index=[0])
         return loc_df
 
 # 2d log gaussian fit
@@ -303,7 +315,7 @@ class gauss3D(gauss2D):
                 widths = [sigma_x, sigma_y]
                 initial_guess = 0.0
                 z_min_max = self.calibration[['z_min','z_max']].values[0]
-                bounds = [(-725.0,z_min_max[1])] # [(z_min_max[0],z_min_max[1])]
+                bounds = [(z_min_max[0],z_min_max[1])]
                 z_fit = optimize.minimize(self.distance, initial_guess, args=(widths,), bounds=bounds)
                 if not z_fit.success:
                     self.fit_info = 'ZFitError: '+z_fit.message
