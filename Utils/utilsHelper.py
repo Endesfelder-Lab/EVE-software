@@ -40,7 +40,9 @@ def strtobool(val):
     else:
         raise ValueError("invalid truth value %r" % (val,))
 
+#DEPRACATED - probably bad idea to use, but kept for prosperity
 def removeCandidates_xytoutliers(candidates,settings,x_std_mult = None, y_std_mult = None, t_std_mult = None):
+    logging.warning('It is recommended not to use XYTOutlier_removal.')
     #._std_mult can be set to a value to force the standard deviation, otherwise it is set by the settings (and if not found, set to default of 2.5):
     if 'XYTOutlierRemoval' in settings:
         if settings['XYTOutlierRemoval']['value'] > 0:

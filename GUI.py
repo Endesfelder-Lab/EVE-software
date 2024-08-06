@@ -69,6 +69,8 @@ def get_stylesheet():
 def main():
     import gc
     gc.enable()
+    from PyQt5.QtCore import Qt
+    QApplication.setAttribute(Qt.AA_ShareOpenGLContexts)
     multiprocessing.freeze_support()
     app = QApplication(sys.argv)
     

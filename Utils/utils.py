@@ -40,6 +40,9 @@ from PyQt5.QtGui import QCursor, QTextCursor, QIntValidator
 from PyQt5.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QTableWidget, QTableWidgetItem, QLayout, QMainWindow, QLabel, QPushButton, QSizePolicy, QGroupBox, QTabWidget, QGridLayout, QWidget, QComboBox, QLineEdit, QFileDialog, QToolBar, QCheckBox,QDesktopWidget, QMessageBox, QTextEdit, QSlider, QSpacerItem
 from PyQt5.QtCore import Qt, QPoint, QProcess, QCoreApplication, QTimer, QFileSystemWatcher, QFile, QThread, pyqtSignal, QObject
 
+from PyQt5.QtCore import QUrl
+import markdown
+from PyQt5.QtWebEngineWidgets import QWebEngineView
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
 # Function declarations
@@ -1375,6 +1378,50 @@ class SmallWindow(QMainWindow):
             except:
                 pass
         lineedit.setText(LineEditText)
+    
+    def addMarkdown(self,mdfile,width=700,height=800):
+        newlayout = QVBoxLayout()
+        markdownViewer = QWebEngineView()
+        markdownViewer.setFixedHeight(height)
+        markdownViewer.setFixedWidth(width)
+        md_file = mdfile
+        with open(md_file, 'r', encoding='utf-8') as file:
+            md_content = file.read()
+        # Convert Markdown to HTML
+        html_content = markdown.markdown(md_content, extensions=['markdown_captions','fenced_code', 'codehilite', 'toc', 'attr_list', 'meta'])
+        # Get the directory of the Markdown file
+        base_dir = os.path.dirname(os.path.abspath(md_file))
+        # Create a complete HTML document with MathJax support
+        full_html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <script type="text/javascript" async
+                src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/MathJax.js?config=TeX-MML-AM_CHTML">
+            </script>
+            <script type="text/x-mathjax-config">
+                MathJax.Hub.Config({{
+                    tex2jax: {{
+                        inlineMath: [['$','$']],
+                        processEscapes: true
+                    }} 
+                }});
+            </script>
+            <style>
+                body {{ font-family: Arial, sans-serif; line-height: 1.6; padding: 20px; }}
+                img {{ max-width: 100%; height: auto; }}
+            </style>
+        </head>
+        <body>
+            {html_content}
+        </body>
+        </html>
+        """
+
+        # Load the HTML content into the web view
+        markdownViewer.setHtml(full_html, QUrl.fromLocalFile(base_dir + "/"))
+        newlayout.addWidget(markdownViewer)
+        self.centralWidget().layout().addLayout(newlayout)
     
     def addDescription(self,description):
         #Create a horizontal box layout:

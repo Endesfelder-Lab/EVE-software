@@ -320,12 +320,12 @@ class MyGUI(QMainWindow):
         
         
         helpMenu = menuBar.addMenu("Help")
-        quickStartMenu = helpMenu.addAction("Quick start")
+        quickStartMenu = helpMenu.addAction("Quick start / User Manual")
         quickStartMenu.triggered.connect(lambda: self.quickStartMenu())
-        documentationMenu = helpMenu.addAction("User manual")
-        documentationMenu.triggered.connect(lambda: self.documentationMenu())
         devManualMenu = helpMenu.addAction("Developer manual")
         devManualMenu.triggered.connect(lambda: self.devManualMenu())
+        sciBGMenu = helpMenu.addAction("Scientific information")
+        sciBGMenu.triggered.connect(lambda: self.sciBGMenu())
         aboutMenu = helpMenu.addAction("About...")
         aboutMenu.triggered.connect(lambda: self.aboutMenu())
 
@@ -333,27 +333,32 @@ class MyGUI(QMainWindow):
         """
         Shows the README.md file
         """
-        quickStartWindow = utils.SmallWindow(self)
-        quickStartWindow.setWindowTitle('Quick start')
-        newlayout = QVBoxLayout()
-        from PyQt5.QtWidgets import QTextBrowser
-        import markdown
-        markdownViewer = QTextBrowser()
-        quickStartWindow.setFixedHeight(800)
-        markdownViewer.setFixedWidth(1100)
-        md_file = 'README.md'
-        with open(md_file, 'r', encoding='utf-8') as file:
-            md_content = file.read()
-
-        # Convert Markdown to HTML
-        html_content = markdown.markdown(md_content,output_format="html5", safe_mode='escape')
-        html_content = html_content.replace("\n","<br>")
-        html_content = html_content.replace("<p>","<br>")
-        markdownViewer.setHtml(html_content)
-        newlayout.addWidget(markdownViewer)
-        quickStartWindow.centralWidget().layout().addLayout(newlayout)
-        quickStartWindow.show()
-        
+        try:
+            quickStartWindow = utils.SmallWindow(self)
+            QApplication.processEvents()
+            quickStartWindow.setWindowTitle('Quick start / User Manual')
+            QApplication.processEvents()
+            quickStartWindow.addMarkdown('README.md')
+            QApplication.processEvents()
+            quickStartWindow.show()
+        except:
+            logging.error('Could not open quick start window.')
+    
+    def sciBGMenu(self):
+        """
+        Shows the ScientificBackground.md file
+        """
+        try:
+            sciBGWindow = utils.SmallWindow(self)
+            QApplication.processEvents()
+            sciBGWindow.setWindowTitle('Scientific background')
+            QApplication.processEvents()
+            sciBGWindow.addMarkdown('ScientificBackground.md')
+            QApplication.processEvents()
+            sciBGWindow.show()
+        except:
+            logging.error('Could not open quick start window.')
+    
     def documentationMenu(self):
         """
         Opens the user manual .pdf externally
@@ -366,10 +371,16 @@ class MyGUI(QMainWindow):
         """
         Opens the developer manual .pdf externally
         """
-        from PyQt5.QtGui import QDesktopServices
-        from PyQt5.QtCore import QUrl
-        url = QUrl.fromLocalFile('DeveloperManual.pdf')
-        QDesktopServices.openUrl(url)
+        try:
+            DevManWindow = utils.SmallWindow(self)
+            QApplication.processEvents()
+            DevManWindow.setWindowTitle('Developer Manual')
+            QApplication.processEvents()
+            DevManWindow.addMarkdown('DeveloperInstructions.md')
+            QApplication.processEvents()
+            DevManWindow.show()
+        except:
+            logging.error('Could not open Developer manual window.')
         
     def aboutMenu(self):
         """
@@ -489,14 +500,14 @@ class MyGUI(QMainWindow):
         globalSettings['MaxFindingBoundingBoxT']['value'] = 1000
         globalSettings['MaxFindingBoundingBoxT']['input'] = float
         globalSettings['MaxFindingBoundingBoxT']['displayName'] = 'Maximum size of a bounding box in ms units'
-        globalSettings['XYTOutlierRemoval'] = {}
-        globalSettings['XYTOutlierRemoval']['value'] = True
-        globalSettings['XYTOutlierRemoval']['input'] = bool
-        globalSettings['XYTOutlierRemoval']['displayName'] = 'XYTOutlierRemoval'
-        globalSettings['XYTOutlierRemoval_multiplier'] = {}
-        globalSettings['XYTOutlierRemoval_multiplier']['value'] = 2.5
-        globalSettings['XYTOutlierRemoval_multiplier']['input'] = float
-        globalSettings['XYTOutlierRemoval_multiplier']['displayName'] = 'STD multiplier for XYTOutlierRemoval'
+        # globalSettings['XYTOutlierRemoval'] = {}
+        # globalSettings['XYTOutlierRemoval']['value'] = False
+        # globalSettings['XYTOutlierRemoval']['input'] = bool
+        # globalSettings['XYTOutlierRemoval']['displayName'] = 'XYTOutlierRemoval'
+        # globalSettings['XYTOutlierRemoval_multiplier'] = {}
+        # globalSettings['XYTOutlierRemoval_multiplier']['value'] = 2.5
+        # globalSettings['XYTOutlierRemoval_multiplier']['input'] = float
+        # globalSettings['XYTOutlierRemoval_multiplier']['displayName'] = 'STD multiplier for XYTOutlierRemoval'
         globalSettings['PixelSize_nm'] = {}
         globalSettings['PixelSize_nm']['value'] = 80
         globalSettings['PixelSize_nm']['input'] = float
@@ -1450,7 +1461,25 @@ class MyGUI(QMainWindow):
                 if significant_digit is not None:
                     localizations[localizations.columns[y]] = localizations[localizations.columns[y]].apply(lambda x: round(x, significant_digit))
 
-            self.LocListTable.setModel(TableModel(table_data = localizations))
+            #Replace common headers
+            header_data = localizations.columns.tolist()
+            changes = [
+                ['x','x [nm]'],
+                ['y','y [nm]'],
+                ['del_x','Δ x [nm]'],
+                ['del_y','Δ y [nm]'],
+                ['t','t [ms]'],
+                ['del_t','Δ t [ms]'],
+                ['x_dim','x_dim [px]'],
+                ['y_dim','y_dim [px]'],
+                ['t_dim','t_dim [ms]'],
+                ['p','polarity'],
+            ]
+            for change in changes:
+                header_data = [change[1] if item == change[0] else item for item in header_data]
+
+
+            self.LocListTable.setModel(TableModel(table_data = localizations, header_names = header_data))
         return
 
     def checkPolarity(self,npyData):
@@ -5147,9 +5176,10 @@ class TableModel(QAbstractTableModel):
     Blatantly taken from https://stackoverflow.com/questions/71076164/fastest-way-to-fill-or-read-from-a-qtablewidget-in-pyqt5
     """
 
-    def __init__(self, table_data, parent=None):
+    def __init__(self, table_data, parent=None, header_names = None):
         super().__init__(parent)
         self.table_data = table_data
+        self._header = header_names if header_names else table_data.columns
 
     def rowCount(self, parent: QModelIndex = ...) -> int:
         return self.table_data.shape[0]
@@ -5163,7 +5193,8 @@ class TableModel(QAbstractTableModel):
 
     def headerData(self, section: int, orientation: Qt.Orientation, role: int = ...) -> typing.Any:
         if orientation == Qt.Horizontal and role == Qt.DisplayRole:
-            return str(self.table_data.columns[section])
+            return str(self._header[section])
+        return super().headerData(section, orientation, role)
 
     def setColumn(self, col, array_items):
         """Set column data"""
