@@ -435,7 +435,7 @@ def DriftCorr_RCC(resultArray,findingResult,settings,**kwargs):
             # Save the variables to a single .npz file
             np.savez(storeLoc, 
                     frame_time_for_dme=frame_time_for_dme, 
-                    estimated_drift=estimated_drift, 
+                    estimated_drift=shift_px, 
                     pixelsize_nm=float(settings['PixelSize_nm']['value']))
         except:
             logging.error('Could not save drift correction data to'+ storeLoc)
