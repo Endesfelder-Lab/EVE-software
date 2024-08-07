@@ -886,6 +886,7 @@ class MyGUI(QMainWindow):
         self.preview_eventType.setObjectName('preview_eventType')
         self.previewLayout.layout().addWidget(self.preview_eventType, 1, 3, 1, 1)
         self.preview_eventType.addItem("All events")
+        self.preview_eventType.addItem("All events treated equal")
         self.preview_eventType.addItem("Positive only")
         self.preview_eventType.addItem("Negative only")
         self.preview_eventType.setCurrentIndex(0)
@@ -1883,7 +1884,7 @@ class MyGUI(QMainWindow):
             timeStretch (tuple): A tuple containing the start and end times for the preview.
             xyStretch (tuple): A tuple containing the minimum and maximum x and y coordinates for the preview.
             frametime (int): The frame time in ms.
-            eventType (str): "All events", "Positive only", "Negative only"
+            eventType (str): "All events", "All events treated equal", "Positive only", "Negative only"
 
         Returns:
             None
@@ -1923,7 +1924,10 @@ class MyGUI(QMainWindow):
             self.previewEvents = self.filterEvents_npy_p(self.previewEvents,1)
         elif eventType == "Negative only":
             self.previewEvents = self.filterEvents_npy_p(self.previewEvents,0)
-        
+        elif eventType == "All events treated equal":
+            #Set all polarities to 1:
+            self.previewEvents['p'] = 1
+            
         logging.info(f"Preview - Displaying {len(self.previewEvents)} events ({eventType}) in the chosen time frame, no finding/fitting.")
         
         #Update the preview panel and localization list:
