@@ -14,6 +14,9 @@ pandoc ScientificBackground.md -o ScientificBackground.pdf --bibliography=Markdo
 
 ## Contents
 <!-- TOC -->
+
+- [Scientific background of EVE](#scientific-background-of-eve)
+    - [Contents](#contents)
 - [Introduction](#introduction)
 - [Finding](#finding)
     - [Eigenfeature-based finding](#eigenfeature-based-finding)
@@ -180,7 +183,7 @@ Due to the nature of event-based sensors to report changes in intensity rather t
 Matching of a “positive PSF” with its corresponding “negative PSF” searches for the closest negative PSF neighbor of the positive PSF. Bounds (default 200 nm radius, 0 to 1000 ms time) can be set by the user. Each positive PSF can only ever be linked to a single negative PSF and vice versa.
 
 ### 1.2. Localization precision
-In a static eveSMLM dataset (i.e. not single-particle tracking and ignoring sample drift), the underlying single-molecule location of the positive and negative PSF are identical, or $\Delta_{spatial}=0$. However, in practice, the found localization difference between the positive and negative PSF ($\Delta_{spatial}$) is degraded by the combined localization precision of both positive and negative fitting routines. Nearest-neighbour analysis (NeNA) [@endesfelder_simple_2014] is used to determine the average localization precision of all polarity-matched positive and negative PSFs in the dataset. For this, $\Delta_{spatial}$ of all polarity-matched PSFs are fitted with the following function:
+In a static eveSMLM dataset (i.e. considering immobile molecules and ignoring sample drift), the underlying single-molecule location of the positive and negative PSF are identical, or $\Delta_{spatial}=0$. However, in practice, the found localization difference between the positive and negative PSF ($\Delta_{spatial}$) is degraded by the combined localization precision of both positive and negative fitting routines. Nearest-neighbour analysis (NeNA) [@endesfelder_simple_2014] is used to determine the average localization precision of all polarity-matched positive and negative PSFs in the dataset. For this, the $pdf(\Delta_{spatial})$ of all polarity-matched PSFs is fitted with the following function:
 $$\Large
 \text{pdf}(\Delta_{spatial}) = A_1 \cdot \left(\frac{\Delta_{spatial}}{2 \cdot \sigma_{\text{SMLM}}^2} \cdot e^{-\frac{\Delta_{spatial}^2}{4 \cdot \sigma_{\text{SMLM}}^2}}\right) + A_2 \cdot \left(\frac{1}{\sqrt{2 \cdot \pi \cdot \omega^2}} \cdot e^{-\frac{(\Delta_{spatial} - d_c)^2}{2 \cdot \omega^2}}\right) + A_3 \cdot \Delta_{spatial}
 $$
@@ -188,14 +191,16 @@ $$
 The first term is the Rayleigh distribution from which $\sigma_{SMLM}$, the (mean) localization precision can be determined, the other two terms represent a Gaussian and a line noise correction, with $\omega$ being the Gaussian standard deviation characterizing the short-range correction term centered at $d_c$, and $A_{1-3}$ are the amplitudes of each term [@endesfelder_simple_2014].
 
 ### 1.3. Estimation of the emitter fluorescent On-time
-In addition to spatial information, the polarity matching also provides temporal information about individual fluorophores. The obtained duration via polarity matching ($\Delta_{temporal}$) is broadly categorized in two regimes: 1. Photophysical on-time of a single fluorophore (i.e. caused by fluorophore bleaching (STORM, PALM) or target dissociation (PAINT)), and this on-time is degraded by: 2. Sensor limitations: typical evePSFs have a temporal duration in the order of tens to hundreds of ms, even while the PSF signal is instantaneous. If the photophysical on-time of the single emitter is shorter than the evePSF formation, the positive PSF does not have time to fully form, and will as such not be localized correctly. Thus, low-value  $\Delta_{temporal}$ are effectively removed from polarity-matching analysis.
+In addition to spatial information, the polarity matching also provides temporal information about the emission cycle duration (i.e. *on-time*) of individual fluorophores. The *on-time* belonging to an entire dataset can be estimated.
+
+The obtained duration between the positive-event PSF and negative-event PSF via polarity matching ($\Delta_{temporal}$) is broadly categorized in two regimes: 1. Photophysical *on-time* of a single fluorophore (i.e. caused by fluorophore bleaching (STORM, PALM) or target dissociation (PAINT)). This *on-time* is degraded by: 2. Sensor limitations: typical evePSFs have a temporal duration in the order of tens to hundreds of ms, even while the PSF signal is instantaneous. If the photophysical *on-time* of the single emitter is shorter than the evePSF formation, the positive PSF does not have time to fully form, and will as such not be localized correctly. Thus, low-value $\Delta_{temporal}$ are effectively removed from polarity-matching analysis.
 
 The lifetime is estimated as follows (Figure \ref{fig:lifetime}): the peak of the $\Delta_{temporal}$ pdf is determined via smoothing of the raw data with a Savitzky-Golay filter, after which an ‘offset’ is determined (default 20% higher than the temporal peak value). The raw data at times longer than this offset are fit with a combination of 1-3 exponential decays (user-definable). Figure shows an exemplary routine.
 
-![Showcase of a DNA PAINT sample. A single exponential decay (blue line) is fitted to $\Delta_{temporal}$ pdf data (gray) on a linear (left) and logarithmic (right) y-axis. The exponential decay is fitted only in the regime where $\Delta_{temporal}$ is larger than the offset position (red). The single exponential decay fit has a half-time of 88 ± 3.5 ms.](Markdown_info/SciBG_lifetime.png){#fig:lifetime}
+![Showcase of the lifetime obtained via EVE from all emitter *on-times* of a DNA PAINT sample. A single exponential decay (blue line) is fitted to $\Delta_{temporal}$ pdf data (gray) on a linear (left) and logarithmic (right) y-axis. The exponential decay is fitted only in the regime where $\Delta_{temporal}$ is larger than the offset position (red). The single exponential decay fit has a half-time of 88 ± 3.5 ms.](Markdown_info/SciBG_lifetime.png){#fig:lifetime}
 
 ## 2. Drift correction
-Drift correction on the final localizations can be performed either via redundant cross correlation (RCC) [@martens_raw_2022] or entropy minimization (DME) [@cnossen_drift_2021]. Since DME is based on the concept of frames, a pseudo-frame-time should be provided for DME to run.
+Drift correction on the final localizations can be performed either via redundant cross correlation (RCC) [@martens_raw_2022] or entropy minimization (DME) [@cnossen_drift_2021]. Since RCC and DME are based on the concept of frames, a pseudo-frame-time should be provided for RCC/DME to run.
 
 ## 3. Visualisation
 Visualisation of the final localizations [@martens_raw_2022] can be performed via individually rendered Gaussians with a global sigma, or with the sigma provided by the localization precision of each localization. Additionally, linearly interpolated 2D histograms can be created. For all methods, a visualisation pixel size should be provided. 

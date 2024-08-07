@@ -2,7 +2,7 @@
 bibliography: Markdown_info/citations.bib
 ---
 
-# Supplementary Note 1: Software manual
+# Supplementary Note 2: Software manual
 
 ## EVE - General-purpose software for eve-SMLM localization
 ![](Eve.png)
@@ -56,7 +56,7 @@ pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/
 ```
 
 #### Optional 
-EVE can read and process event-based data in `.npy` and `.hdf5` format. Additionally the `.raw` format of [Prophesee](https://www.prophesee.ai/) can be used. If you have `.raw` data that you want to analyze you need to install the [Metavision SDK from Prophesee](https://docs.prophesee.ai/stable/installation/index.html) beforehand. We recommend using `.hdf5` whenever possible, as this is a hierarchical data format optimized for efficient saving and reading of large files.
+EVE can read and process event-based data in `.npy` and `.hdf5` format. Additionally the `.raw` format of [Prophesee](https://www.prophesee.ai/) can be used. If you have `.raw` data that you want to analyze you need to install the [Metavision SDK from Prophesee](https://docs.prophesee.ai/stable/installation/index.html) beforehand ([https://docs.prophesee.ai/stable/installation/index.html](https://docs.prophesee.ai/stable/installation/index.html)). We recommend using `.hdf5` whenever possible, as this is a hierarchical data format optimized for efficient saving and reading of large files.
 
 
 ### Running instructions
@@ -80,8 +80,7 @@ The folder `Data` contains the GUI configuration (`settings.json`) that we will 
    The folder `Data` contains an exemplary event-based acquisition of a DNA nanoruler (`DNAPAINT.hdf5`) which we will use in this tutorial. Fill the path entry field `Dataset location:` with the corresponding path to the nanoruler dataset.
 
    In the `Data selection` box, you can now further specify which parts of the data should be analysed and how. You have different options for `Polarity`, `Time` and `Position`. Choose `Pos and neg seperately` as `Polarity` option while leaving the remaining settings unchanged. Thereby, you simply load the all events without temporal or spatial constraints. By selecting `Pos and neg seperately` all subsequent analysis steps will be run on the positive and negative events distinctly. As you can see, the GUI has adapted to your selection and you can now choose finding and fitting routines for positive and negative events seperatly.<br>  
- 
- 
+
 ![](Quick_Start/4_change_and_save_GUI_contents.png)<br>  
 3. **Candidate Finding routine:** Here, you can select among different candidate finding routines. Choose `Eigen-feature analysis`, both for positive and negative events and change the settings as shown in the screenshot above.<br>  
 4. **Candidate Fitting routine:** Here, you can specify which fitting routines you want to use to get localizations for each candidate, cluster. Choose `2D Gaussian` again for both polarities and modify all other parameters as shown in the screenshot above.<br>  
@@ -97,7 +96,7 @@ Switch to the `Preview run` tab, as soon as the preview run is complete (`Update
 
 ![](Quick_Start/6_preview2.png)<br>
 
-Each candidate cluster found by the candidate finding routine will be highlighted with an orange or red box and gets a unique candidate ID that is here displayed in blue. A red box indicates that a failed fit, meaning that no localization could be generated. All localizations are marked as red crosses in the frame where the x,y,t localization is found.
+Each candidate cluster found by the candidate finding routine will be highlighted with an purple or green box and gets a unique candidate ID that is here displayed in blue. A red box indicates that a failed fit, meaning that no localization could be generated. All localizations are marked as red crosses in the frame where the x,y,t localization is found.
 You can use the slider below the image to view all the frames that were created in the preview run.
 
 ### 3. Explore the Candidate Preview
