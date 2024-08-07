@@ -5,7 +5,7 @@ bibliography: Markdown_info/citations.bib
 # Supplementary Note 2: Software manual
 
 ## EVE - General-purpose software for eveSMLM localization
-![](Eve.png)
+![](Quick_Start/EveSmall.png)
 
 ## About EVE
 EVE is a user-interfaced software package that provides several methods to localize emitters from single molecule localization microscopy (SMLM) experiments performed on event-based sensors (eveSMLM).
@@ -20,6 +20,30 @@ EVE is designed to quickly and directly process and analyse event-based single m
 EVE allows flexible combinations of different finding and fitting routines to optimize the localization results for the specific event-based dataset. Besides a variety of different finding and fitting algorithms, EVE also offers various preview options, visualisation tools and post-processing and evaluation functions. A detailed description of the algorithms can be found in **Supplementary Note 1: Scientific Background**.
 
 EVE is written in Python and structured in such a way, that is easy to implement and add new functionalties in form of new finding, fitting routines, etc. Details about this can be found in the **Developer's Manual**. EVE can also be run via the command line interface, `EVE_CommandLine.ipynb` for detailed information.
+
+<!-- TOC -->
+# Contents
+- [Version](#version)
+- [How to install and run EVE](#how-to-install-and-run-eve)
+   - [Installation instructions](#installation-instructions)
+      - [Optional](#optional)
+   - [Running instructions](#running-instructions)
+- [Quick Start Guide](#quick-start-guide)
+   - [Set up the Processing Tab](#set-up-the-processing-tab)
+   - [Perform a Preview Run](#perform-a-preview-run)
+   - [Explore the Candidate Preview](#explore-the-candidate-preview)
+   - [Notes of best finding/fitting algorithms and parameters](#notes-of-best-findingfitting-algorithms-and-parameters)
+   - [Execute a full Run](#execute-a-full-run)
+   - [Visualize the Localization Results](#visualize-the-localization-results)
+   - [Apply a Drift Correction](#apply-a-drift-correction)
+      - [Under Windows](#under-windows)
+      - [Under Linux](#under-linux)
+   - [The final Localization List](#the-final-localization-list)
+   - [Estimate the Localization Precision](#estimate-the-localization-precision)
+   - [Metadata, run and result files](#metadata-run-and-result-files)
+   - [Command-line interface](#command-line-interface)
+   - [Exemplary data](#exemplary-data)
+<!-- /TOC -->
 
 ## Version
 The `main` branch contains the latest running version of the software. The latest developments are stored in the `develop` branch.

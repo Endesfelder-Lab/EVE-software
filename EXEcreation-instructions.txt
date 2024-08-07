@@ -1,5 +1,0 @@
-
-
-Mostly working 2024.05.23 - annoyances with multiprocessing. Currently have multiprocessing.freeze_support() at start of main as in https://github.com/pyinstaller/pyinstaller/wiki/Recipe-Multiprocessing but no luck:
-
-pyinstaller --clean --onefile Gui.py --add-data "C:\Users\Koen Martens\Documents\GitHub\Eve;." --hidden-import sklearn --hidden-import tqdm --hidden-import imageio --hidden-import joblib --hidden-import napari --collect-all vispy --collect-all napari --collect-all open3d --add-binary "C:\CondaEnvironments\EBSEnv39\Lib\site-packages\joblib\externals\loky\backend\utils.py:joblib/externals/loky/backend"
