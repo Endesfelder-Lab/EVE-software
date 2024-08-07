@@ -500,14 +500,6 @@ class MyGUI(QMainWindow):
         globalSettings['MaxFindingBoundingBoxT']['value'] = 1000
         globalSettings['MaxFindingBoundingBoxT']['input'] = float
         globalSettings['MaxFindingBoundingBoxT']['displayName'] = 'Maximum size of a bounding box in ms units'
-        # globalSettings['XYTOutlierRemoval'] = {}
-        # globalSettings['XYTOutlierRemoval']['value'] = False
-        # globalSettings['XYTOutlierRemoval']['input'] = bool
-        # globalSettings['XYTOutlierRemoval']['displayName'] = 'XYTOutlierRemoval'
-        # globalSettings['XYTOutlierRemoval_multiplier'] = {}
-        # globalSettings['XYTOutlierRemoval_multiplier']['value'] = 2.5
-        # globalSettings['XYTOutlierRemoval_multiplier']['input'] = float
-        # globalSettings['XYTOutlierRemoval_multiplier']['displayName'] = 'STD multiplier for XYTOutlierRemoval'
         globalSettings['PixelSize_nm'] = {}
         globalSettings['PixelSize_nm']['value'] = 80
         globalSettings['PixelSize_nm']['input'] = float
@@ -589,8 +581,19 @@ class MyGUI(QMainWindow):
         
 
         #Add options here that should NOT show up in the global settings window - i.e. options that should not be changed
-        globalSettings['IgnoreInOptions'] = ('IgnoreInOptions','StoreFinalOutput', 'JSONGUIstorePath','GlobalOptionsStorePath','GUIWindowWize')
+        globalSettings['IgnoreInOptions'] = ('IgnoreInOptions','StoreFinalOutput', 'JSONGUIstorePath','GlobalOptionsStorePath','GUIWindowWize','XYTOutlierRemoval','XYTOutlierRemoval_multiplier')
         return globalSettings
+    
+        #For prosperity
+        # globalSettings['XYTOutlierRemoval'] = {}
+        # globalSettings['XYTOutlierRemoval']['value'] = False
+        # globalSettings['XYTOutlierRemoval']['input'] = bool
+        # globalSettings['XYTOutlierRemoval']['displayName'] = 'XYTOutlierRemoval'
+        # globalSettings['XYTOutlierRemoval_multiplier'] = {}
+        # globalSettings['XYTOutlierRemoval_multiplier']['value'] = 2.5
+        # globalSettings['XYTOutlierRemoval_multiplier']['input'] = float
+        # globalSettings['XYTOutlierRemoval_multiplier']['displayName'] = 'STD multiplier for XYTOutlierRemoval'
+        
 
     def datasetSearchButtonClicked(self):
         # Function that handles the dataset 'File' lookup button
