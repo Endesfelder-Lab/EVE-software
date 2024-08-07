@@ -5109,11 +5109,13 @@ class CandidatePreview(QWidget):
                 if parent.data['avg_candidates_pos'] > 0:
                     parent.data['avg_cluster_size_pos'] /= parent.data['avg_candidates_pos']
                     parent.data['AveragePSFpos'].sort_values(by='t', inplace=True)
+                    # parent.data['AveragePSFpos'].to_csv('C:\\Data\\EBS\\AveragePSF_GaussianT\\AveragePSF_pos.csv', index=False, header=True)
                 if parent.data['avg_candidates_neg'] > 0:
                     parent.data['avg_cluster_size_neg'] /= parent.data['avg_candidates_neg']
                     parent.data['AveragePSFneg'].sort_values(by='t', inplace=True)
+                    # parent.data['AveragePSFneg'].to_csv('C:\\Data\\EBS\\AveragePSF_GaussianT\\AveragePSF_neg.csv', index=False, header=True)
             average_loc = pd.DataFrame({'x': [0], 'y': [0], 't': [0]})
-
+            
             # First clear text and figures
             self.candidate_info.setText('')
             self.fit_info.setText('')

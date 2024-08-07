@@ -4,11 +4,11 @@ bibliography: Markdown_info/citations.bib
 
 # Supplementary Note 2: Software manual
 
-## EVE - General-purpose software for eve-SMLM localization
+## EVE - General-purpose software for eveSMLM localization
 ![](Eve.png)
 
 ## About EVE
-EVE is a user-interfaced software package that provides several methods to localize emitters from single molecule localization microscopy (SMLM) experiments performed on event-based sensors (eve-SMLM).
+EVE is a user-interfaced software package that provides several methods to localize emitters from single molecule localization microscopy (SMLM) experiments performed on event-based sensors (eveSMLM).
 
 Event-based data differs fundamentally from conventional camera images. Unlike traditional sensors, event-based sensors only capture intensity changes, registering them as either positive (when intensity surpasses a predefined threshold) or negative events (when intensity drops below a predefined threshold). As a result, only a list of x and y pixel coordinate pairs is stored together with the detected event polarities and timestamps.
 
@@ -71,7 +71,7 @@ Running `GUI.py` will open EVE's graphical user interface which you can see on t
 ![](Quick_Start/1_Setting_up_GUI_new.png)
 
 The main window has 7 major parts that are marked with red boxes and are described in more detail in the following.  
-1. **Menu bar:** BBy clicking on `Settings`, you can open the `Advanced settings`, save or load the current GUI configuration. Under `Utilities` you will find some additional functionalities to pre-process the raw event data files before processing them with Eve. Under `Help` you have access to all important information around EVE, such as the **LINK** Users manual, the **LINK** Developers manual and the **LINK** Scientific information.<br>  
+1. **Menu bar:** By clicking on `Settings`, you can open the `Advanced settings`, save or load the current GUI configuration. Under `Utilities` you will find some additional functionalities to pre-process the raw event data files before processing them with Eve. Under `Help` you have access to all important information around EVE, such as the **LINK** Users manual, the **LINK** Developers manual and the **LINK** Scientific information.<br>  
 The folder `Data` contains the GUI configuration (`settings.json`) that we will use throughout this users manual. You can load the GUI configuration via `Settings -> Load specific GUI contents` and selecting the correct path. Now, open the `Advanced settings`, where you can adapt all global settings.<br>  
    <br>  
    ![](Quick_Start/3_advanced_settings.png)<br>  
