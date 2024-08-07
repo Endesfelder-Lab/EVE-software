@@ -47,22 +47,23 @@ def __function_metadata__():
             "help_string": "Eigen-feature analysis. Performs spectral clustering methodology on the data to separate SMLM signal from noise. Practically finds clusters based on the Eigenvalues of the covariance matrix obtained by looking at the [Number of neighbours] closest points. Only events with an Eigenvalue lower than [Maximum Eigenvalue cutoff] are used. Also selects against linearity via [Linearity cutoff]",
             "display_name": "Eigen-feature analysis"
         },
-        "eigen_feature_analysis_autoRadiusSelect": {
-            "required_kwargs": [
-                {"name": "max_eigenval_cutoff","display_text":"Maximum Eigenvalue cutoff", "description": "Cutoff of maximum eigenvalue of events. Set to zero to auto-determine this-  and use Debug to visualise!","default":0.0,"type":float},
-                {"name": "linearity_cutoff","display_text":"Linearity cutoff", "description": "Linearity (0-1) cutoff","default":0.7,"type":float},
-                {"name": "min_radius","display_text":"Minimum radius", "description": "Minimal radius","default":4,"type":float},
-                {"name": "max_radius","display_text":"Maximum radius", "description": "Maximum radius","default":10,"type":float},
-                {"name": "ratio_ms_to_px","display_text":"Ratio ms to px", "description": "Ratio of milliseconds to pixels.","default":35.0,"type":float},
-                {"name": "DBSCAN_eps","display_text":"DBSCAN epsilon", "description": "Eps of DBSCAN.","default":3,"type":int},
-                {"name": "DBSCAN_n_neighbours","display_text":"DBSCAN nr. neighbours", "description": "Minimum nr of points for DBSCAN cluster.","default":17,"type":int},
-            ],
-            "optional_kwargs": [
-                {"name": "debug", "display_text":"Debug Boolean", "description": "Get some debug info.","default":False},
-            ],
-            "help_string": "Eigen-feature analysis. Performs spectral clustering methodology on the data to separate SMLM signal from noise. Practically finds clusters based on the Eigenvalues of the covariance matrix obtained by looking neighbours in a radius. It tries to auto-select the best radius (highest contrast) via [Minimum radius] and [Maximum radius]. Only events with an Eigenvalue lower than [Maximum Eigenvalue cutoff] are used. Also selects against linearity via [Linearity cutoff]. Experimental method.",
-            "display_name": "Eigen-feature analysis, automatic radius finding"
-        },
+        # Not sure if this method works good (August 2024), removing for now.
+        # "eigen_feature_analysis_autoRadiusSelect": {
+        #     "required_kwargs": [
+        #         {"name": "max_eigenval_cutoff","display_text":"Maximum Eigenvalue cutoff", "description": "Cutoff of maximum eigenvalue of events. Set to zero to auto-determine this-  and use Debug to visualise!","default":0.0,"type":float},
+        #         {"name": "linearity_cutoff","display_text":"Linearity cutoff", "description": "Linearity (0-1) cutoff","default":0.7,"type":float},
+        #         {"name": "min_radius","display_text":"Minimum radius", "description": "Minimal radius","default":4,"type":float},
+        #         {"name": "max_radius","display_text":"Maximum radius", "description": "Maximum radius","default":10,"type":float},
+        #         {"name": "ratio_ms_to_px","display_text":"Ratio ms to px", "description": "Ratio of milliseconds to pixels.","default":35.0,"type":float},
+        #         {"name": "DBSCAN_eps","display_text":"DBSCAN epsilon", "description": "Eps of DBSCAN.","default":3,"type":int},
+        #         {"name": "DBSCAN_n_neighbours","display_text":"DBSCAN nr. neighbours", "description": "Minimum nr of points for DBSCAN cluster.","default":17,"type":int},
+        #     ],
+        #     "optional_kwargs": [
+        #         {"name": "debug", "display_text":"Debug Boolean", "description": "Get some debug info.","default":False},
+        #     ],
+        #     "help_string": "Eigen-feature analysis. Performs spectral clustering methodology on the data to separate SMLM signal from noise. Practically finds clusters based on the Eigenvalues of the covariance matrix obtained by looking neighbours in a radius. It tries to auto-select the best radius (highest contrast) via [Minimum radius] and [Maximum radius]. Only events with an Eigenvalue lower than [Maximum Eigenvalue cutoff] are used. Also selects against linearity via [Linearity cutoff]. Experimental method.",
+        #     "display_name": "Eigen-feature analysis, automatic radius finding"
+        # },
         "eigenFeature_analysis_and_bbox_finding": {
             "required_kwargs": [
                 {"name": "search_n_neighbours","display_text":"Number of neighbours", "description": "Number of (closest) neighbouring events for the covariance determination","default":50,"type":int},
