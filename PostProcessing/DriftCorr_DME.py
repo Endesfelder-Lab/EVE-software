@@ -203,7 +203,7 @@ def DriftCorr_entropyMin(resultArray,findingResult,settings,**kwargs):
 
     #To store, we should store the following data: fraem_time_for_dme, estimated_drift, pixelsize_nm
     storeLoc = kwargs['storeLoc']
-    if storeLoc != '':
+    if storeLoc != '' and storeLoc != None and storeLoc != 'None' and storeLoc != ' ':
         try:
             #Check if storeLoc ends in .npz, otherwise add it:
             if storeLoc[-4:]!= '.npz':
@@ -215,6 +215,8 @@ def DriftCorr_entropyMin(resultArray,findingResult,settings,**kwargs):
                     pixelsize_nm=float(settings['PixelSize_nm']['value']))
         except:
             logging.error('Could not save drift correction data to'+ storeLoc)
+    else:
+        logging.debug("No drift correction stored")
 
     import logging
     #Remove all entries where a negative time was given:
@@ -320,7 +322,7 @@ def DriftCorr_entropyMin_3D(resultArray,findingResult,settings,**kwargs):
 
     #To store, we should store the following data: fraem_time_for_dme, estimated_drift, pixelsize_nm
     storeLoc = kwargs['storeLoc']
-    if storeLoc != '':
+    if storeLoc != '' and storeLoc != None and storeLoc != 'None' and storeLoc != ' ':
         try:
             #Check if storeLoc ends in .npz, otherwise add it:
             if storeLoc[-4:]!= '.npz':
@@ -332,7 +334,9 @@ def DriftCorr_entropyMin_3D(resultArray,findingResult,settings,**kwargs):
                     pixelsize_nm=float(settings['PixelSize_nm']['value']))
         except:
             logging.error('Could not save drift correction data to'+ storeLoc)
-
+    else:
+        logging.debug("No drift correction stored")
+        
     import logging
     #Remove all entries where a negative time was given:
     if len(resultArray[resultArray['t'] <= 0]):
@@ -423,7 +427,7 @@ def DriftCorr_RCC(resultArray,findingResult,settings,**kwargs):
 
     #To store, we should store the following data: fraem_time_for_dme, estimated_drift, pixelsize_nm
     storeLoc = kwargs['storeLoc']
-    if storeLoc != '':
+    if storeLoc != '' and storeLoc != None and storeLoc != 'None' and storeLoc != ' ':
         try:
             #Check if storeLoc ends in .npz, otherwise add it:
             if storeLoc[-4:]!= '.npz':
@@ -435,6 +439,8 @@ def DriftCorr_RCC(resultArray,findingResult,settings,**kwargs):
                     pixelsize_nm=float(settings['PixelSize_nm']['value']))
         except:
             logging.error('Could not save drift correction data to'+ storeLoc)
+    else:
+        logging.debug("No drift correction stored")
 
     import logging
     #Remove all entries where a negative time was given:
