@@ -414,20 +414,12 @@ def PolarityMatching_time(localizations,findingResult,settings,**kwargs):
         n_curves = int(kwargs['nPops'])
         #Fit with n_curves exponential decays:
         from scipy.optimize import curve_fit
-        # def exponential_decay_1(x, a, b):
-        #     return a * np.exp(-b * x)
-        # def exponential_decay_2(x, a, b, c, f1):
-        #     return a * (f1 * np.exp(-b * x) + (1-f1) * np.exp(-c * x))
-        # def exponential_decay_3(x, a, b, c, d, f1, f2):
-        #     return a * (f1 * np.exp(-b * x) + f2 * np.exp(-c * x) + (1-f1-f2) * np.exp(-d * x))
-        
-        
         def exponential_decay_1(x, a, b):
-            return a * .5**(b * x)
+            return a * np.exp(-b * x)
         def exponential_decay_2(x, a, b, c, f1):
-            return a * (f1 * .5**(b * x) + (1-f1) * .5**(c * x))
+            return a * (f1 * np.exp(-b * x) + (1-f1) * np.exp(-c * x))
         def exponential_decay_3(x, a, b, c, d, f1, f2):
-            return a * (f1 * .5**(b * x) + f2 * .5**(c * x) + (1-f1-f2) * .5**(d * x))
+            return a * (f1 * np.exp(-b * x) + f2 * np.exp(-c * x) + (1-f1-f2) * np.exp(-d * x))
         if n_curves == 1:
             popt, pcov = curve_fit(exponential_decay_1, valuesToFit[0], valuesToFit[1], p0=[1, 0.01], bounds=(0, np.inf), maxfev=5000)
             #get RelUncertainty on popt[1]:
