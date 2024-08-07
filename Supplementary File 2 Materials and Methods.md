@@ -38,5 +38,3 @@ The full dataset was then analyzed with Eigenfeature-based finding (*Positive po
 
 ## Hardware and software environment
 All analysis, including the performance tests, was performed on a 64-bit PC equipped with a i5-12400 12th gen Intel Core processor (6 cores, 12 threads) at 2.50 GHz, 32 GB RAM (3600 MT/s), NVIDIA RTX 4070 Ti (7680 cores, 12 GB memory), on a PRIME B660M-K D4 motherboard. EVE was run via Python 3.9.18 running in a Conda environment in Windows 11 Pro, and analysis was performed with processing parallelization turned on.
-
-# References
