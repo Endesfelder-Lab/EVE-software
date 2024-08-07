@@ -1,4 +1,9 @@
-﻿# Supplementary Methods
+﻿---
+bibliography: Markdown_info\citations.bib
+csl: ieee.csl
+---
+
+# Supplementary Methods
 
 ## *E. coli* sample preparation
 *E. coli* MG1655 rpoC:mEos3.2-A69T (CamR) was grown o/n from -70°C glycerol stocks in M9 minimal medium (Merck) at 37°C under constant agitation. This culture was subcultured 1:100 in EZRDM (EZ rich defined medium; Teknova) complemented with 1:100 20% glucose, and grown for 24h, after which it was subcultured the same. This culture was grown for 3 hours, and the cells were directly fixed by adding 150 µL 37% glycerol (pre-warmed to 37°C) to 1350 µL culture and gentle agitation, and this fixation was continued for 20 minutes at 37°C. The cells were washed twice with 500 µL PBS at 37°C by centrifugation at 9000 g, and finally concentrated in 200 µL PBS. This sample was placed on an 8-chamber Ibidi slide, which was beforehand prepared as follows: the slide was cleaned by 15 minutes incubation with 1M KOH, washed twice with distilled water, incubated with poly-L-lysine (PLL) for 20 minutes, washed twice with distilled water. After incubation of the sample on the slide, the sample was washed twice with PBS before imaging.
@@ -14,11 +19,18 @@ For DNA-PAINT nanoruler (80RG, Gattaquant) imaging, the sample was illuminated w
 
 For DNA-PAINT nanoruler analysis, the Eigenfeature-based finding routine (*Positive polarity:* Linearity cutoff = 0.7, Maximum Eigenvalue cutoff = 18, Number of neighbours = 50, Ratio ms to px = 10, DBSCAN epsilon = 3 and DBSCAN nr. neighbours = 12; *Negative Polarity:* Linearity cutoff = 0.7, Maximum Eigenvalue cutoff = 18, Number of neighbours = 20, Ratio ms to px = 18, DBSCAN epsilon = 3 and DBSCAN nr. neighbours = 8) was combined with logarithmic Gaussian fitting (Time fit routine = Lognormal CDF (first events, weighted), distribution = 2D histogram of x,y positions, expected width = 150.0, fitting tolerance = 1.0; same parameters for both event polarities).
 
-## Cos7 sample preparation
-\* Biological – Manon/Clement
+## $\alpha$-tubulin sample preparation
+African green monkey kidney cells (COS-7) were cultured at 37°C and 5 % CO2 in DMEM medium containing glutamax (Gibco No. 31966-047), 10 % fetal bovine serum (FBS, Gibco No. A3840401) and 50 U/ml penicillin and 50 µg/ml streptomycin (Gibco No. 15140-148). For experiments, cells were plated on 25 mm diameter glass coverslips (type 1.5, Marienfeld) placed in six-well plates containing culture medium with 2 % FBS at low density, and fixed on the following day in 0.1 M sodium phosphate buffer (PB), pH 7.4, containing 4 % paraformaldehyde (PFA), 0.2 % glutaraldehyde, 1 % sucrose, at 37 °C for 10 minutes, followed by three rinses in PBS. Cells were permeabilized with PBS containing 0.1 % Triton X-100 for 10 minutes and rinsed three times with PBS prior to immunolabeling. For the labeling, the cells were incubated for 1 hour at 37°C with 1:300 mouse anti-alpha-tubulin antibody (Sigma Aldrich, T6199) in PBS + 1 % BSA. This was followed by three washing steps in PBS + 1 % BSA, incubation for 45 minutes at 37°C with 1:300 goat anti-mouse AF647 antibody (Life Technologies, A21237) diluted in PBS + 1 % BSA and three more washes in PBS. Finally, the cells were post-fixed with 3.6 % formaldehyde for 15 min in PBS. The cells were washed in PBS three times and then reduced for 10 minutes with 50 mM NH4Cl (Sigma Aldrich, 254134), followed by three additional washes in PBS.
 
-## Imaging and Analysis of Cos7 samples
-\* France setup– Manon/Clement
+The fluorescent beads sample used for the calibration was prepared by diluting dark red 40 nm fluorescent beads (F10720, Thermo Fisher) with a dilution factor of 1:107 in phosphate buffered saline (PBS) and allowing them to deposit on a coverslip.
+
+
+## Imaging and Analysis of $\alpha$-tubulin samples
+A custom-built microscope with a RM21 body and a MANNZ nano-positioner (Mad City Labs) was used. The illumination and fluorescence collection were done with a Nikon 100x 1.49NA APO TIRF SR oil immersion objective. The excitation was performed via a 638 nm laser (LBX-638-180, 180 mW, Oxxius) and consisted of a vertical Gaussian beam with a diameter of 30 µm in the object plane. A full multiband filter set (LF405/488/561/635-A-000, Semrock) was used to separate and clean the illumination and the fluorescence. The fluorescence was sent in the detection module and recorded on the event-based sensor (EVK V2 Gen4.1, Prophesee). We used two afocal doublets (Thorlabs) to adjust the pixel size to 67 nm in the object plane. The 3D information was encoded by astigmatism using a cylindrical lens (focal length = 500 nm, Thorlabs) to achieve a separation of the x and y widths minima of 400 nm.
+
+3D SMLM acquisitions on COS-7 cells were done using a continuous excitation with an irradiance of 5 kW/cm2. We used a dSTORM buffer composed of 100 mg/ml glucose, 3.86 mg/ml MEA, 0.5 mg/ml glucose oxidase and 1.18 µl/ml catalase in PBS. After a pumping phase of a few minutes, the acquisitions were started, and stopped after 25 minutes. A low power continuous 405 nm excitation was also added during the second half of the acquisition to increase the density of detections.
+
+For the calibration acquisitions, the excitation power was modulated with a square signal at a frequency of 30 Hz and with a duty cycle of 0.5. A series of acquisitions was performed with a 100 nm nanopositioner z position difference between each plane. These positions were converted to the corresponding positions of the focus plane by applying a focal shift correction coefficient of 0.75, as previously calibrated with a sample of known geometry [@cabriel_3d_2024].
 
 All calibration files (each containing data aquired at different z-positions) were analyzed with EVE, treating all event polarities equally and performing a frame-based finding (Detection threshold = 3.0, Exclusion radius = 4.0, Min. Radius = 1.25, Max. Radius = 4.0, Frame time (ms) = 3200 and Candidate radius = 4.0) and 2D Gaussian fitting (Time fit routine = Average time, distribution = 2D histogram of x,y positions, expected width = 200.0, fitting tolerance = 10.0). The maximum size of a bounding box was adjusted to the frame time of 3200 ms in the advanced settings. For each calibration file analyzed, the x,y-widths of all localizations were then averaged and finally all average localizations were fitted with a fourth degree polynomial depending on their z-position. Hereby, the first 4 datapoints were excluded from the fit due to strong spherical aberrations.
 
@@ -26,3 +38,5 @@ The full dataset was then analyzed with Eigenfeature-based finding (*Positive po
 
 ## Hardware and software environment
 All analysis, including the performance tests, was performed on a 64-bit PC equipped with a i5-12400 12th gen Intel Core processor (6 cores, 12 threads) at 2.50 GHz, 32 GB RAM (3600 MT/s), NVIDIA RTX 4070 Ti (7680 cores, 12 GB memory), on a PRIME B660M-K D4 motherboard. EVE was run via Python 3.9.18 running in a Conda environment in Windows 11 Pro, and analysis was performed with processing parallelization turned on.
+
+# References

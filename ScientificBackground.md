@@ -9,7 +9,7 @@ cd C:\Users\Koen Martens\Documents\GitHub\Eve
 pandoc ScientificBackground.md -o ScientificBackground.pdf --bibliography=Markdown_info\citations.bib --csl=ieee.csl --citeproc --pdf-engine=xelatex -V geometry:margin=1in
 -->
 
-# Scientific background of EVE
+# Supplementary Note 1: Scientific background of EVE
 <!--Analysis methods implemented in EVE-->
 
 ## Contents
