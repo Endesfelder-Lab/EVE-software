@@ -173,7 +173,7 @@ If selected correctly in the `Advanced Settings`, EVE will store a lot of metada
 All of EVE can also be accessed via the command-line. For a detailed overview look at `EVE_CommandLine.ipynb`.
 
 ### 12. Exemplary data
-The EVE software is packaged with three exemplary datasets, found in the **Data** folder: DNA-PAINT nanoruler, *E. coli* with endogenous RpoC-mEos3.2 and Nile Red membrane stain, and an $\alpha$-tubulin labeled Cos7 dSTORM sample. Here are succint instructions for how to fully analse these datasets:
+The EVE software is packaged with three exemplary datasets, found in the **Data** folder: DNA-PAINT nanoruler, *E. coli* with endogenous RpoC-mEos3.2 and Nile Red membrane stain, and an $\alpha$-tubulin labeled Cos7 dSTORM sample. Here are succint instructions for how to fully analyse these datasets:
 
 1. Nanoruler (DNA-PAINT):
    - In EVE, in the processing tab, set the Dataset location to the */Data/Nanoruler/Nanoruler_Small.hdf5* file (via the *File...* button).
@@ -196,5 +196,6 @@ The EVE software is packaged with three exemplary datasets, found in the **Data*
    - By using *Settings-Load Specific GUI contents*, load the */Data/aTubulin/GUI_Settings_aTubulin.json* file.
    - Open the advanced settings via *Settings-Advanced Settings*, and use *Load Global Settings* to load the */Data/aTubulin/GUI_Settings_aTubulin_advancedSettings.json* file.
    - Run the analysis by pressing **Run** in the Processing tab, or alternatively, investigate the findin g/fitting options via the **Preview** tab.
+   - After running, the results need to be drift-corrected - either via *Post-processing - Drift correction by entropy minimization [2D]* (default settings), or by loading (*Load stored drift correction DME/RCC*) the */Data/aTubulin/DME_driftCorrection.npz* file.
    - The results can be visualized by opening the *Visualization* tab and running *Gaussian-blurred with locPrecision sigma*.
    - These results should be similar to the localizations found in */Data/aTubulin/aTubulin_Small_FitResults.csv*.
