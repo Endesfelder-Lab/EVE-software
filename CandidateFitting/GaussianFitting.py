@@ -44,7 +44,7 @@ def __function_metadata__():
             "optional_kwargs": [
             ],
             "help_string": "Makes a 2D log-gaussian fit (via least squares) to determine the localization parameters.",
-            "display_name": "2D LogGaussian"
+            "display_name": "2D LogarithmicGaussian"
         }, 
         "Gaussian3D": {
             "dist_kwarg" : {"base": "XYDist", "description": "Two-dimensional event-distribution to fit to get x,y-localization.", "default_option": "Hist2d_xy"},
@@ -72,7 +72,7 @@ def __function_metadata__():
             "optional_kwargs": [
             ],
             "help_string": "Makes a 2D gaussian fit with rotation angle theta to determine the 3D localization parameters.",
-            "display_name": "3D LogGaussian: Astigmatism"
+            "display_name": "3D Logarithmic Gaussian: Astigmatism"
         }
     }
 
