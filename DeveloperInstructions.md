@@ -1,4 +1,4 @@
-﻿# Developer manual - EVE software
+﻿# Supplementary Note 3: Developer Instructions - EVE software
 
 ## Contents
 <!-- TOC -->
