@@ -338,11 +338,13 @@ class MyGUI(QMainWindow):
             QApplication.processEvents()
             quickStartWindow.setWindowTitle('Quick start / User Manual')
             QApplication.processEvents()
-            quickStartWindow.addMarkdown('README.md')
+            from pathlib import Path
+            current_dir = Path(__file__).parent
+            quickStartWindow.addMarkdown(str(current_dir)+os.sep+'README.md')
             QApplication.processEvents()
             quickStartWindow.show()
-        except:
-            logging.error('Could not open quick start window.')
+        except Exception as e:
+            logging.error(f'Could not open quick start window. {e}')
     
     def sciBGMenu(self):
         """
@@ -353,7 +355,9 @@ class MyGUI(QMainWindow):
             QApplication.processEvents()
             sciBGWindow.setWindowTitle('Scientific background')
             QApplication.processEvents()
-            sciBGWindow.addMarkdown('ScientificBackground.md')
+            from pathlib import Path
+            current_dir = Path(__file__).parent
+            sciBGWindow.addMarkdown(str(current_dir)+os.sep+'ScientificBackground.md')
             QApplication.processEvents()
             sciBGWindow.show()
         except:
@@ -376,7 +380,9 @@ class MyGUI(QMainWindow):
             QApplication.processEvents()
             DevManWindow.setWindowTitle('Developer Manual')
             QApplication.processEvents()
-            DevManWindow.addMarkdown('DeveloperInstructions.md')
+            from pathlib import Path
+            current_dir = Path(__file__).parent
+            DevManWindow.addMarkdown(str(current_dir)+os.sep+'DeveloperInstructions.md')
             QApplication.processEvents()
             DevManWindow.show()
         except:

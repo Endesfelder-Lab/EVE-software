@@ -5,6 +5,7 @@ except ImportError:
     from Utils import utilsHelper
 import pandas as pd
 import numpy as np
+import logging
 import time
 
 # from .dme import *
@@ -135,6 +136,7 @@ def DriftCorr_entropyMin(resultArray,findingResult,settings,**kwargs):
 
     #Import the correct package
     from .dme.dme import dme
+    import logging
     
     #Set user variables
     frame_time_for_dme = float(kwargs['frame_time_for_dme']) #in ms
@@ -218,7 +220,6 @@ def DriftCorr_entropyMin(resultArray,findingResult,settings,**kwargs):
     else:
         logging.debug("No drift correction stored")
 
-    import logging
     #Remove all entries where a negative time was given:
     if len(resultArray[resultArray['t'] <= 0]):
         logging.warning('Removing ' + str(len(resultArray[resultArray['t'] <= 0])) + ' negative times')
@@ -250,6 +251,7 @@ def DriftCorr_entropyMin_3D(resultArray,findingResult,settings,**kwargs):
 
     #Import the correct package
     from .dme.dme import dme
+    import logging
     
     #Set user variables
     frame_time_for_dme = float(kwargs['frame_time_for_dme']) #in ms
@@ -337,7 +339,6 @@ def DriftCorr_entropyMin_3D(resultArray,findingResult,settings,**kwargs):
     else:
         logging.debug("No drift correction stored")
         
-    import logging
     #Remove all entries where a negative time was given:
     if len(resultArray[resultArray['t'] <= 0]):
         logging.warning('Removing ' + str(len(resultArray[resultArray['t'] <= 0])) + ' negative times')
@@ -371,6 +372,7 @@ def DriftCorr_RCC(resultArray,findingResult,settings,**kwargs):
     #Import the correct package
     from .dme.dme import dme
     from .dme.dme.rcc import rcc, rcc3D
+    import logging
     
     
     #Set user variables
@@ -442,7 +444,6 @@ def DriftCorr_RCC(resultArray,findingResult,settings,**kwargs):
     else:
         logging.debug("No drift correction stored")
 
-    import logging
     #Remove all entries where a negative time was given:
     if len(resultArray[resultArray['t'] <= 0]):
         logging.warning('Removing ' + str(len(resultArray[resultArray['t'] <= 0])) + ' negative times')

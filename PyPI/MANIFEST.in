@@ -1,1 +1,7 @@
 include src/eve_smlm/Eve.png
+recursive-include src/eve_smlm/PostProcessing/dme *
+recursive-include src/eve_smlm/Visualisation/dme *
+include src/eve_smlm/*.md
+
+recursive-include src/eve_smlm/Markdown_info *
+recursive-include src/eve_smlm/Quick_Start *
