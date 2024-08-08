@@ -97,7 +97,7 @@ $A_{1-3}$ are the amplitudes of each term. The  ($x_0$,  $y_0$) - localization u
 ## 4. 2D Logarithmic Gaussian
 Due to the logarithmic nature of consecutive events a 2D logarithmic Gaussian fit was implemented similar to the 2D Gaussian fit:
 
-$$\Large pdf(x,y)=log(A_1\cdot e^{-{(x-x_0)^2\over2\sigma_x^2} +{(y-y_0)^2\over2\sigma_y^2}}+A_2)$$
+$$\Large pdf(x,y)=A_1\cdot log(1 + e^{-{(x-x_0)^2\over2\sigma_x^2} +{(y-y_0)^2\over2\sigma_y^2}})+A_2$$
 
 Again, the  ($x_0$,  $y_0$) - localization uncertainties given by the fit are used as a tolerance measure to discard imprecise fits where the fit uncertainty is larger than a user-definable factor times the pixel-size. A temporal fitting method has to be selected separately.
 
