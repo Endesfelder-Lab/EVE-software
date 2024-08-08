@@ -17,7 +17,7 @@ def argumentChecking(dictionaryInfo, function_name, given_kwargs):
     missing_opt_args = [arg for arg in optional_args if arg not in given_kwargs]
     provided_opt_args = [arg for arg in optional_args if arg in given_kwargs]
     if missing_opt_args:
-        warnings.warn(f"Unused optional arguments: {', '.join(missing_opt_args)} in function {str(function_name)}")
+        logging.info(f"Unused optional arguments: {', '.join(missing_opt_args)} in function {str(function_name)}")
     
     #Return the provided and missing optional arguments
     return [provided_opt_args, missing_opt_args]

@@ -16,11 +16,12 @@
 9. For local installation (testing package), run this: 
     [Check exact name/version number, and ideally do this in an empty, new, conda environment]
     pip install "../v011/dist/eve_smlm-0.1.1-py3-none-any.whl"
+    
 10. Upload to test pypi via this command:
     python -m twine upload --repository testpypi dist/*
     [The API is required, see our Sciebo folder; kjamartens account]
 11. To install from Test-PyPI:
-    pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple eve-SMLM==0.1.1
+    pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple eve-SMLM
 
 12. Upload to real PyPI via this command:
     python -m twine upload dist/*

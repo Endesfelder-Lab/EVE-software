@@ -704,7 +704,7 @@ def changeLayout_choice(curr_layout,className,displayNameToFunctionNameMap,paren
                     label.setToolTip(infoFromMetadata(current_selected_function,specificKwarg=reqKwargs[k]))
                     curr_layout.addWidget(label,2+((k+labelposoffset))%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+0)
                 #Check if we want to add a fileLoc-input:
-                if typeFromKwarg(current_selected_function,reqKwargs[k]) == 'fileLoc':
+                if typeFromKwarg(current_selected_function,reqKwargs[k]) == 'fileLoc' or typeFromKwarg(current_selected_function,reqKwargs[k]) == 'fileLocSave':
                     #Create a new qhboxlayout:
                     hor_boxLayout = QHBoxLayout()
                     #Add a line_edit to this:
@@ -729,8 +729,12 @@ def changeLayout_choice(curr_layout,className,displayNameToFunctionNameMap,paren
                         #Add a on-change listener:
                         line_edit.textChanged.connect(lambda text,line_edit=line_edit: kwargValueInputChanged(line_edit))
                         
-                        #Add an listener when the pushButton is pressed
-                        line_edit_lookup.clicked.connect(lambda text2,line_edit_change_objName = line_edit,text="Select file",filter="*.*": lineEditFileLookup(line_edit_change_objName, text, filter,parent=parent))
+                        if typeFromKwarg(current_selected_function,reqKwargs[k]) == 'fileLocSave':
+                            #Add an listener when the pushButton is pressed
+                            line_edit_lookup.clicked.connect(lambda text2,line_edit_change_objName = line_edit,text="Select file",filter="*.*": lineEditFileSaveLookup(line_edit_change_objName, text, filter,parent=parent))
+                        else:
+                            #Add an listener when the pushButton is pressed
+                            line_edit_lookup.clicked.connect(lambda text2,line_edit_change_objName = line_edit,text="Select file",filter="*.*": lineEditFileLookup(line_edit_change_objName, text, filter,parent=parent))
                 elif type(typeFromKwarg(current_selected_function,reqKwargs[k])) == str and typeFromKwarg(current_selected_function,reqKwargs[k])[0:9] == 'dropDown(':
                     centerText = typeFromKwarg(current_selected_function,reqKwargs[k])[9:-1]
                     if centerText[0:2] == '__' and centerText[-2:] == '__':
@@ -798,7 +802,7 @@ def changeLayout_choice(curr_layout,className,displayNameToFunctionNameMap,paren
                 label.setToolTip(infoFromMetadata(current_selected_function,specificKwarg=optKwargs[k]))
                 curr_layout.addWidget(label,2+((k+labelposoffset+len(reqKwargs)))%maxNrRows,(((k+labelposoffset+len(reqKwargs)))//maxNrRows)*2+0)
             #Check if we want to add a fileLoc-input:
-            if typeFromKwarg(current_selected_function,optKwargs[k]) == 'fileLoc':
+            if typeFromKwarg(current_selected_function,optKwargs[k]) == 'fileLoc' or typeFromKwarg(current_selected_function,optKwargs[k]) == 'fileLocSave':
                 #Create a new qhboxlayout:
                 hor_boxLayout = QHBoxLayout()
                 #Add a line_edit to this:
@@ -819,12 +823,16 @@ def changeLayout_choice(curr_layout,className,displayNameToFunctionNameMap,paren
                     line_edit.setToolTip(infoFromMetadata(current_selected_function,specificKwarg=optKwargs[k]))
                     if defaultValue is not None:
                         line_edit.setText(str(defaultValue))
-                    curr_layout.addLayout(hor_boxLayout,2+((k+labelposoffset))%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+1)
+                    curr_layout.addLayout(hor_boxLayout,2+((k+labelposoffset+len(reqKwargs)))%maxNrRows,(((k+labelposoffset+len(reqKwargs)))//maxNrRows)*2+1)
                     #Add a on-change listener:
                     line_edit.textChanged.connect(lambda text,line_edit=line_edit: kwargValueInputChanged(line_edit))
                     
-                    #Add an listener when the pushButton is pressed
-                    line_edit_lookup.clicked.connect(lambda text2,line_edit_change_objName = line_edit,text="Select file",filter="*.*": lineEditFileLookup(line_edit_change_objName, text, filter,parent=parent))
+                    if typeFromKwarg(current_selected_function,optKwargs[k]) == 'fileLocSave':
+                        #Add an listener when the pushButton is pressed
+                        line_edit_lookup.clicked.connect(lambda text2,line_edit_change_objName = line_edit,text="Select file",filter="*.*": lineEditFileSaveLookup(line_edit_change_objName, text, filter,parent=parent))
+                    else:
+                        #Add an listener when the pushButton is pressed
+                        line_edit_lookup.clicked.connect(lambda text2,line_edit_change_objName = line_edit,text="Select file",filter="*.*": lineEditFileLookup(line_edit_change_objName, text, filter,parent=parent))
                         
             else:
                 line_edit = QLineEdit()
@@ -879,7 +887,7 @@ def kwargValueInputChanged(line_edit):
     #Get the value
     value = line_edit.text()
     expectedType = typeFromKwarg(function,kwarg)
-    if expectedType == 'fileLoc':
+    if expectedType == 'fileLoc' or expectedType == 'fileLocSave':
         expectedType=str
     if expectedType is not None:
         if expectedType is str:
@@ -1013,9 +1021,27 @@ def lineEditFileLookup(line_edit_objName, text, filter,parent=None):
     file_path = generalFileSearchButtonAction(parent=parent,text=text,filter=filter,parentFolder=parentFolder)
     line_edit_objName.setText(file_path)
         
+
+def lineEditFileSaveLookup(line_edit_objName, text, filter,parent=None):
+    parentFolder = line_edit_objName.text()
+    if parentFolder != "":
+        parentFolder = os.path.dirname(parentFolder)
+    
+    file_path = generalFileSaveButtonAction(parent=parent,text=text,filter=filter,parentFolder=parentFolder)
+    line_edit_objName.setText(file_path)
+        
 def generalFileSearchButtonAction(parent=None,text='Select File',filter='*.txt',parentFolder=""):
+    file_path, _ = QFileDialog.getOpenFileName(parent,text,parentFolder,filter=filter)
+    return file_path
+
+def generalFileSaveButtonAction(parent=None,text='Select File',filter='*.txt',parentFolder=""):
     file_path, _ = QFileDialog.getSaveFileName(parent,text,parentFolder,filter=filter)
     return file_path
+
+def generalSaveButtonAction(parent=None,text='Select File',filter='*.txt',parentFolder=""):
+    file_path, _ = QFileDialog.getOpenFileName(parent,text,parentFolder,filter=filter)
+    return file_path
+
 
     
 def getEvalTextFromGUIFunction(methodName, methodKwargNames, methodKwargValues, partialStringStart=None, removeKwargs=None):
@@ -1361,7 +1387,7 @@ class SmallWindow(QMainWindow):
         except:
             folderName = ""
         
-        file_name, _ = QFileDialog.getSaveFileName(None, "Open File", folderName, fileArgs, options=options)
+        file_name, _ = QFileDialog.getOpenFileName(None, "Open File", folderName, fileArgs, options=options)
         if file_name:
             self.fileLocationLineEdit.setText(file_name)
         

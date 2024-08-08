@@ -30,7 +30,7 @@ def __function_metadata__():
                 {"name": "visualisation", "description": "Visualisation of the drift traces (Boolean).","default":True,"display_text":"Visualisation"},
             ],
             "optional_kwargs": [
-                {"name": "storeLoc", "description": "File location (*.npz file)","default":'',"type":"fileLoc","display_text":"Storage location (*.npz)"},
+                {"name": "storeLoc", "description": "File location (*.npz file)","default":'',"type":"fileLocSave","display_text":"Storage location (*.npz)"},
             ],
             "help_string": "Corrects drift based on entropy minimization in two dimensions. Original implementation from Cnossen et al., Optics Express, 2021.",
             "display_name": "Drift correction by entropy minimization [2D]"
@@ -42,7 +42,7 @@ def __function_metadata__():
                 {"name": "visualisation", "description": "Visualisation of the drift traces.","default":True,"display_text":"Visualisation"},
             ],
             "optional_kwargs": [
-                {"name": "storeLoc", "description": "File location (*.npz file)","default":'',"type":"fileLoc","display_text":"Storage location (*.npz)"},
+                {"name": "storeLoc", "description": "File location (*.npz file)","default":'',"type":"fileLocSave","display_text":"Storage location (*.npz)"},
             ],
             "help_string": "Corrects drift based on entropy minimization in three dimensions. Original implementation from Cnossen et al., Optics Express, 2021.",
             "display_name": "Drift correction by entropy minimization [3D]"
@@ -56,7 +56,7 @@ def __function_metadata__():
                 {"name": "ConvHist", "description": "Use convoluted histogram, ideally do not use - required for Linux","default":False,"display_text":"Use ConvHist (Linux; Boolean)"},
             ],
             "optional_kwargs": [
-                {"name": "storeLoc", "description": "File location (*.npz file)","default":'',"type":"fileLoc","display_text":"Storage location (*.npz)"},
+                {"name": "storeLoc", "description": "File location (*.npz file)","default":'',"type":"fileLocSave","display_text":"Storage location (*.npz)"},
             ],
             "help_string": "Redudant cross-correlation drift correction. Based on the implementation from Cnossen et al., Optics Express, 2021; on linux, based on the implementatino from Martens et al., 2022",
             "display_name": "Drift correction by RCC (redundant cross-correlation)"
