@@ -29,7 +29,6 @@ def __function_metadata__():
                 {"name": "candidate_radius", "description": "Radius of the area around the localization (in px)","default":4.,"display_text":"Candidate radius"},
             ],
             "optional_kwargs": [
-                {"name": "multithread","description": "True to use multithread parallelization; False not to.","default":True,"display_text":"Multithreading"},
             ],
             "help_string": "Convert event data to frames and perform candidate finding via wavelet detection",
             "display_name": "Frame Based finding"
@@ -249,7 +248,7 @@ def FrameBased_finding(npy_array,settings,**kwargs):
     candidate_radius = float(kwargs['candidate_radius'])
 
     # Load the optional kwargs
-    multithread = utilsHelper.strtobool(kwargs['multithread'])
+    multithread = bool(settings['Multithread']['value'])
 
     # Initializations - general
     if multithread == True: num_cores = multiprocessing.cpu_count()
