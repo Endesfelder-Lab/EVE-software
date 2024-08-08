@@ -75,8 +75,28 @@ def main():
     app = QApplication(sys.argv)
     
     gui = MyGUI()
+    
+    print('NewV!')
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    gui.setWindowIcon(QIcon(current_dir + os.sep + 'Eve.png'))
+    #Check if icon is here:
+    if os.path.isfile(current_dir + os.sep + 'Eve.png'):
+        gui.setWindowIcon(QIcon(current_dir + os.sep + 'Eve.png'))
+    else:
+        try:
+            #PIP icon finding:
+            from pathlib import Path
+            # Get the directory of the current file
+            print(__file__)
+            current_dir = Path(__file__).parent
+            # Construct the path to the icon file
+            icon_path = current_dir + os.sep + 'Eve.png'
+            print(icon_path)
+            # Use the icon path
+            gui.setWindowIcon(QIcon(str(icon_path)))
+        except:
+            print("Unable to load icon. Continuing without it.")
+
+        
     gui.setStyleSheet(get_stylesheet())
     gui.show()
     sys.exit(app.exec_())
