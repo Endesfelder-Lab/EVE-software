@@ -224,7 +224,7 @@ def compute_thread(i, sub_events, frame_time, candidate_radius, min_diameter, ma
         if len(candidates)!=0:
             dict_index = max(key_list)+1
         candidates[dict_index]=generate_candidate(events_loaded, ROIs[k,:], frame_time, candidate_radius)
-    print('Finding candidates (thread '+str(i)+') done!')
+    logging.info('Finding candidates (thread '+str(i)+') done!')
     return candidates
 
 
@@ -267,7 +267,7 @@ def FrameBased_finding(npy_array,settings,**kwargs):
 
     single_frame = Frame(npy_array)
     events_split, njobs, num_cores = slice_data(npy_array, num_cores, frame_time)
-    print("Candidate fitting split in "+str(njobs)+" job(s) and divided on "+str(num_cores)+" core(s).")
+    logging.info("Candidate fitting split in "+str(njobs)+" job(s) and divided on "+str(num_cores)+" core(s).")
     RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(compute_thread)(i, events_split[i], frame_time, candidate_radius, min_diameter, max_diameter, exclusion_radius, kernel1, kernel2, kernel, threshold_detection, single_frame) for i in range(len(events_split)))
     for i in range(len(RES)):
         for candidate in RES[i].items():

@@ -59,7 +59,7 @@ def localize_candidate(candidate, candidate_id, time_fit, pixel_size, distfunc):
         t, del_t, fit_info, opt_t = time_fit(candidate['events'], opt_loc)
     mean_polarity = candidate['events']['p'].mean()
     p = int(mean_polarity == 1) + int(mean_polarity == 0) * 0 + int(mean_polarity > 0 and mean_polarity < 1) * 2
-    loc_df = pd.DataFrame({'candidate_id': candidate_id, 'x': xmean, 'y': ymean, 'del_x': xstd, 'del_y': ystd, 'p': p, 't': t, 'del_t': del_t, 'N_events': candidate['N_events'], 'x_dim': candidate['cluster_size'][0], 'y_dim': candidate['cluster_size'][1], 't_dim': candidate['cluster_size'][2]*1e-3, 'fit_info': fit_info}, index=[0])
+    loc_df = pd.DataFrame({'candidate_id': candidate_id, 'x': xmean, 'y': ymean, 'del_x': xstd, 'del_y': ystd, 'p': p, 't': t, 'del_t': del_t, 'N_events': candidate['N_events'], 'x_dim': candidate['cluster_size'][1], 'y_dim': candidate['cluster_size'][0], 't_dim': candidate['cluster_size'][2]*1e-3, 'fit_info': fit_info}, index=[0])
     return loc_df
 
 # perform localization for part of candidate dictionary

@@ -53,7 +53,7 @@ def __function_metadata__():
                 {"name": "nr_time_bins", "description": "Number of time bins","default":10,"type":int,"display_text":"Number of bins"},
                 {"name": "zoom_level", "description": "Zoom level","default":2,"type":int,"display_text":"Zoom of RCC plots"},
                 {"name": "visualisation", "description": "Visualisation of the drift traces.","default":True,"display_text":"Visualisation"},
-                {"name": "ConvHist", "description": "Use convoluted histogram, ideally do not use - required for Linux","default":False,"display_text":"Use ConvHist (Linux; Boolean)"},
+                {"name": "ConvHist", "description": "Use convoluted histogram, ideally do not use - required for Linux, MacOs","default":False,"display_text":"Use ConvHist (Linux, MacOS; Boolean)"},
             ],
             "optional_kwargs": [
                 {"name": "storeLoc", "description": "File location (*.npz file)","default":'',"type":"fileLocSave","display_text":"Storage location (*.npz)"},

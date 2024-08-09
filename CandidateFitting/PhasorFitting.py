@@ -108,7 +108,7 @@ class phasor():
         
         mean_polarity = candidate['events']['p'].mean()
         p = int(mean_polarity == 1) + int(mean_polarity == 0) * 0 + int(mean_polarity > 0 and mean_polarity < 1) * 2
-        loc_df = pd.DataFrame({'candidate_id': candidate_id, 'x': x, 'y': y, 'p': p, 't': t, 'N_events': candidate['N_events'], 'x_dim': candidate['cluster_size'][0], 'y_dim': candidate['cluster_size'][1], 't_dim': candidate['cluster_size'][2]*1e-3, 'fit_info': ''}, index=[0])
+        loc_df = pd.DataFrame({'candidate_id': candidate_id, 'x': x, 'y': y, 'p': p, 't': t, 'N_events': candidate['N_events'], 'x_dim': candidate['cluster_size'][1], 'y_dim': candidate['cluster_size'][0], 't_dim': candidate['cluster_size'][2]*1e-3, 'fit_info': ''}, index=[0])
         return loc_df
 
 class phasor_customTimeFit(fit):
@@ -153,7 +153,7 @@ class phasor_customTimeFit(fit):
         
         mean_polarity = candidate['events']['p'].mean()
         p = int(mean_polarity == 1) + int(mean_polarity == 0) * 0 + int(mean_polarity > 0 and mean_polarity < 1) * 2
-        loc_df = pd.DataFrame({'candidate_id': candidate_id, 'x': x, 'y': y, 'p': p, 't': t, 'del_t': del_t, 'N_events': candidate['N_events'], 'x_dim': candidate['cluster_size'][0], 'y_dim': candidate['cluster_size'][1], 't_dim': candidate['cluster_size'][2]*1e-3, 'fit_info': ''}, index=[0])
+        loc_df = pd.DataFrame({'candidate_id': candidate_id, 'x': x, 'y': y, 'p': p, 't': t, 'del_t': del_t, 'N_events': candidate['N_events'], 'x_dim': candidate['cluster_size'][1], 'y_dim': candidate['cluster_size'][0], 't_dim': candidate['cluster_size'][2]*1e-3, 'fit_info': ''}, index=[0])
         return loc_df
 
 # perform localization for part of candidate dictionary

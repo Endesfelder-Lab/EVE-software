@@ -389,7 +389,7 @@ def get_events_in_bbox(npyarr,bboxes,ms_to_px,multiThread=True):
             
             candidates2[bboxid] = {}
             candidates2[bboxid]['events'] = filtered_df
-            candidates2[bboxid]['cluster_size'] = [np.max(filtered_array['y'])-np.min(filtered_array['y']), np.max(filtered_array['x'])-np.min(filtered_array['x']), np.max(filtered_array['t'])-np.min(filtered_array['t'])]
+            candidates2[bboxid]['cluster_size'] = [np.max(filtered_array['y'])-np.min(filtered_array['y'])+1, np.max(filtered_array['x'])-np.min(filtered_array['x'])+1, np.max(filtered_array['t'])-np.min(filtered_array['t'])]
             candidates2[bboxid]['N_events'] = len(filtered_array)
         end_time = time.time()
         logging.info('Time to get bounding boxes o3d: '+str(end_time-start_time))
@@ -435,7 +435,7 @@ def get_events_in_bbox(npyarr,bboxes,ms_to_px,multiThread=True):
                 indexv = counter
                 candidates[indexv] = {}
                 candidates[indexv]['events'] = filtered_df2
-                candidates[indexv]['cluster_size'] = [np.max(filtered_array['y'])-np.min(filtered_array['y']), np.max(filtered_array['x'])-np.min(filtered_array['x']), np.max(filtered_array['t'])-np.min(filtered_array['t'])]
+                candidates[indexv]['cluster_size'] = [np.max(filtered_array['y'])-np.min(filtered_array['y'])+1, np.max(filtered_array['x'])-np.min(filtered_array['x'])+1, np.max(filtered_array['t'])-np.min(filtered_array['t'])]
                 candidates[indexv]['N_events'] = len(filtered_array)
                 counter+=1
         
@@ -475,7 +475,7 @@ def get_events_in_bbox(npyarr,bboxes,ms_to_px,multiThread=True):
         #         filtered_df2 = pd.DataFrame(filtered_array)
         #         candidates[counter] = {}
         #         candidates[counter]['events'] = filtered_df2
-        #         candidates[counter]['cluster_size'] = [np.max(filtered_array['y'])-np.min(filtered_array['y']), np.max(filtered_array['x'])-np.min(filtered_array['x']), np.max(filtered_array['t'])-np.min(filtered_array['t'])]
+        #         candidates[counter]['cluster_size'] = [np.max(filtered_array['y'])-np.min(filtered_array['y'])+1, np.max(filtered_array['x'])-np.min(filtered_array['x'])+1, np.max(filtered_array['t'])-np.min(filtered_array['t'])]
         #         candidates[counter]['N_events'] = len(filtered_array)
         #         counter +=1
                 
@@ -533,7 +533,7 @@ def get_events_in_bbox_bisect(npyarr,bboxes,ms_to_px):
         
         candidates[bboxid] = {}
         candidates[bboxid]['events'] = filtered_df
-        candidates[bboxid]['cluster_size'] = [np.max(filtered_array['y'])-np.min(filtered_array['y']), np.max(filtered_array['x'])-np.min(filtered_array['x']), np.max(filtered_array['t'])-np.min(filtered_array['t'])]
+        candidates[bboxid]['cluster_size'] = [np.max(filtered_array['y'])-np.min(filtered_array['y'])+1, np.max(filtered_array['x'])-np.min(filtered_array['x'])+1, np.max(filtered_array['t'])-np.min(filtered_array['t'])]
         candidates[bboxid]['N_events'] = len(filtered_array)
     end_time = time.time()
     
@@ -775,7 +775,7 @@ def DBSCAN_onlyHighDensity(npy_array,settings,**kwargs):
             clusterEvents = clusters[cluster_labels == cl]
             candidates[cl] = {}
             candidates[cl]['events'] = clusterEvents
-            candidates[cl]['cluster_size'] = [np.max(clusterEvents['y'])-np.min(clusterEvents['y']), np.max(clusterEvents['x'])-np.min(clusterEvents['x']), np.max(clusterEvents['t'])-np.min(clusterEvents['t'])]
+            candidates[cl]['cluster_size'] = [np.max(clusterEvents['y'])-np.min(clusterEvents['y'])+1, np.max(clusterEvents['x'])-np.min(clusterEvents['x'])+1, np.max(clusterEvents['t'])-np.min(clusterEvents['t'])]
             candidates[cl]['N_events'] = len(clusterEvents)
     endtime = time.time()
     # Print the elapsed time:

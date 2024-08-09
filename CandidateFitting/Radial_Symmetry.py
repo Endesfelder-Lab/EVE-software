@@ -155,7 +155,7 @@ def radialcenter(distfunc, candidateID, candidate, time_fit, pixel_size):
     xc = (xc + np.min(candidate['events']['x']))*pixel_size # in nm
     yc = (yc + np.min(candidate['events']['y']))*pixel_size # in nm
 
-    loc_df = pd.DataFrame({'candidate_id': candidateID, 'x': xc, 'y': yc, 'p': p, 't': t, 'del_t': del_t, 'N_events': candidate['N_events'], 'x_dim': candidate['cluster_size'][0], 'y_dim': candidate['cluster_size'][1], 't_dim': candidate['cluster_size'][2]*1e-3, 'fit_info': t_fit_info}, index=[0])
+    loc_df = pd.DataFrame({'candidate_id': candidateID, 'x': xc, 'y': yc, 'p': p, 't': t, 'del_t': del_t, 'N_events': candidate['N_events'], 'x_dim': candidate['cluster_size'][1], 'y_dim': candidate['cluster_size'][0], 't_dim': candidate['cluster_size'][2]*1e-3, 'fit_info': t_fit_info}, index=[0])
     return loc_df
 
 
@@ -301,7 +301,7 @@ class radysm:
                 self.fit_info = t_fit_info
         mean_polarity = candidate['events']['p'].mean()
         p = int(mean_polarity == 1) + int(mean_polarity == 0) * 0 + int(mean_polarity > 0 and mean_polarity < 1) * 2
-        loc_df = pd.DataFrame({'candidate_id': candidateID, 'x': x, 'y': y, 'del_x': del_x, 'del_y': del_y, 'p': p, 't': t, 'del_t': del_t, 'N_events': candidate['N_events'], 'x_dim': candidate['cluster_size'][0], 'y_dim': candidate['cluster_size'][1], 't_dim': candidate['cluster_size'][2]*1e-3, 'fit_info': self.fit_info}, index=[0])
+        loc_df = pd.DataFrame({'candidate_id': candidateID, 'x': x, 'y': y, 'del_x': del_x, 'del_y': del_y, 'p': p, 't': t, 'del_t': del_t, 'N_events': candidate['N_events'], 'x_dim': candidate['cluster_size'][1], 'y_dim': candidate['cluster_size'][0], 't_dim': candidate['cluster_size'][2]*1e-3, 'fit_info': self.fit_info}, index=[0])
         return loc_df
 
 # perform localization for part of candidate dictionary
@@ -485,7 +485,7 @@ def radialcenter3d(candidateID, candidate, time_bin_width, pixel_size):
     mean_polarity = candidate['events']['p'].mean()
     p = int(mean_polarity == 1) + int(mean_polarity == 0) * 0 + int(mean_polarity > 0 and mean_polarity < 1) * 2
 
-    loc_df = pd.DataFrame({'candidate_id': candidateID, 'x': center[0], 'y': center[1], 'del_x': error[0], 'del_y': error[1], 'p': p, 't': center[2], 'del_t': error[2], 'N_events': candidate['N_events'], 'x_dim': candidate['cluster_size'][0], 'y_dim': candidate['cluster_size'][1], 't_dim': candidate['cluster_size'][2]*1e-3, 'fit_info': fit_info}, index=[0])
+    loc_df = pd.DataFrame({'candidate_id': candidateID, 'x': center[0], 'y': center[1], 'del_x': error[0], 'del_y': error[1], 'p': p, 't': center[2], 'del_t': error[2], 'N_events': candidate['N_events'], 'x_dim': candidate['cluster_size'][1], 'y_dim': candidate['cluster_size'][0], 't_dim': candidate['cluster_size'][2]*1e-3, 'fit_info': fit_info}, index=[0])
     return loc_df
 
 # perform localization for part of candidate dictionary with 3d radial symmetry

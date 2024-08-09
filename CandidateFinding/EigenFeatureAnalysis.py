@@ -252,10 +252,10 @@ def clusterPoints_to_candidates(clusterpoints,cluster_labels,ms_to_px):
             candidates[cl] = {}
             candidates[cl]['events'] = clusterEvents
             candidates[cl]['N_events'] = int(len(clusterEvents))
-            # candidates[cl]['cluster_size'] = [int((clusterEvents['y']).max()-(clusterEvents['y']).min()), int((clusterEvents['x']).max()-(clusterEvents['x']).min()), int((clusterEvents['t']).max()-(clusterEvents['t']).min())]
+            # candidates[cl]['cluster_size'] = [int((clusterEvents['y']).max()-(clusterEvents['y']).min()+1), int((clusterEvents['x']).max()-(clusterEvents['x']).min()+1), int((clusterEvents['t']).max()-(clusterEvents['t']).min())]
             
             #We know that they're time-sorted, so for time, we can do end-start, which is max-min. Speeds up a little
-            candidates[cl]['cluster_size'] = [int((clusterEvents['y']).max()-(clusterEvents['y']).min()), int((clusterEvents['x']).max()-(clusterEvents['x']).min()), int(clusterEvents['t'].iloc[-1]-clusterEvents['t'].iloc[0])]
+            candidates[cl]['cluster_size'] = [int((clusterEvents['y']).max()-(clusterEvents['y']).min()+1), int((clusterEvents['x']).max()-(clusterEvents['x']).min()+1), int(clusterEvents['t'].iloc[-1]-clusterEvents['t'].iloc[0])]
             
     endtime = time.time()
     
