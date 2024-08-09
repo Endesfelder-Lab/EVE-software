@@ -3683,7 +3683,7 @@ class AdvancedSettingsWindow(QMainWindow):
     def load_as_global_settings(self):
         ## Have a file load dialog to open json:
         # Open the file dialog
-        jsonLocation, _ = QFileDialog.getOpenFileName(self, "Load Advanced settings file", "", "Settings File (*.json);")
+        jsonLocation, _ = QFileDialog.getOpenFileName(self, "Load Advanced settings file", "", "Settings File (*.json);;All Files (*);")
         json_file_path = jsonLocation
         try:    # Load the globalSettings dictionary from the JSON file
             with open(json_file_path, "r") as json_file:
