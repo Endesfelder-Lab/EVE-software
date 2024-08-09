@@ -1,0 +1,123 @@
+Metadata information for file /home/laura/PhD/Event_Based_Sensor_Project/Eve/Data/Nanoruler/Nanoruler_Small.hdf5
+Analysis routine started at 2024-08-08 16:14:58
+Analysis routine finished at 2024-08-08 16:20:22
+
+
+-----Information on finding of polarity Pos: -----
+Methodology Used:
+FrameBasedFinding.FrameBased_finding(self.events,self.settings,threshold_detection="3.0",exclusion_radius="4.0",min_diameter="1.25",max_diameter="4.0",frame_time="100.0",candidate_radius="4.0")
+
+Number of candidates found: 6625
+Candidate fitting took 229.544682264328 seconds.
+
+
+-----Information on finding of polarity Neg: -----
+Methodology Used:
+EigenFeatureAnalysis.eigenFeature_analysis(self.events,self.settings,search_n_neighbours="20",max_eigenval_cutoff="18",linearity_cutoff="0.7",ratio_ms_to_px="18",DBSCAN_eps="3",DBSCAN_n_neighbours="8",debug="False")
+
+Number of candidates found: 3821
+Candidate fitting took 3.1962790489196777 seconds.
+
+
+-----Information on fitting of polarity Pos: -----
+Methodology Used:
+SimpleOperants.AverageXYpos(self.partialFindingResults,self.settings,dist_kwarg="Hist2d_xy",time_kwarg="LognormCDFFirstEvents_weighted")
+
+Number of valid localizations found: 6625
+Candidate fitting took 59.898327112197876 seconds.
+
+
+-----Information on fitting of polarity Neg: -----
+Methodology Used:
+SimpleOperants.AverageXYpos(self.partialFindingResults,self.settings,dist_kwarg="Hist2d_xy",time_kwarg="LognormCDFFirstEvents_weighted")
+
+Number of valid localizations found: 3821
+Candidate fitting took 30.541378021240234 seconds.
+
+
+
+---- Global settings used ----
+
+MinFindingBoundingBoxXY: 2
+MinFindingBoundingBoxT: 10
+MaxFindingBoundingBoxXY: 20
+MaxFindingBoundingBoxT: 1000
+PixelSize_nm: 80
+MetaVisionPath: C:\Program Files\Prophesee\lib\python3\site-packages
+StoreConvertedRawData: 0
+StoreFileMetadata: 2
+StoreFindingOutput: 2
+StoreFittingOutput: 2
+HotPixelIndexes: 
+OutputDataFormat: thunderstorm
+LoggingFilePath: C:\Users\Koen Martens\AppData\Local\UniBonn\Eve\logging.log
+Multithread: 2
+UseCUDA: False
+FindingBatching: 2
+FindingBatchingTimeMs: 60000
+FindingBatchingTimeOverlapMs: 2000
+
+
+---- Additional custom output ----
+
+Custom output from finding function:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Eigen-Feature Finding ran for 1.299187421798706 seconds.
+Eigen-Feature Finding ran for 1.1544148921966553 seconds.
+Eigen-Feature Finding ran for 1.2117257118225098 seconds.
+Eigen-Feature Finding ran for 1.2780423164367676 seconds.
+Eigen-Feature Finding ran for 1.1380345821380615 seconds.
+Eigen-Feature Finding ran for 1.0577101707458496 seconds.
+Eigen-Feature Finding ran for 1.072629690170288 seconds.
+Eigen-Feature Finding ran for 1.189502239227295 seconds.
+Eigen-Feature Finding ran for 0.9525010585784912 seconds.
+Eigen-Feature Finding ran for 1.2611973285675049 seconds.
+Eigen-Feature Finding ran for 1.0353128910064697 seconds.
+Eigen-Feature Finding ran for 1.2154982089996338 seconds.
+Eigen-Feature Finding ran for 0.6904900074005127 seconds.
+Eigen-Feature Finding ran for 0.6329772472381592 seconds.
+Eigen-Feature Finding ran for 0.5318706035614014 seconds.
+Eigen-Feature Finding ran for 0.18168258666992188 seconds.
+
+
+Custom output from fitting function:
+Took average time instead of fitted time for 122/6625 (1.84%) candidates due to TimeOptimizeWarning.
+Took average time instead of fitted time for 248/6625 (3.74%) candidates due to TimeRuntimeError.
+Took average time instead of fitted time for 7/6625 (0.11%) candidates due to TimeRuntimeWarning.
+Took average time instead of fitted time for 108/6625 (1.63%) candidates due to TimeToleranceWarning.
+
+Candidates for which average time was taken instead of fitted time due to TimeOptimizeWarning:[1, 185, 199, 241, 337, 524, 529, 530, 533, 714, ..., 6150, 6184, 6213, 6233, 6304, 6335, 6424, 6490, 6504, 6607]
+Candidates for which average time was taken instead of fitted time due to TimeRuntimeError:[13, 32, 34, 60, 64, 66, 82, 87, 93, 126, ..., 6259, 6267, 6271, 6361, 6422, 6470, 6478, 6501, 6553, 6559]
+Candidates for which average time was taken instead of fitted time due to TimeRuntimeWarning: [509, 1283, 2737, 3529, 4777, 5008, 6555]
+Candidates for which average time was taken instead of fitted time due to TimeToleranceWarning:[33, 81, 92, 97, 188, 269, 291, 336, 339, 402, ..., 6145, 6151, 6195, 6260, 6326, 6380, 6421, 6423, 6512, 6584]
+No candidates were discarded due to bad fitting. Average time was taken instead of fitted time for several candidates.
+
+
+Took average time instead of fitted time for 43/3821 (1.13%) candidates due to TimeOptimizeWarning.
+Took average time instead of fitted time for 211/3821 (5.52%) candidates due to TimeRuntimeError.
+Took average time instead of fitted time for 15/3821 (0.39%) candidates due to TimeRuntimeWarning.
+Took average time instead of fitted time for 102/3821 (2.67%) candidates due to TimeToleranceWarning.
+
+Candidates for which average time was taken instead of fitted time due to TimeOptimizeWarning:[136, 248, 266, 300, 311, 324, 459, 680, 724, 744, ..., 3229, 3279, 3332, 3480, 3549, 3569, 3570, 3605, 3639, 3685]
+Candidates for which average time was taken instead of fitted time due to TimeRuntimeError:[28, 29, 39, 60, 62, 64, 76, 104, 114, 120, ..., 3578, 3598, 3636, 3677, 3689, 3690, 3759, 3761, 3773, 3810]
+Candidates for which average time was taken instead of fitted time due to TimeRuntimeWarning: [495, 959, 1232, 1313, 1486, 1580, 1903, 2128, 2271, 2894, 3177, 3207, 3306, 3760, 3777]
+Candidates for which average time was taken instead of fitted time due to TimeToleranceWarning:[18, 37, 74, 86, 158, 268, 281, 317, 347, 491, ..., 3543, 3544, 3625, 3628, 3646, 3673, 3712, 3725, 3774, 3776]
+No candidates were discarded due to bad fitting. Average time was taken instead of fitted time for several candidates.

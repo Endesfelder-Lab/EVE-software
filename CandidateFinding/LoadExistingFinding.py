@@ -1,5 +1,8 @@
 import inspect, logging
-from Utils import utilsHelper
+try:
+    from eve_smlm.Utils import utilsHelper
+except ImportError:
+    from Utils import utilsHelper
 import pickle
 
 # Required function __function_metadata__
@@ -22,6 +25,9 @@ def __function_metadata__():
 #Callable functions
 #-------------------------------------------------------------------------------------------------------------------------------
 def LoadExistingFinding(npy_array,settings,**kwargs):
+    """
+    Load existing Finding function
+    """
     #Check if we have the required kwargs
     [provided_optional_args, missing_optional_args] = utilsHelper.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
 

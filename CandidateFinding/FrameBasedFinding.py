@@ -1,4 +1,8 @@
-from Utils import utilsHelper
+
+try:
+    from eve_smlm.Utils import utilsHelper
+except ImportError:
+    from Utils import utilsHelper
 from sklearn.cluster import DBSCAN
 import scipy.ndimage
 from scipy import spatial
@@ -25,9 +29,8 @@ def __function_metadata__():
                 {"name": "candidate_radius", "description": "Radius of the area around the localization (in px)","default":4.,"display_text":"Candidate radius"},
             ],
             "optional_kwargs": [
-                {"name": "multithread","description": "True to use multithread parallelization; False not to.","default":True,"display_text":"Multithreading"},
             ],
-            "help_string": "Convert event data to frames and do finding via wavelet detection",
+            "help_string": "Convert event data to frames and perform candidate finding via wavelet detection",
             "display_name": "Frame Based finding"
         }
     }
@@ -62,6 +65,9 @@ class Frame():
     
 # wavelet detection
 def wavelet_detection(frame, kernel1, kernel2, kernel, threshold_detection):
+    """
+    Perform difference-of-wavelet detection via scipy's convolve
+    """
     V1=scipy.ndimage.convolve1d(scipy.ndimage.convolve1d(frame,kernel1,axis=1),kernel1,axis=0)
     V2=scipy.ndimage.convolve1d(scipy.ndimage.convolve1d(V1,kernel2,axis=1),kernel2,axis=0)
     Wavelet2nd=V1-V2
@@ -72,7 +78,9 @@ def wavelet_detection(frame, kernel1, kernel2, kernel, threshold_detection):
 
 # PSF detection
 def detect_PSFs(frame, x0, y0, min_diameter, max_diameter, exclusion_radius, candidate_radius, kernel1, kernel2, kernel, threshold_detection):# verify exceptions for zero detections
-    
+    """
+    General PSF detection function
+    """
     # Generate image to label
     image_to_label=wavelet_detection(frame, kernel1, kernel2, kernel, threshold_detection)
     
@@ -130,12 +138,18 @@ def detect_PSFs(frame, x0, y0, min_diameter, max_diameter, exclusion_radius, can
 
 # Process frame (get all ROIs in frame)
 def process_frame(frame, x0, y0, times, min_diameter, max_diameter, exclusion_radius, candidate_radius, kernel1, kernel2, kernel, threshold_detection):    
+    """
+    Process a single frame
+    """
     ROIs=detect_PSFs(frame, x0, y0, min_diameter, max_diameter, exclusion_radius, candidate_radius, kernel1, kernel2, kernel, threshold_detection)
     ROIs[:,2]=times[0]
     return ROIs
 
-# Generate single candidate dictionary entry for specified ROI + parameter
+
 def generate_candidate(events, ROI, frame_time, candidate_radius):
+    """
+    # Generate single candidate dictionary entry for specified ROI + parameter
+    """
     msk=(events['t']>=ROI[2])*(events['t']<ROI[2]+frame_time)
     rho=(events['y']-ROI[0])**2+(events['x']-ROI[1])**2
     msk*=(rho<=candidate_radius**2)
@@ -146,8 +160,11 @@ def generate_candidate(events, ROI, frame_time, candidate_radius):
     candidate['N_events'] = len(sub_events)
     return candidate
 
-# Calculate number of jobs on CPU
+
 def nb_jobs(events, num_cores, frame_time):
+    """
+    # Calculate number of jobs on CPU
+    """
     time_tot = events['t'][-1]-events['t'][0]
     time_base = frame_time
     if time_tot < frame_time or num_cores == 1:
@@ -161,8 +178,10 @@ def nb_jobs(events, num_cores, frame_time):
         num_cores = njobs
     return njobs, num_cores, time_base
 
-# Slice data to distribute the computation on several cores
 def slice_data(events, num_cores, frame_time):
+    """
+    # Slice data to distribute the computation on several cores
+    """
     njobs, num_cores, time_slice = nb_jobs(events, num_cores, frame_time)
     data_split=[]
     t_min = events['t'][0]
@@ -173,8 +192,10 @@ def slice_data(events, num_cores, frame_time):
         data_split.append(events[msk])
     return data_split, njobs, num_cores
 
-# Candidate finding routine on a single core
 def compute_thread(i, sub_events, frame_time, candidate_radius, min_diameter, max_diameter, exclusion_radius, kernel1, kernel2, kernel, threshold_detection, single_frame):
+    """
+    # Candidate finding routine on a single core
+    """
     print('Finding candidates (thread '+str(i)+')...')
     time_max=np.max(sub_events['t'])
     time_min=np.min(sub_events['t'])
@@ -203,7 +224,7 @@ def compute_thread(i, sub_events, frame_time, candidate_radius, min_diameter, ma
         if len(candidates)!=0:
             dict_index = max(key_list)+1
         candidates[dict_index]=generate_candidate(events_loaded, ROIs[k,:], frame_time, candidate_radius)
-    print('Finding candidates (thread '+str(i)+') done!')
+    logging.info('Finding candidates (thread '+str(i)+') done!')
     return candidates
 
 
@@ -211,6 +232,9 @@ def compute_thread(i, sub_events, frame_time, candidate_radius, min_diameter, ma
 #Callable functions
 #-------------------------------------------------------------------------------------------------------------------------------
 def FrameBased_finding(npy_array,settings,**kwargs):
+    """
+    General FrameBased finding  function
+    """
     # Check if we have the required kwargs
     [provided_optional_args, missing_optional_args] = utilsHelper.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
 
@@ -224,7 +248,7 @@ def FrameBased_finding(npy_array,settings,**kwargs):
     candidate_radius = float(kwargs['candidate_radius'])
 
     # Load the optional kwargs
-    multithread = utilsHelper.strtobool(kwargs['multithread'])
+    multithread = bool(settings['Multithread']['value'])
 
     # Initializations - general
     if multithread == True: num_cores = multiprocessing.cpu_count()
@@ -243,7 +267,7 @@ def FrameBased_finding(npy_array,settings,**kwargs):
 
     single_frame = Frame(npy_array)
     events_split, njobs, num_cores = slice_data(npy_array, num_cores, frame_time)
-    print("Candidate fitting split in "+str(njobs)+" job(s) and divided on "+str(num_cores)+" core(s).")
+    logging.info("Candidate fitting split in "+str(njobs)+" job(s) and divided on "+str(num_cores)+" core(s).")
     RES = Parallel(n_jobs=num_cores,backend="loky")(delayed(compute_thread)(i, events_split[i], frame_time, candidate_radius, min_diameter, max_diameter, exclusion_radius, kernel1, kernel2, kernel, threshold_detection, single_frame) for i in range(len(events_split)))
     for i in range(len(RES)):
         for candidate in RES[i].items():

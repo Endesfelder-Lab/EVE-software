@@ -1,5 +1,8 @@
 import inspect
-from Utils import utilsHelper
+try:
+    from eve_smlm.Utils import utilsHelper
+except ImportError:
+    from Utils import utilsHelper
 import pandas as pd
 import numpy as np
 import time
@@ -10,12 +13,13 @@ def __function_metadata__():
     return {
         "Histogram_convolution": {
             "required_kwargs": [
-                {"name": "ZoomValue", "description": "Pixel-to-pseudopixel ratio","default":10},
-                {"name": "Convolution_kernel", "description": "Convolution pixel size","default":3},
+                {"name": "PxSize","display_text": "Pixel size (nm)", "description": "Pixel-to-pseudopixel ratio","default":10},
+                {"name": "Convolution_kernel","display_text": "Convolution kernel size (nm)", "description": "Convolution pixel size","default":50},
             ],
             "optional_kwargs": [
             ],
-            "help_string": "Returns a test dictionary and metadata string, to check if the program is working properly."
+            "help_string": "Returns a test dictionary and metadata string, to check if the program is working properly.",
+            "display_name": "2D Histogram with circular kernel convolution"
         }
     }
 
@@ -47,7 +51,15 @@ def Histogram_convolution(resultArray,settings,**kwargs):
     # Start the timer
     start_time = time.time()
     
-    zoomvalue=float(kwargs['ZoomValue'])
+    #Get pixels sizes for the histogram and kernel
+    pxsizeHist = float(kwargs['PxSize'])
+    pxsizeKernel = float(kwargs['Convolution_kernel'])
+    
+    #Set them to 'magnification' and 'kernel size in px'
+    zoomvalue = float(settings['PixelSize_nm']['value'])/pxsizeHist
+    KernelWidthPx = int(round(pxsizeKernel/pxsizeHist))
+    
+    # zoomvalue=float(kwargs['ZoomValue'])
     
     #Idea: create an empty array with the right size, i.e. ZoomValue times bigger than the maximum size of the results.
     #Then simply increase the value of the pixels in that array based on resultArray
@@ -72,7 +84,7 @@ def Histogram_convolution(resultArray,settings,**kwargs):
     histogram_original = np.histogram2d(data['x'], data['y'], range=[[minx, maxx], [miny, maxy]],
                                     bins=[int(maxx*zoomvalue), int(maxy*zoomvalue)])
     
-    kernel = create_kernel(int(kwargs['Convolution_kernel']))
+    kernel = create_kernel(KernelWidthPx)
     
     histogram_convolved = scipy.signal.convolve2d(histogram_original[0], kernel, mode='same')
     

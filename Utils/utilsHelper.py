@@ -17,7 +17,7 @@ def argumentChecking(dictionaryInfo, function_name, given_kwargs):
     missing_opt_args = [arg for arg in optional_args if arg not in given_kwargs]
     provided_opt_args = [arg for arg in optional_args if arg in given_kwargs]
     if missing_opt_args:
-        warnings.warn(f"Unused optional arguments: {', '.join(missing_opt_args)} in function {str(function_name)}")
+        logging.info(f"Unused optional arguments: {', '.join(missing_opt_args)} in function {str(function_name)}")
     
     #Return the provided and missing optional arguments
     return [provided_opt_args, missing_opt_args]
@@ -40,7 +40,9 @@ def strtobool(val):
     else:
         raise ValueError("invalid truth value %r" % (val,))
 
+#DEPRACATED - probably bad idea to use, but kept for prosperity
 def removeCandidates_xytoutliers(candidates,settings,x_std_mult = None, y_std_mult = None, t_std_mult = None):
+    logging.warning('It is recommended not to use XYTOutlier_removal.')
     #._std_mult can be set to a value to force the standard deviation, otherwise it is set by the settings (and if not found, set to default of 2.5):
     if 'XYTOutlierRemoval' in settings:
         if settings['XYTOutlierRemoval']['value'] > 0:

@@ -1,12 +1,16 @@
 import inspect
-from Utils import utilsHelper
+try:
+    from eve_smlm.Utils import utilsHelper
+    from eve_smlm.EventDistributions import eventDistributions
+    from eve_smlm.TemporalFitting import timeFitting
+except ImportError:
+    from Utils import utilsHelper
+    from EventDistributions import eventDistributions
+    from TemporalFitting import timeFitting
 import pandas as pd
 import numpy as np
 from scipy import optimize
 import logging
-#Obtain eventdistribution functions
-from EventDistributions import eventDistributions
-from TemporalFitting import timeFitting
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib.gridspec import GridSpec
 

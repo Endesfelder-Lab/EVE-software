@@ -1,5 +1,10 @@
 import inspect
-from Utils import utilsHelper
+try:
+    from eve_smlm.Utils import utilsHelper
+    from eve_smlm.TemporalFitting import timeFitting
+except ImportError:
+    from Utils import utilsHelper
+    from TemporalFitting import timeFitting
 import pandas as pd
 import numpy as np
 from scipy.optimize import curve_fit
@@ -9,7 +14,6 @@ import logging
 import warnings
 from scipy.optimize import OptimizeWarning
 warnings.simplefilter("error", OptimizeWarning)
-from TemporalFitting import timeFitting
 
 # Required function __function_metadata__
 # Should have an entry for every function in this file
@@ -21,7 +25,8 @@ def __function_metadata__():
                 {"name": "show_first", "display_text":"show first events", "description": "Plot the first events per pixel","default":"False"},
             ],
             "optional_kwargs": [
-                {"name": "weigh_first", "display_text":"weigh first events", "description": "Weigh first events per pixel with number of events/pixel","default":"False"}
+                {"name": "weigh_first", "display_text":"weigh first events", "description": "Weigh first events per pixel with number of events/pixel","default":"False"},
+                {"name": "use_background_parameters", "display_text":"use background parameters", "description": "Use background parameters for fitting","default":"True"}
             ],
             "help_string": "Draws cumulative sum (and lognormal cdf fit) of all events of the candidate cluster.",
             "display_name": "Cumulative sum of candidate cluster (Lognormal cdf fit)"
@@ -42,6 +47,7 @@ def CumulativeSum(findingResult, fittingResult, previewEvents, figure, settings,
     show_fits = utilsHelper.strtobool(kwargs['show_fits'])
     show_first = utilsHelper.strtobool(kwargs['show_first'])
     weigh_first = utilsHelper.strtobool(kwargs['weigh_first'])
+    use_background_parameters = utilsHelper.strtobool(kwargs['use_background_parameters'])
 
     ax = figure.add_subplot(111)
     figure.tight_layout()
@@ -104,7 +110,7 @@ def CumulativeSum(findingResult, fittingResult, previewEvents, figure, settings,
             # ax.axvspan(t-del_t, t+del_t, alpha=0.1, color='maroon')
     
     # first events
-    if show_first==True:
+    if show_first==True and use_background_parameters==True:
         if weigh_first!=True:
             lognorm_cdf = timeFitting.LognormCDFFirstEvents()
             t, del_t, fit_info, opt = lognorm_cdf(findingResult, fittingResult)
@@ -142,6 +148,62 @@ def CumulativeSum(findingResult, fittingResult, previewEvents, figure, settings,
                 ax.plot(times, lognorm_cdf.fit.func(times, *opt), color='black', ls='--', label='Lognormal CDF fit (first, weighted)')
                 ax.axvline(x=t, color='maroon', ls='--', label='Fitted time (first, weighted)')
                 # ax.axvspan(t-del_t, t+del_t, alpha=0.1, color='maroon')
+    elif show_first==True and use_background_parameters==False:
+        if weigh_first != True:
+            lognorm_cdf = timeFitting.LognormCDFFirstEvents_NoBackground()
+            t, del_t, fit_info, opt = lognorm_cdf(findingResult, fittingResult)
+            ax.errorbar(lognorm_cdf.fit.times, lognorm_cdf.fit.cumsum, color='C2', marker='.', markersize=5, mfc='darkgreen', label='Cumulative sum (first)', zorder=-1)
+            if show_fits== True and np.isnan(opt[0]):
+                # Fit failed, add info to text
+                if text != '':
+                    text += '\n'
+                text += f'Fit of first events failed! {fit_info}'
+            if show_fits==True and not np.isnan(opt[0]):
+                if not t_min==None:
+                    t_min = np.min([t, t_min])
+                else:
+                    t_min = t
+                times = np.linspace(np.min([lognorm_cdf.fit.times[0], t]), lognorm_cdf.fit.times[-1], 100)
+                ax.plot(times, lognorm_cdf.fit.func(times, *opt), color='black', ls='--', label='Lognormal CDF fit (first, no background)')
+                ax.axvline(x=t, color='maroon', ls='--', label='Fitted time (first)')
+                # ax.axvspan(t-del_t, t+del_t, alpha=0.1, color='maroon')
+        else:
+            lognorm_cdf = timeFitting.LognormCDFFirstEvents_weighted()
+            t, del_t, fit_info, opt = lognorm_cdf(findingResult, fittingResult)
+            
+            ax.errorbar(lognorm_cdf.fit.times, lognorm_cdf.fit.cumsum, yerr=lognorm_cdf.sigma, color='C2', marker='.', markersize=5, mfc='darkgreen', label='Cumulative sum (first, weighted)', zorder=-1)
+            if show_fits== True and np.isnan(opt[0]):
+                # Fit failed, add info to text
+                if text != '':
+                    text += '\n'
+                text += f'Fit of first events failed! {fit_info}'
+            if show_fits==True and not np.isnan(opt[0]):
+                if not t_min==None:
+                    t_min = np.min([t, t_min])
+                else:
+                    t_min = t
+                times = np.linspace(np.min([lognorm_cdf.fit.times[0], t]), lognorm_cdf.fit.times[-1], 100)
+                ax.plot(times, lognorm_cdf.fit.func(times, *opt), color='black', ls='--', label='Lognormal CDF fit (first, weighted, no background)')
+                ax.axvline(x=t, color='maroon', ls='--', label='Fitted time (first, weighted)')
+                # ax.axvspan(t-del_t, t+del_t, alpha=0.1, color='maroon')
+    elif show_first==False and use_background_parameters==False:
+        lognorm_cdf = timeFitting.LognormCDFAllEvents_NoBackground()
+        t, del_t, fit_info, opt = lognorm_cdf(findingResult, fittingResult)
+        ax.errorbar(lognorm_cdf.fit.times, lognorm_cdf.fit.cumsum, color='C2', marker='.', markersize=5, mfc='darkgreen', label='Cumulative sum (first)', zorder=-1)
+        if show_fits== True and np.isnan(opt[0]):
+            # Fit failed, add info to text
+            if text != '':
+                text += '\n'
+            text += f'Fit of first events failed! {fit_info}'
+        if show_fits==True and not np.isnan(opt[0]):
+            if not t_min==None:
+                t_min = np.min([t, t_min])
+            else:
+                t_min = t
+            times = np.linspace(np.min([lognorm_cdf.fit.times[0], t]), lognorm_cdf.fit.times[-1], 100)
+            ax.plot(times, lognorm_cdf.fit.func(times, *opt), color='black', ls='--', label='Lognormal CDF fit (no background)')
+            ax.axvline(x=t, color='maroon', ls='--', label='Fitted time (first)')
+            # ax.axvspan(t-del_t, t+del_t, alpha=0.1, color='maroon')
 
     for index, row in fittingResult[:-1].iterrows():
         ax.axvline(x=row['t'], color='red')

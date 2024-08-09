@@ -1,5 +1,8 @@
 import inspect, logging
-from Utils import utilsHelper
+try:
+    from eve_smlm.Utils import utilsHelper
+except ImportError:
+    from Utils import utilsHelper
 import pickle
 
 # Required function __function_metadata__

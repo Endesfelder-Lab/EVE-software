@@ -1,0 +1,15 @@
+\usepackage{etoolbox}
+\patchcmd{\chapter}{\cleardoublepage}{\clearpage}{}{}
+
+% Add this line to push text to the top of the page
+\raggedbottom
+
+% break long lines in code
+\usepackage{fancyvrb}
+\usepackage{fvextra}
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{breaklines,commandchars=\\\{\}}
+
+% add caption to figures
+\usepackage{caption}
+\DeclareCaptionFormat{mybold}{\textbf{#1#2}#3}
+\captionsetup[figure]{labelformat=simple, labelsep=colon, name={\textbf{Supplementary figure}}}

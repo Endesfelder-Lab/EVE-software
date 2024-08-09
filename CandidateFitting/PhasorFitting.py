@@ -1,5 +1,12 @@
 import inspect
-from Utils import utilsHelper
+try:
+    from eve_smlm.Utils import utilsHelper
+    from eve_smlm.EventDistributions import eventDistributions
+    from eve_smlm.TemporalFitting import timeFitting
+except ImportError:
+    from Utils import utilsHelper
+    from EventDistributions import eventDistributions
+    from TemporalFitting import timeFitting
 import pandas as pd
 import numpy as np
 import time, logging
@@ -9,8 +16,6 @@ from sklearn.metrics import mean_squared_error
 
 from joblib import Parallel, delayed
 import multiprocessing
-from TemporalFitting import timeFitting
-from EventDistributions import eventDistributions
 
 # Required function __function_metadata__
 # Should have an entry for every function in this file
@@ -18,9 +23,7 @@ def __function_metadata__():
     return {
         "PhasorFitting": {
             "dist_kwarg" : {"base": "XYDist", "description": "Two-dimensional event-distribution to fit to get x,y-localization.", "default_option": "Hist2d_xy"},
-            "required_kwargs": [
-                {"name": "UNUSED_KWARG", "display_text":"UNUSED_KWARG", "description": "ERROR _ UNUSED KWARG","default":0.},
-            ],
+            "required_kwargs": [            ],
             "optional_kwargs": [],
             "help_string": "3D phasor.",
             "display_name": "Phasor"
@@ -28,9 +31,7 @@ def __function_metadata__():
         "PhasorFitting_customTimeFit": {
             "dist_kwarg" : {"base": "XYDist", "description": "Two-dimensional event-distribution to fit to get x,y-localization.", "default_option": "Hist2d_xy"},
             "time_kwarg" : {"base": "TemporalFits", "description": "Temporal fitting routine to get time estimate.", "default_option": "LognormCDFFirstEvents_weighted"},
-            "required_kwargs": [
-                {"name": "UNUSED_KWARG", "display_text":"UNUSED_KWARG", "description": "ERROR _ UNUSED KWARG","default":0.},
-            ],
+            "required_kwargs": [            ],
             "optional_kwargs": [],
             "help_string": "2D phasor with custom time fit routine",
             "display_name": "Phasor - custom time fit"
@@ -107,7 +108,7 @@ class phasor():
         
         mean_polarity = candidate['events']['p'].mean()
         p = int(mean_polarity == 1) + int(mean_polarity == 0) * 0 + int(mean_polarity > 0 and mean_polarity < 1) * 2
-        loc_df = pd.DataFrame({'candidate_id': candidate_id, 'x': x, 'y': y, 'p': p, 't': t, 'N_events': candidate['N_events'], 'x_dim': candidate['cluster_size'][0], 'y_dim': candidate['cluster_size'][1], 't_dim': candidate['cluster_size'][2]*1e-3, 'fit_info': ''}, index=[0])
+        loc_df = pd.DataFrame({'candidate_id': candidate_id, 'x': x, 'y': y, 'p': p, 't': t, 'N_events': candidate['N_events'], 'x_dim': candidate['cluster_size'][1], 'y_dim': candidate['cluster_size'][0], 't_dim': candidate['cluster_size'][2]*1e-3, 'fit_info': ''}, index=[0])
         return loc_df
 
 class phasor_customTimeFit(fit):
@@ -152,7 +153,7 @@ class phasor_customTimeFit(fit):
         
         mean_polarity = candidate['events']['p'].mean()
         p = int(mean_polarity == 1) + int(mean_polarity == 0) * 0 + int(mean_polarity > 0 and mean_polarity < 1) * 2
-        loc_df = pd.DataFrame({'candidate_id': candidate_id, 'x': x, 'y': y, 'p': p, 't': t, 'del_t': del_t, 'N_events': candidate['N_events'], 'x_dim': candidate['cluster_size'][0], 'y_dim': candidate['cluster_size'][1], 't_dim': candidate['cluster_size'][2]*1e-3, 'fit_info': ''}, index=[0])
+        loc_df = pd.DataFrame({'candidate_id': candidate_id, 'x': x, 'y': y, 'p': p, 't': t, 'del_t': del_t, 'N_events': candidate['N_events'], 'x_dim': candidate['cluster_size'][1], 'y_dim': candidate['cluster_size'][0], 't_dim': candidate['cluster_size'][2]*1e-3, 'fit_info': ''}, index=[0])
         return loc_df
 
 # perform localization for part of candidate dictionary

@@ -1,7 +1,11 @@
 import inspect
-from Utils import utilsHelper
+try:
+    from eve_smlm.Utils import utilsHelper
+except ImportError:
+    from Utils import utilsHelper
 import pandas as pd
 import numpy as np
+import logging
 import time
 
 # from .dme import *
@@ -10,16 +14,38 @@ import time
 # Should have an entry for every function in this file
 def __function_metadata__():
     return {
+        "Load_storedData": {
+            "required_kwargs": [
+                {"name": "fileLoc", "description": "File location (*.npz file)","default":'',"type":"fileLoc","display_text":"File location"},
+            ],
+            "optional_kwargs": [
+            ],
+            "help_string": "Load a stored .npz obtained from DME/RCC drift correction performed in EVE.",
+            "display_name": "Load stored drift correction DME/RCC"
+        },
         "DriftCorr_entropyMin": {
+            "required_kwargs": [
+                {"name": "frame_time_for_dme", "description": "Frame-time used for drift-correction (in ms)","default":100.,"type":float,"display_text":"Frame time used in DME"},
+                {"name": "frames_per_bin", "description": "Number of frames in every bin for dme drift correction ","default":50,"type":int,"display_text":"Frames per bin"},
+                {"name": "visualisation", "description": "Visualisation of the drift traces (Boolean).","default":True,"display_text":"Visualisation"},
+            ],
+            "optional_kwargs": [
+                {"name": "storeLoc", "description": "File location (*.npz file)","default":'',"type":"fileLocSave","display_text":"Storage location (*.npz)"},
+            ],
+            "help_string": "Corrects drift based on entropy minimization in two dimensions. Original implementation from Cnossen et al., Optics Express, 2021.",
+            "display_name": "Drift correction by entropy minimization [2D]"
+        },
+        "DriftCorr_entropyMin_3D": {
             "required_kwargs": [
                 {"name": "frame_time_for_dme", "description": "Frame-time used for drift-correction (in ms)","default":100.,"type":float,"display_text":"Frame time used in DME"},
                 {"name": "frames_per_bin", "description": "Number of frames in every bin for dme drift correction ","default":50,"type":int,"display_text":"Frames per bin"},
                 {"name": "visualisation", "description": "Visualisation of the drift traces.","default":True,"display_text":"Visualisation"},
             ],
             "optional_kwargs": [
+                {"name": "storeLoc", "description": "File location (*.npz file)","default":'',"type":"fileLocSave","display_text":"Storage location (*.npz)"},
             ],
-            "help_string": "Drift correction from Cnossen et al..",
-            "display_name": "Drift correction by entropy minimization"
+            "help_string": "Corrects drift based on entropy minimization in three dimensions. Original implementation from Cnossen et al., Optics Express, 2021.",
+            "display_name": "Drift correction by entropy minimization [3D]"
         },
         "DriftCorr_RCC": {
             "required_kwargs": [
@@ -27,11 +53,12 @@ def __function_metadata__():
                 {"name": "nr_time_bins", "description": "Number of time bins","default":10,"type":int,"display_text":"Number of bins"},
                 {"name": "zoom_level", "description": "Zoom level","default":2,"type":int,"display_text":"Zoom of RCC plots"},
                 {"name": "visualisation", "description": "Visualisation of the drift traces.","default":True,"display_text":"Visualisation"},
-                {"name": "ConvHist", "description": "Use convoluted histogram, ideally do not use","default":False,"display_text":"Use ConvHist (Linux)"}
+                {"name": "ConvHist", "description": "Use convoluted histogram, ideally do not use - required for Linux, MacOs","default":False,"display_text":"Use ConvHist (Linux, MacOS; Boolean)"},
             ],
             "optional_kwargs": [
+                {"name": "storeLoc", "description": "File location (*.npz file)","default":'',"type":"fileLocSave","display_text":"Storage location (*.npz)"},
             ],
-            "help_string": "RCC Drift correction from Cnossen et al..",
+            "help_string": "Redudant cross-correlation drift correction. Based on the implementation from Cnossen et al., Optics Express, 2021; on linux, based on the implementatino from Martens et al., 2022",
             "display_name": "Drift correction by RCC (redundant cross-correlation)"
         }
     }
@@ -44,6 +71,62 @@ def __function_metadata__():
 #-------------------------------------------------------------------------------------------------------------------------------
 #Callable functions
 #-------------------------------------------------------------------------------------------------------------------------------
+def Load_storedData(resultArray,findingResult,settings, **kwargs):
+    import logging
+    """
+    Load and apply stored drift correction data.
+    """
+    #Check if we have the required kwargs
+    [provided_optional_args, missing_optional_args] = utilsHelper.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
+    
+    # Load the .npz file
+    loaded_data = np.load(kwargs['fileLoc'])
+    try:
+    # Access the variables
+        frame_time_for_dme = loaded_data['frame_time_for_dme']
+        estimated_drift = loaded_data['estimated_drift']
+        pixelsize_nm = loaded_data['pixelsize_nm']
+    except: 
+        logging.error("Could not load the drift correction data from the file. Please check the file location.")
+        return
+
+    #2D drift corr
+    if estimated_drift.shape[1] == 2:
+        framenumFull = np.floor(np.array(resultArray['t'].values)/(frame_time_for_dme))
+        framenumFull -= min(framenumFull)
+        framenumFull = framenumFull.astype(int)
+        #Get the drift of every localization - note the back-conversion from px to nm
+        drift_locs = ([estimated_drift[min(i,len(estimated_drift)-1)][0]*(pixelsize_nm) for i in framenumFull],[estimated_drift[min(i,len(estimated_drift)-1)][1]*(pixelsize_nm) for i in framenumFull])
+        
+        import copy
+        #Correct the resultarray for the drift
+        drift_corr_locs = copy.deepcopy(resultArray)
+        drift_corr_locs.loc[:,'x'] -= drift_locs[0]
+        drift_corr_locs.loc[:,'y'] -= drift_locs[1]
+
+        performance_metadata = f"2D driftcorr-load applied with settings {kwargs}."
+        logging.info(f"2D drift corrected from file {kwargs['fileLoc']}.")
+
+        return drift_corr_locs, performance_metadata
+    elif estimated_drift.shape[1] == 3: #3D drift corr
+        framenumFull = np.floor(np.array(resultArray['t'].values)/(frame_time_for_dme))
+        framenumFull -= min(framenumFull)
+        framenumFull = framenumFull.astype(int)
+        #Get the drift of every localization - note the back-conversion from px to nm
+        drift_locs = ([estimated_drift[min(i,len(estimated_drift)-1)][0]*(pixelsize_nm) for i in framenumFull],[estimated_drift[min(i,len(estimated_drift)-1)][1]*(pixelsize_nm) for i in framenumFull], [estimated_drift[min(i,len(estimated_drift)-1)][2]*(pixelsize_nm) for i in framenumFull])
+        
+        import copy
+        #Correct the resultarray for the drift
+        drift_corr_locs = copy.deepcopy(resultArray)
+        drift_corr_locs.loc[:,'x'] -= drift_locs[0]
+        drift_corr_locs.loc[:,'y'] -= drift_locs[1]
+        drift_corr_locs.loc[:,'z [nm]'] -= drift_locs[2]
+        
+        performance_metadata = f"3D driftcorr-load applied with settings {kwargs}."
+        logging.info(f"3D drift corrected from file {kwargs['fileLoc']}.")
+
+        return drift_corr_locs, performance_metadata
+
 def DriftCorr_entropyMin(resultArray,findingResult,settings,**kwargs):
     """ 
     Implementation of DME drift correction based on Cnossen et al. 2021 (https://opg.optica.org/oe/fulltext.cfm?uri=oe-29-18-27961&id=457245). 
@@ -53,6 +136,7 @@ def DriftCorr_entropyMin(resultArray,findingResult,settings,**kwargs):
 
     #Import the correct package
     from .dme.dme import dme
+    import logging
     
     #Set user variables
     frame_time_for_dme = float(kwargs['frame_time_for_dme']) #in ms
@@ -94,7 +178,7 @@ def DriftCorr_entropyMin(resultArray,findingResult,settings,**kwargs):
                 framesperbin = framesperbinv, 
                 imgshape=[fov_width, fov_width], 
                 coarseFramesPerBin=int(np.floor(min(framesperbinv*10,max(framenum)/20))),
-                coarseSigma=[0.2,0.2],
+                coarseSigma=[1,1],
                 useCuda=use_cuda,
                 useDebugLibrary=False,
                 estimatePrecision=False,
@@ -119,7 +203,23 @@ def DriftCorr_entropyMin(resultArray,findingResult,settings,**kwargs):
         plt.title('Drift Estimation')
         plt.show()
 
-    import logging
+    #To store, we should store the following data: fraem_time_for_dme, estimated_drift, pixelsize_nm
+    storeLoc = kwargs['storeLoc']
+    if storeLoc != '' and storeLoc != None and storeLoc != 'None' and storeLoc != ' ':
+        try:
+            #Check if storeLoc ends in .npz, otherwise add it:
+            if storeLoc[-4:]!= '.npz':
+                storeLoc += '.npz'
+            # Save the variables to a single .npz file
+            np.savez(storeLoc, 
+                    frame_time_for_dme=frame_time_for_dme, 
+                    estimated_drift=estimated_drift, 
+                    pixelsize_nm=float(settings['PixelSize_nm']['value']))
+        except:
+            logging.error('Could not save drift correction data to'+ storeLoc)
+    else:
+        logging.debug("No drift correction stored")
+
     #Remove all entries where a negative time was given:
     if len(resultArray[resultArray['t'] <= 0]):
         logging.warning('Removing ' + str(len(resultArray[resultArray['t'] <= 0])) + ' negative times')
@@ -137,12 +237,128 @@ def DriftCorr_entropyMin(resultArray,findingResult,settings,**kwargs):
     drift_corr_locs = copy.deepcopy(resultArray)
     drift_corr_locs.loc[:,'x'] -= drift_locs[0]
     drift_corr_locs.loc[:,'y'] -= drift_locs[1]
-    
-    print(drift_locs[0][0], drift_locs[1][0])
-    print(drift_locs[0][-1], drift_locs[1][-1])
 
-    performance_metadata = f"Dummy function ran for seconds."
-    print('Function one ran!')
+    performance_metadata = f"Driftcorrection DME-2D applied with settings {kwargs}."
+
+    return drift_corr_locs, performance_metadata
+
+def DriftCorr_entropyMin_3D(resultArray,findingResult,settings,**kwargs):
+    """ 
+    Implementation of DME drift correction based on Cnossen et al. 2021 (https://opg.optica.org/oe/fulltext.cfm?uri=oe-29-18-27961&id=457245). 
+    """
+    #Check if we have the required kwargs
+    [provided_optional_args, missing_optional_args] = utilsHelper.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
+
+    #Import the correct package
+    from .dme.dme import dme
+    import logging
+    
+    #Set user variables
+    frame_time_for_dme = float(kwargs['frame_time_for_dme']) #in ms
+    framesperbinv = int(kwargs['frames_per_bin'])#in 'frames'
+    use_cuda= settings['UseCUDA']['value']>0
+    visualisation=utilsHelper.strtobool(kwargs['visualisation'])
+    
+    #Hard-coded variables
+    fov_width = 200 #in pixels
+
+    #Obtain the localizations from the resultArray
+    resultArray=resultArray.dropna()
+    locs_for_dme = np.column_stack(((resultArray['x'].values-min(resultArray['x'])),
+                                    (resultArray['y'].values-min(resultArray['y'])),
+                                    resultArray['z [nm]'].values))
+    #Convert it to pixel-units 
+    locs_for_dme/=(float(settings['PixelSize_nm']['value']))
+    
+    #Get the 'frame' for each localization based on user-defined frame_time_for_dme
+    framenumFull = np.floor(np.array(resultArray['t'].values)/(frame_time_for_dme))
+    #Pop -1 entries:
+    locs_for_dme = locs_for_dme[framenumFull != -1]
+    framenum = framenumFull[framenumFull != -1]
+    framenum -= min(framenum)
+    framenum = framenum.astype(int)
+    
+    #to prevent unexpected errors: remove the bottom and top 0.1 percentile:
+    bottom_percentile = np.percentile(framenum, 0.1)
+    top_percentile = np.percentile(framenum, 99.9)
+    locs_for_dme = locs_for_dme[(framenum > bottom_percentile) & (framenum < top_percentile)]
+    framenum = framenum[(framenum > bottom_percentile) & (framenum < top_percentile)]
+    
+    framenum -= min(framenum)
+    
+    #CRLB is hardcoded at half a pixel in x,y. Probably not the best implementation, but it seems to work
+    crlb = np.ones(locs_for_dme.shape) * np.array((0.5,0.5,0.5))[None]
+    
+    #Estimate the drift!
+    # estimated_drift = np.load('C:\\Data\\EBS\\3D_Tubulin\\3d_drift_small_top_right.npy')
+    estimated_drift = dme.dme_estimate(locs_for_dme, framenum, 
+                crlb, 
+                framesperbin = framesperbinv, 
+                imgshape=[fov_width, fov_width,fov_width], 
+                coarseFramesPerBin=int(np.floor(min(framesperbinv*10,max(framenum)/20))),
+                coarseSigma=[1,1,1],
+                useCuda=use_cuda,
+                useDebugLibrary=False,
+                estimatePrecision=False,
+                display=False)
+
+    #Briefly visualise the drift if wanted:
+    if visualisation:
+        import matplotlib.pyplot as plt
+        #Close all previous plots, assumed max 10
+        for i in range(10):
+            plt.close()
+        #Create a new figure
+        plt.figure(88)
+        #Plot the drift traces
+        plt.plot(np.arange(int(len(estimated_drift)))*(frame_time_for_dme),estimated_drift[:,0]*(float(settings['PixelSize_nm']['value'])))
+        plt.plot(np.arange(int(len(estimated_drift)))*(frame_time_for_dme),estimated_drift[:,1]*(float(settings['PixelSize_nm']['value'])))
+        plt.plot(np.arange(int(len(estimated_drift)))*(frame_time_for_dme),estimated_drift[:,2]*(float(settings['PixelSize_nm']['value'])))
+        #Add axis labels:
+        plt.xlabel('Time (ms)')
+        plt.ylabel('Drift (nm)')
+        plt.legend(['X drift', 'Y drift','Z drift'])
+        #Add a title:
+        plt.title('Drift Estimation')
+        plt.show()
+
+    #To store, we should store the following data: fraem_time_for_dme, estimated_drift, pixelsize_nm
+    storeLoc = kwargs['storeLoc']
+    if storeLoc != '' and storeLoc != None and storeLoc != 'None' and storeLoc != ' ':
+        try:
+            #Check if storeLoc ends in .npz, otherwise add it:
+            if storeLoc[-4:]!= '.npz':
+                storeLoc += '.npz'
+            # Save the variables to a single .npz file
+            np.savez(storeLoc, 
+                    frame_time_for_dme=frame_time_for_dme, 
+                    estimated_drift=estimated_drift, 
+                    pixelsize_nm=float(settings['PixelSize_nm']['value']))
+        except:
+            logging.error('Could not save drift correction data to'+ storeLoc)
+    else:
+        logging.debug("No drift correction stored")
+        
+    #Remove all entries where a negative time was given:
+    if len(resultArray[resultArray['t'] <= 0]):
+        logging.warning('Removing ' + str(len(resultArray[resultArray['t'] <= 0])) + ' negative times')
+    resultArray = resultArray[resultArray['t'] > 0]
+    
+
+    framenumFull = np.floor(np.array(resultArray['t'].values)/(frame_time_for_dme))
+    framenumFull -= min(framenumFull)
+    framenumFull = framenumFull.astype(int)
+    #Get the drift of every localization - note the back-conversion from px to nm
+    drift_locs = ([estimated_drift[min(i,len(estimated_drift)-1)][0]*(float(settings['PixelSize_nm']['value'])) for i in framenumFull],[estimated_drift[min(i,len(estimated_drift)-1)][1]*(float(settings['PixelSize_nm']['value'])) for i in framenumFull], [estimated_drift[min(i,len(estimated_drift)-1)][2]*(float(settings['PixelSize_nm']['value'])) for i in framenumFull])
+    
+    import copy
+    #Correct the resultarray for the drift
+    drift_corr_locs = copy.deepcopy(resultArray)
+    drift_corr_locs.loc[:,'x'] -= drift_locs[0]
+    drift_corr_locs.loc[:,'y'] -= drift_locs[1]
+    drift_corr_locs.loc[:,'z [nm]'] -= drift_locs[2]
+
+    performance_metadata = f"Driftcorrection DME-3D applied with settings {kwargs}."
 
     return drift_corr_locs, performance_metadata
 
@@ -156,6 +372,7 @@ def DriftCorr_RCC(resultArray,findingResult,settings,**kwargs):
     #Import the correct package
     from .dme.dme import dme
     from .dme.dme.rcc import rcc, rcc3D
+    import logging
     
     
     #Set user variables
@@ -210,7 +427,23 @@ def DriftCorr_RCC(resultArray,findingResult,settings,**kwargs):
         plt.title('Drift Estimation')
         plt.show()
 
-    import logging
+    #To store, we should store the following data: fraem_time_for_dme, estimated_drift, pixelsize_nm
+    storeLoc = kwargs['storeLoc']
+    if storeLoc != '' and storeLoc != None and storeLoc != 'None' and storeLoc != ' ':
+        try:
+            #Check if storeLoc ends in .npz, otherwise add it:
+            if storeLoc[-4:]!= '.npz':
+                storeLoc += '.npz'
+            # Save the variables to a single .npz file
+            np.savez(storeLoc, 
+                    frame_time_for_dme=frame_time_for_dme, 
+                    estimated_drift=shift_px, 
+                    pixelsize_nm=float(settings['PixelSize_nm']['value']))
+        except:
+            logging.error('Could not save drift correction data to'+ storeLoc)
+    else:
+        logging.debug("No drift correction stored")
+
     #Remove all entries where a negative time was given:
     if len(resultArray[resultArray['t'] <= 0]):
         logging.warning('Removing ' + str(len(resultArray[resultArray['t'] <= 0])) + ' negative times')
@@ -229,14 +462,16 @@ def DriftCorr_RCC(resultArray,findingResult,settings,**kwargs):
     drift_corr_locs.loc[:,'x'] -= drift_locs[0]
     drift_corr_locs.loc[:,'y'] -= drift_locs[1]
 
-    performance_metadata = f"Dummy function ran for seconds."
-    print('Function one ran!')
+    performance_metadata = f"Driftcorrection RCC applied with settings {kwargs}."
 
     return drift_corr_locs, performance_metadata
 
 
 def rcc_own(xy, framenum, timebins, zoom=1, 
         sigma=1, maxpairs=1000, use_cuda=False, use_conv_hist = False):
+    """
+    Child function to do RCC
+    """
     
     from .dme.dme import dme
     from .dme.dme.rcc import findshift_pairs, InterpolatedUnivariateSpline
@@ -249,6 +484,7 @@ def rcc_own(xy, framenum, timebins, zoom=1,
     imgshape = area*zoom
     images = np.zeros((timebins, *imgshape))
 
+    #Normally use Cnossen's RCC
     if use_conv_hist == False:
         from .dme.dme.native_api import NativeAPI
         with NativeAPI(use_cuda) as dll:
@@ -269,6 +505,7 @@ def rcc_own(xy, framenum, timebins, zoom=1,
 
                 images[k] = dll.DrawGaussians(img, spots)
     elif use_conv_hist == True:
+        #On Linux, use Martens' implementation -- slower
         maxx = imgshape[0]/zoom
         maxy = imgshape[1]/zoom
         for k in range(timebins):
@@ -332,6 +569,9 @@ def rcc_own(xy, framenum, timebins, zoom=1,
     return shift_interp, shift_estim, images
 
 def create_kernel(size):
+    """
+    Kernel required for frame visualisation for RCC
+    """
     #Check if size is odd:
     if size % 2 == 0:
         import logging

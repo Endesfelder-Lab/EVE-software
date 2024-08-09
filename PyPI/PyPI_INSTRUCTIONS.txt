@@ -1,0 +1,30 @@
+
+1. Create a new folder, e.g. '..\PyPI\v011'
+2. In this folder, add the following files (check these files in the PyPI main directory, and copy-paste):
+    LICENCE
+    pyproject.toml
+    README_PIP.md
+    MANIFEST.in
+3. In pyproject.toml, change the [project] [version] to whatever version we want to be in.
+4. In the folder ('..\PyPI\v011'), add a new folder called 'src', and a folder inside 'src' called 'eve_smlm' (i.e. final folder is '..\PyPI\v011\src\eve_smlm')
+5. In folder '..\PyPI\v011\src\eve_smlm', add and empty __init__.py file.
+6. In folder '..\PyPI\v011\src\eve_smlm', add the entire content of EVE's github.
+7. In a python terminal, run these commands:
+    cd '..\PyPI\v011'
+    python -m build
+8. Check that the .whl file is in the folder '..\PyPI\v011\dist'
+9. For local installation (testing package), run this: 
+    [Check exact name/version number, and ideally do this in an empty, new, conda environment]
+    pip install "../v011/dist/eve_smlm-0.1.1-py3-none-any.whl"
+    
+10. Upload to test pypi via this command:
+    python -m twine upload --repository testpypi dist/*
+    [The API is required, see our Sciebo folder; kjamartens account]
+11. To install from Test-PyPI:
+    pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple eve-SMLM
+
+12. Upload to real PyPI via this command:
+    python -m twine upload dist/*
+    [The API is required, see our Sciebo folder; kjamartens account]
+13. To install:
+    pip install eve-SMLM

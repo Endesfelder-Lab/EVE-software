@@ -1,5 +1,8 @@
 import inspect
-from Utils import utilsHelper
+try:
+    from eve_smlm.Utils import utilsHelper
+except ImportError:
+    from Utils import utilsHelper
 import pandas as pd
 import numpy as np
 import time, logging
@@ -23,50 +26,52 @@ def __function_metadata__():
     return {
         "DBSCAN_onlyHighDensity": {
             "required_kwargs": [
-                {"name": "min_cluster_size", "description": "Required number of neighbouring events in spatiotemporal voxel","default":17,"type":int,"display_text":"Minimum cluster size"},
-                {"name": "distance_radius_lookup", "description": "Outer radius (in px) to count the neighbours in.","default":7,"type":int,"display_text":"Distance radius lookup"},
-                {"name": "density_multiplier", "description": "Distance multiplier","default":1.5,"type":float,"display_text":"Density multiplier"},
+                {"name": "distance_radius_lookup", "description": "Outer radius (in px) to count the neighbours in.","default":7,"type":int,"display_text":"Average-density sphere radius"},
+                {"name": "density_multiplier", "description": "Density multiplier","default":1.5,"type":float,"display_text":"Density multiplier"},
+                {"name": "min_cluster_size", "description": "Minimum number of events to be considered a Core point in DBSCAN","default":17,"type":int,"display_text":"DBSCAN Core threshold"},
                 {"name": "ratio_ms_to_px", "description": "Ratio of milliseconds to pixels.","default":35.0,"type":float,"display_text":"Ratio ms to px"},
-                {"name": "DBSCAN_eps", "description": "Eps of DBSCAN.","default":6,"type":int,"display_text":"DBSCAN epsilon"},
+                {"name": "DBSCAN_eps", "description": "Epsilon of DBSCAN. This is the radius of the DBSCAN sphere.","default":6,"type":int,"display_text":"DBSCAN epsilon"},
             ],
             "optional_kwargs": [
-               {"name": "min_consec", "description": "Minimum number of consecutive events","default":1,"type":int,"display_text":"Min. consec"},
-               {"name": "max_consec", "description": "Maximum number of consecutive events, discards hot pixels","default":30,"type":int,"display_text":"Max. consec"},
+                {"name": "min_consec", "description": "Minimum number of consecutive events","default":1,"type":int,"display_text":"Min. consec events"},
+                # {"name": "max_consec", "description": "Maximum number of consecutive events, discards hot pixels","default":30,"type":int,"display_text":"Max. consec events"},
             ],
-            "help_string": "DBSCAN, only return events that are considered high-density.",
+            "help_string": "DBSCAN, only return events that are considered high-density. High-density is determined via the 'Density multiplier' variable (i.e. events with density > avg(density)*multiplier are high-density).",
             "display_name": "DBSCAN returning high-density events"
         },
         "DBSCAN_allEvents": {
             "required_kwargs": [
-                {"name": "min_cluster_size", "description": "Required number of neighbouring events in spatiotemporal voxel","default":17,"type":int,"display_text":"Minimum cluster size"},
-                {"name": "distance_radius_lookup", "description": "Outer radius (in px) to count the neighbours in.","default":7,"type":int,"display_text":"Distance radius lookup"},
-                {"name": "density_multiplier", "description": "Distance multiplier","default":1.5,"type":float,"display_text":"Density multiplier"},
+                {"name": "distance_radius_lookup", "description": "Outer radius (in px) to count the neighbours in.","default":7,"type":int,"display_text":"Average-density sphere radius"},
+                {"name": "density_multiplier", "description": "Density multiplier","default":1.5,"type":float,"display_text":"Density multiplier"},
+                {"name": "min_cluster_size", "description": "Minimum number of events to be considered a Core point in DBSCAN","default":17,"type":int,"display_text":"DBSCAN Core threshold"},
                 {"name": "ratio_ms_to_px", "description": "Ratio of milliseconds to pixels.","default":35.0,"type":float,"display_text":"Ratio ms to px"},
-                {"name": "DBSCAN_eps", "description": "Eps of DBSCAN.","default":6,"type":int,"display_text":"DBSCAN epsilon"},
+                {"name": "DBSCAN_eps", "description": "Epsilon of DBSCAN. This is the radius of the DBSCAN sphere.","default":6,"type":int,"display_text":"DBSCAN epsilon"},
                 {"name": "padding_xy", "description": "Result padding in x,y pixels.","default":0,"type":int,"display_text":"XY padding"},
             ],
             "optional_kwargs": [
-               {"name": "min_consec", "description": "Minimum number of consecutive events","default":1,"type":int,"display_text":"Min. consec"},
-               {"name": "max_consec", "description": "Maximum number of consecutive events, discards hot pixels","default":30,"type":int,"display_text":"Max. consec"},
+                {"name": "min_consec", "description": "Minimum number of consecutive events","default":1,"type":int,"display_text":"Min. consec events"},
+                # {"name": "max_consec", "description": "Maximum number of consecutive events, discards hot pixels","default":30,"type":int,"display_text":"Max. consec events"},
             ],
-            "help_string": "DBSCAN on high-density, but returns all events in the bounding box specified by DBSCAN.",
+            "help_string": "See DBSCAN-high density. This expands on it by returning all events in the bounding box specified by DBSCAN. Note that this will always give a rectangular bounding box..",
             "display_name": "DBSCAN returning all events"
         },
         "DBSCAN_allEvents_remove_outliers": {
             "required_kwargs": [
-                {"name": "neighbour_points", "description": "Removes points that has less than this number of neighbours in neighbour_radius","default":30,"type":int,"display_text":"Minimum neighbours"},
-                {"name": "neighbour_radius", "description": "Removes points that has less than neighbour_points in this radius","default":3.0,"type":float,"display_text":"Neighbour radius"},
-                {"name": "min_cluster_size", "description": "Required number of neighbouring events in spatiotemporal voxel","default":17,"type":int,"display_text":"Minimum cluster size"},
+                {"name": "distance_radius_lookup", "description": "Outer radius (in px) to count the neighbours in.","default":7,"type":int,"display_text":"Average-density sphere radius"},
+                {"name": "density_multiplier", "description": "Density multiplier","default":1.5,"type":float,"display_text":"Density multiplier"},
+                {"name": "min_cluster_size", "description": "Minimum number of events to be considered a Core point in DBSCAN","default":17,"type":int,"display_text":"DBSCAN Core threshold"},
                 {"name": "ratio_ms_to_px", "description": "Ratio of milliseconds to pixels.","default":35.0,"type":float,"display_text":"Ratio ms to px"},
-                {"name": "DBSCAN_eps", "description": "Eps of DBSCAN.","default":3,"type":int,"display_text":"DBSCAN epsilon"},
+                {"name": "DBSCAN_eps", "description": "Epsilon of DBSCAN. This is the radius of the DBSCAN sphere.","default":6,"type":int,"display_text":"DBSCAN epsilon"},
                 {"name": "padding_xy", "description": "Result padding in x,y pixels.","default":2,"type":int,"display_text":"XY padding"},
+                {"name": "outlier_removal_radius", "description": "Radius of Event-sphere.","default":3,"type":int,"display_text":"Event-sphere radius"},
+                {"name": "outlier_removal_nbPoints", "description": "Min nr of events that signal should contain in Event-sphere radius.","default":30,"type":int,"display_text":"Event-sphere min. nr. of events"},
             ],
             "optional_kwargs": [
-               {"name": "min_consec", "description": "Minimum number of consecutive events","default":1,"type":int,"display_text":"Min. consec"},
-               {"name": "max_consec", "description": "Maximum number of consecutive events, discards hot pixels","default":30,"type":int,"display_text":"Max. consec"},
+                {"name": "min_consec", "description": "Minimum number of consecutive events","default":1,"type":int,"display_text":"Min. consec events"},
+                # {"name": "max_consec", "description": "Maximum number of consecutive events, discards hot pixels","default":30,"type":int,"display_text":"Max. consec events"},
             ],
-            "help_string": "Removes outliers via o3d's remove_radius_outlier.",
-            "display_name": "DBSCAN returning all events, using radius outlier removal"
+            "help_string": "See DBSCAN-allEvents. Additionally, removes points that have few neighbours in the Event-sphere. Uses o3d's remove_radius_outlier.",
+            "display_name": "DBSCAN returning all events, removing events with few neighbours in Event-sphere"
         }
     }
 
@@ -83,7 +88,7 @@ def remove_radius_outlier_o3d(events,nb_points=30,radius=3,print_progress=True,m
     point_cloud = o3d.geometry.PointCloud()
     point_cloud.points = o3d.utility.Vector3dVector(zip(data_for_o3d['x'],data_for_o3d['y'],data_for_o3d['t']/(1000*ms_to_px)))
     
-    cleaned_pcp =point_cloud.remove_radius_outlier(30, 3, print_progress=True)
+    cleaned_pcp =point_cloud.remove_radius_outlier(int(nb_points), radius, print_progress=print_progress)
     
     pcp = np.asarray(cleaned_pcp[0].points)
     #change columns 0 and 1 to integer values:
@@ -384,7 +389,7 @@ def get_events_in_bbox(npyarr,bboxes,ms_to_px,multiThread=True):
             
             candidates2[bboxid] = {}
             candidates2[bboxid]['events'] = filtered_df
-            candidates2[bboxid]['cluster_size'] = [np.max(filtered_array['y'])-np.min(filtered_array['y']), np.max(filtered_array['x'])-np.min(filtered_array['x']), np.max(filtered_array['t'])-np.min(filtered_array['t'])]
+            candidates2[bboxid]['cluster_size'] = [np.max(filtered_array['y'])-np.min(filtered_array['y'])+1, np.max(filtered_array['x'])-np.min(filtered_array['x'])+1, np.max(filtered_array['t'])-np.min(filtered_array['t'])]
             candidates2[bboxid]['N_events'] = len(filtered_array)
         end_time = time.time()
         logging.info('Time to get bounding boxes o3d: '+str(end_time-start_time))
@@ -430,7 +435,7 @@ def get_events_in_bbox(npyarr,bboxes,ms_to_px,multiThread=True):
                 indexv = counter
                 candidates[indexv] = {}
                 candidates[indexv]['events'] = filtered_df2
-                candidates[indexv]['cluster_size'] = [np.max(filtered_array['y'])-np.min(filtered_array['y']), np.max(filtered_array['x'])-np.min(filtered_array['x']), np.max(filtered_array['t'])-np.min(filtered_array['t'])]
+                candidates[indexv]['cluster_size'] = [np.max(filtered_array['y'])-np.min(filtered_array['y'])+1, np.max(filtered_array['x'])-np.min(filtered_array['x'])+1, np.max(filtered_array['t'])-np.min(filtered_array['t'])]
                 candidates[indexv]['N_events'] = len(filtered_array)
                 counter+=1
         
@@ -470,7 +475,7 @@ def get_events_in_bbox(npyarr,bboxes,ms_to_px,multiThread=True):
         #         filtered_df2 = pd.DataFrame(filtered_array)
         #         candidates[counter] = {}
         #         candidates[counter]['events'] = filtered_df2
-        #         candidates[counter]['cluster_size'] = [np.max(filtered_array['y'])-np.min(filtered_array['y']), np.max(filtered_array['x'])-np.min(filtered_array['x']), np.max(filtered_array['t'])-np.min(filtered_array['t'])]
+        #         candidates[counter]['cluster_size'] = [np.max(filtered_array['y'])-np.min(filtered_array['y'])+1, np.max(filtered_array['x'])-np.min(filtered_array['x'])+1, np.max(filtered_array['t'])-np.min(filtered_array['t'])]
         #         candidates[counter]['N_events'] = len(filtered_array)
         #         counter +=1
                 
@@ -528,7 +533,7 @@ def get_events_in_bbox_bisect(npyarr,bboxes,ms_to_px):
         
         candidates[bboxid] = {}
         candidates[bboxid]['events'] = filtered_df
-        candidates[bboxid]['cluster_size'] = [np.max(filtered_array['y'])-np.min(filtered_array['y']), np.max(filtered_array['x'])-np.min(filtered_array['x']), np.max(filtered_array['t'])-np.min(filtered_array['t'])]
+        candidates[bboxid]['cluster_size'] = [np.max(filtered_array['y'])-np.min(filtered_array['y'])+1, np.max(filtered_array['x'])-np.min(filtered_array['x'])+1, np.max(filtered_array['t'])-np.min(filtered_array['t'])]
         candidates[bboxid]['N_events'] = len(filtered_array)
     end_time = time.time()
     
@@ -690,7 +695,7 @@ def DBSCAN_allEvents(npy_array,settings,**kwargs):
         max_consec_ev = float(kwargs["max_consec"])
     else:
         # Default value for max number of consecutive events
-        max_consec_ev = 30
+        max_consec_ev = 1e10
 
     # Start the timer
     start_time = time.time()
@@ -741,7 +746,7 @@ def DBSCAN_onlyHighDensity(npy_array,settings,**kwargs):
         max_consec_ev = float(kwargs["max_consec"])
     else:
         # Default value for max number of consecutive events
-        max_consec_ev = 30
+        max_consec_ev = 1e10
 
     # Start the timer
     start_time = time.time()
@@ -770,7 +775,7 @@ def DBSCAN_onlyHighDensity(npy_array,settings,**kwargs):
             clusterEvents = clusters[cluster_labels == cl]
             candidates[cl] = {}
             candidates[cl]['events'] = clusterEvents
-            candidates[cl]['cluster_size'] = [np.max(clusterEvents['y'])-np.min(clusterEvents['y']), np.max(clusterEvents['x'])-np.min(clusterEvents['x']), np.max(clusterEvents['t'])-np.min(clusterEvents['t'])]
+            candidates[cl]['cluster_size'] = [np.max(clusterEvents['y'])-np.min(clusterEvents['y'])+1, np.max(clusterEvents['x'])-np.min(clusterEvents['x'])+1, np.max(clusterEvents['t'])-np.min(clusterEvents['t'])]
             candidates[cl]['N_events'] = len(clusterEvents)
     endtime = time.time()
     # Print the elapsed time:
@@ -839,14 +844,13 @@ def DBSCAN_allEvents_remove_outliers(npy_array,settings,**kwargs):
         max_consec_ev = float(kwargs["max_consec"])
     else:
         # Default value for max number of consecutive events
-        max_consec_ev = 30
+        max_consec_ev = 1e10
     
     
     weights,df_events = determineWeights(npy_array)
     hotpixel_filtered_events = hotPixel_filter(npy_array,max_consec_ev,weights=weights,df_events=df_events)
     logging.info('Hotpixel filtering completed')
-    filtered_events, polarities = remove_radius_outlier_o3d(hotpixel_filtered_events,nb_points=30,radius=3,print_progress=True,ms_to_px=float(kwargs['ratio_ms_to_px']))
-    
+    filtered_events, polarities = remove_radius_outlier_o3d(hotpixel_filtered_events,nb_points=int(kwargs['outlier_removal_nbPoints']),radius=float(kwargs['outlier_removal_radius']),print_progress=True,ms_to_px=float(kwargs['ratio_ms_to_px']))
     
     clustersHD, cluster_labels = clustering(filtered_events, polarities, eps = float(kwargs['DBSCAN_eps']), min_points_per_cluster = int(kwargs['min_cluster_size']))
     logging.info('DBSCAN done')

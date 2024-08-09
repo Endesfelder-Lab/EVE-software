@@ -1,9 +1,16 @@
-from GUI_main import MyGUI
-import sys,argparse,colorsys
+
 from PyQt5.QtWidgets import QApplication
+try:
+    from eve_smlm.GUI_main import MyGUI
+except ImportError:
+    from GUI_main import MyGUI  # Fallback for direct execution
+
+import sys,argparse,colorsys
 import multiprocessing
 from PyQt5.QtGui import QIcon
 import os
+
+multiprocessing.freeze_support()
 
 def adjust_color_brightness(hex_color, percent):
     # Convert hexadecimal color to RGB
@@ -59,12 +66,37 @@ def get_stylesheet():
 
     return stylesheet
 
-if __name__ == "__main__":
+def main():
+    import gc
+    gc.enable()
+    from PyQt5.QtCore import Qt
+    QApplication.setAttribute(Qt.AA_ShareOpenGLContexts)
+    multiprocessing.freeze_support()
     app = QApplication(sys.argv)
     
     gui = MyGUI()
+    
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    gui.setWindowIcon(QIcon(current_dir + os.sep + 'Eve.png'))
+    #Check if icon is here:
+    if os.path.isfile(current_dir + os.sep + 'Eve.png'):
+        gui.setWindowIcon(QIcon(current_dir + os.sep + 'Eve.png'))
+    else:
+        try:
+            #PIP icon finding:
+            from pathlib import Path
+            # Get the directory of the current file
+            current_dir = Path(__file__).parent
+            # Construct the path to the icon file
+            icon_path = current_dir + os.sep + 'Eve.png'
+            # Use the icon path
+            gui.setWindowIcon(QIcon(str(icon_path)))
+        except:
+            print("Unable to load icon. Continuing without it.")
+
+        
     gui.setStyleSheet(get_stylesheet())
     gui.show()
     sys.exit(app.exec_())
+
+if __name__ == "__main__":
+    main()
