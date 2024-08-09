@@ -88,7 +88,7 @@ def remove_radius_outlier_o3d(events,nb_points=30,radius=3,print_progress=True,m
     point_cloud = o3d.geometry.PointCloud()
     point_cloud.points = o3d.utility.Vector3dVector(zip(data_for_o3d['x'],data_for_o3d['y'],data_for_o3d['t']/(1000*ms_to_px)))
     
-    cleaned_pcp =point_cloud.remove_radius_outlier(nb_points, radius, print_progress=print_progress)
+    cleaned_pcp =point_cloud.remove_radius_outlier(int(nb_points), radius, print_progress=print_progress)
     
     pcp = np.asarray(cleaned_pcp[0].points)
     #change columns 0 and 1 to integer values:
@@ -850,7 +850,7 @@ def DBSCAN_allEvents_remove_outliers(npy_array,settings,**kwargs):
     weights,df_events = determineWeights(npy_array)
     hotpixel_filtered_events = hotPixel_filter(npy_array,max_consec_ev,weights=weights,df_events=df_events)
     logging.info('Hotpixel filtering completed')
-    filtered_events, polarities = remove_radius_outlier_o3d(hotpixel_filtered_events,nb_points=float(kwargs['outlier_removal_nbPoints']),radius=float(kwargs['outlier_removal_radius']),print_progress=True,ms_to_px=float(kwargs['ratio_ms_to_px']))
+    filtered_events, polarities = remove_radius_outlier_o3d(hotpixel_filtered_events,nb_points=int(kwargs['outlier_removal_nbPoints']),radius=float(kwargs['outlier_removal_radius']),print_progress=True,ms_to_px=float(kwargs['ratio_ms_to_px']))
     
     clustersHD, cluster_labels = clustering(filtered_events, polarities, eps = float(kwargs['DBSCAN_eps']), min_points_per_cluster = int(kwargs['min_cluster_size']))
     logging.info('DBSCAN done')
