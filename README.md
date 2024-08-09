@@ -1,8 +1,4 @@
----
-bibliography: Markdown_info/citations.bib
----
-
-# Supplementary Note 2: Software manual
+# Software manual
 
 ## EVE - General-purpose software for eveSMLM localization
 ![](Quick_Start/EveSmall.png)
