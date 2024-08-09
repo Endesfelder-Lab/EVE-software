@@ -44,7 +44,7 @@ def __function_metadata__():
             "optional_kwargs": [
             ],
             "help_string": "Makes a 2D log-gaussian fit (via least squares) to determine the localization parameters.",
-            "display_name": "2D LogarithmicGaussian"
+            "display_name": "2D Logarithmic Gaussian"
         }, 
         "Gaussian3D": {
             "dist_kwarg" : {"base": "XYDist", "description": "Two-dimensional event-distribution to fit to get x,y-localization.", "default_option": "Hist2d_xy"},
