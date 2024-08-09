@@ -170,6 +170,7 @@ Matching of a “positive PSF” with its corresponding “negative PSF” searc
 
 ### 1.2. Localization precision
 In a static eveSMLM dataset (i.e. considering immobile molecules and ignoring sample drift), the underlying single-molecule location of the positive and negative PSF are identical, or $\Delta_{spatial}=0$. However, in practice, the found localization difference between the positive and negative PSF ($\Delta_{spatial}$) is degraded by the combined localization precision of both positive and negative fitting routines. Nearest-neighbour analysis (NeNA) [@endesfelder_simple_2014] is used to determine the average localization precision of all polarity-matched positive and negative PSFs in the dataset. For this, the $pdf(\Delta_{spatial})$ of all polarity-matched PSFs is fitted with the following function:
+
 $$\Large
 \text{pdf}(\Delta_{spatial}) = A_1 \cdot \left(\frac{\Delta_{spatial}}{2 \cdot \sigma_{\text{SMLM}}^2} \cdot e^{-\frac{\Delta_{spatial}^2}{4 \cdot \sigma_{\text{SMLM}}^2}}\right) + A_2 \cdot \left(\frac{1}{\sqrt{2 \cdot \pi \cdot \omega^2}} \cdot e^{-\frac{(\Delta_{spatial} - d_c)^2}{2 \cdot \omega^2}}\right) + A_3 \cdot \Delta_{spatial}
 $$
