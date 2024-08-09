@@ -1,6 +1,6 @@
 ﻿---
 bibliography: Markdown_info\citations.bib
-csl: ieee.csl
+csl: Markdown_info\ieee.csl
 figureTitle: |
   Figure #
 ---
@@ -9,14 +9,11 @@ cd C:\Users\Koen Martens\Documents\GitHub\Eve
 pandoc ScientificBackground.md -o ScientificBackground.pdf --bibliography=Markdown_info\citations.bib --csl=ieee.csl --citeproc --pdf-engine=xelatex -V geometry:margin=1in
 -->
 
-# Supplementary Note 1: Scientific background of EVE
+# Supplementary Note 1: Analysis methods implemented in EVE
 <!--Analysis methods implemented in EVE-->
 
 ## Contents
 <!-- TOC -->
-
-- [Scientific background of EVE](#scientific-background-of-eve)
-    - [Contents](#contents)
 - [Introduction](#introduction)
 - [Finding](#finding)
     - [Eigenfeature-based finding](#eigenfeature-based-finding)
@@ -77,7 +74,7 @@ Density-based spatial clustering of applications with noise (DBSCAN) is an algor
 The frame-based finding methodology is an adapted version of the frame-based analysis used in [@cabriel_event-based_2022]. It naively reduces event-data to images using ‘frames’ of e.g. 100 ms. In these frames, standard image blob detection methods can be employed – in our implementation, an image wavelet segmentation method is used [@izeddin_wavelet_2012; @cabriel_event-based_2022]. This segmentation method reports a single spatial location (in pixel-units), and a user-defined area is extracted around this location. All events in this spatial area, in the temporal region defined by the frame, are passed on for sub-pixel localization.
 
 # Fitting 
-All fitting methods aim to determine the x-, y- (,z-) and t-coordinates for each candidate cluster. Since a candidate cluster consists of a three-dimensional point cloud of events (see Supplementary Figure \ref{fig:fittingDistr} a), conventional single-molecule localization methods that process image data cannot be used directly. Various event-based fitting methods are implemented in EVE, which can be divided into spatial, temporal and spatio-temporal fitting methods. The first two methods can be flexibly combined to obtain the final localization, whereas the third method directly estimates both temporal and spatial coordinates together.
+All fitting methods aim to determine the x-, y- (,z-) and t-coordinates for each candidate cluster. Since a candidate cluster consists of a three-dimensional point cloud of events (see Supplementary Figure \ref{fig:fittingDistr} a), conventional single-molecule localization methods that process image data cannot be used directly. Various event-based fitting methods are implemented in EVE, which can be divided into spatial, temporal and spatio-temporal fitting method types. The first two method types can be flexibly combined to obtain the final localization, whereas the third method type directly estimates both temporal and spatial coordinates together.
 
 ## 1. Fitting distributions
 Besides directly analyzing the event point cloud data associated with a candidate (Supplementary Figure \ref{fig:fittingDistr} a), it is also possible to reduce the data to a two-dimensional distribution, e.g. by counting all events per pixel (Supplementary Figure \ref{fig:fittingDistr} b), by only taking the time of the first events per pixel (Supplementary Figure \ref{fig:fittingDistr} c) or by calculating the mean time delay between all events per pixel (see Supplementary Figure \ref{fig:fittingDistr} d). These distributions can then be fitted by a conventional two-dimensional function, e.g. a Gaussian, to obtain the x,y(,z) localization. 
@@ -85,7 +82,7 @@ Besides directly analyzing the event point cloud data associated with a candidat
 ![Fitting distributions that can be derived from the event data. a. Event point cloud belonging to a candidate.  b. Total number of events per pixel. c. Time of the first event per pixel (pixels with 0 events cannot be evaluated). d. Mean time delay between all events per pixel (pixels with less than 2 events cannot be evaluated).](Markdown_info/SciBG_cluster.png){#fig:fittingDistr}
 
 
-Within EVE, we separated the creation of the two-dimensional distribution from the fitting of this distribution. This allows a very flexible combination of both, method and distribution, to achieve the most accurate localization result by fully evaluating and exploiting the information stored in a candidate cluster. Two-dimensional fitting routines can be chosen from: Mean X,Y position; Gaussian; logarithmic Gaussian; astigmatic Gaussian; Radial Symmetry and Phasor routines. Two-dimensional distributions can be chosen from: The time of the first event; the total number of events; the average/median time of all events for each pixel; the average/minimum/maximum time delay between events for each pixel. 
+Within EVE, we separated the creation of the two-dimensional distribution from the fitting of this distribution. This allows a very flexible combination of both, method and distribution, to achieve the most accurate localization result by fully evaluating and exploiting the information stored in a candidate cluster. Two-dimensional fitting routines can be chosen from: Mean X,Y position; Gaussian; logarithmic Gaussian; astigmatic Gaussian and Phasor routines. Two-dimensional distributions can be chosen from: The time of the first event; the total number of events; the average/median time of all events for each pixel; the average/minimum/maximum time delay between events for each pixel. 
 
 ## 2. Mean X,Y position
 The average X,Y fitting method calculates the average x,y position for the chosen two-dimensional distribution, the uncertainties of the spatial x,y estimators are determined by the standard deviation in x and y. A temporal fitting method has to be selected separately.
@@ -95,12 +92,12 @@ Analogous to conventional frame-based SMLM [@stallinga_accuracy_2010; @mortensen
 
 $$\Large pdf(x,y)=A_1\cdot e^{-{(x-x_0)^2\over2\sigma_x^2} +{(y-y_0)^2\over2\sigma_y^2}}+A_2$$
 
-The  ($x_0$,  $y_0$) - localization uncertainties given by the fit are used as a tolerance measure to discard imprecise fits where the fit uncertainty is larger than a user-definable factor times the pixel-size. A temporal fitting method has to be selected separately. 
+$A_{1-3}$ are the amplitudes of each term. The  ($x_0$,  $y_0$) - localization uncertainties given by the fit are used as a tolerance measure to discard imprecise fits where the fit uncertainty is larger than a user-definable factor times the pixel-size. A temporal fitting method has to be selected separately. 
 
 ## 4. 2D Logarithmic Gaussian
 Due to the logarithmic nature of consecutive events a 2D logarithmic Gaussian fit was implemented similar to the 2D Gaussian fit:
 
-$$\Large pdf(x,y)=log(A_1\cdot e^{-{(x-x_0)^2\over2\sigma_x^2} +{(y-y_0)^2\over2\sigma_y^2}}+A_2)$$
+$$\Large pdf(x,y)=A_1\cdot log(1 + e^{-{(x-x_0)^2\over2\sigma_x^2} +{(y-y_0)^2\over2\sigma_y^2}})+A_2$$
 
 Again, the  ($x_0$,  $y_0$) - localization uncertainties given by the fit are used as a tolerance measure to discard imprecise fits where the fit uncertainty is larger than a user-definable factor times the pixel-size. A temporal fitting method has to be selected separately.
 
@@ -113,7 +110,7 @@ A rotated elliptical Gaussian function with rotation angle $\phi$ is used to rep
 
 $$\Large pdf(x,y)=A_1\cdot e^{-{\hat{x}^2\over2\sigma_{\hat{x}}^2} +{\hat{y}^2\over2\sigma_{\hat{y}}^2}}+A_2$$
 
-where $A_{1,2}$ are constants, $\sigma_{x,y}$ are the imaged widths of the molecule along two perpendicular axes rotated by $\phi$ with respect to the x,y-axes and x,y are defined by:
+where $A_{1,2}$ are amplitude terms, $\sigma_{x,y}$ are the imaged widths of the molecule along two perpendicular axes rotated by $\phi$ with respect to the x,y-axes and x,y are defined by:
 
 $$\Large \hat{x} = (x-x_0)cos(\phi)-(y-y_0)sin(\phi)$$
 
@@ -159,7 +156,7 @@ $$ \Large
 $$
 
 To account for background noise, the fit consists of a first term containing the lognormal, and two additional terms that describe a linear dependency following from the assumption that the noise event rate is constant. $A_{1-3}$ are the amplitudes of each term, $erf$ is the Gaussian error function, $t_s$ is the shift of the fitting function, $\mu$ and $\sigma^2$ describe the mean and variance of the underlying normal function. 
-The starting time of the cluster can now be estimated through the intersection of the maximum slope of the fit (gray curve in  4) and the background model (dashed line in Supplementary Figure \ref{fig:logNorm1}).
+The starting time of the cluster can now be estimated through the intersection of the maximum slope of the fit (gray curve in Supplementary Figure \ref{fig:logNorm1}) and the background model (dashed line in Supplementary Figure \ref{fig:logNorm1}).
 
 ![Exemplary representation of lognormal CDF fitting for time estimation. The cumulative number of events (blue) per cluster is fitted by a lognormal cumulative distribution function including a linear background correction model (black). The time (red) can be estimated via intersection of the maximum slope (gray) and background curve (dashed black line).](Markdown_info/SciBG_LogNorm.png){#fig:logNorm1}
 
@@ -195,7 +192,7 @@ In addition to spatial information, the polarity matching also provides temporal
 
 The obtained duration between the positive-event PSF and negative-event PSF via polarity matching ($\Delta_{temporal}$) is broadly categorized in two regimes: 1. Photophysical *on-time* of a single fluorophore (i.e. caused by fluorophore bleaching (STORM, PALM) or target dissociation (PAINT)). This *on-time* is degraded by: 2. Sensor limitations: typical evePSFs have a temporal duration in the order of tens to hundreds of ms, even while the PSF signal is instantaneous. If the photophysical *on-time* of the single emitter is shorter than the evePSF formation, the positive PSF does not have time to fully form, and will as such not be localized correctly. Thus, low-value $\Delta_{temporal}$ are effectively removed from polarity-matching analysis.
 
-The lifetime is estimated as follows (Supplementary Figure \ref{fig:lifetime}): the peak of the $\Delta_{temporal}$ pdf is determined via smoothing of the raw data with a Savitzky-Golay filter, after which an ‘offset’ is determined (default 20% higher than the temporal peak value). The raw data at times longer than this offset are fit with a combination of 1-3 exponential decays (user-definable). Supplementary Figure shows an exemplary routine.
+The lifetime is estimated as follows (Supplementary Figure \ref{fig:lifetime}): the peak of the $\Delta_{temporal}$ pdf is determined via smoothing of the raw data with a Savitzky-Golay filter, after which an ‘offset’ is determined (default 20% higher than the temporal peak value). The raw data at times longer than this offset are fit with a combination of 1-3 exponential decays (user-definable).
 
 ![Showcase of the lifetime obtained via EVE from all emitter *on-times* of a DNA PAINT sample. A single exponential decay (blue line) is fitted to $\Delta_{temporal}$ pdf data (gray) on a linear (left) and logarithmic (right) y-axis. The exponential decay is fitted only in the regime where $\Delta_{temporal}$ is larger than the offset position (red). The single exponential decay fit has a half-time of 88 ± 3.5 ms.](Markdown_info/SciBG_lifetime.png){#fig:lifetime}
 
