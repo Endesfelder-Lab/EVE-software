@@ -57,13 +57,14 @@ conda activate EVE
 pip install eve-SMLM
 ```
 
-**With virtualenv**  
+**With virtualenv on Linux or MacOs**  
 
-First, install python 3.9 from python.org.
+First, install python 3.9 from (www.python.org) and virtualenv from (https://virtualenv.pypa.io/en/latest/).
 
-Replace `PYTHON_PATH` by your python path, e.g. `/usr/bin` and `ENVIRONMENT_PATH` by the path to the virtual environments on your machine and follow the instructions below:
+Replace `PYTHON_PATH` by your python path, e.g. `/usr/bin` on Linux, and `ENVIRONMENT_PATH` by the path to the virtual environments on your machine and follow the instructions below:
 ```bash
-virtualenv -p PYTHON_PATH/python3.9 ENVIRONMENT_PATH/Eve
+virtualenv -p PYTHON_PATH/python3.9 ENVIRONMENT_PATH/EVE
+source ENVIRONMENT_PATH/EVE/bin/activate
 pip install eve-SMLM
 ```
 
