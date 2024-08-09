@@ -13,9 +13,9 @@ EVE is designed to quickly and directly process and analyse event-based single m
 2. **Candidate Fitting:** The x,y,(z),p,t-localization is determined for each candidate cluster.<br>  
 3. **Postprocessing and Evaluation:** Various analytical routines to process and interpret the data.<br>  
 
-EVE allows flexible combinations of different finding and fitting routines to optimize the localization results for the specific event-based dataset. Besides a variety of different finding and fitting algorithms, EVE also offers various preview options, visualisation tools and post-processing and evaluation functions. A detailed description of the algorithms can be found in [**Supplementary Note 1: Analysis methods implemented in EVE**](ScientificBackground.md).
+EVE allows flexible combinations of different finding and fitting routines to optimize the localization results for the specific event-based dataset. Besides a variety of different finding and fitting algorithms, EVE also offers various preview options, visualisation tools and post-processing and evaluation functions. A detailed description of the algorithms can be found in [**Analysis methods implemented in EVE**](ScientificBackground.md).
 
-EVE is written in Python and structured in such a way, that is easy to implement and add new functionalties in form of new finding, fitting routines, etc. Details about this can be found in the [**Supplementary Note 3: Developer Instructions**](DeveloperInstructions.md). EVE can also be run via the command line interface, see [`EVE_CommandLine.ipynb`](EVE_CommandLine.ipynb) for detailed information.
+EVE is written in Python and structured in such a way, that is easy to implement and add new functionalties in form of new finding, fitting routines, etc. Details about this can be found in the [**Developer Instructions**](DeveloperInstructions.md). EVE can also be run via the command line interface, see [`EVE_CommandLine.ipynb`](EVE_CommandLine.ipynb) for detailed information.
 
 <!-- TOC -->
 # Contents
