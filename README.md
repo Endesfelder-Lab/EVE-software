@@ -6,7 +6,7 @@
 ## About EVE
 EVE is a graphical user-interfaced software package that provides several methods to localize emitters from single molecule localization microscopy (SMLM) experiments performed on event-based sensors (eveSMLM).
 
-EVE is described in the publication "EVE is an open modular data analysis software for event-based localization microscopy" by Laura M Weber*, Koen J.A. Martens*, Clément Cabriel, Joel J. Gates, Manon Albecq, Fredrik Vermeulen, Katharina Hein, Ignacio Izeddin, and Ulrike Endesfelder.
+EVE is described in the publication "EVE is an open modular data analysis software for event-based localization microscopy" by Laura M. Weber*, Koen J.A. Martens*, Clément Cabriel, Joel J. Gates, Manon Albecq, Fredrik Vermeulen, Katharina Hein, Ignacio Izeddin, and Ulrike Endesfelder.
 
 Event-based data differs fundamentally from conventional camera images. Unlike traditional sensors, event-based sensors only capture intensity changes, registering them as either positive (when the intensity surpasses a predefined threshold) or negative events (when the intensity drops below a predefined threshold). As a result, only a list of x and y pixel coordinate pairs is stored together with the detected event polarities (p) and timestamps (t).
 
