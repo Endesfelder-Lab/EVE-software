@@ -3554,14 +3554,17 @@ class AdvancedSettingsWindow(QMainWindow):
         layout.addWidget(save_button,currentRow,0,1,2)
 
         # Create a load button
-        load_button = QPushButton("Load Global Settings")
+        load_button = QPushButton("Load stored Global Settings")
         load_button.clicked.connect(self.load_global_settings)
         layout.addWidget(load_button,currentRow+1,0,1,2)
+        load_as_button = QPushButton("Load-as Global Settings")
+        load_as_button.clicked.connect(self.load_as_global_settings)
+        layout.addWidget(load_as_button,currentRow+2,0,1,2)
 
         #Add a full-reset button:
         full_reset_button = QPushButton("Fully reset GUI and global settings")
         full_reset_button.clicked.connect(self.confirm_full_reset_GUI_GlobSettings)
-        layout.addWidget(full_reset_button,currentRow+2,0,1,2)
+        layout.addWidget(full_reset_button,currentRow+3,0,1,2)
 
         # Create a widget and set the layout
         widget = QWidget()
@@ -3581,28 +3584,31 @@ class AdvancedSettingsWindow(QMainWindow):
         for setting, value in self.parent.globalSettings.items():
             # Check if the setting is not in IgnoreInOptions
             if setting not in self.parent.globalSettings.get('IgnoreInOptions'):
-                # Create a label with the setting title
-                if 'displayName' in value:
-                    self.labelGlobSettings[setting] = QLabel(value['displayName'])
-                else:
-                    self.labelGlobSettings[setting] = QLabel(setting)
+                try:
+                    # Create a label with the setting title
+                    if 'displayName' in value:
+                        self.labelGlobSettings[setting] = QLabel(value['displayName'])
+                    else:
+                        self.labelGlobSettings[setting] = QLabel(setting)
 
-                # Check the type of the input
-                input_type = value['input']
+                    # Check the type of the input
+                    input_type = value['input']
 
-                # Create a checkbox for boolean values
-                if input_type == bool:
-                    self.checkboxGlobSettings[setting].setChecked(value['value'])
+                    # Create a checkbox for boolean values
+                    if input_type == bool:
+                        self.checkboxGlobSettings[setting].setChecked(value['value'])
 
-                # Create an input field for string or integer values
-                elif input_type in (str, float):
-                    self.input_fieldGlobSettings[setting].setText(str(value['value']))
+                    # Create an input field for string or integer values
+                    elif input_type in (str, float):
+                        self.input_fieldGlobSettings[setting].setText(str(value['value']))
 
-                # Create a dropdown for choices
-                elif input_type == 'choice':
-                    options = value['options']
-                    current_index = options.index(value['value'])
-                    self.dropdownGlobSettings[setting].setCurrentIndex(current_index)
+                    # Create a dropdown for choices
+                    elif input_type == 'choice':
+                        options = value['options']
+                        current_index = options.index(value['value'])
+                        self.dropdownGlobSettings[setting].setCurrentIndex(current_index)
+                except:
+                    logging.debug(f"Error with setting {setting}")
 
     def confirm_full_reset_GUI_GlobSettings(self):
         reply = QMessageBox.question(self, 'Confirmation', "Are you sure you want to fully reset the GUI and global settings? This will close the GUI and you have to re-open.", QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
@@ -3651,7 +3657,7 @@ class AdvancedSettingsWindow(QMainWindow):
         self.close()
 
     def load_global_settings(self,jsonLocation=None):
-        if jsonLocation == None:
+        if jsonLocation == None or jsonLocation == False:
             # Specify the path and filename for the JSON file
             json_file_path = self.parent.globalSettings['GlobalOptionsStorePath']['value']
         else:
@@ -3672,6 +3678,30 @@ class AdvancedSettingsWindow(QMainWindow):
         except:
             self.save_global_settings()
             logging.info('No global settings storage found, new one created.')
+            
+            
+    def load_as_global_settings(self):
+        ## Have a file load dialog to open json:
+        # Open the file dialog
+        jsonLocation, _ = QFileDialog.getOpenFileName(self, "Load Advanced settings file", "", "Settings File (*.json);")
+        json_file_path = jsonLocation
+        try:    # Load the globalSettings dictionary from the JSON file
+            with open(json_file_path, "r") as json_file:
+                loaded_settings = json.load(json_file)
+
+            # Update the 'input' value in self.parent.globalSettings, if it exists
+            for key, value in loaded_settings.items():
+                if key != 'IgnoreInOptions':
+                    if key != "JSONGUIstorePath" and key != "GlobalOptionsStorePath" and key != "MetaVisionPath" and key != "LoggingFilePath":
+                        if key in self.parent.globalSettings:
+                            # self.parent.globalSettings[key]['input'] = value['input']
+                            loaded_settings[key]['input'] = self.parent.globalSettings[key].get('input', None)
+
+            self.parent.globalSettings.update(loaded_settings)
+            #Update the values of the globalSettings GUI
+            self.updateGlobSettingsGUIValues()
+        except:
+            logging.error(f"Problem with loading adv settings from file {json_file_path}")
 
 class ImageSlider(QWidget):
     def __init__(self, figures=None, parent=None):
