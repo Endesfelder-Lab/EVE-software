@@ -183,7 +183,7 @@ If selected correctly in the `Advanced Settings`, EVE will store a lot of metada
 
 ### 11. Command-line interface
 
-All of EVE can also be accessed via the command-line. For a detailed overview look at `EVE_CommandLine.ipynb`.
+All of EVE can also be accessed via the command-line. For a detailed overview look at [`EVE_CommandLine.ipynb`](EVE_CommandLine.ipynb).
 
 ### 12. Exemplary data
 The EVE software is packaged with three exemplary datasets, found in the **Data** folder: DNA-PAINT nanoruler, *E. coli* with endogenous RpoC-mEos3.2 and Nile Red membrane stain. The $\alpha$-tubulin labeled Cos7 dSTORM sample dataset, as well as full-sized versions of the other datasets, can be found at [doi:10.5281/zenodo.13269600](doi:10.5281/zenodo.13269600).  Here are succint instructions for how to fully analyse these datasets:
