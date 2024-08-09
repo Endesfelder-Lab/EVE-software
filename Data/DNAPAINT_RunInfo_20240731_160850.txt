@@ -1,0 +1,461 @@
+Metadata information for file /home/laura/PhD/Event_Based_Sensor_Project/Eve/Data/DNAPAINT.hdf5
+Analysis routine started at 2024-07-31 16:08:50
+Analysis routine finished at 2024-07-31 16:10:37
+
+
+-----Information on finding of polarity Pos: -----
+Methodology Used:
+EigenFeatureAnalysis.eigenFeature_analysis(self.events,self.settings,linearity_cutoff="0.7",max_eigenval_cutoff="18.0",search_n_neighbours="50",ratio_ms_to_px="10",DBSCAN_eps="3",DBSCAN_n_neighbours="12",debug="False")
+
+Number of candidates found: 4759
+Candidate fitting took 32.75988292694092 seconds.
+
+
+-----Information on finding of polarity Neg: -----
+Methodology Used:
+EigenFeatureAnalysis.eigenFeature_analysis(self.events,self.settings,linearity_cutoff="0.7",max_eigenval_cutoff="18",search_n_neighbours="20",ratio_ms_to_px="18",DBSCAN_eps="3",DBSCAN_n_neighbours="8",debug="True")
+
+Number of candidates found: 2399
+Candidate fitting took 13.106883764266968 seconds.
+
+
+-----Information on fitting of polarity Pos: -----
+Methodology Used:
+GaussianFitting.Gaussian2D(self.partialFindingResults,self.settings,expected_width="150.0",fitting_tolerance="1.0",dist_kwarg="Hist2d_xy",time_kwarg="LognormCDFFirstEvents_weighted")
+
+Number of valid localizations found: 4662
+Candidate fitting took 39.9697048664093 seconds.
+
+
+-----Information on fitting of polarity Neg: -----
+Methodology Used:
+GaussianFitting.Gaussian2D(self.partialFindingResults,self.settings,expected_width="150.0",fitting_tolerance="1.0",dist_kwarg="Hist2d_xy",time_kwarg="LognormCDFFirstEvents_weighted")
+
+Number of valid localizations found: 2201
+Candidate fitting took 20.65321373939514 seconds.
+
+
+
+---- Global settings used ----
+
+MinFindingBoundingBoxXY: 4
+MinFindingBoundingBoxT: 10
+MaxFindingBoundingBoxXY: 20
+MaxFindingBoundingBoxT: 1000
+XYTOutlierRemoval: 0
+XYTOutlierRemoval_multiplier: 2.5
+PixelSize_nm: 67
+MetaVisionPath: /usr/lib/python3/dist-packages
+StoreConvertedRawData: 0
+StoreFileMetadata: 2
+StoreFindingOutput: 0
+StoreFittingOutput: 0
+HotPixelIndexes: 
+OutputDataFormat: thunderstorm
+LoggingFilePath: /home/laura/.local/share/Eve/logging.log
+Multithread: True
+UseCUDA: False
+FindingBatching: 2
+FindingBatchingTimeMs: 5000
+FindingBatchingTimeOverlapMs: 500
+
+
+---- Additional custom output ----
+
+Custom output from finding function:
+
+SpectralClustering Finding ran for 0.2268996238708496 seconds.
+SpectralClustering Finding ran for 0.2960996627807617 seconds.
+SpectralClustering Finding ran for 0.2828953266143799 seconds.
+SpectralClustering Finding ran for 0.30306410789489746 seconds.
+SpectralClustering Finding ran for 23.969202995300293 seconds.
+SpectralClustering Finding ran for 0.2689642906188965 seconds.
+SpectralClustering Finding ran for 0.31847333908081055 seconds.
+SpectralClustering Finding ran for 0.3245201110839844 seconds.
+SpectralClustering Finding ran for 0.312772274017334 seconds.
+SpectralClustering Finding ran for 24.592451810836792 seconds.
+SpectralClustering Finding ran for 0.3834056854248047 seconds.
+SpectralClustering Finding ran for 0.4919886589050293 seconds.
+SpectralClustering Finding ran for 0.3301966190338135 seconds.
+SpectralClustering Finding ran for 0.3272559642791748 seconds.
+SpectralClustering Finding ran for 0.3752281665802002 seconds.
+SpectralClustering Finding ran for 0.3198428153991699 seconds.
+SpectralClustering Finding ran for 0.2788980007171631 seconds.
+SpectralClustering Finding ran for 0.26749181747436523 seconds.
+SpectralClustering Finding ran for 0.42141079902648926 seconds.
+SpectralClustering Finding ran for 0.3675997257232666 seconds.
+SpectralClustering Finding ran for 0.24005866050720215 seconds.
+SpectralClustering Finding ran for 0.33068251609802246 seconds.
+SpectralClustering Finding ran for 0.23720097541809082 seconds.
+SpectralClustering Finding ran for 0.4071478843688965 seconds.
+SpectralClustering Finding ran for 0.2728593349456787 seconds.
+SpectralClustering Finding ran for 0.26287293434143066 seconds.
+SpectralClustering Finding ran for 0.25317978858947754 seconds.
+SpectralClustering Finding ran for 0.3757197856903076 seconds.
+SpectralClustering Finding ran for 0.4319732189178467 seconds.
+SpectralClustering Finding ran for 0.4016716480255127 seconds.
+SpectralClustering Finding ran for 0.43314027786254883 seconds.
+SpectralClustering Finding ran for 0.43696045875549316 seconds.
+SpectralClustering Finding ran for 0.3916923999786377 seconds.
+SpectralClustering Finding ran for 0.29807114601135254 seconds.
+SpectralClustering Finding ran for 0.3053557872772217 seconds.
+SpectralClustering Finding ran for 0.29807496070861816 seconds.
+SpectralClustering Finding ran for 0.29238224029541016 seconds.
+SpectralClustering Finding ran for 0.21390271186828613 seconds.
+SpectralClustering Finding ran for 0.27652525901794434 seconds.
+SpectralClustering Finding ran for 0.33650755882263184 seconds.
+SpectralClustering Finding ran for 0.2893097400665283 seconds.
+SpectralClustering Finding ran for 0.3177826404571533 seconds.
+SpectralClustering Finding ran for 0.23296451568603516 seconds.
+SpectralClustering Finding ran for 0.23719286918640137 seconds.
+SpectralClustering Finding ran for 0.2338566780090332 seconds.
+SpectralClustering Finding ran for 0.23755812644958496 seconds.
+SpectralClustering Finding ran for 0.266556978225708 seconds.
+SpectralClustering Finding ran for 0.23793745040893555 seconds.
+SpectralClustering Finding ran for 0.24651312828063965 seconds.
+SpectralClustering Finding ran for 0.27182579040527344 seconds.
+SpectralClustering Finding ran for 0.2639768123626709 seconds.
+SpectralClustering Finding ran for 0.2636737823486328 seconds.
+SpectralClustering Finding ran for 0.24846386909484863 seconds.
+SpectralClustering Finding ran for 0.21798253059387207 seconds.
+SpectralClustering Finding ran for 0.22373151779174805 seconds.
+SpectralClustering Finding ran for 0.23400473594665527 seconds.
+SpectralClustering Finding ran for 0.2920875549316406 seconds.
+SpectralClustering Finding ran for 0.2451622486114502 seconds.
+SpectralClustering Finding ran for 0.27582740783691406 seconds.
+SpectralClustering Finding ran for 0.20331668853759766 seconds.
+SpectralClustering Finding ran for 0.2559354305267334 seconds.
+SpectralClustering Finding ran for 0.22219061851501465 seconds.
+SpectralClustering Finding ran for 0.2734525203704834 seconds.
+SpectralClustering Finding ran for 0.2403855323791504 seconds.
+SpectralClustering Finding ran for 0.27215003967285156 seconds.
+SpectralClustering Finding ran for 0.24031519889831543 seconds.
+SpectralClustering Finding ran for 0.22851109504699707 seconds.
+SpectralClustering Finding ran for 0.2565171718597412 seconds.
+SpectralClustering Finding ran for 0.23055219650268555 seconds.
+SpectralClustering Finding ran for 0.2161710262298584 seconds.
+SpectralClustering Finding ran for 0.2165391445159912 seconds.
+SpectralClustering Finding ran for 0.2218937873840332 seconds.
+SpectralClustering Finding ran for 0.21716737747192383 seconds.
+SpectralClustering Finding ran for 0.2880535125732422 seconds.
+SpectralClustering Finding ran for 0.24504995346069336 seconds.
+SpectralClustering Finding ran for 0.19699859619140625 seconds.
+SpectralClustering Finding ran for 0.23459124565124512 seconds.
+SpectralClustering Finding ran for 0.20996379852294922 seconds.
+SpectralClustering Finding ran for 0.2349393367767334 seconds.
+SpectralClustering Finding ran for 0.21217012405395508 seconds.
+SpectralClustering Finding ran for 0.202742338180542 seconds.
+SpectralClustering Finding ran for 0.22092652320861816 seconds.
+SpectralClustering Finding ran for 0.18926358222961426 seconds.
+SpectralClustering Finding ran for 0.22365283966064453 seconds.
+SpectralClustering Finding ran for 0.20869755744934082 seconds.
+SpectralClustering Finding ran for 0.23629331588745117 seconds.
+SpectralClustering Finding ran for 0.21747899055480957 seconds.
+SpectralClustering Finding ran for 0.26067638397216797 seconds.
+SpectralClustering Finding ran for 0.21412444114685059 seconds.
+SpectralClustering Finding ran for 0.2328169345855713 seconds.
+SpectralClustering Finding ran for 0.20205974578857422 seconds.
+SpectralClustering Finding ran for 0.23610234260559082 seconds.
+SpectralClustering Finding ran for 0.24146604537963867 seconds.
+SpectralClustering Finding ran for 0.22096538543701172 seconds.
+SpectralClustering Finding ran for 0.18714261054992676 seconds.
+SpectralClustering Finding ran for 0.18932008743286133 seconds.
+SpectralClustering Finding ran for 0.20636630058288574 seconds.
+SpectralClustering Finding ran for 0.2045307159423828 seconds.
+SpectralClustering Finding ran for 0.28586697578430176 seconds.
+SpectralClustering Finding ran for 0.2183852195739746 seconds.
+SpectralClustering Finding ran for 0.24533820152282715 seconds.
+SpectralClustering Finding ran for 0.2451610565185547 seconds.
+SpectralClustering Finding ran for 0.22517085075378418 seconds.
+SpectralClustering Finding ran for 0.21863055229187012 seconds.
+SpectralClustering Finding ran for 0.2530848979949951 seconds.
+SpectralClustering Finding ran for 0.25061988830566406 seconds.
+SpectralClustering Finding ran for 0.23757219314575195 seconds.
+SpectralClustering Finding ran for 0.24716663360595703 seconds.
+SpectralClustering Finding ran for 0.2220304012298584 seconds.
+SpectralClustering Finding ran for 0.2119734287261963 seconds.
+SpectralClustering Finding ran for 0.2700505256652832 seconds.
+SpectralClustering Finding ran for 0.3132944107055664 seconds.
+SpectralClustering Finding ran for 0.2184755802154541 seconds.
+SpectralClustering Finding ran for 0.22815442085266113 seconds.
+SpectralClustering Finding ran for 0.2614929676055908 seconds.
+SpectralClustering Finding ran for 0.27175068855285645 seconds.
+SpectralClustering Finding ran for 0.24887442588806152 seconds.
+SpectralClustering Finding ran for 0.2781033515930176 seconds.
+SpectralClustering Finding ran for 0.2302837371826172 seconds.
+SpectralClustering Finding ran for 0.2584037780761719 seconds.
+SpectralClustering Finding ran for 0.19935154914855957 seconds.
+SpectralClustering Finding ran for 0.18671154975891113 seconds.
+SpectralClustering Finding ran for 0.19059967994689941 seconds.
+SpectralClustering Finding ran for 0.25774168968200684 seconds.
+SpectralClustering Finding ran for 0.2715010643005371 seconds.
+SpectralClustering Finding ran for 0.25862812995910645 seconds.
+SpectralClustering Finding ran for 0.25707364082336426 seconds.
+SpectralClustering Finding ran for 0.20355796813964844 seconds.
+SpectralClustering Finding ran for 0.2404918670654297 seconds.
+SpectralClustering Finding ran for 0.21780729293823242 seconds.
+SpectralClustering Finding ran for 0.20267176628112793 seconds.
+SpectralClustering Finding ran for 0.2455308437347412 seconds.
+SpectralClustering Finding ran for 0.22121620178222656 seconds.
+SpectralClustering Finding ran for 0.22461557388305664 seconds.
+SpectralClustering Finding ran for 0.21693158149719238 seconds.
+SpectralClustering Finding ran for 0.24117064476013184 seconds.
+SpectralClustering Finding ran for 0.20837783813476562 seconds.
+SpectralClustering Finding ran for 0.22562360763549805 seconds.
+SpectralClustering Finding ran for 0.20473289489746094 seconds.
+SpectralClustering Finding ran for 0.21670293807983398 seconds.
+SpectralClustering Finding ran for 0.2401115894317627 seconds.
+SpectralClustering Finding ran for 0.21697235107421875 seconds.
+SpectralClustering Finding ran for 0.2354271411895752 seconds.
+SpectralClustering Finding ran for 0.25346970558166504 seconds.
+SpectralClustering Finding ran for 0.2557861804962158 seconds.
+SpectralClustering Finding ran for 0.20844125747680664 seconds.
+SpectralClustering Finding ran for 0.22779202461242676 seconds.
+SpectralClustering Finding ran for 0.19106745719909668 seconds.
+SpectralClustering Finding ran for 0.17418313026428223 seconds.
+SpectralClustering Finding ran for 0.25760531425476074 seconds.
+SpectralClustering Finding ran for 0.266857385635376 seconds.
+SpectralClustering Finding ran for 0.2127389907836914 seconds.
+SpectralClustering Finding ran for 0.22582483291625977 seconds.
+SpectralClustering Finding ran for 0.2127678394317627 seconds.
+SpectralClustering Finding ran for 0.2297220230102539 seconds.
+SpectralClustering Finding ran for 0.2803621292114258 seconds.
+SpectralClustering Finding ran for 0.19550824165344238 seconds.
+SpectralClustering Finding ran for 0.2316122055053711 seconds.
+SpectralClustering Finding ran for 0.22084617614746094 seconds.
+SpectralClustering Finding ran for 0.217742919921875 seconds.
+SpectralClustering Finding ran for 0.20213818550109863 seconds.
+SpectralClustering Finding ran for 0.21329474449157715 seconds.
+SpectralClustering Finding ran for 0.22116470336914062 seconds.
+SpectralClustering Finding ran for 0.27408647537231445 seconds.
+SpectralClustering Finding ran for 0.29733991622924805 seconds.
+SpectralClustering Finding ran for 0.19766592979431152 seconds.
+SpectralClustering Finding ran for 0.2001955509185791 seconds.
+SpectralClustering Finding ran for 0.21869921684265137 seconds.
+SpectralClustering Finding ran for 0.22858595848083496 seconds.
+SpectralClustering Finding ran for 0.20120859146118164 seconds.
+SpectralClustering Finding ran for 0.22443342208862305 seconds.
+SpectralClustering Finding ran for 0.19662976264953613 seconds.
+SpectralClustering Finding ran for 0.20943355560302734 seconds.
+SpectralClustering Finding ran for 0.23855948448181152 seconds.
+SpectralClustering Finding ran for 0.2081623077392578 seconds.
+SpectralClustering Finding ran for 0.22533464431762695 seconds.
+SpectralClustering Finding ran for 0.20813393592834473 seconds.
+SpectralClustering Finding ran for 0.20314288139343262 seconds.
+SpectralClustering Finding ran for 0.18686151504516602 seconds.
+SpectralClustering Finding ran for 0.20422720909118652 seconds.
+SpectralClustering Finding ran for 0.17563486099243164 seconds.
+SpectralClustering Finding ran for 0.21053409576416016 seconds.
+SpectralClustering Finding ran for 0.1608588695526123 seconds.
+
+
+SpectralClustering Finding ran for 0.13713550567626953 seconds.
+SpectralClustering Finding ran for 0.11922574043273926 seconds.
+SpectralClustering Finding ran for 0.11121273040771484 seconds.
+SpectralClustering Finding ran for 0.14256787300109863 seconds.
+SpectralClustering Finding ran for 10.695393085479736 seconds.
+SpectralClustering Finding ran for 0.10702252388000488 seconds.
+SpectralClustering Finding ran for 0.13877630233764648 seconds.
+SpectralClustering Finding ran for 0.09194588661193848 seconds.
+SpectralClustering Finding ran for 0.11354279518127441 seconds.
+SpectralClustering Finding ran for 10.079181909561157 seconds.
+SpectralClustering Finding ran for 0.14073538780212402 seconds.
+SpectralClustering Finding ran for 0.14458775520324707 seconds.
+SpectralClustering Finding ran for 0.09419655799865723 seconds.
+SpectralClustering Finding ran for 0.12268257141113281 seconds.
+SpectralClustering Finding ran for 0.1650536060333252 seconds.
+SpectralClustering Finding ran for 0.1570749282836914 seconds.
+SpectralClustering Finding ran for 0.11498785018920898 seconds.
+SpectralClustering Finding ran for 0.11203455924987793 seconds.
+SpectralClustering Finding ran for 0.13325047492980957 seconds.
+SpectralClustering Finding ran for 0.1911625862121582 seconds.
+SpectralClustering Finding ran for 0.15630531311035156 seconds.
+SpectralClustering Finding ran for 0.06612610816955566 seconds.
+SpectralClustering Finding ran for 0.152878999710083 seconds.
+SpectralClustering Finding ran for 0.1253981590270996 seconds.
+SpectralClustering Finding ran for 0.11663532257080078 seconds.
+SpectralClustering Finding ran for 0.09722685813903809 seconds.
+SpectralClustering Finding ran for 0.12519407272338867 seconds.
+SpectralClustering Finding ran for 0.10111641883850098 seconds.
+SpectralClustering Finding ran for 0.11451220512390137 seconds.
+SpectralClustering Finding ran for 0.12365007400512695 seconds.
+SpectralClustering Finding ran for 0.230025053024292 seconds.
+SpectralClustering Finding ran for 0.10216331481933594 seconds.
+SpectralClustering Finding ran for 0.13410115242004395 seconds.
+SpectralClustering Finding ran for 0.12155914306640625 seconds.
+SpectralClustering Finding ran for 0.12592053413391113 seconds.
+SpectralClustering Finding ran for 0.11219668388366699 seconds.
+SpectralClustering Finding ran for 0.06527853012084961 seconds.
+SpectralClustering Finding ran for 0.10002493858337402 seconds.
+SpectralClustering Finding ran for 0.14308524131774902 seconds.
+SpectralClustering Finding ran for 0.19174981117248535 seconds.
+SpectralClustering Finding ran for 0.10268616676330566 seconds.
+SpectralClustering Finding ran for 0.18175673484802246 seconds.
+SpectralClustering Finding ran for 0.0982811450958252 seconds.
+SpectralClustering Finding ran for 0.13291573524475098 seconds.
+SpectralClustering Finding ran for 0.13608193397521973 seconds.
+SpectralClustering Finding ran for 0.1407322883605957 seconds.
+SpectralClustering Finding ran for 0.10655879974365234 seconds.
+SpectralClustering Finding ran for 0.15355253219604492 seconds.
+SpectralClustering Finding ran for 0.1371312141418457 seconds.
+SpectralClustering Finding ran for 0.09994363784790039 seconds.
+SpectralClustering Finding ran for 0.08819174766540527 seconds.
+SpectralClustering Finding ran for 0.12313151359558105 seconds.
+SpectralClustering Finding ran for 0.10559654235839844 seconds.
+SpectralClustering Finding ran for 0.09739208221435547 seconds.
+SpectralClustering Finding ran for 0.0974726676940918 seconds.
+SpectralClustering Finding ran for 0.09389424324035645 seconds.
+SpectralClustering Finding ran for 0.11594533920288086 seconds.
+SpectralClustering Finding ran for 0.09697198867797852 seconds.
+SpectralClustering Finding ran for 0.1034853458404541 seconds.
+SpectralClustering Finding ran for 0.12802386283874512 seconds.
+SpectralClustering Finding ran for 0.10218381881713867 seconds.
+SpectralClustering Finding ran for 0.09537267684936523 seconds.
+SpectralClustering Finding ran for 0.12236332893371582 seconds.
+SpectralClustering Finding ran for 0.11552977561950684 seconds.
+SpectralClustering Finding ran for 0.10536003112792969 seconds.
+SpectralClustering Finding ran for 0.09947991371154785 seconds.
+SpectralClustering Finding ran for 0.12489008903503418 seconds.
+SpectralClustering Finding ran for 0.07903361320495605 seconds.
+SpectralClustering Finding ran for 0.12166690826416016 seconds.
+SpectralClustering Finding ran for 0.08990216255187988 seconds.
+SpectralClustering Finding ran for 0.10604238510131836 seconds.
+SpectralClustering Finding ran for 0.09393906593322754 seconds.
+SpectralClustering Finding ran for 0.09747648239135742 seconds.
+SpectralClustering Finding ran for 0.10074663162231445 seconds.
+SpectralClustering Finding ran for 0.09286260604858398 seconds.
+SpectralClustering Finding ran for 0.06067490577697754 seconds.
+SpectralClustering Finding ran for 0.060671091079711914 seconds.
+SpectralClustering Finding ran for 0.07502365112304688 seconds.
+SpectralClustering Finding ran for 0.10296797752380371 seconds.
+SpectralClustering Finding ran for 0.08997297286987305 seconds.
+SpectralClustering Finding ran for 0.10312104225158691 seconds.
+SpectralClustering Finding ran for 0.14963531494140625 seconds.
+SpectralClustering Finding ran for 0.1451706886291504 seconds.
+SpectralClustering Finding ran for 0.12219071388244629 seconds.
+SpectralClustering Finding ran for 0.11461544036865234 seconds.
+SpectralClustering Finding ran for 0.1302947998046875 seconds.
+SpectralClustering Finding ran for 0.13399815559387207 seconds.
+SpectralClustering Finding ran for 0.09281349182128906 seconds.
+SpectralClustering Finding ran for 0.08032703399658203 seconds.
+SpectralClustering Finding ran for 0.12043929100036621 seconds.
+SpectralClustering Finding ran for 0.12031388282775879 seconds.
+SpectralClustering Finding ran for 0.1426997184753418 seconds.
+SpectralClustering Finding ran for 0.15462350845336914 seconds.
+SpectralClustering Finding ran for 0.1137547492980957 seconds.
+SpectralClustering Finding ran for 0.11592769622802734 seconds.
+SpectralClustering Finding ran for 0.07103395462036133 seconds.
+SpectralClustering Finding ran for 0.09074592590332031 seconds.
+SpectralClustering Finding ran for 0.1090235710144043 seconds.
+SpectralClustering Finding ran for 0.09517073631286621 seconds.
+SpectralClustering Finding ran for 0.09800934791564941 seconds.
+SpectralClustering Finding ran for 0.09371280670166016 seconds.
+SpectralClustering Finding ran for 0.11276078224182129 seconds.
+SpectralClustering Finding ran for 0.1074678897857666 seconds.
+SpectralClustering Finding ran for 0.10442996025085449 seconds.
+SpectralClustering Finding ran for 0.10619163513183594 seconds.
+SpectralClustering Finding ran for 0.08482146263122559 seconds.
+SpectralClustering Finding ran for 0.12210869789123535 seconds.
+SpectralClustering Finding ran for 0.12012910842895508 seconds.
+SpectralClustering Finding ran for 0.14881062507629395 seconds.
+SpectralClustering Finding ran for 0.09564757347106934 seconds.
+SpectralClustering Finding ran for 0.0816652774810791 seconds.
+SpectralClustering Finding ran for 0.09363937377929688 seconds.
+SpectralClustering Finding ran for 0.11260557174682617 seconds.
+SpectralClustering Finding ran for 0.10154867172241211 seconds.
+SpectralClustering Finding ran for 0.14297914505004883 seconds.
+SpectralClustering Finding ran for 0.09786105155944824 seconds.
+SpectralClustering Finding ran for 0.09260964393615723 seconds.
+SpectralClustering Finding ran for 0.0865025520324707 seconds.
+SpectralClustering Finding ran for 0.1407301425933838 seconds.
+SpectralClustering Finding ran for 0.16417646408081055 seconds.
+SpectralClustering Finding ran for 0.07314491271972656 seconds.
+SpectralClustering Finding ran for 0.16203975677490234 seconds.
+SpectralClustering Finding ran for 0.09504175186157227 seconds.
+SpectralClustering Finding ran for 0.11047697067260742 seconds.
+SpectralClustering Finding ran for 0.12895750999450684 seconds.
+SpectralClustering Finding ran for 0.10762763023376465 seconds.
+SpectralClustering Finding ran for 0.10699772834777832 seconds.
+SpectralClustering Finding ran for 0.08790087699890137 seconds.
+SpectralClustering Finding ran for 0.11935925483703613 seconds.
+SpectralClustering Finding ran for 0.10851263999938965 seconds.
+SpectralClustering Finding ran for 0.12966489791870117 seconds.
+SpectralClustering Finding ran for 0.09370994567871094 seconds.
+SpectralClustering Finding ran for 0.11441850662231445 seconds.
+SpectralClustering Finding ran for 0.14289569854736328 seconds.
+SpectralClustering Finding ran for 0.10613560676574707 seconds.
+SpectralClustering Finding ran for 0.0834343433380127 seconds.
+SpectralClustering Finding ran for 0.09540867805480957 seconds.
+SpectralClustering Finding ran for 0.1314709186553955 seconds.
+SpectralClustering Finding ran for 0.09689664840698242 seconds.
+SpectralClustering Finding ran for 0.12910962104797363 seconds.
+SpectralClustering Finding ran for 0.10657882690429688 seconds.
+SpectralClustering Finding ran for 0.08856534957885742 seconds.
+SpectralClustering Finding ran for 0.06712555885314941 seconds.
+SpectralClustering Finding ran for 0.10174942016601562 seconds.
+SpectralClustering Finding ran for 0.14200305938720703 seconds.
+SpectralClustering Finding ran for 0.06905841827392578 seconds.
+SpectralClustering Finding ran for 0.0845794677734375 seconds.
+SpectralClustering Finding ran for 0.11414647102355957 seconds.
+SpectralClustering Finding ran for 0.1078639030456543 seconds.
+SpectralClustering Finding ran for 0.12571239471435547 seconds.
+SpectralClustering Finding ran for 0.11251282691955566 seconds.
+SpectralClustering Finding ran for 0.10303401947021484 seconds.
+SpectralClustering Finding ran for 0.10618376731872559 seconds.
+SpectralClustering Finding ran for 0.0872490406036377 seconds.
+SpectralClustering Finding ran for 0.12066364288330078 seconds.
+SpectralClustering Finding ran for 0.09134674072265625 seconds.
+SpectralClustering Finding ran for 0.11175346374511719 seconds.
+SpectralClustering Finding ran for 0.132354736328125 seconds.
+SpectralClustering Finding ran for 0.13232016563415527 seconds.
+SpectralClustering Finding ran for 0.1202538013458252 seconds.
+SpectralClustering Finding ran for 0.10668396949768066 seconds.
+SpectralClustering Finding ran for 0.08255338668823242 seconds.
+SpectralClustering Finding ran for 0.13440275192260742 seconds.
+SpectralClustering Finding ran for 0.0991506576538086 seconds.
+SpectralClustering Finding ran for 0.09540748596191406 seconds.
+SpectralClustering Finding ran for 0.10209822654724121 seconds.
+SpectralClustering Finding ran for 0.12427091598510742 seconds.
+SpectralClustering Finding ran for 0.08942556381225586 seconds.
+SpectralClustering Finding ran for 0.10427737236022949 seconds.
+SpectralClustering Finding ran for 0.16098332405090332 seconds.
+SpectralClustering Finding ran for 0.10106372833251953 seconds.
+SpectralClustering Finding ran for 0.09845399856567383 seconds.
+SpectralClustering Finding ran for 0.08078241348266602 seconds.
+SpectralClustering Finding ran for 0.08206295967102051 seconds.
+SpectralClustering Finding ran for 0.08278799057006836 seconds.
+SpectralClustering Finding ran for 0.08110785484313965 seconds.
+SpectralClustering Finding ran for 0.09797048568725586 seconds.
+SpectralClustering Finding ran for 0.11667108535766602 seconds.
+SpectralClustering Finding ran for 0.0821070671081543 seconds.
+SpectralClustering Finding ran for 0.08144187927246094 seconds.
+SpectralClustering Finding ran for 0.08482551574707031 seconds.
+SpectralClustering Finding ran for 0.0888509750366211 seconds.
+SpectralClustering Finding ran for 0.06929969787597656 seconds.
+
+
+Custom output from fitting function:
+Removed 8/4759 (0.17%) candidates due to RuntimeError.
+Took average time instead of fitted time for 161/4759 (3.38%) candidates due to TimeRuntimeError.
+Took average time instead of fitted time for 15/4759 (0.32%) candidates due to TimeToleranceWarning.
+Removed 89/4759 (1.87%) candidates due to ToleranceWarning.
+
+Candidates discarded by RuntimeError: [51, 84, 400, 628, 797, 1794, 2241, 4417]
+Candidates for which average time was taken instead of fitted time due to TimeRuntimeError:[11, 26, 63, 80, 90, 92, 105, 110, 119, 173, ..., 4423, 4470, 4503, 4517, 4551, 4577, 4641, 4650, 4661, 4700]
+Candidates for which average time was taken instead of fitted time due to TimeToleranceWarning: [580, 596, 749, 756, 1128, 1317, 1398, 2075, 3188, 3356, 3475, 3654, 3914, 3941, 4437]
+Candidates discarded by ToleranceWarning: [17, 82, 128, 141, 158, 219, 224, 328, 384, 432, ..., 4041, 4123, 4135, 4151, 4285, 4512, 4643, 4670, 4685, 4694]
+
+
+
+Removed 6/2399 (0.25%) candidates due to RuntimeError.
+Took average time instead of fitted time for 111/2399 (4.63%) candidates due to TimeRuntimeError.
+Took average time instead of fitted time for 1/2399 (0.04%) candidates due to TimeRuntimeWarning.
+Took average time instead of fitted time for 6/2399 (0.25%) candidates due to TimeToleranceWarning.
+Removed 192/2399 (8.00%) candidates due to ToleranceWarning.
+
+Candidates discarded by RuntimeError: [412, 476, 929, 935, 1480, 2226]
+Candidates for which average time was taken instead of fitted time due to TimeRuntimeError:[0, 20, 43, 72, 132, 135, 154, 164, 175, 182, ..., 2162, 2179, 2183, 2197, 2210, 2215, 2315, 2357, 2365, 2386]
+Candidates for which average time was taken instead of fitted time due to TimeRuntimeWarning: [330]
+Candidates for which average time was taken instead of fitted time due to TimeToleranceWarning: [1041, 1157, 1509, 1601, 2223, 2366]
+Candidates discarded by ToleranceWarning: [2, 10, 11, 25, 34, 45, 47, 56, 61, 74, ..., 2249, 2289, 2299, 2310, 2321, 2339, 2341, 2350, 2351, 2379]
+

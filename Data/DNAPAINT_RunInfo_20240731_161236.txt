@@ -1,0 +1,55 @@
+Metadata information for file /home/laura/PhD/Event_Based_Sensor_Project/Eve/Data/DNAPAINT.hdf5
+Analysis routine started at 2024-07-31 16:12:36
+Analysis routine finished at 2024-07-31 16:12:39
+
+
+-----Information on finding of polarity Mix: -----
+Methodology Used:
+FrameBasedFinding.FrameBased_finding(self.events,self.settings,threshold_detection="3.0",exclusion_radius="4.0",min_diameter="1.25",max_diameter="6.0",frame_time="200",candidate_radius="5.0",multithread="False")
+
+Number of candidates found: 3
+Candidate fitting took 3.4427595138549805 seconds.
+
+
+-----Information on fitting of polarity Mix: -----
+Methodology Used:
+GaussianFitting.Gaussian2D(self.partialFindingResults,self.settings,expected_width="150.0",fitting_tolerance="1.0",dist_kwarg="Hist2d_xy",time_kwarg="AverageTime")
+
+Number of valid localizations found: 3
+Candidate fitting took 0.08547282218933105 seconds.
+
+
+
+---- Global settings used ----
+
+MinFindingBoundingBoxXY: 4
+MinFindingBoundingBoxT: 10
+MaxFindingBoundingBoxXY: 20
+MaxFindingBoundingBoxT: 1000
+XYTOutlierRemoval: 0
+XYTOutlierRemoval_multiplier: 2.5
+PixelSize_nm: 67
+MetaVisionPath: /usr/lib/python3/dist-packages
+StoreConvertedRawData: 0
+StoreFileMetadata: 2
+StoreFindingOutput: 0
+StoreFittingOutput: 0
+HotPixelIndexes: 
+OutputDataFormat: thunderstorm
+LoggingFilePath: /home/laura/.local/share/Eve/logging.log
+Multithread: True
+UseCUDA: False
+FindingBatching: 2
+FindingBatchingTimeMs: 5000
+FindingBatchingTimeOverlapMs: 500
+
+
+---- Additional custom output ----
+
+Custom output from finding function:
+
+
+
+
+Custom output from fitting function:
+No candidates were discarded due to bad fitting.
