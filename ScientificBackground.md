@@ -1,6 +1,6 @@
 ﻿---
-bibliography: Markdown_info\citations.bib
-csl: Markdown_info\ieee.csl
+bibliography: Markdown_info/citations.bib
+csl: Markdown_info/ieee.csl
 figureTitle: |
   Figure #
 ---
