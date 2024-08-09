@@ -1,15 +1,4 @@
-﻿---
-bibliography: Markdown_info/citations.bib
-csl: Markdown_info/ieee.csl
-figureTitle: |
-  Figure #
----
-<!--
-cd C:\Users\Koen Martens\Documents\GitHub\Eve
-pandoc ScientificBackground.md -o ScientificBackground.pdf --bibliography=Markdown_info\citations.bib --csl=ieee.csl --citeproc --pdf-engine=xelatex -V geometry:margin=1in
--->
-
-# Supplementary Note 1: Analysis methods implemented in EVE
+# Analysis methods implemented in EVE
 <!--Analysis methods implemented in EVE-->
 
 ## Contents
