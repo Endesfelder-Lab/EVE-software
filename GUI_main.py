@@ -163,7 +163,7 @@ class MyGUI(QMainWindow):
         """
         #Initialisation - title and size
         super().__init__()
-        self.setWindowTitle("Eve - alphaVersion")
+        self.setWindowTitle("EVE")
         self.setMinimumSize(400, 400)  # Set minimum size for the GUI window
 
         # Create a scroll area
