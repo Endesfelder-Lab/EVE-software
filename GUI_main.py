@@ -3689,6 +3689,7 @@ class AdvancedSettingsWindow(QMainWindow):
             with open(json_file_path, "r") as json_file:
                 loaded_settings = json.load(json_file)
 
+            to_rem = []
             # Update the 'input' value in self.parent.globalSettings, if it exists
             for key, value in loaded_settings.items():
                 if key != 'IgnoreInOptions':
@@ -3696,6 +3697,14 @@ class AdvancedSettingsWindow(QMainWindow):
                         if key in self.parent.globalSettings:
                             # self.parent.globalSettings[key]['input'] = value['input']
                             loaded_settings[key]['input'] = self.parent.globalSettings[key].get('input', None)
+                    else:
+                        #pop from loaded settings:
+                        #concat key to to_rem:
+                        to_rem.append(key)
+            
+            for key in to_rem:
+                #Remove this key from loaded_settings:
+                loaded_settings.pop(key)
 
             self.parent.globalSettings.update(loaded_settings)
             #Update the values of the globalSettings GUI
