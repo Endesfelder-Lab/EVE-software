@@ -59,6 +59,7 @@ try:
     from eve_smlm.Visualisation import *
     from eve_smlm.PostProcessing import *
     from eve_smlm.CandidatePreview import *
+    from eve_smlm.DataAnalysis import *
     from eve_smlm.Utils import *
 
     #Obtain the helperfunctions
@@ -74,6 +75,7 @@ except ImportError:
     from Visualisation import *
     from PostProcessing import *
     from CandidatePreview import *
+    from DataAnalysis import *
     from Utils import *
 
     #Obtain the helperfunctions
@@ -216,6 +218,8 @@ class MyGUI(QMainWindow):
         self.mainTabWidget.addTab(self.tab_previewVis, "Preview run")
         self.tab_canPreview = QWidget()
         self.mainTabWidget.addTab(self.tab_canPreview, "Candidate preview")
+        self.tab_dataAnalysis = QWidget()
+        self.mainTabWidget.addTab(self.tab_dataAnalysis, "Data Analysis")
 
         # Set up the tabs
         self.setup_tab('Processing')
@@ -225,6 +229,7 @@ class MyGUI(QMainWindow):
         self.setup_tab('Run info')
         self.setup_tab('Preview visualisation')
         self.setup_tab('Candidate preview')
+        self.setup_tab('Data Analysis')
 
         #Loop through all combobox states briefly to initialise them (and hide them)
         self.set_all_combobox_states()
@@ -280,7 +285,7 @@ class MyGUI(QMainWindow):
             # Compile regex patterns
             compiled_patterns = [re.compile(pattern) for pattern in patterns]
             for pattern in compiled_patterns:
-                if pattern.match(message):
+                if pattern.match(str(message)):
                     return False
             return True
 
@@ -471,7 +476,8 @@ class MyGUI(QMainWindow):
             'LocalizationList': self.setup_loclistTab,
             'Run info': self.setup_logFileTab,
             'Preview visualisation': self.setup_previewTab,
-            'Candidate preview': self.setup_canPreviewTab
+            'Candidate preview': self.setup_canPreviewTab,
+            'Data Analysis': self.setup_dataAnalysisTab
         }
         #Run the setup of this tab
         setup_func = tab_mapping.get(tab_name)
@@ -1151,6 +1157,33 @@ class MyGUI(QMainWindow):
         self.postProcessingtab_widget = PostProcessing(self)
         self.tab_postProcessing.layout().addWidget(self.postProcessingtab_widget)
 
+    def setup_dataAnalysisTab(self):
+        """
+        Function that set up the data analysis tab
+        """
+        tab_layout = QGridLayout()
+        self.tab_dataAnalysis.setLayout(tab_layout)
+        #Dataset location and searching Grid Layout
+        self.datasetLocation_layout = QGridLayout()
+        tab_layout.addLayout(self.datasetLocation_layout, 0, 0)
+
+        # Add a label:
+        self.datasetLocation_label = QLabel("Dataset location:")
+        self.datasetLocation_layout.addWidget(self.datasetLocation_label, 0, 0,2,1)
+        # Create the input field
+        self.dataLocationInput = QLineEdit()
+        self.dataLocationInput.setObjectName("processing_dataLocationInput")
+        self.datasetLocation_layout.layout().addWidget(self.dataLocationInput, 0, 1,2,1)
+        # Create the search buttons
+        self.datasetSearchButton = QPushButton("File...")
+        self.datasetSearchButton.clicked.connect(self.datasetSearchButtonClicked)
+        self.datasetLocation_layout.layout().addWidget(self.datasetSearchButton, 0, 2)
+        self.datasetFolderButton = QPushButton("Folder...")
+        self.datasetFolderButton.clicked.connect(self.datasetFolderButtonClicked)
+        self.datasetLocation_layout.layout().addWidget(self.datasetFolderButton, 1, 2)
+        self.dataAnalysistab_widget = DataAnalysisWidget(self)
+        self.tab_dataAnalysis.layout().addWidget(self.dataAnalysistab_widget)
+
     def setup_logFileTab(self):
         """
         Function that set up the logger lab ('Run Info')
@@ -1566,7 +1599,7 @@ class MyGUI(QMainWindow):
 
             return eventsDict
 
-    def RawToNpy(self,filepath,buffer_size = 5e9, n_batches=5e9):
+    def RawToNpy(self,filepath,buffer_size = 1e8, n_batches=1e7):
         if(os.path.exists(filepath[:-4]+'.npy')):
             events = np.load(filepath[:-4]+'.npy')
             logging.info('NPY file from RAW was already present, loading this instead of RAW!')
@@ -5372,3 +5405,540 @@ class TableModel(QAbstractTableModel):
     def getColumn(self, col):
         """Get column data"""
         return self.table_data[col]
+
+class DataAnalysisWidget(QWidget):
+    """
+    Class that handles the Data Analysis tab.
+    Allows dynamic loading of analysis scripts, execution, visualization, and saving.
+    """
+    def __init__(self, parent):
+        self.parent = parent
+        super().__init__()
+        
+        # Main layout
+        self.mainlayout = QVBoxLayout()
+        self.setLayout(self.mainlayout)
+        
+        # --- Control Panel (Analysis Settings) ---
+        self.settingsGroupbox = QGroupBox("Analysis Settings")
+        self.settingsGroupbox.setLayout(QGridLayout())
+        self.settingsGroupbox.setObjectName("DataAnalysisSettingsGroupboxKEEP")
+        
+        # Dropdown for function selection
+        self.analysisDropdown = QComboBox(self)
+        self.analysisDropdown.setMaxVisibleItems(30)
+        self.analysisDropdown.setObjectName("DataAnalysisDropdownKEEP")
+        
+        # Get options dynamically
+        options = utils.functionNamesFromDir('DataAnalysis')
+        self.displaynames, self.functionNameToDisplayNameMapping = utils.displayNamesFromFunctionNames(options, '')
+        self.analysisDropdown.addItems(self.displaynames)
+        
+        # Connect dropdown change to dynamic layout update
+        self.analysisDropdown.currentTextChanged.connect(
+            lambda text: utils.changeLayout_choice(
+                self.settingsGroupbox.layout(),
+                "DataAnalysisDropdownKEEP",
+                self.functionNameToDisplayNameMapping,
+                parent=self,
+                ignorePolarity=True
+            )
+        )
+        
+        # Add dropdown to layout
+        self.settingsGroupbox.layout().addWidget(self.analysisDropdown, 0, 0, 1, 6)
+        
+        # Initial layout update
+        utils.changeLayout_choice(
+            self.settingsGroupbox.layout(),
+            "DataAnalysisDropdownKEEP",
+            self.functionNameToDisplayNameMapping,
+            parent=self,
+            ignorePolarity=True
+        )
+
+        # Batch Mode Checkbox
+        self.batchModeCheckbox = QCheckBox("Batch Mode (Recursive Folder)")
+        self.batchModeCheckbox.setObjectName("DataAnalysisBatchModeCheckboxKEEP")
+        self.settingsGroupbox.layout().addWidget(self.batchModeCheckbox, 1, 0, 1, 6)
+        
+        # Analyze Button
+        self.analyzeButton = QPushButton("Analyze")
+        self.analyzeButton.setObjectName("DataAnalysisRunButtonKEEP")
+        self.analyzeButton.clicked.connect(self.run_analysis_callback)
+        self.settingsGroupbox.layout().addWidget(self.analyzeButton, 99, 0, 1, 6)
+        
+        self.mainlayout.addWidget(self.settingsGroupbox)
+        
+        # --- Results Area ---
+        # Splitter for visualization and text results
+        self.splitter = QtWidgets.QSplitter(Qt.Vertical)
+        self.mainlayout.addWidget(self.splitter)
+        
+        # Plot Area
+        self.plotWidget = QWidget()
+        self.plotLayout = QVBoxLayout()
+        self.plotWidget.setLayout(self.plotLayout)
+        
+        self.figure = plt.figure()
+        self.canvas = FigureCanvas(self.figure)
+        self.toolbar = NavigationToolbar(self.canvas, self)
+        
+        self.plotLayout.addWidget(self.toolbar)
+        self.plotLayout.addWidget(self.canvas)
+        self.splitter.addWidget(self.plotWidget)
+        
+        # Results Text Area
+        self.resultsText = QTextEdit()
+        self.resultsText.setReadOnly(True)
+        self.splitter.addWidget(self.resultsText)
+        
+        # Save Button
+        self.saveButton = QPushButton("Save Results")
+        self.saveButton.clicked.connect(self.save_results_callback)
+        self.mainlayout.addWidget(self.saveButton)
+        
+        # Data storage
+        self.current_results = None
+        self.current_figure = None
+
+    def run_analysis_callback(self):
+        logging.info("Data Analysis button pressed")
+
+        # Check for Batch Mode
+        if self.batchModeCheckbox.isChecked():
+            # Validate directory
+            dataLocation = self.parent.dataLocationInput.text()
+            if not os.path.isdir(dataLocation):
+                 logging.error(f"Batch mode requires a directory input. Got: {dataLocation}")
+                 QMessageBox.critical(self, "Input Error", "Batch mode requires a directory input. Please select a folder.")
+                 return
+            
+            self._run_batch_analysis(dataLocation)
+            return
+
+        
+        # Construct function call string
+        # We need to construct the args. Primary args: data, settings
+        # The dynamic inputs are handled by utils.getEvalTextFromGUIFunction
+        
+        # We need to find the function name selected
+        methodName = ""
+        text = self.analysisDropdown.currentText()
+        for i in range(len(self.functionNameToDisplayNameMapping)):
+            if self.functionNameToDisplayNameMapping[i][0] == text:
+                methodName = self.functionNameToDisplayNameMapping[i][1]
+                break
+        
+        if not methodName:
+            logging.error("No analysis method selected.")
+            return
+
+        # Prepare kwargs extraction similar to PostProcessing
+        # We implementation a simplified version of getPostProcessingFunctionEvalText here
+        # or use utils.getEvalTextFromGUIFunction directly if we can gather the inputs.
+        
+        methodKwargNames = []
+        methodKwargValues = []
+        
+        # Helper to find inputs in the groupbox
+        # We iterate over children of the groupbox layout
+        layout = self.settingsGroupbox.layout()
+        if layout:
+            for i in range(layout.count()):
+                item = layout.itemAt(i)
+                if item.widget():
+                    widget = item.widget()
+                    self._extract_widget_value(widget, methodName, methodKwargNames, methodKwargValues)
+                elif item.layout(): # Sometimes inputs are in sub-layouts (like file inputs)
+                    sublayout = item.layout()
+                    for j in range(sublayout.count()):
+                         subitem = sublayout.itemAt(j)
+                         if subitem.widget():
+                             self._extract_widget_value(subitem.widget(), methodName, methodKwargNames, methodKwargValues)
+
+        # Construct the eval string
+        
+        # Load the data
+        dataLocation = self.parent.dataLocationInput.text()
+        eventsDict = self.parent.loadRawData(dataLocation)
+        
+        if eventsDict is None or len(eventsDict) == 0:
+            logging.error("Could not load data for analysis.")
+            return
+
+        # Combine events if multiple chunks (e.g. split polarity) are returned
+        if len(eventsDict) > 1:
+             events = np.vstack(eventsDict)
+             # Sort by timestamp (column 0)
+             events = events[events[:, 0].argsort()]
+        else:
+             events = eventsDict[0]
+        
+        partialString = "ev=events"
+        
+        evalText = utils.getEvalTextFromGUIFunction(
+            methodName, 
+            methodKwargNames, 
+            methodKwargValues, 
+            partialStringStart=partialString
+        )
+        
+        logging.debug(f"Data Analysis Eval: {evalText}")
+        
+        if evalText:
+            try:
+                # Execute
+                result = eval(evalText)
+                print(f"DEBUG: Analysis result type: {type(result)}")
+                # Unpack results: (figure, results_dict)
+                if isinstance(result, tuple) and len(result) == 2:
+                    self.current_figure = result[0]
+                    self.current_results = result[1]
+                    
+                    # Update Plot
+                    self.plotLayout.removeWidget(self.canvas)
+                    self.plotLayout.removeWidget(self.toolbar)
+                    self.canvas.close()
+                    self.toolbar.close()
+                    
+                    self.canvas = FigureCanvas(self.current_figure)
+                    self.toolbar = NavigationToolbar(self.canvas, self)
+                    self.plotLayout.addWidget(self.toolbar)
+                    self.plotLayout.addWidget(self.canvas)
+                    self.canvas.draw()
+                    
+                    # Update Results Text
+                    self.resultsText.setText(json.dumps(self.current_results, indent=4))
+                    
+                else:
+                    logging.error("Analysis script must return (figure, results_dict)")
+                    self.resultsText.setText("Error: Analysis script must return (figure, results_dict)")
+
+            except Exception as e:
+                logging.error(f"Analysis failed: {e}")
+                logging.error(traceback.format_exc())
+                QMessageBox.critical(self, "Analysis Error", str(e))
+
+    def _run_batch_analysis(self, data_path):
+        """
+        Helper to run analysis on all supported files in a directory recursively.
+        Groups files by parent directory and averages results.
+        """
+
+        print(f"DEBUG: _run_batch_analysis called with {data_path}")
+
+        # 1. Search for files
+        extensions = ['*.raw']
+        files = []
+        for ext in extensions:
+            found = glob.glob(os.path.join(data_path, '**', ext), recursive=True)
+            print(f"DEBUG: Searching {ext} in {data_path} -> Found {len(found)}")
+            files.extend(found)
+
+        print(f"DEBUG: Total files found: {files}")
+
+        if not files:
+            QMessageBox.information(self, "Batch Analysis", "No supported data files found in the directory.")
+            print("DEBUG: No files found, returning.")
+            return
+
+        # Determine Method and Args
+        methodName = ""
+        text = self.analysisDropdown.currentText()
+        print(f"DEBUG: Dropdown text: {text}")
+        for i in range(len(self.functionNameToDisplayNameMapping)):
+            if self.functionNameToDisplayNameMapping[i][0] == text:
+                methodName = self.functionNameToDisplayNameMapping[i][1]
+                break
+        print(f"DEBUG: Resolved methodName: {methodName}")
+
+        if not methodName:
+            logging.error("No analysis method selected.")
+            return
+
+        # 2. Setup Results Directory
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        results_dir = os.path.join(data_path, f"Analysis_Results_{methodName}_{timestamp}")
+        os.makedirs(results_dir, exist_ok=True)
+        print(f"DEBUG: Created results dir: {results_dir}")
+
+        methodKwargNames = []
+        methodKwargValues = []
+        layout = self.settingsGroupbox.layout()
+        if layout:
+            for i in range(layout.count()):
+                item = layout.itemAt(i)
+                if item.widget():
+                    self._extract_widget_value(item.widget(), methodName, methodKwargNames, methodKwargValues)
+                elif item.layout():
+                    sublayout = item.layout()
+                    for j in range(sublayout.count()):
+                        subitem = sublayout.itemAt(j)
+                        if subitem.widget():
+                            self._extract_widget_value(subitem.widget(), methodName, methodKwargNames,
+                                                       methodKwargValues)
+
+        # 3. Group files by directory (parent folder)
+        files_by_directory = {}
+        for file_path in files:
+            directory = os.path.dirname(file_path)
+            if directory not in files_by_directory:
+                files_by_directory[directory] = []
+            files_by_directory[directory].append(file_path)
+
+        print(f"DEBUG: Grouped into {len(files_by_directory)} directories")
+
+        # 4. Iterate over directories and analyze
+        aggregated_results = []
+        directory_overlay_curves = {}
+
+        logging.info(f"Starting batch analysis on {len(files_by_directory)} directories...")
+        self.resultsText.setText(f"Starting batch analysis on {len(files_by_directory)} directories...\n")
+
+        for directory, files_in_dir in sorted(files_by_directory.items()):
+            try:
+                dir_name = os.path.basename(directory)
+                logging.info(f"Processing directory: {dir_name} ({len(files_in_dir)} files)...")
+                self.resultsText.append(f"Processing: {dir_name}\n")
+
+                dir_results = []
+                dir_curves = []
+
+                # Analyze each file in the directory
+                for file_path in files_in_dir:
+                    try:
+                        filename = os.path.basename(file_path)
+                        logging.debug(f"  Analyzing {filename}...")
+
+                        # Load Data
+                        eventsDict = self.parent.loadRawData(file_path)
+
+                        if eventsDict is None or len(eventsDict) == 0:
+                            logging.warning(f"Empty or invalid data for {filename}, skipping.")
+                            continue
+
+                        if len(eventsDict) > 1:
+                            events = np.vstack(eventsDict)
+                            events = events[events[:, 0].argsort()]
+                        else:
+                            events = eventsDict[0]
+
+                        # Prepare Eval
+                        partialString = "ev=events"
+                        evalText = utils.getEvalTextFromGUIFunction(
+                            methodName,
+                            methodKwargNames,
+                            methodKwargValues,
+                            partialStringStart=partialString
+                        )
+
+                        # Execute
+                        result = eval(evalText)
+
+                        if isinstance(result, tuple) and len(result) == 2:
+                            current_fig = result[0]
+                            current_res = result[1]
+
+                            # Save individual Figure
+                            fig_name = f"{os.path.splitext(filename)[0]}_analysis.png"
+                            fig_path = os.path.join(results_dir, fig_name)
+                            current_fig.savefig(fig_path)
+                            current_fig.clf()
+                            plt.close(current_fig)
+
+                            # Collect Results
+                            if isinstance(current_res, dict):
+                                row = current_res.copy()
+                                row['filename'] = filename
+                                row['directory'] = dir_name
+                                dir_results.append(row)
+
+                                # Accumulate curves for averaging
+                                if 'curve_x' in current_res and 'curve_y' in current_res:
+                                    dir_curves.append({
+                                        'filename': filename,
+                                        'x': np.array(current_res['curve_x']),
+                                        'y': np.array(current_res['curve_y'])
+                                    })
+                            else:
+                                logging.warning(f"Unknown result format for {filename}: {type(current_res)}")
+
+                        else:
+                            logging.warning(f"Script returned invalid format for {filename}")
+
+                    except Exception as e:
+                        logging.error(f"Failed to analyze {filename}: {e}")
+                        self.resultsText.append(f"  Failed: {filename} ({str(e)})")
+                        continue
+
+                # 5. Average results per directory
+                if dir_results:
+                    avg_result = self._average_directory_results(dir_results)
+                    avg_result['directory'] = dir_name
+                    avg_result['num_files'] = len(dir_results)
+                    aggregated_results.append(avg_result)
+
+                    # Store directory curves for overlay
+                    if dir_curves:
+                        directory_overlay_curves[dir_name] = dir_curves
+
+                logging.info(f"Completed directory: {dir_name}")
+
+            except Exception as e:
+                logging.error(f"Failed to process directory {directory}: {e}")
+                self.resultsText.append(f"Failed directory: {directory} ({str(e)})")
+                continue
+
+        # 6. Create overlay plot per directory AND Collect Global Averages
+        global_averages = []  # <--- New list to store data for the global plot
+
+        for dir_name, curves in directory_overlay_curves.items():
+            try:
+                logging.info(f"Generating overlay plot for {dir_name}...")
+                fig_overlay = plt.figure(figsize=(10, 6))
+
+                # Plot individual curves
+                for curve in curves:
+                    plt.plot(curve['x'], curve['y'],
+                             label=curve['filename'],
+                             marker='o', markersize=3, alpha=0.5)
+
+                # Calculate and plot average
+                if curves:
+                    # Calculate mean for the Global Plot (even if there is only 1 file)
+                    avg_x = curves[0]['x']
+                    avg_y = np.mean([c['y'] for c in curves], axis=0)
+
+                    # Store this directory's average for the next step
+                    global_averages.append({
+                        'directory': dir_name,
+                        'x': avg_x,
+                        'y': avg_y
+                    })
+
+                    # Existing logic: Only draw the black "Average" line on the directory plot
+                    # if there is more than 1 file (to avoid clutter on single-file plots)
+                    if len(curves) > 1:
+                        plt.plot(avg_x, avg_y,
+                                 label='Average',
+                                 linewidth=2.5, color='black', marker='s', markersize=5)
+
+                plt.title(f"Summary: {dir_name}")
+                plt.xlabel("Interval (μs)")
+                plt.ylabel("Contrast Value")
+                plt.legend()
+                plt.grid(True)
+
+                overlay_path = os.path.join(results_dir, f"overlay_{dir_name}.png")
+                fig_overlay.savefig(overlay_path, dpi=150)
+                plt.close(fig_overlay)
+                logging.info(f"Overlay saved to {overlay_path}")
+            except Exception as e:
+                logging.error(f"Failed to create overlay for {dir_name}: {e}")
+
+        # 7. Create Global Directory Comparison Overlay (NEW)
+        if global_averages:
+            try:
+                logging.info("Generating global directory comparison plot...")
+                fig_global = plt.figure(figsize=(12, 8))
+
+                for item in global_averages:
+                    plt.plot(item['x'], item['y'],
+                             label=item['directory'],
+                             linewidth=2, marker='o', markersize=4, alpha=0.8)
+
+                plt.title("Global Comparison: Average per Directory")
+                plt.xlabel("Interval (μs)")
+                plt.ylabel("Contrast Value")
+                plt.legend(bbox_to_anchor=(1.04, 1), loc="upper left")  # Move legend outside if many dirs
+                plt.grid(True)
+                plt.tight_layout()
+
+                global_path = os.path.join(results_dir, "global_directory_comparison.png")
+                fig_global.savefig(global_path, dpi=150)
+                plt.close(fig_global)
+                logging.info(f"Global comparison saved to {global_path}")
+            except Exception as e:
+                logging.error(f"Failed to create global comparison plot: {e}")
+
+        # 8. Save summary CSV
+        if aggregated_results:
+            df = pd.DataFrame(aggregated_results)
+            cols = ['directory', 'num_files'] + [c for c in df.columns if c not in ['directory', 'num_files']]
+            df = df[cols]
+
+            csv_path = os.path.join(results_dir, "directory_summary.csv")
+            df.to_csv(csv_path, index=False)
+
+            summary_msg = f"Batch Analysis Complete.\nProcessed {len(aggregated_results)} directories.\nResults saved to: {results_dir}\n\nSummary:\n{df.to_markdown()}"
+            self.resultsText.setText(summary_msg)
+            logging.info(f"Batch analysis complete. Results saved at {results_dir}")
+        else:
+            self.resultsText.append("\nBatch analysis finished with no successful results.")
+
+    def _average_directory_results(self, results_list):
+        """
+        Average numeric results across multiple files in a directory.
+        Handles both scalar values and array-like curves.
+        """
+        if not results_list:
+            return {}
+
+        avg_result = {}
+
+        # Get all numeric keys from first result
+        first_result = results_list[0]
+
+        for key in first_result.keys():
+            if key in ['filename', 'directory', 'curve_x', 'curve_y']:
+                continue
+
+            values = []
+            for result in results_list:
+                if key in result:
+                    val = result[key]
+                    # Try to convert to float for averaging
+                    try:
+                        values.append(float(val))
+                    except (ValueError, TypeError):
+                        continue
+
+            # Calculate average and std
+            if values and len(values) == len(results_list):
+                avg_result[f"{key}_mean"] = np.mean(values)
+                avg_result[f"{key}_std"] = np.std(values)
+
+        return avg_result
+
+    def _extract_widget_value(self, widget, methodName, names, values):
+        if "LineEdit" in widget.objectName() and widget.isVisible():
+            parts = widget.objectName().split('#')
+            if len(parts) >= 3 and parts[1] == methodName:
+                names.append(parts[2])
+                values.append(widget.text().replace('\\', '/'))
+        elif "ComboBox" in widget.objectName() and widget.isVisible() and "Dropdown" not in widget.objectName():
+             parts = widget.objectName().split('#')
+             if len(parts) >= 3 and parts[1] == methodName:
+                names.append(parts[2])
+                values.append(widget.currentText())
+
+    def save_results_callback(self):
+        if self.current_results is None:
+            return
+
+        folder = QFileDialog.getExistingDirectory(self, "Select Directory to Save Results")
+        if folder:
+            try:
+                # Save JSON
+                with open(os.path.join(folder, "analysis_results.json"), 'w') as f:
+                    json.dump(self.current_results, f, indent=4)
+                
+                # Save Figure
+                if self.current_figure:
+                    self.current_figure.savefig(os.path.join(folder, "analysis_plot.png"))
+                    self.current_figure.savefig(os.path.join(folder, "analysis_plot.pdf"))
+                
+                QMessageBox.information(self, "Success", "Results saved successfully.")
+            except Exception as e:
+                QMessageBox.critical(self, "Save Error", str(e))

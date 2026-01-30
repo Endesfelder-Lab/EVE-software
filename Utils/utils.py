@@ -18,6 +18,7 @@ try:
     from eve_smlm.Visualisation import *
     from eve_smlm.PostProcessing import *
     from eve_smlm.CandidatePreview import *
+    from eve_smlm.DataAnalysis import *
     from eve_smlm.Utils import *
     from eve_smlm.EventDistributions import eventDistributions
 
@@ -30,6 +31,7 @@ except ImportError:
     from Visualisation import *
     from PostProcessing import *
     from CandidatePreview import *
+    from DataAnalysis import *
     from Utils import *
     from EventDistributions import eventDistributions
 
@@ -193,28 +195,32 @@ def classKwargValuesFromFittingFunction(functionname, class_type):
                         derivedClasses_display_name.append(obj.display_name)
                     except:
                         derivedClasses_display_name.append(name)
-                    try:
+                    try: 
                         derivedClasses_description.append(obj.description)
                     except:
                         derivedClasses_description.append("")
     elif allkwarginfo[3] != [] and class_type=="time":
         base_pattern = r"base:\s*(\S+)"
-        base_name = re.findall(base_pattern, allkwarginfo[3][0])[0]
-        # get base class
-        baseClass = getattr(timeFitting, base_name, None)
-        if not baseClass == None:
-            # get all derived classes that share common base
-            for name, obj in inspect.getmembers(timeFitting):
-                if inspect.isclass(obj) and issubclass(obj, baseClass) and obj != baseClass:
-                    derivedClasses.append(name)
-                    try:
-                        derivedClasses_display_name.append(obj.display_name)
-                    except:
-                        derivedClasses_display_name.append(name)
-                    try:
-                        derivedClasses_description.append(obj.description)
-                    except:
-                        derivedClasses_description.append("")
+        base_name_matches = re.findall(base_pattern, allkwarginfo[3][0])
+        if len(base_name_matches) > 0:
+            base_name = base_name_matches[0]
+            # get base class
+            baseClass = getattr(timeFitting, base_name, None)
+            if not baseClass == None:
+                # get all derived classes that share common base
+                for name, obj in inspect.getmembers(timeFitting):
+                    if inspect.isclass(obj) and issubclass(obj, baseClass) and obj != baseClass:
+                        derivedClasses.append(name)
+                        try:
+                            derivedClasses_display_name.append(obj.display_name)
+                        except:
+                            derivedClasses_display_name.append(name)
+                        try:
+                            derivedClasses_description.append(obj.description)
+                        except:
+                            derivedClasses_description.append("")
+        else:
+             logging.debug("No base pattern found for time fitting kwarg.")
                     
     name_to_displayName_map = dict(zip(derivedClasses, derivedClasses_display_name))
     
